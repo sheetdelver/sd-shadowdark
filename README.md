@@ -1,7 +1,7 @@
 # Sheet Delver - Shadowdark RPG Sheets Module
 
 ### About
-While not yet feature-complete, SheetDelver offers robust support for Shadowdark:
+While not yet feature-complete, offers robust support for Shadowdark it Sheet Delver:
 - **Character Sheets**: Full support for Shadowdark character sheets with a clean, modern UI.
 - **Auto-Calculations**: Automatic calculation of Stats, HP, AC, and Inventory flexibility.
 - **Inventory Management**: Drag-and-drop equipment, slot tracking, and toggleable states (Equipped/Stashed/Light).
