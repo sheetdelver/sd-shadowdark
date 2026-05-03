@@ -5,6 +5,10 @@ import { isRareLanguage } from '../logic/rules';
 import { SYSTEM_PREDEFINED_EFFECTS, BOON_TYPE_MAP, EFFECT_TRANSLATIONS_MAP } from '../data/talent-effects';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * ShadowdarkRegistry is a server-only service that manages system-wide data.
@@ -40,7 +44,7 @@ export class ShadowdarkRegistry {
 
     private aggregationPromise: Promise<any> | null = null;
     private pendingFetches = new Map<string, Promise<any>>();
-    
+
     private readonly SYSTEM_ID = 'shadowdark';
     private readonly CACHE_TTL = 300000; // 5 minutes
 
@@ -107,7 +111,7 @@ export class ShadowdarkRegistry {
         // Force full data for character builder critical categories
         // This ensures the Generator gets "unaltered" data without diet summaries.
         const forceFull = [
-            'ancestries', 'backgrounds', 'classes', 
+            'ancestries', 'backgrounds', 'classes',
             'deities', 'patrons', 'talents', 'languages'
         ].includes(id);
 
@@ -145,10 +149,10 @@ export class ShadowdarkRegistry {
         this.aggregationPromise = (async () => {
             try {
                 logger.info('[ShadowdarkRegistry] Starting manifest-driven aggregation...');
-                
+
                 const manifestKey = `manifest-${this.SYSTEM_ID}`;
                 const manifest = await persistentCache.get<any>(this.SYSTEM_ID, manifestKey);
-                
+
                 if (!manifest || !manifest.packs) {
                     logger.warn(`[ShadowdarkRegistry] No manifest found for ${this.SYSTEM_ID}. Skipping aggregation.`);
                     this.systemData = {
@@ -161,9 +165,17 @@ export class ShadowdarkRegistry {
                 const aggregated = this.createSkeleton();
                 const encounteredUuids = new Set<string>();
                 const compendiumCache = CompendiumCache.getInstance();
-                
-                // Load the "Truth" from info.json
-                const infoPath = path.join(process.cwd(), 'src/modules/shadowdark/info.json');
+
+                // Dynamically resolve module root by looking for info.json upwards from this file
+                const findModuleRoot = (startDir: string): string => {
+                    let current = startDir;
+                    while (current !== path.dirname(current)) {
+                        if (fs.existsSync(path.join(current, 'info.json'))) return current;
+                        current = path.dirname(current);
+                    }
+                    throw new Error(`Could not find module root starting from ${startDir}`);
+                };
+                const infoPath = path.join(findModuleRoot(__dirname), 'info.json');
                 let allowedPacks: string[] = [];
                 try {
                     const infoJson = JSON.parse(fs.readFileSync(infoPath, 'utf8'));
@@ -172,10 +184,10 @@ export class ShadowdarkRegistry {
                     logger.error('[ShadowdarkRegistry] Failed to load info.json for filtering:', e);
                 }
 
-                const packIds = Object.keys(manifest.packs).filter(id => 
+                const packIds = Object.keys(manifest.packs).filter(id =>
                     allowedPacks.length === 0 || allowedPacks.includes(id)
                 );
-                
+
                 let loadedCount = 0;
                 for (const packId of packIds) {
                     const shardKey = `pack-${packId.replace(/\./g, '-')}`;
@@ -193,7 +205,7 @@ export class ShadowdarkRegistry {
                     if (name) acc[uuid] = name as string;
                     return acc;
                 }, {}) : {};
-                
+
                 // systemData now only contains the lean metadata/character-relevant objects
                 this.systemData = {
                     ...this.createSkeleton(),
@@ -201,12 +213,12 @@ export class ShadowdarkRegistry {
                     titles: aggregated.titles || {},
                     ...this._getRuleData()
                 };
-                
+
                 this.lastFetch = Date.now();
-                
+
                 const responseData = { ...this.systemData, _debug: { size: Object.keys(this.nameIndex).length, timestamp: this.lastFetch } };
                 logger.info(`[ShadowdarkRegistry] Aggregation complete. ${loadedCount} shards processed. Index size: ${Object.keys(this.nameIndex).length}`);
-                
+
                 return responseData;
             } catch (err) {
                 logger.error('[ShadowdarkRegistry] Aggregation failed:', err);
@@ -238,7 +250,7 @@ export class ShadowdarkRegistry {
             found = collections[key]?.find((d: any) => {
                 const idMatch = d._id === extractedId || d.id === extractedId || d._id === uuid || d.id === uuid;
                 if (d.uuid === uuid || idMatch) return true;
-                
+
                 // Flexible UUID matching (handle missing .Item. or .RollTable. segment)
                 if (uuid.startsWith('Compendium.') && d.uuid?.startsWith('Compendium.')) {
                     const parts1 = uuid.split('.');
@@ -295,7 +307,7 @@ export class ShadowdarkRegistry {
     public async draw(uuidOrName: string, client: any, rollOverride?: number): Promise<any | null> {
         // Resolve from Cache ONLY
         let table = await this.getDocument(uuidOrName);
-        
+
         if (!table && !uuidOrName.includes('.')) {
             table = await this.findByName(uuidOrName, 'RollTable');
         }
@@ -308,7 +320,7 @@ export class ShadowdarkRegistry {
         // Formula can be in system.formula or top-level formula
         const formula = table.system?.formula || table.formula || "1d20";
         let roll = rollOverride;
-        
+
         if (roll === undefined) {
             // Simple simulator
             const match = formula.match(/^(\d+)d(\d+)$/i);
@@ -331,7 +343,7 @@ export class ShadowdarkRegistry {
         for (const res of matched) {
             // Shadowdark Table results use 'documentUuid' for direct compendium links
             const targetUuid = res.documentUuid || (res.documentCollection && res.documentId ? `Compendium.${res.documentCollection}.Item.${res.documentId}` : null);
-            
+
             if (targetUuid) {
                 const item = await this.getDocument(targetUuid, client);
                 if (item) items.push(item);
@@ -364,7 +376,7 @@ export class ShadowdarkRegistry {
 
                 const docType = (doc.type || "").toLowerCase();
                 const targetType = type.toLowerCase();
-                
+
                 // Flexible matching for RollTables: match if category is tables and doc has results, 
                 // even if explicit 'type' string is missing or different.
                 if (targetType === 'rolltable' && (doc.results || key === 'tables')) return true;
@@ -389,7 +401,7 @@ export class ShadowdarkRegistry {
             const list = Array.isArray(spellClasses) ? spellClasses : [spellClasses];
             return list.some((c: string) => {
                 const identifier = String(c).toLowerCase();
-                
+
                 // 1. Direct Name Match (e.g. "Priest")
                 if (identifier.includes(normalizedClass)) return true;
 
@@ -472,13 +484,13 @@ export class ShadowdarkRegistry {
             // Actually, we need a UUID for internal tracking, we clone the doc for our collections
             const doc = { ...originalDoc };
             const id = doc._id || doc.id;
-            
+
             if (!doc.uuid) {
                 const isTable = doc.type === 'RollTable' || (doc.results && !doc.type) || lowerPack.includes('rollable-tables');
                 const docType = isTable ? 'RollTable' : 'Item';
                 doc.uuid = `Compendium.${packId}.${docType}.${id}`;
             }
-            doc.pack = packId; 
+            doc.pack = packId;
 
             if (encounteredUuids.has(doc.uuid)) return;
             encounteredUuids.add(doc.uuid);
@@ -486,10 +498,10 @@ export class ShadowdarkRegistry {
 
             const type = (doc.type || "").toLowerCase();
             let category: string | null = null;
-            
+
             // 1. Explicit Type/Pack Keyword Mapping
             category = ShadowdarkRegistry.TYPE_TO_COLLECTION[type] || null;
-            
+
             if (!category) {
                 if (lowerPack.includes('ancestries')) category = 'ancestries';
                 else if (lowerPack.includes('backgrounds')) category = 'backgrounds';
@@ -525,7 +537,7 @@ export class ShadowdarkRegistry {
                     results.gear.push(doc);
                 }
             }
-            
+
             // Ensure RollTables are pushed to results.tables if not already categorized
             if (type === 'rolltable' || (doc.results && !category)) {
                 if (!results.tables.includes(doc)) {

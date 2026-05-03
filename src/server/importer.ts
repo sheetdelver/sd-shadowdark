@@ -4,6 +4,10 @@ import { FoundryClient } from '@core/foundry';
 import type { RouteFoundryClient } from '@server/shared/types/requestContext';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 import { findEffectUuid, SYSTEM_PREDEFINED_EFFECTS } from '../data/talent-effects';
 import { shadowdarkAdapter } from '../server/ShadowdarkAdapter';
 import { sanitizeItem, sanitizeItems, createEffect } from '../utils/Sanitizer';
@@ -29,7 +33,18 @@ export class ShadowdarkImporter {
     private async loadMapping() {
         if (this.mapping) return;
         try {
-            const mappingPath = path.join(process.cwd(), 'src/modules/shadowdark/data/shadowdarkling/map-shadowdarkling.json');
+            // Dynamically resolve module root by looking for info.json upwards from this file
+            const findModuleRoot = (startDir: string): string => {
+                let current = startDir;
+                while (current !== path.dirname(current)) {
+                    if (fs.existsSync(path.join(current, 'info.json'))) return current;
+                    current = path.dirname(current);
+                }
+                throw new Error(`Could not find module root starting from ${startDir}`);
+            };
+
+            const moduleRoot = findModuleRoot(__dirname);
+            const mappingPath = path.join(moduleRoot, 'data/shadowdarkling/map-shadowdarkling.json');
             const fileContent = await fs.promises.readFile(mappingPath, 'utf-8');
             this.mapping = JSON.parse(fileContent);
         } catch (error) {
