@@ -88,7 +88,7 @@ export async function handleGetResultPool(_request: Request, tableId: string, re
         return Response.json({
             success: true,
             id: tableId,
-            roll: range[0], 
+            roll: range[0],
             results: pool
         });
     } catch (error: unknown) {

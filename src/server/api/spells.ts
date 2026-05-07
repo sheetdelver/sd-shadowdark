@@ -4,6 +4,7 @@ import { getConfig } from '@core/config';
 import { getErrorMessage } from '@server/shared/utils/getErrorMessage';
 import type { RouteFoundryClient } from '@server/shared/types/requestContext';
 import { shadowdarkAdapter } from '../../server/ShadowdarkAdapter';
+import { isSpellcaster, canUseMagicItems } from '../../logic/rules';
 
 /**
  * POST /api/modules/shadowdark/actors/[id]/spells/learn
@@ -193,40 +194,4 @@ export async function handleGetSpellsBySource(request: Request) {
         return Response.json({ error: getErrorMessage(error) }, { status: 500 });
     }
 }
-import { isSpellcaster, canUseMagicItems } from '../../logic/rules';
-
-/**
- * GET /api/modules/shadowdark/actors/[id]/spellcaster
- *
- * Returns spellcaster info for an actor.
- * Uses the normalized actor from the adapter (which already handles caching and
- * name resolution internally) — no separate raw fetch is needed.
- */
-export async function handleGetSpellcasterInfo(actorId: string, clientOverride?: RouteFoundryClient | null) {
-    try {
-        const client = clientOverride || getClient();
-        if (!client || !client.isConnected) {
-            return Response.json({ error: 'Not connected to Foundry' }, { status: 503 });
-        }
-
-        // getActor fetches, normalizes, resolves names, and caches — one operation.
-        const normalizedActor = await shadowdarkAdapter.getActor(client, actorId);
-        if (!normalizedActor || normalizedActor.error) {
-            return Response.json({ error: 'Actor not found' }, { status: 404 });
-        }
-
-        // Unified spellcaster check using rules.ts (works on normalized actor).
-        const isCaster = isSpellcaster(normalizedActor);
-        const magicItemCaster = canUseMagicItems(normalizedActor);
-
-        return Response.json({
-            isSpellcaster: isCaster,
-            canUseMagicItems: magicItemCaster,
-            showSpellsTab: isCaster || magicItemCaster
-        });
-
-    } catch (error: unknown) {
-        logger.error('[API] Spellcaster Info Error:', error);
-        return Response.json({ error: getErrorMessage(error) || 'Failed to get spellcaster info' }, { status: 500 });
-    }
 }

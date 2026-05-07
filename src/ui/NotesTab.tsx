@@ -1,7 +1,7 @@
 // 'use client';
 
 import RichTextEditor from '@client/ui/components/RichTextEditor';
-import { shadowdarkTheme } from '@modules/shadowdark/src/ui/themes/shadowdark';
+import { shadowdarkTheme } from './themes/shadowdark';
 import { logger } from '@shared/utils/logger';
 
 import { useShadowdarkActor } from './context/ShadowdarkActorContext';

@@ -475,3 +475,83 @@ export async function handleRandomizeCharacter(request: Request) {
     }
 }
 
+export async function handleRandomizeLanguages(request: Request) {
+    try {
+        const client = getModuleFoundryClient(request);
+        if (!client) throw new Error('Not authenticated');
+        const body = await request.json().catch(() => ({}));
+
+        const ancestry = body.ancestryUuid ? await client.fetchByUuid(body.ancestryUuid) : null;
+        const cls = body.classUuid ? await client.fetchByUuid(body.classUuid) : null;
+        const intMod = body.intMod || 0;
+
+        const languages = await getRandomLanguages(client, ancestry, cls, intMod);
+        return Response.json({ languages });
+    } catch (error: unknown) { return Response.json({ error: getErrorMessage(error) }, { status: 500 }); }
+}
+
+
+// --- Main Aggregation Handler ---
+
+export async function handleRandomizeCharacter(request: Request) {
+    try {
+        const client = getModuleFoundryClient(request);
+        if (!client) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+
+        const body = await request.json().catch(() => ({}));
+        const isLevel0 = body.level0 === true;
+
+        // Parallel fetch for basic randoms
+        const [ancestry, bg, deity, alignment, stats, gear] = await Promise.all([
+            getRandomAncestry(client),
+            getRandomBackground(client),
+            getRandomDeity(client),
+            Promise.resolve(getRandomAlignment()),
+            Promise.resolve(getRandomStats()),
+            getRandomGear(client, isLevel0)
+        ]);
+
+        // Class (Level 0 check)
+        let cls = null;
+        let patron = null;
+        if (!isLevel0) {
+            cls = await getRandomClass(client);
+            if (cls && cls.name.toLowerCase().includes('warlock')) {
+                patron = await getRandomPatron(client);
+            }
+        }
+
+        // Name (needs ancestry)
+        const name = ancestry ? await getRandomName(client, ancestry.uuid) : "Unnamed";
+
+        // Talents (needs ancestry + class)
+        const talents = getRandomTalents(ancestry, cls);
+
+        // Languages (needs ancestry + class + int mod)
+        const intMod = stats.INT?.mod || 0;
+        const languages = await getRandomLanguages(client, ancestry, cls, intMod);
+
+        const result = {
+            name,
+            ancestry,
+            class: cls,
+            background: bg,
+            alignment,
+            deity,
+            patron,
+            stats,
+            gear,
+            talents,
+            languages,
+            hp: isLevel0 ? Math.max(1, 1 + (stats.CON?.mod || 0)) : 0,
+            gold: 0
+        };
+
+        return Response.json(result);
+
+    } catch (error: unknown) {
+        logger.error(`Randomize Character Error: ${getErrorMessage(error)}`);
+        return Response.json({ error: getErrorMessage(error) }, { status: 500 });
+    }
+}
+

@@ -8,7 +8,7 @@ import { useConfig } from '@client/ui/context/ConfigContext';
 import { useShadowdarkUI, ShadowdarkUIProvider } from '../context/ShadowdarkUIContext';
 import { useFoundry } from '@client/ui/context/FoundryContext';
 import LoadingModal from '@client/ui/components/LoadingModal';
-import { enrichItem, resolveSubItems, EnrichmentContext } from '@modules/shadowdark/src/logic/actor-enricher';
+import { enrichItem, resolveSubItems, EnrichmentContext } from '../../logic/actor-enricher';
 
 export default function Generator() {
     const token = typeof window !== 'undefined' ? localStorage.getItem('sheet-delver-token') : null;
