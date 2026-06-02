@@ -1,6 +1,6 @@
-import { getClient } from '@core/foundry/instance';
 import { logger } from '@shared/utils/logger';
 import { getConfig } from '@core/config';
+import { compendiumStore } from '@server/core/compendium';
 import { getErrorMessage } from '@server/shared/utils/getErrorMessage';
 import type { RouteFoundryClient } from '@server/shared/types/requestContext';
 import { shadowdarkAdapter } from '../../server/ShadowdarkAdapter';
@@ -12,9 +12,9 @@ import { isSpellcaster, canUseMagicItems } from '../../logic/rules';
  */
 export async function handleLearnSpell(actorId: string, request: Request, client?: RouteFoundryClient | null) {
     try {
-        const foundryClient = client || getClient();
+        const foundryClient = client;
         if (!foundryClient || !foundryClient.isConnected) {
-            logger.warn(`[API] Learn Spell Failed: Client disconnected. Provided Client: ${!!client}, Global Client: ${!!getClient()}`);
+            logger.warn(`[API] Learn Spell Failed: Client disconnected. Provided Client: ${!!client}`);
             return Response.json({ error: 'Not connected to Foundry' }, { status: 503 });
         }
 
@@ -56,7 +56,7 @@ export async function handleLearnSpell(actorId: string, request: Request, client
  * GET /api/modules/shadowdark/spells/list?source=...
  * Fetch spells filtered by class source (e.g. "Wizard")
  */
-export async function handleGetSpellsBySource(request: Request) {
+export async function handleGetSpellsBySource(request: Request, client?: RouteFoundryClient | null) {
     try {
         const { searchParams } = new URL(request.url, getConfig().app.url);
         const source = searchParams.get('source'); // e.g. "Wizard", "Priest"
@@ -71,7 +71,6 @@ export async function handleGetSpellsBySource(request: Request) {
         const localSpells = await shadowdarkAdapter.getSpellsBySource(source);
 
         // 2. Fetch Remote Spells (Foundry)
-        const client = getClient();
         const remoteSpells: any[] = [];
         const remoteSpellIds = new Set<string>();
 
@@ -82,7 +81,14 @@ export async function handleGetSpellsBySource(request: Request) {
                 const worldSpells = (worldItems?.result || []).filter((i: any) => i.type === 'Spell');
 
                 // Fetch Compendium Spells (Indices)
-                const packs = await client.getAllCompendiumIndices();
+                // ADR-0015 Phase 5 removed compendium readers from the route
+                // client/socket surface. Bootstrap warms CompendiumStore, so
+                // module routes read the active-world index snapshot directly.
+                const packs = compendiumStore.listPackIndices().map(pack => ({
+                    id: pack.id,
+                    metadata: pack.metadata,
+                    index: pack.variant.index,
+                }));
 
                 // Helper to check class match
                 const checkClassMatch = (spellClasses: any) => {

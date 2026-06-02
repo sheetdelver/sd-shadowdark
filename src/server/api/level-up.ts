@@ -1,4 +1,3 @@
-import { getClient } from '@core/foundry/instance';
 import { logger } from '@shared/utils/logger';
 import { getConfig } from '@core/config';
 import type { UserSessionLike } from '@server/shared/types/foundry';
@@ -9,7 +8,7 @@ import * as levelUpEngine from './level-up-engine';
 import { TALENT_HANDLERS } from '../../logic/talent-handlers';
 import { resolveBaggage } from './gear-resolver';
 
-import { Roll } from '@core/foundry/classes/Roll';
+import { Roll } from '@core/foundry/Roll';
 
 /**
  * GET /api/shadowdark/actors/[id]/level-up/data

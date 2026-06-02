@@ -195,7 +195,7 @@ export const apiRoutes = {
         return Response.json(effects);
     },
     'spells/list': async (request: Request) => {
-        return handleGetSpellsBySource(request);
+        return handleGetSpellsBySource(request, getModuleFoundryClient(request));
     },
     'roll-table': async (request: Request) => {
         return handleListRollTables();
@@ -217,6 +217,5 @@ export const apiRoutes = {
         return handleGetResultPool(request, tableId, resultId, getModuleFoundryClient(request));
     }
 };
-
 
 

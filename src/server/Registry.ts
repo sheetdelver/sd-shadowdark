@@ -1,6 +1,5 @@
 import { logger } from '@shared/utils/logger';
 import { persistentCache } from '@core/cache/PersistentCache';
-import { CompendiumCache } from '@core/foundry/compendium-cache';
 import { isRareLanguage } from '../logic/rules';
 import { SYSTEM_PREDEFINED_EFFECTS, BOON_TYPE_MAP, EFFECT_TRANSLATIONS_MAP } from '../data/talent-effects';
 import * as fs from 'node:fs';
@@ -164,7 +163,7 @@ export class ShadowdarkRegistry {
 
                 const aggregated = this.createSkeleton();
                 const encounteredUuids = new Set<string>();
-                const compendiumCache = CompendiumCache.getInstance();
+                const localNameIndex = new Map<string, string>();
 
                 // Dynamically resolve module root by looking for info.json upwards from this file
                 const findModuleRoot = (startDir: string): string => {
@@ -179,7 +178,7 @@ export class ShadowdarkRegistry {
                 let allowedPacks: string[] = [];
                 try {
                     const infoJson = JSON.parse(fs.readFileSync(infoPath, 'utf8'));
-                    allowedPacks = (infoJson.discovery?.packs || []).map((p: any) => p.id);
+                    allowedPacks = (infoJson.compendiumPacks?.packs || []).map((p: any) => p.id);
                 } catch (e) {
                     logger.error('[ShadowdarkRegistry] Failed to load info.json for filtering:', e);
                 }
@@ -195,14 +194,14 @@ export class ShadowdarkRegistry {
 
                     if (documents && Array.isArray(documents)) {
                         loadedCount++;
-                        this._processShardDocuments(packId, documents, aggregated, compendiumCache, encounteredUuids);
+                        this._processShardDocuments(packId, documents, aggregated, localNameIndex, encounteredUuids);
                     }
                 }
 
                 this._collections = aggregated;
                 this.nameIndex = encounteredUuids.size > 0 ? Array.from(encounteredUuids).reduce((acc: Record<string, string>, uuid: string) => {
-                    const name = compendiumCache.getName(uuid);
-                    if (name) acc[uuid] = name as string;
+                    const name = localNameIndex.get(uuid);
+                    if (name) acc[uuid] = name;
                     return acc;
                 }, {}) : {};
 
@@ -477,7 +476,7 @@ export class ShadowdarkRegistry {
         return skeleton;
     }
 
-    private _processShardDocuments(packId: string, docs: any[], results: any, compendiumCache: CompendiumCache, encounteredUuids: Set<string>) {
+    private _processShardDocuments(packId: string, docs: any[], results: any, nameIndex: Map<string, string>, encounteredUuids: Set<string>) {
         const lowerPack = packId.toLowerCase();
         docs.forEach(originalDoc => {
             // Add a temporary UUID for lookup if missing, but DO NOT mutate source if possible
@@ -494,7 +493,9 @@ export class ShadowdarkRegistry {
 
             if (encounteredUuids.has(doc.uuid)) return;
             encounteredUuids.add(doc.uuid);
-            compendiumCache.set(doc.uuid, doc.name);
+            if (typeof doc.uuid === 'string' && typeof doc.name === 'string') {
+                nameIndex.set(doc.uuid, doc.name);
+            }
 
             const type = (doc.type || "").toLowerCase();
             let category: string | null = null;
