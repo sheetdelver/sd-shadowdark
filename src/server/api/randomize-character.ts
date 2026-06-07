@@ -313,99 +313,10 @@ export async function handleRandomizeName(request: Request) {
     } catch (error: unknown) { return Response.json({ error: getErrorMessage(error) }, { status: 500 }); }
 }
 
-export async function handleRandomizeAncestry(request: Request) {
-    try {
-        const client = getModuleFoundryClient(request);
-        if (!client) throw new Error('Not authenticated');
-        const ancestry = await getRandomAncestry(client);
-        return Response.json({ ancestry });
-    } catch (error: unknown) { return Response.json({ error: getErrorMessage(error) }, { status: 500 }); }
-}
-
-export async function handleRandomizeClass(request: Request) {
-    try {
-        const client = getModuleFoundryClient(request);
-        if (!client) throw new Error('Not authenticated');
-        const cls = await getRandomClass(client);
-        return Response.json({ class: cls });
-    } catch (error: unknown) { return Response.json({ error: getErrorMessage(error) }, { status: 500 }); }
-}
-
-export async function handleRandomizeBackground(request: Request) {
-    try {
-        const client = getModuleFoundryClient(request);
-        if (!client) throw new Error('Not authenticated');
-        const bg = await getRandomBackground(client);
-        return Response.json({ background: bg });
-    } catch (error: unknown) { return Response.json({ error: getErrorMessage(error) }, { status: 500 }); }
-}
-
-export async function handleRandomizeAlignment(request: Request) {
-    try {
-        const alignment = getRandomAlignment();
-        return Response.json({ alignment });
-    } catch (error: unknown) { return Response.json({ error: getErrorMessage(error) }, { status: 500 }); }
-}
-
-export async function handleRandomizeDeity(request: Request) {
-    try {
-        const client = getModuleFoundryClient(request);
-        if (!client) throw new Error('Not authenticated');
-        const deity = await getRandomDeity(client);
-        return Response.json({ deity });
-    } catch (error: unknown) { return Response.json({ error: getErrorMessage(error) }, { status: 500 }); }
-}
-
-export async function handleRandomizePatron(request: Request) {
-    try {
-        const client = getModuleFoundryClient(request);
-        if (!client) throw new Error('Not authenticated');
-        const patron = await getRandomPatron(client);
-        return Response.json({ patron });
-    } catch (error: unknown) { return Response.json({ error: getErrorMessage(error) }, { status: 500 }); }
-}
-
 export async function handleRandomizeStats(request: Request) {
     try {
         const stats = getRandomStats();
         return Response.json({ stats });
-    } catch (error: unknown) { return Response.json({ error: getErrorMessage(error) }, { status: 500 }); }
-}
-
-export async function handleRandomizeGear(request: Request) {
-    try {
-        const client = getModuleFoundryClient(request);
-        if (!client) throw new Error('Not authenticated');
-        const body = await request.json().catch(() => ({}));
-        const gear = await getRandomGear(client, body.level0 === true);
-        return Response.json({ gear });
-    } catch (error: unknown) { return Response.json({ error: getErrorMessage(error) }, { status: 500 }); }
-}
-
-export async function handleRandomizeTalents(request: Request) {
-    try {
-        const client = getModuleFoundryClient(request);
-        if (!client) throw new Error('Not authenticated');
-        const body = await request.json().catch(() => ({}));
-        const ancestry = body.ancestryUuid ? await client.fetchByUuid(body.ancestryUuid) : null;
-        const cls = body.classUuid ? await client.fetchByUuid(body.classUuid) : null;
-        const talents = getRandomTalents(ancestry, cls);
-        return Response.json({ talents });
-    } catch (error: unknown) { return Response.json({ error: getErrorMessage(error) }, { status: 500 }); }
-}
-
-export async function handleRandomizeLanguages(request: Request) {
-    try {
-        const client = getModuleFoundryClient(request);
-        if (!client) throw new Error('Not authenticated');
-        const body = await request.json().catch(() => ({}));
-
-        const ancestry = body.ancestryUuid ? await client.fetchByUuid(body.ancestryUuid) : null;
-        const cls = body.classUuid ? await client.fetchByUuid(body.classUuid) : null;
-        const intMod = body.intMod || 0;
-
-        const languages = await getRandomLanguages(client, ancestry, cls, intMod);
-        return Response.json({ languages });
     } catch (error: unknown) { return Response.json({ error: getErrorMessage(error) }, { status: 500 }); }
 }
 

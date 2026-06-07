@@ -358,23 +358,6 @@ export async function handleRollBoon(actorId: string | undefined, request: Reque
 }
 
 /**
- * POST /api/shadowdark/actors/[id]/level-up/resolve-choice
- */
-export async function handleResolveChoice(actorId: string | undefined, request: Request, client: any) {
-    try {
-        const body = await request.json();
-        const { type, selection } = body;
-
-        // Implementation for resolving specific choices (Weapon Mastery, etc)
-        // This might just return structured data for the frontend to store until finalize
-        return Response.json({ success: true, selection });
-
-    } catch (error: unknown) {
-        return Response.json({ error: getErrorMessage(error) }, { status: 500 });
-    }
-}
-
-/**
  * POST /api/shadowdark/actors/[id]/level-up/finalize
  * Finalize level-up and apply changes
  */

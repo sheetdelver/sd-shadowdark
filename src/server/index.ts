@@ -3,31 +3,19 @@
 import { handleImport } from './api/import';
 import type { ModuleRouteParams } from '@server/shared/types/moduleProxy';
 import { getModuleFoundryClient, getModuleUserSession } from '@server/shared/utils/getModuleFoundryClient';
-import { handleGetLevelUpData, handleRollHP, handleRollGold, handleFinalizeLevelUp, handleRollTalent, handleRollBoon, handleResolveChoice } from "./api/level-up";
+import { handleGetLevelUpData, handleRollHP, handleRollGold, handleFinalizeLevelUp, handleRollTalent, handleRollBoon } from "./api/level-up";
 import { handleLearnSpell, handleGetSpellsBySource, handleGetSpellcasterInfo } from './api/spells';
 import { handleGetDocument } from './api/document';
 import { handleEffects } from './api/effects';
-import { handleGetGear } from './api/gear';
 import { handleGetCollection } from './api/collections';
 import { handleIndex } from './api/index';
 import { handleGetCustomMaps } from './api/custom-maps';
-import { handleListRollTables, handleGetRollTable, handleDrawRollTable, handleGetResultPool } from './api/tables';
 import { handleGetNotes, handleUpdateNotes } from './api/notes';
 import { getConfig } from '@core/config';
-import { logger } from '@sheet-delver/sdk';
 import {
     handleRandomizeCharacter,
     handleRandomizeName,
-    handleRandomizeAncestry,
-    handleRandomizeClass,
-    handleRandomizeBackground,
-    handleRandomizeAlignment,
-    handleRandomizeDeity,
-    handleRandomizePatron,
-    handleRandomizeStats,
-    handleRandomizeGear,
-    handleRandomizeTalents,
-    handleRandomizeLanguages
+    handleRandomizeStats
 } from './api/randomize-character';
 import { shadowdarkAdapter } from './ShadowdarkAdapter';
 
@@ -48,9 +36,8 @@ export const apiRoutes = {
     'index': handleIndex,
     'custom-maps': handleGetCustomMaps,
     'import': handleImport,
-    'gear/list': handleGetGear,
     // Available fetch-pack IDs:
-    // ancestries, backgrounds, classes, deities, patrons, spells, 
+    // ancestries, backgrounds, classes, deities, patrons, spells,
     // talents, languages, gear, magic-items, conditions, spell-effects
     'fetch-pack/[id]': async (request: Request, { params }: ModuleRouteParams) => {
         const { route } = await params;
@@ -59,21 +46,11 @@ export const apiRoutes = {
         return handleGetCollection(request, packId, client);
     },
     'document/[uuid]': handleGetDocument,
+    // Full-character randomizer (the Generator's "randomize all"); per-field randomize
+    // logic lives in the getRandom* helpers that handleRandomizeCharacter composes.
     'actors/randomize': handleRandomizeCharacter,
     'actors/randomize/name': handleRandomizeName,
-    'actors/randomize/ancestry': handleRandomizeAncestry,
-    'actors/randomize/class': handleRandomizeClass,
-    'actors/randomize/background': handleRandomizeBackground,
-    'actors/randomize/alignment': handleRandomizeAlignment,
-    'actors/randomize/deity': handleRandomizeDeity,
-    'actors/randomize/patron': handleRandomizePatron,
     'actors/randomize/stats': handleRandomizeStats,
-    'actors/randomize/gear': handleRandomizeGear,
-    'actors/randomize/talents': handleRandomizeTalents,
-    'actors/randomize/languages': handleRandomizeLanguages,
-    'actors/level-up/data': async (request: Request) => {
-        return handleGetLevelUpData(undefined, request, getModuleFoundryClient(request));
-    },
     'actors/[id]/level-up/data': async (request: Request, { params }: ModuleRouteParams) => {
         const { route } = await params;
         const actorId = route[1]; // Extract [id] from route array
@@ -166,11 +143,6 @@ export const apiRoutes = {
         const actorId = route[1];
         return handleRollBoon(actorId, request, getModuleFoundryClient(request));
     },
-    'actors/[id]/level-up/resolve-choice': async (request: Request, { params }: ModuleRouteParams) => {
-        const { route } = await params;
-        const actorId = route[1];
-        return handleResolveChoice(actorId, request, getModuleFoundryClient(request));
-    },
     'actors/[id]/spells/learn': async (request: Request, { params }: ModuleRouteParams) => {
         const { route } = await params;
         const actorId = route[1];
@@ -181,40 +153,8 @@ export const apiRoutes = {
         const actorId = route[1];
         return handleGetSpellcasterInfo(actorId, getModuleFoundryClient(request));
     },
-    'effects/predefined-effects': async (request: Request) => {
-        const client = getModuleFoundryClient(request);
-        if (!client) return Response.json({ error: 'Not authenticated' }, { status: 401 });
-
-        const systemData = await shadowdarkAdapter.getSystemData(client, { minimal: true });
-
-        const effects = Object.entries(systemData.PREDEFINED_EFFECTS || {}).map(([id, effect]: [string, any]) => ({
-            id,
-            ...effect
-        }));
-
-        return Response.json(effects);
-    },
     'spells/list': async (request: Request) => {
         return handleGetSpellsBySource(request, getModuleFoundryClient(request));
-    },
-    'roll-table': async (request: Request) => {
-        return handleListRollTables();
-    },
-    'roll-table/[id]': async (request: Request, { params }: ModuleRouteParams) => {
-        const { route } = await params;
-        const id = route[1];
-        return handleGetRollTable(request, id, getModuleFoundryClient(request));
-    },
-    'roll-table/[id]/draw': async (request: Request, { params }: ModuleRouteParams) => {
-        const { route } = await params;
-        const id = route[1];
-        return handleDrawRollTable(request, id, getModuleFoundryClient(request));
-    },
-    'roll-table/[tableId]/draw/[resultId]': async (request: Request, { params }: ModuleRouteParams) => {
-        const { route } = await params;
-        const tableId = route[1];
-        const resultId = route[3];
-        return handleGetResultPool(request, tableId, resultId, getModuleFoundryClient(request));
     }
 };
 
