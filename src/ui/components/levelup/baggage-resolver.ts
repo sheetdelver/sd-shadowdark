@@ -1,4 +1,4 @@
-import { logger } from '@shared/utils/logger';
+import { logger } from '@sheet-delver/sdk';
 
 function getUuidRef(ref: unknown): string | null {
     if (typeof ref === 'string') return ref;

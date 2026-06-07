@@ -6,7 +6,7 @@ import ItemModal from './components/ItemModal';
 import NotesModal from './components/NotesModal';
 import { LevelUpModal } from './components/LevelUpModal';
 import { useNotifications } from '@client/ui/components/NotificationSystem';
-import { logger } from '@shared/utils/logger';
+import { logger } from '@sheet-delver/sdk';
 import { useShadowdarkLevelUp } from './hooks/useShadowdarkLevelUp';
 import { useShadowdarkUI } from './context/ShadowdarkUIContext';
 

@@ -1,7 +1,6 @@
 import { shadowdarkAdapter } from '../ShadowdarkAdapter';
-import { getErrorMessage } from '@server/shared/utils/getErrorMessage';
+import { getErrorMessage, logger } from '@sheet-delver/sdk';
 import type { RouteFoundryClient } from '@server/shared/types/requestContext';
-import { logger } from '@shared/utils/logger';
 
 /**
  * GET /api/modules/shadowdark/roll-table

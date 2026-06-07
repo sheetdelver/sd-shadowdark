@@ -1,7 +1,6 @@
 import { shadowdarkAdapter } from '../ShadowdarkAdapter';
 import { getModuleFoundryClient } from '@server/shared/utils/getModuleFoundryClient';
-import { getErrorMessage } from '@server/shared/utils/getErrorMessage';
-import { logger } from '@shared/utils/logger';
+import { getErrorMessage, logger } from '@sheet-delver/sdk';
 
 export async function handleIndex(request: Request) {
     try {

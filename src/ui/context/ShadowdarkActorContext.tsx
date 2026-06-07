@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { logger } from '@shared/utils/logger';
+import { logger } from '@sheet-delver/sdk';
 import { useShadowdarkUI } from './ShadowdarkUIContext';
 import { calculateSpellBonus } from '../sheet-utils';
 import { useNotifications } from '@client/ui/components/NotificationSystem';

@@ -3,7 +3,7 @@
     "version": "0.4",
     "title": "Shadowdark RPG",
     "manifest": {
-        "ui": "src/ui/index.tsx",
+        "ui": "module/ui.tsx",
         "logic": "src/server/ShadowdarkAdapter.ts",
         "server": "module/server"
     },

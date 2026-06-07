@@ -1,4 +1,4 @@
-import { logger } from '@shared/utils/logger';
+import { logger } from '@sheet-delver/sdk';
 import { shadowdarkAdapter } from '../../server/ShadowdarkAdapter';
 import { sanitizeItem } from '../../utils/Sanitizer';
 

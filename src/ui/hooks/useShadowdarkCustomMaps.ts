@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { logger } from '@shared/utils/logger';
+import { logger } from '@sheet-delver/sdk';
 
 const getErrorMessage = (error: unknown, fallback = 'Failed to fetch custom maps'): string => {
     if (error instanceof Error) return error.message;

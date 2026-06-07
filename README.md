@@ -11,8 +11,8 @@ While not yet feature-complete, offers robust support for Shadowdark it Sheet De
 - **Formatted Chat**: Rich chat messages for rolls and abilities with inline roll buttons.
 - **Character Import**: Import characters via JSON from Shadowdarklings.
 - **Level Up Wizard**: Guided level-up process with talent/boon rolling and choice resolution.
-<img src="https://github.com/sheetdelver/sheet-delver/images/sheets/shadowdark/sd-character-sheet.png" width="25%">
-<img src="https://github.com/sheetdelver/sheet-delver/images/sheets/shadowdark/sd-paper-view.png" width="25%">
+<img src="https://github.com/sheetdelver/sheetdelver/blob/main/images/sheets/shadowdark/sd-character-sheet.png" width="25%">
+<img src="https://github.com/sheetdelver/sheetdelver/blob/main/images/sheets/shadowdark/sd-paper-view.png" width="25%">
 
 ### Third-Party Licenses
 

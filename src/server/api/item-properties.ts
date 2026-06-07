@@ -1,5 +1,5 @@
 
-import { logger } from '@shared/utils/logger';
+import { logger } from '@sheet-delver/sdk';
 
 // Map of Item ID (or Source ID) to Overrides
 const ITEM_OVERRIDES: Record<string, (item: any) => void> = {

@@ -30,7 +30,7 @@ const LevelUpModal = dynamic(() => import('./components/LevelUpModal').then(mod 
 });
 
 import ShadowdarkPaperSheet from './ShadowdarkPaperSheet';
-import { logger } from '@shared/utils/logger';
+import { logger } from '@sheet-delver/sdk';
 
 interface ShadowdarkSheetProps {
     token?: string | null;

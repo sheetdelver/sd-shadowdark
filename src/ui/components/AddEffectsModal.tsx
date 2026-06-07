@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { X, Power, Search } from 'lucide-react';
 import { useConfig } from '@client/ui/context/ConfigContext';
 import { useShadowdarkCustomMaps } from '../hooks/useShadowdarkCustomMaps';
-import { logger } from '@shared/utils/logger';
+import { logger } from '@sheet-delver/sdk';
 
 interface AddEffectsModalProps {
     isOpen: boolean;

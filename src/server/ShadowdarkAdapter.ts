@@ -3,8 +3,7 @@ import { ShadowdarkNormalizer, resolveDocumentName } from '../logic/normalizatio
 import { shadowdarkTheme } from '../ui/themes/shadowdark';
 import { getInitiativeFormula, normalizeItemData, isClassSpellcaster } from '../logic/rules';
 import { TALENT_GRANTED_SPELLS } from '../data/talent-effects';
-import { logger } from '@shared/utils/logger';
-import { getErrorMessage } from '@server/shared/utils/getErrorMessage';
+import { getErrorMessage, logger } from '@sheet-delver/sdk';
 import { SystemAdapter } from '@modules/registry/types';
 import { ActorSheetData } from '@shared/interfaces';
 

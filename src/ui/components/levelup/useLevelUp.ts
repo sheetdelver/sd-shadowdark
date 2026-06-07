@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { isClassSpellcaster } from '../../../logic/rules';
-import { logger } from '@shared/utils/logger';
+import { logger } from '@sheet-delver/sdk';
 import { TALENT_HANDLERS } from '../../../logic/talent-handlers';
 import { useShadowdarkUI } from '../../context/ShadowdarkUIContext';
 import { useConfig } from '@client/ui/context/ConfigContext';

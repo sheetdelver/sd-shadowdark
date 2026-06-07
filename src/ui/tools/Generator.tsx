@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
 import { LevelUpModal } from '../components/LevelUpModal';
-import { logger } from '@shared/utils/logger';
+import { logger } from '@sheet-delver/sdk';
 import { useConfig } from '@client/ui/context/ConfigContext';
 import { useShadowdarkUI, ShadowdarkUIProvider } from '../context/ShadowdarkUIContext';
 import { useFoundry } from '@client/ui/context/FoundryContext';

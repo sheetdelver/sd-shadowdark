@@ -4,7 +4,7 @@ import React from 'react';
 import { X } from 'lucide-react';
 import RichTextEditor from '@client/ui/components/RichTextEditor';
 import { shadowdarkTheme } from '../themes/shadowdark';
-import { logger } from '@shared/utils/logger';
+import { logger } from '@sheet-delver/sdk';
 
 import { useShadowdarkActor } from '../context/ShadowdarkActorContext';
 import { useShadowdarkUI } from '../context/ShadowdarkUIContext';

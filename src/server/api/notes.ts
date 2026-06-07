@@ -1,6 +1,6 @@
 import type { RawActor } from '@server/shared/types/actors';
 import type { RouteFoundryClient } from '@server/shared/types/requestContext';
-import { logger } from '@shared/utils/logger';
+import { logger } from '@sheet-delver/sdk';
 
 type ActorWithNotes = RawActor & {
     system?: {

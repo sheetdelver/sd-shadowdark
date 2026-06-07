@@ -11,7 +11,7 @@ import {
     normalizeActorData as rulesNormalizeActorData,
     normalizeItemData
 } from './rules';
-import { logger } from '@shared/utils/logger';
+import { logger } from '@sheet-delver/sdk';
 
 /**
  * Standalone utility to resolve a document name from a UUID or ID using the system data.

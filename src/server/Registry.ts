@@ -1,4 +1,4 @@
-import { logger } from '@shared/utils/logger';
+import { logger } from '@sheet-delver/sdk';
 import { persistentCache } from '@core/cache/PersistentCache';
 import { isRareLanguage } from '../logic/rules';
 import { SYSTEM_PREDEFINED_EFFECTS, BOON_TYPE_MAP, EFFECT_TRANSLATIONS_MAP } from '../data/talent-effects';

@@ -2,7 +2,7 @@
 'use client';
 
 import { useState } from 'react';
-import { logger } from '@shared/utils/logger';
+import { logger } from '@sheet-delver/sdk';
 
 interface ShadowdarkImportModalProps {
     onClose: () => void;

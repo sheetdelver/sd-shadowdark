@@ -1,4 +1,4 @@
-import { logger } from '@shared/utils/logger';
+import { logger } from '@sheet-delver/sdk';
 import { useState, useEffect, useMemo } from 'react';
 import { X, Search, ChevronDown, ChevronRight, Shield, Backpack, Swords, Sparkles, Sprout, Briefcase, Plus, Flame, Sun, Target } from 'lucide-react';
 import { useConfig } from '@client/ui/context/ConfigContext';

@@ -14,7 +14,7 @@ import { handleGetCustomMaps } from './api/custom-maps';
 import { handleListRollTables, handleGetRollTable, handleDrawRollTable, handleGetResultPool } from './api/tables';
 import { handleGetNotes, handleUpdateNotes } from './api/notes';
 import { getConfig } from '@core/config';
-import { logger } from '@shared/utils/logger';
+import { logger } from '@sheet-delver/sdk';
 import {
     handleRandomizeCharacter,
     handleRandomizeName,

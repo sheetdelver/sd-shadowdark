@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { X, Search, Check, ChevronDown, ChevronUp } from 'lucide-react';
 import { resolveImage, formatDescription, getSafeDescription } from '../sheet-utils';
 import { useConfig } from '@client/ui/context/ConfigContext';
-import { logger } from '@shared/utils/logger';
+import { logger } from '@sheet-delver/sdk';
 import { useShadowdarkUI } from '../context/ShadowdarkUIContext';
 
 interface SpellOption {

@@ -1,6 +1,5 @@
 import { SYSTEM_PREDEFINED_EFFECTS, BOON_TYPE_MAP, EFFECT_TRANSLATIONS_MAP } from '../../data/talent-effects';
-import { logger } from '@shared/utils/logger';
-import { getErrorMessage } from '@server/shared/utils/getErrorMessage';
+import { getErrorMessage, logger } from '@sheet-delver/sdk';
 
 /**
  * API handler to serve static Shadowdark rule mappings and predefined effects.

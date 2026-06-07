@@ -1,1 +1,1 @@
-export * from '../src/server/index';
+export { apiRoutes } from '../src/server/index';
