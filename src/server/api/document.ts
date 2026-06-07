@@ -12,7 +12,7 @@ export async function handleGetDocument(request: Request, { params }: any) {
         }
 
         const client = getModuleFoundryClient(request);
-        const document = await shadowdarkAdapter.resolveDocument(client, uuid);
+        const document = await shadowdarkAdapter.resolveDocument(uuid);
 
         if (!document) {
             return Response.json({ error: `Document not found: ${uuid}` }, { status: 404 });

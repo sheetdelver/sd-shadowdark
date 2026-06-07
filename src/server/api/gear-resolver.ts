@@ -38,7 +38,7 @@ export async function resolveBaggage(doc: any, client?: any): Promise<any[]> {
         const uuid = getUuidRef(ref);
         if (uuid) {
             try {
-                const item = await shadowdarkAdapter.resolveDocument(client, uuid);
+                const item = await shadowdarkAdapter.resolveDocument(uuid);
                 if (item) {
                     // DEEP CLONE: Prevent cache poisoning by ensuring each resolved item is a fresh instance
                     const clean = JSON.parse(JSON.stringify(sanitizeItem(item)));
@@ -90,7 +90,7 @@ export async function resolveGear(doc: any, client?: any): Promise<any[]> {
     const resolvedItems = [];
     for (const entry of candidates) {
         try {
-            const item = await shadowdarkAdapter.resolveDocument(client, entry);
+            const item = await shadowdarkAdapter.resolveDocument(entry);
             if (item) {
                 // DEEP CLONE: Prevent cache poisoning
                 const clean = JSON.parse(JSON.stringify(sanitizeItem(item)));

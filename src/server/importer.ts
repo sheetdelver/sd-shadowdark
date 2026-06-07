@@ -83,7 +83,7 @@ export class ShadowdarkImporter {
 
             // 1. Sharded Discovery (Core Managed Cache)
             log(`[Importer] Ensures system data is discovered (Registry)...`);
-            const systemData = await shadowdarkAdapter.getSystemData(client);
+            const systemData = await shadowdarkAdapter.getSystemData();
 
             // --- HELPER FUNCTIONS ---
 
@@ -97,7 +97,7 @@ export class ShadowdarkImporter {
                 if (indexDoc) {
                     const uuid = indexDoc.uuid || indexDoc._id;
                     trace(`[findItem] Found in index: ${uuid}. Hydrating...`);
-                    const fullDoc = await shadowdarkAdapter.resolveDocument(client, uuid);
+                    const fullDoc = await shadowdarkAdapter.resolveDocument(uuid);
                     trace(`[findItem] Hydration complete for: ${uuid}`);
                     if (fullDoc) return sanitizeItem(fullDoc);
                 }
@@ -117,7 +117,7 @@ export class ShadowdarkImporter {
 
                 if (itemUuid) {
                     log(`[findItem] Found in mapping: ${itemUuid}. Fetching...`);
-                    const item = await shadowdarkAdapter.resolveDocument(client, itemUuid);
+                    const item = await shadowdarkAdapter.resolveDocument(itemUuid);
                     trace(`[findItem] Mapping fetch complete: ${itemUuid}`);
                     if (item) return sanitizeItem(item);
                     log(`[findItem] WARN: Mapping UUID ${itemUuid} could not be resolved`);
@@ -148,7 +148,7 @@ export class ShadowdarkImporter {
                     if (match) {
                         log(`[findSpell] Found verified spell: ${match.name}`);
                         // Fulfillment
-                        const fullDoc = await shadowdarkAdapter.resolveDocument(client, match.uuid || match._id);
+                        const fullDoc = await shadowdarkAdapter.resolveDocument(match.uuid || match._id);
                         trace(`[findSpell] Fulfillment complete for spell: ${match.name}`);
                         return sanitizeItem(fullDoc || match);
                     }
@@ -177,14 +177,14 @@ export class ShadowdarkImporter {
                 let foundTalent = null;
                 if (patternStr) {
                     const uuid = mBonus[patternStr];
-                    foundTalent = await shadowdarkAdapter.resolveDocument(client, uuid);
+                    foundTalent = await shadowdarkAdapter.resolveDocument(uuid);
                 }
 
                 if (!foundTalent) {
                     const uuid = findEffectUuid(bonus.bonusName || bonus.name);
                     if (uuid) {
                         log(`[findTalent] Found match in TALENT_EFFECTS_MAP: ${uuid}`);
-                        foundTalent = await shadowdarkAdapter.resolveDocument(client, uuid);
+                        foundTalent = await shadowdarkAdapter.resolveDocument(uuid);
                     }
                 }
 
@@ -206,7 +206,7 @@ export class ShadowdarkImporter {
                         const uuid = findEffectUuid(lookup);
                         if (uuid) {
                             log(`[findTalent] Resolved specific spellcasting: ${lookup}`);
-                            foundTalent = await shadowdarkAdapter.resolveDocument(client, uuid);
+                            foundTalent = await shadowdarkAdapter.resolveDocument(uuid);
                         }
                     }
 
@@ -305,10 +305,10 @@ export class ShadowdarkImporter {
                 mapping: this.mapping,
                 patronName: patronName || undefined,
                 discoveredItems: [],
-                resolveDoc: (uuid: string) => shadowdarkAdapter.resolveDocument(client, uuid)
+                resolveDoc: (uuid: string) => shadowdarkAdapter.resolveDocument(uuid)
             };
 
-            const resolveDoc = (uuid: string) => shadowdarkAdapter.resolveDocument(client, uuid);
+            const resolveDoc = (uuid: string) => shadowdarkAdapter.resolveDocument(uuid);
 
 
             // --- MAIN LOGIC ---
@@ -433,7 +433,7 @@ export class ShadowdarkImporter {
  
                  // Starting Spells (Fixed)
                  if (classObj.system?.startingSpells) {
-                     const startSpells = await Promise.all(classObj.system.startingSpells.map((uuid: string) => shadowdarkAdapter.resolveDocument(client, uuid)));
+                     const startSpells = await Promise.all(classObj.system.startingSpells.map((uuid: string) => shadowdarkAdapter.resolveDocument(uuid)));
                      for (const s of startSpells.filter(Boolean)) {
                          const enriched = await enrichItem(s, enrichmentContext);
                          if (enriched) spells.push(enriched);

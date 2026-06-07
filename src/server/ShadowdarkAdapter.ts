@@ -1,29 +1,31 @@
-import { shadowdarkRegistry, ShadowdarkRegistry } from './Registry';
+import { BaseSystemAdapter, logger } from '@sheet-delver/sdk';
+import type { ActorSheetData } from '@sheet-delver/sdk';
+import type { ModuleRuntime } from '@sheet-delver/sdk/server';
+import { ShadowdarkRegistry } from './Registry';
 import { ShadowdarkNormalizer, resolveDocumentName } from '../logic/normalization';
 import { shadowdarkTheme } from '../ui/themes/shadowdark';
-import { getInitiativeFormula, normalizeItemData, isClassSpellcaster } from '../logic/rules';
+import { getInitiativeFormula, isClassSpellcaster } from '../logic/rules';
 import { TALENT_GRANTED_SPELLS } from '../data/talent-effects';
-import { getErrorMessage, logger } from '@sheet-delver/sdk';
-import { SystemAdapter } from '@modules/registry/types';
-import { ActorSheetData } from '@shared/interfaces';
 
 /**
- * ShadowdarkAdapter is the primary entry point for the Shadowdark module.
- * It follows a facade pattern, delegating specialized logic to sub-services.
- * 
- * Refactored to use ShadowdarkRegistry for all server-side data management.
+ * ShadowdarkAdapter — the Shadowdark system adapter (ADR-0027 conformed).
+ *
+ * Extends BaseSystemAdapter; all system data flows through the runtime-backed
+ * {@link ShadowdarkRegistry} (wired in `initialize`). A `globalThis` singleton bridges the
+ * platform-instantiated adapter (which receives `initialize(runtime)`) and the
+ * `shadowdarkAdapter` instance the module's route handlers import, so both share one
+ * initialized registry.
  */
-export class ShadowdarkAdapter implements SystemAdapter {
+export class ShadowdarkAdapter extends BaseSystemAdapter {
     systemId = 'shadowdark';
     private static instance: ShadowdarkAdapter;
-    private get _registry() {
-        return ShadowdarkRegistry.getInstance();
-    }
+    private readonly _registry = new ShadowdarkRegistry();
 
     theme = shadowdarkTheme.colors;
-    componentStyles = shadowdarkTheme;
+    componentStyles = shadowdarkTheme as any;
 
     constructor() {
+        super();
         const globalAny = globalThis as any;
         if (globalAny.__shadowdarkAdapter) {
             return globalAny.__shadowdarkAdapter;
@@ -46,6 +48,18 @@ export class ShadowdarkAdapter implements SystemAdapter {
         return ShadowdarkAdapter.instance;
     }
 
+    async initialize(runtime: ModuleRuntime): Promise<void> {
+        await super.initialize(runtime);
+        this._registry.attach(runtime.compendium, runtime.documents);
+        logger.info('[ShadowdarkAdapter] Service layer unified via runtime-backed Registry.');
+        // Warm the projection so the first sheet render has names resolved.
+        try {
+            await this._registry.getSystemData();
+        } catch (e) {
+            logger.warn('[ShadowdarkAdapter] System data warm-up deferred:', e);
+        }
+    }
+
     getInitiativeFormula(actor: any): string {
         return getInitiativeFormula(actor);
     }
@@ -54,9 +68,7 @@ export class ShadowdarkAdapter implements SystemAdapter {
         const s = actor.system || {};
         const names = actor.computed?.resolvedNames || {};
 
-        const resolve = (val: any) => {
-            return resolveDocumentName(val, (this._registry as any).systemData);
-        };
+        const resolve = (val: any) => resolveDocumentName(val, this._registry.getCachedSystemData());
 
         const ancestry = names.ancestry || resolve(s.ancestry);
         const className = names.class || resolve(s.class);
@@ -78,44 +90,16 @@ export class ShadowdarkAdapter implements SystemAdapter {
         return actor.systemId === 'shadowdark' || (hasShadowdarkType && hasShadowdarkSystem);
     }
 
-    async getActor(client: any, actorId: string): Promise<any> {
-        const systemData = await this.getSystemData(client);
-        let actorData = null;
-
-        try {
-            actorData = await (client.getActorRaw ? client.getActorRaw(actorId) : client.getActor(actorId));
-        } catch (error: unknown) {
-            const message = getErrorMessage(error);
-            logger.error(`[ShadowdarkAdapter] Failed to fetch actor ${actorId}: ${message}`);
-            return { error: message };
-        }
-
-        if (!actorData) return null;
-
-        const actor = {
-            ...actorData,
-            _theme: this.theme,
-            items: (actorData.items || []).map((item: any) => normalizeItemData(item))
-        };
-
-        await ShadowdarkNormalizer.resolveActorNames(actor, systemData);
-        const normalized = ShadowdarkNormalizer.normalizeActorData(actor, systemData);
-
-        return normalized;
-    }
-
-    async getSystemData(client: any, _options?: { minimal?: boolean }): Promise<any> {
-        const data = await this._registry.getSystemData(client);
-        logger.debug(`[ShadowdarkAdapter] Handing off system data. Type: ${typeof data}, Keys: ${Object.keys(data || {}).length}`);
-        return data;
+    async getSystemData(_options?: { minimal?: boolean }): Promise<any> {
+        return this._registry.getSystemData();
     }
 
     async getCollection(id: string, options: { summary?: boolean } = {}): Promise<any[]> {
         return this._registry.getCollection(id, options);
     }
 
-    async drawTable(uuidOrName: string, client: any, rollOverride?: number): Promise<any> {
-        return this._registry.draw(uuidOrName, client, rollOverride);
+    async drawTable(uuidOrName: string, rollOverride?: number): Promise<any> {
+        return this._registry.draw(uuidOrName, rollOverride);
     }
 
     async getSpellsBySource(className: string): Promise<any[]> {
@@ -126,30 +110,20 @@ export class ShadowdarkAdapter implements SystemAdapter {
         return this._registry.findByName(name, type);
     }
 
-    async getRegistryIndex() {
+    async getRegistryIndex(): Promise<Record<string, string>> {
         return this._registry.getIndex();
     }
 
-    normalizeActorData(actor: any, _client?: any): ActorSheetData {
+    normalizeActorData(actor: any): ActorSheetData {
         if (actor && !actor._theme) actor._theme = this.theme;
-        return ShadowdarkNormalizer.normalizeActorData(actor, (this._registry as any).systemData);
+        return ShadowdarkNormalizer.normalizeActorData(actor, this._registry.getCachedSystemData());
     }
 
-    async resolveActorNames(actor: any, clientOrCache: any): Promise<void> {
-        let systemData = (this._registry as any).systemData;
-
-        if (!systemData && clientOrCache && typeof clientOrCache.getSystem === 'function') {
-            systemData = await this.getSystemData(clientOrCache);
-        }
-
-        return ShadowdarkNormalizer.resolveActorNames(actor, systemData);
+    async resolveDocument(uuid: string): Promise<any> {
+        return this._registry.getDocument(uuid);
     }
 
-    async resolveDocument(client: any, uuid: string): Promise<any> {
-        return this._registry.getDocument(uuid, client);
-    }
-
-    async getLevelUpData(client: any, actor: any, classUuidOverride?: string, patronUuidOverride?: string) {
+    async getLevelUpData(actor: any, classUuidOverride?: string, patronUuidOverride?: string) {
         const currentLevel = actor?.system?.level?.value || 0;
         const targetLevel = currentLevel + 1;
         const currentXP = actor?.system?.level?.xp || 0;
@@ -160,20 +134,8 @@ export class ShadowdarkAdapter implements SystemAdapter {
         let classDoc = null;
         let patronDoc = null;
 
-        if (classUuid) classDoc = await this.resolveDocument(client, classUuid);
-        if (patronUuid) patronDoc = await this.resolveDocument(client, patronUuid);
-
-        if (!classDoc && classUuid) {
-            try {
-                classDoc = await client.fetchByUuid(classUuid);
-            } catch (e) { logger.error(`[ShadowdarkAdapter] Failed to fetch class ${classUuid}:`, e); }
-        }
-
-        if (!patronDoc && patronUuid) {
-            try {
-                patronDoc = await client.fetchByUuid(patronUuid);
-            } catch (e) { logger.error(`[ShadowdarkAdapter] Failed to fetch patron ${patronUuid}:`, e); }
-        }
+        if (classUuid) classDoc = await this.resolveDocument(classUuid);
+        if (patronUuid) patronDoc = await this.resolveDocument(patronUuid);
 
         const talentGained = targetLevel % 2 !== 0;
         const isSpellcasterChar = classDoc ? isClassSpellcaster(classDoc) : false;
@@ -201,7 +163,6 @@ export class ShadowdarkAdapter implements SystemAdapter {
                 const freeSpellUuids = new Set<string>();
                 const actorItems = actor?.items || [];
 
-                // Check actor's existing talents for innate grants
                 actorItems.forEach((i: any) => {
                     if (['Talent', 'Boon', 'Feature', 'Class Ability'].includes(i.type)) {
                         const sourceId = i.flags?.core?.sourceId || i.uuid || i._id;
@@ -219,12 +180,10 @@ export class ShadowdarkAdapter implements SystemAdapter {
                     }
                 });
 
-                // Also check if the class itself grants innate spells (like Turn Undead for Priests)
                 if (classDoc.name.toLowerCase() === 'priest') {
                     freeSpellUuids.add(TALENT_GRANTED_SPELLS["LfHTnYW8I65x8Y31"]);
                 }
 
-                // Flag the available spells
                 availableSpells.forEach(s => {
                     const sourceId = s.flags?.core?.sourceId || s.uuid || s._id;
                     const name = (s.name || "").toLowerCase();
@@ -252,15 +211,12 @@ export class ShadowdarkAdapter implements SystemAdapter {
             talentTable: await (async () => {
                 const tableRaw = classDoc?.system?.classTalentTable;
                 if (!tableRaw) return null;
-                
-                // If it's already a full UUID, return it
+
                 if (tableRaw.includes('Compendium.')) return tableRaw;
 
-                // Try to resolve Name or ID to a full UUID
-                const tableDoc = await this.resolveDocument(client, tableRaw);
+                const tableDoc = await this.resolveDocument(tableRaw);
                 if (tableDoc?.uuid) return tableDoc.uuid;
-                
-                // Final fallback: if it's a name that Registry can find, return that
+
                 const foundByName = await this.findDocumentByName(tableRaw, 'RollTable');
                 if (foundByName?.uuid) return foundByName.uuid;
 
@@ -373,15 +329,6 @@ export class ShadowdarkAdapter implements SystemAdapter {
             }
         }
         return null;
-    }
-
-    async getCompendiumItem(client: any, uuid: string): Promise<any | null> {
-        return this.resolveDocument(client, uuid);
-    }
-
-    async initialize(client?: any): Promise<void> {
-        logger.info('[ShadowdarkAdapter] Service Layer Unified via Registry.');
-        if (client) await this.getSystemData(client);
     }
 }
 

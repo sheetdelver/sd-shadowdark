@@ -235,7 +235,7 @@ export async function assembleFinalItems(state: LevelUpState, targetLevel: numbe
     for (const handler of TALENT_HANDLERS) {
         if (handler.resolveItems) {
             const extra = await handler.resolveItems(state, targetLevel, async (uuid: string) => {
-                return shadowdarkAdapter.resolveDocument(client, uuid);
+                return shadowdarkAdapter.resolveDocument(uuid);
             });
             items.push(...extra);
         }
@@ -346,7 +346,7 @@ export async function assembleFinalItems(state: LevelUpState, targetLevel: numbe
 
         if (needsResolution) {
             try {
-                const doc = await shadowdarkAdapter.resolveDocument(client, uuid!);
+                const doc = await shadowdarkAdapter.resolveDocument(uuid!);
                 if (doc) {
                     // DEEP CLONE: Prevent cache poisoning
                     clean = JSON.parse(JSON.stringify(doc));

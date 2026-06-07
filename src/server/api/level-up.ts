@@ -30,7 +30,7 @@ export async function handleGetLevelUpData(actorId: string | undefined, request:
             actor = await client.getActor(actorId);
         }
 
-        const data = await shadowdarkAdapter.getLevelUpData(client, actor, classId || undefined, patronId || undefined);
+        const data = await shadowdarkAdapter.getLevelUpData(actor, classId || undefined, patronId || undefined);
 
         return Response.json({ success: true, data });
 
@@ -72,7 +72,7 @@ export async function handleRollHP(actorId: string | undefined, request: Request
         if (hitDie === '1d4' && classId) {
             try {
                 logger.info(`[API] Fetching class doc for ${classId}`);
-                const classDoc = await shadowdarkAdapter.resolveDocument(client, classId);
+                const classDoc = await shadowdarkAdapter.resolveDocument(classId);
                 if (classDoc?.system?.hitPoints) {
                     hitDie = classDoc.system.hitPoints;
                     logger.info(`[API] Found hitDie from class doc: ${hitDie}`);
@@ -264,7 +264,7 @@ export async function handleRollTalent(actorId: string | undefined, request: Req
 
         while (attempts < maxAttempts) {
             attempts++;
-            const result = await shadowdarkAdapter.drawTable(tableUuidOrName, client);
+            const result = await shadowdarkAdapter.drawTable(tableUuidOrName);
             if (!result) {
                 return Response.json({ error: `RollTable not found: ${tableUuidOrName}` }, { status: 404 });
             }
@@ -379,10 +379,10 @@ export async function handleFinalizeLevelUp(actorId: string, request: Request, c
         }
 
         // Backend assembly and validation
-        const classObj = body.classObj || (body.classUuid ? (await shadowdarkAdapter.resolveDocument(client, body.classUuid)) : null);
-        const ancestry = body.ancestryObj || (body.ancestryUuid ? (await shadowdarkAdapter.resolveDocument(client, body.ancestryUuid)) : null);
-        const background = body.backgroundObj || (body.backgroundUuid ? (await shadowdarkAdapter.resolveDocument(client, body.backgroundUuid)) : null);
-        const patron = body.patronObj || (body.patronUuid ? (await shadowdarkAdapter.resolveDocument(client, body.patronUuid)) : null);
+        const classObj = body.classObj || (body.classUuid ? (await shadowdarkAdapter.resolveDocument(body.classUuid)) : null);
+        const ancestry = body.ancestryObj || (body.ancestryUuid ? (await shadowdarkAdapter.resolveDocument(body.ancestryUuid)) : null);
+        const background = body.backgroundObj || (body.backgroundUuid ? (await shadowdarkAdapter.resolveDocument(body.backgroundUuid)) : null);
+        const patron = body.patronObj || (body.patronUuid ? (await shadowdarkAdapter.resolveDocument(body.patronUuid)) : null);
 
         const state = {
             rolledTalents: body.rolledTalents || [],

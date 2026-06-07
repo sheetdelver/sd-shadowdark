@@ -4,7 +4,7 @@ import { handleImport } from './api/import';
 import type { ModuleRouteParams } from '@server/shared/types/moduleProxy';
 import { getModuleFoundryClient, getModuleUserSession } from '@server/shared/utils/getModuleFoundryClient';
 import { handleGetLevelUpData, handleRollHP, handleRollGold, handleFinalizeLevelUp, handleRollTalent, handleRollBoon } from "./api/level-up";
-import { handleLearnSpell, handleGetSpellsBySource, handleGetSpellcasterInfo } from './api/spells';
+import { handleLearnSpell, handleGetSpellsBySource } from './api/spells';
 import { handleGetDocument } from './api/document';
 import { handleEffects } from './api/effects';
 import { handleGetCollection } from './api/collections';
@@ -147,11 +147,6 @@ export const apiRoutes = {
         const { route } = await params;
         const actorId = route[1];
         return handleLearnSpell(actorId, request, getModuleFoundryClient(request));
-    },
-    'actors/[id]/spellcaster': async (request: Request, { params }: ModuleRouteParams) => {
-        const { route } = await params;
-        const actorId = route[1];
-        return handleGetSpellcasterInfo(actorId, getModuleFoundryClient(request));
     },
     'spells/list': async (request: Request) => {
         return handleGetSpellsBySource(request, getModuleFoundryClient(request));

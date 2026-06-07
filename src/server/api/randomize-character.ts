@@ -8,35 +8,35 @@ async function getRandomAncestry(client: any) {
     const options = await shadowdarkAdapter.getCollection('ancestries', { summary: true });
     if (!options.length) return null;
     const selection = options[Math.floor(Math.random() * options.length)];
-    return await shadowdarkAdapter.resolveDocument(client, selection.uuid);
+    return await shadowdarkAdapter.resolveDocument(selection.uuid);
 }
 
 async function getRandomClass(client: any) {
     const options = (await shadowdarkAdapter.getCollection('classes', { summary: true })).filter((c: any) => c.name !== "Level 0");
     if (!options.length) return null;
     const selection = options[Math.floor(Math.random() * options.length)];
-    return await shadowdarkAdapter.resolveDocument(client, selection.uuid);
+    return await shadowdarkAdapter.resolveDocument(selection.uuid);
 }
 
 async function getRandomBackground(client: any) {
     const options = await shadowdarkAdapter.getCollection('backgrounds', { summary: true });
     if (!options.length) return null;
     const selection = options[Math.floor(Math.random() * options.length)];
-    return await shadowdarkAdapter.resolveDocument(client, selection.uuid);
+    return await shadowdarkAdapter.resolveDocument(selection.uuid);
 }
 
 async function getRandomDeity(client: any) {
     const options = await shadowdarkAdapter.getCollection('deities', { summary: true });
     if (!options.length) return null;
     const selection = options[Math.floor(Math.random() * options.length)];
-    return await shadowdarkAdapter.resolveDocument(client, selection.uuid);
+    return await shadowdarkAdapter.resolveDocument(selection.uuid);
 }
 
 async function getRandomPatron(client: any) {
     const options = await shadowdarkAdapter.getCollection('patrons', { summary: true });
     if (!options.length) return null;
     const selection = options[Math.floor(Math.random() * options.length)];
-    return await shadowdarkAdapter.resolveDocument(client, selection.uuid);
+    return await shadowdarkAdapter.resolveDocument(selection.uuid);
 }
 
 function getRandomAlignment() {
@@ -58,9 +58,9 @@ async function getRandomName(client: any, ancestryUuid?: string) {
     if (!ancestryUuid) return "Unnamed";
 
     try {
-        const ancestry = await shadowdarkAdapter.resolveDocument(client, ancestryUuid);
+        const ancestry = await shadowdarkAdapter.resolveDocument(ancestryUuid);
         if (ancestry?.system?.nameTable) {
-            const table = await shadowdarkAdapter.resolveDocument(client, ancestry.system.nameTable);
+            const table = await shadowdarkAdapter.resolveDocument(ancestry.system.nameTable);
             if (table && table.results) {
                 const results = table.results;
                 const max = Math.max(...results.map((r: any) => (r.range?.[1] || 0)));

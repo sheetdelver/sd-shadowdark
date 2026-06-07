@@ -5,7 +5,7 @@ import { getErrorMessage, logger } from '@sheet-delver/sdk';
 export async function handleIndex(request: Request) {
     try {
         const client = getModuleFoundryClient(request);
-        const systemData = await shadowdarkAdapter.getSystemData(client);
+        const systemData = await shadowdarkAdapter.getSystemData();
         
         logger.debug(`[ShadowdarkAPI] Responding with system data. Keys: ${Object.keys(systemData || {}).join(', ')}, IndexSize: ${Object.keys(systemData?.nameIndex || {}).length}`);
         

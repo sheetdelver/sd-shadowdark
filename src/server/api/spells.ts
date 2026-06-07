@@ -3,7 +3,6 @@ import { compendiumStore } from '@server/core/compendium';
 import { getErrorMessage, logger } from '@sheet-delver/sdk';
 import type { RouteFoundryClient } from '@server/shared/types/requestContext';
 import { shadowdarkAdapter } from '../../server/ShadowdarkAdapter';
-import { isSpellcaster, canUseMagicItems } from '../../logic/rules';
 
 /**
  * POST /api/modules/shadowdark/actors/[id]/spells/learn
@@ -24,7 +23,7 @@ export async function handleLearnSpell(actorId: string, request: Request, client
         }
 
         // 1. Fetch Spell Data (Unified Resolver)
-        const spellData = await shadowdarkAdapter.resolveDocument(foundryClient, spellUuid);
+        const spellData = await shadowdarkAdapter.resolveDocument(spellUuid);
 
         if (!spellData) {
             return Response.json({ error: 'Spell not found' }, { status: 404 });
@@ -200,34 +199,3 @@ export async function handleGetSpellsBySource(request: Request, client?: RouteFo
     }
 }
 
-/**
- * GET /api/modules/shadowdark/actors/[id]/spellcaster
- * Whether the actor is a spellcaster / can use magic items — gates the Spells tab.
- */
-export async function handleGetSpellcasterInfo(actorId: string, client?: RouteFoundryClient | null) {
-    try {
-        if (!client || !client.isConnected) {
-            return Response.json({ error: 'Not connected to Foundry' }, { status: 503 });
-        }
-
-        // getActor fetches, normalizes, resolves names, and caches — one operation.
-        const normalizedActor = await shadowdarkAdapter.getActor(client, actorId);
-        if (!normalizedActor || normalizedActor.error) {
-            return Response.json({ error: 'Actor not found' }, { status: 404 });
-        }
-
-        // Unified spellcaster check using rules.ts (works on normalized actor).
-        const isCaster = isSpellcaster(normalizedActor);
-        const magicItemCaster = canUseMagicItems(normalizedActor);
-
-        return Response.json({
-            isSpellcaster: isCaster,
-            canUseMagicItems: magicItemCaster,
-            showSpellsTab: isCaster || magicItemCaster
-        });
-
-    } catch (error: unknown) {
-        logger.error('[API] Spellcaster Info Error:', error);
-        return Response.json({ error: getErrorMessage(error) || 'Failed to get spellcaster info' }, { status: 500 });
-    }
-}
