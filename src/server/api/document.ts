@@ -1,8 +1,8 @@
+import type { ModuleServerRequest, ModuleServerParams } from '@sheet-delver/sdk/server';
 import { shadowdarkAdapter } from '../../server/ShadowdarkAdapter';
 import { getErrorMessage, logger } from '@sheet-delver/sdk';
-import { getModuleFoundryClient } from '@server/shared/utils/getModuleFoundryClient';
 
-export async function handleGetDocument(request: Request, { params }: any) {
+export async function handleGetDocument(_req: ModuleServerRequest, { params }: ModuleServerParams) {
     try {
         const { route } = await params;
         const uuid = route.slice(1).join('/');
@@ -11,7 +11,6 @@ export async function handleGetDocument(request: Request, { params }: any) {
             return Response.json({ error: 'Missing UUID' }, { status: 400 });
         }
 
-        const client = getModuleFoundryClient(request);
         const document = await shadowdarkAdapter.resolveDocument(uuid);
 
         if (!document) {

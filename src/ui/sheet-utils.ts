@@ -21,5 +21,5 @@ export {
     shouldGainTalent
 };
 
-import { resolveImage, processHtmlContent, getSafeDescription } from '@modules/registry/client';
+import { resolveImage, processHtmlContent, getSafeDescription } from '@sheet-delver/sdk';
 export { resolveImage, processHtmlContent as formatDescription, getSafeDescription };

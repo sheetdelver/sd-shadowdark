@@ -1,6 +1,4 @@
-import type { RawActor, RawItem } from '@server/shared/types/actors';
-import type { RouteFoundryClient } from '@server/shared/types/requestContext';
-import { logger } from '@sheet-delver/sdk';
+import type { ModuleRequestRuntime } from '@sheet-delver/sdk/server';
 import { SYSTEM_PREDEFINED_EFFECTS } from '../../data/talent-effects';
 
 type EffectLike = Record<string, unknown> & {
@@ -19,11 +17,14 @@ type EffectLike = Record<string, unknown> & {
     };
 };
 
-type ItemWithEffects = RawItem & {
+type ItemWithEffects = Record<string, unknown> & {
+    _id?: string;
+    id?: string;
+    name?: string;
     effects?: EffectLike[];
 };
 
-type ActorWithEffects = RawActor & {
+type ActorWithEffects = {
     effects?: EffectLike[];
     items?: ItemWithEffects[];
 };
@@ -44,26 +45,24 @@ const PREDEFINED_EFFECTS_LIST = Object.entries(SYSTEM_PREDEFINED_EFFECTS).map(([
 }));
 
 /**
- * Handles all ActiveEffect operations for a given actor.
- * Uses the static PREDEFINED_EFFECTS_LIST (built at module load) rather than
- * fetching systemData on every call, which was previously triggering the entire
- * discovery/cache pipeline for a list that never changes at runtime.
+ * Handles all ActiveEffect operations for a given actor over `req.runtime`.
+ *
+ * Actor-level effects use parent `{ type: 'Actor', id }`; effects that live on an actor's
+ * owned item use the owned-item parent `{ type: 'Actor.<actorId>.Item', id: itemId }` — both
+ * resolve through `runtime.documents.effects`, which gates writes on the root actor.
  */
 export async function handleEffects(
     actorId: string,
-    client: RouteFoundryClient,
+    runtime: ModuleRequestRuntime,
     action: 'list' | 'toggle' | 'create' | 'update' | 'delete',
     data?: any
 ) {
-    // Use getActorRaw to get un-normalized items/effects for CRUD operations.
-    const actor = await (client.getActorRaw ? client.getActorRaw(actorId) : client.getActor(actorId)) as ActorWithEffects | null | undefined;
+    const actor = await runtime.documents.get('Actor', actorId) as ActorWithEffects | null;
     if (!actor) throw new Error('Actor not found');
 
     switch (action) {
         case 'list': {
             const allEffects: any[] = [];
-
-            // Raw socket data should have effects/items as arrays
             const actorEffects = actor.effects || [];
 
             // 1. Process Actor Effects
@@ -129,7 +128,7 @@ export async function handleEffects(
             });
 
             if (existing) {
-                return await handleEffects(actorId, client, 'delete', { effectId: existing._id || existing.id });
+                return await handleEffects(actorId, runtime, 'delete', { effectId: existing._id || existing.id });
             } else {
                 const newEffect = {
                     name: effectData.name,
@@ -140,21 +139,18 @@ export async function handleEffects(
                     flags: { core: { statusId: effectData.id } },
                     changes: [{ key: effectData.effectKey, value: effectData.defaultValue, mode: effectData.mode }]
                 };
-                return await client.dispatchDocument('ActiveEffect', 'create', { data: [newEffect] }, { type: 'Actor', id: actorId });
+                return await runtime.documents.effects.create({ type: 'Actor', id: actorId }, newEffect);
             }
         }
 
         case 'create':
-            return await client.dispatchDocument('ActiveEffect', 'create',
-                { data: [data] },
-                { type: 'Actor', id: actorId }
-            );
+            return await runtime.documents.effects.create({ type: 'Actor', id: actorId }, data);
 
         case 'update': {
             const effectId = data._id;
             const actorEffect = (actor.effects || []).find((e: any) => (e._id || e.id) === effectId);
             if (actorEffect) {
-                return await client.dispatchDocument('ActiveEffect', 'update', { updates: [data] }, { type: 'Actor', id: actorId });
+                return await runtime.documents.effects.update({ type: 'Actor', id: actorId }, effectId, data);
             }
 
             if (actor.items) {
@@ -163,7 +159,7 @@ export async function handleEffects(
                     const itemId = item._id || item.id;
                     if (!itemId) continue;
                     if (itEffect) {
-                        return await client.dispatchDocument('ActiveEffect', 'update', { updates: [data] }, { type: `Actor.${actorId}.Item`, id: itemId });
+                        return await runtime.documents.effects.update({ type: `Actor.${actorId}.Item`, id: itemId }, effectId, data);
                     }
                 }
             }
@@ -174,7 +170,8 @@ export async function handleEffects(
             const effectId = data.effectId;
             const actorEffect = (actor.effects || []).find((e: any) => (e._id || e.id) === effectId);
             if (actorEffect) {
-                return await client.dispatchDocument('ActiveEffect', 'delete', { ids: [effectId] }, { type: 'Actor', id: actorId });
+                await runtime.documents.effects.delete({ type: 'Actor', id: actorId }, effectId);
+                return { success: true };
             }
 
             if (actor.items) {
@@ -183,7 +180,8 @@ export async function handleEffects(
                     const itemId = item._id || item.id;
                     if (!itemId) continue;
                     if (itEffect) {
-                        return await client.dispatchDocument('ActiveEffect', 'delete', { ids: [effectId] }, { type: `Actor.${actorId}.Item`, id: itemId });
+                        await runtime.documents.effects.delete({ type: `Actor.${actorId}.Item`, id: itemId }, effectId);
+                        return { success: true };
                     }
                 }
             }

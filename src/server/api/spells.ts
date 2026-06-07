@@ -1,35 +1,27 @@
-import { getConfig } from '@core/config';
-import { compendiumStore } from '@server/core/compendium';
+import type { ModuleServerRequest } from '@sheet-delver/sdk/server';
 import { getErrorMessage, logger } from '@sheet-delver/sdk';
-import type { RouteFoundryClient } from '@server/shared/types/requestContext';
 import { shadowdarkAdapter } from '../../server/ShadowdarkAdapter';
 
 /**
  * POST /api/modules/shadowdark/actors/[id]/spells/learn
- * Learn a spell by UUID or ID
+ * Learn a spell by UUID or ID.
  */
-export async function handleLearnSpell(actorId: string, request: Request, client?: RouteFoundryClient | null) {
+export async function handleLearnSpell(actorId: string, req: ModuleServerRequest) {
     try {
-        const foundryClient = client;
-        if (!foundryClient || !foundryClient.isConnected) {
-            logger.warn(`[API] Learn Spell Failed: Client disconnected. Provided Client: ${!!client}`);
-            return Response.json({ error: 'Not connected to Foundry' }, { status: 503 });
-        }
-
-        const { spellUuid } = await request.json();
+        const { spellUuid } = await req.json<{ spellUuid?: string }>();
 
         if (!spellUuid) {
             return Response.json({ error: 'Spell UUID is required' }, { status: 400 });
         }
 
-        // 1. Fetch Spell Data (Unified Resolver)
+        // 1. Fetch Spell Data (unified resolver, runtime-backed)
         const spellData = await shadowdarkAdapter.resolveDocument(spellUuid);
 
         if (!spellData) {
             return Response.json({ error: 'Spell not found' }, { status: 404 });
         }
 
-        // 2. Create Item on Actor
+        // 2. Create the spell Item on the actor via the document store.
         const creationData = {
             name: spellData.name,
             type: 'Spell',
@@ -40,7 +32,7 @@ export async function handleLearnSpell(actorId: string, request: Request, client
             }
         };
 
-        const result = await foundryClient.createActorItem(actorId, creationData);
+        const result = await req.runtime.documents.items.create({ type: 'Actor', id: actorId }, creationData);
 
         return Response.json({ success: true, data: result });
 
@@ -52,11 +44,12 @@ export async function handleLearnSpell(actorId: string, request: Request, client
 
 /**
  * GET /api/modules/shadowdark/spells/list?source=...
- * Fetch spells filtered by class source (e.g. "Wizard")
+ * Fetch spells filtered by class source (e.g. "Wizard"): declared-compendium spells plus any
+ * custom world spells.
  */
-export async function handleGetSpellsBySource(request: Request, client?: RouteFoundryClient | null) {
+export async function handleGetSpellsBySource(req: ModuleServerRequest) {
     try {
-        const { searchParams } = new URL(request.url, getConfig().app.url);
+        const { searchParams } = new URL(req.url, 'http://localhost');
         const source = searchParams.get('source'); // e.g. "Wizard", "Priest"
 
         if (!source) {
@@ -65,126 +58,62 @@ export async function handleGetSpellsBySource(request: Request, client?: RouteFo
 
         const normalizedSource = source.toLowerCase();
 
-        // 1. Fetch Local Spells (Offline Capable)
+        const checkClassMatch = (spellClasses: any) => {
+            const classes = Array.isArray(spellClasses) ? spellClasses : [spellClasses].filter(Boolean);
+            return classes.some((c: any) => {
+                const cStr = String(c).toLowerCase();
+                if (cStr === normalizedSource) return true;
+                // UUID match (heuristic)
+                if (cStr.includes(`.${normalizedSource}.`) || cStr.includes(`/${normalizedSource}/`)) return true;
+                return false;
+            });
+        };
+
+        // 1. Declared-compendium spells (offline, identity-stamped).
         const localSpells = await shadowdarkAdapter.getSpellsBySource(source);
 
-        // 2. Fetch Remote Spells (Foundry)
+        // 2. Custom world spells (the declared compendium is already covered above, so we only
+        //    pull world Item spells here via the document store).
         const remoteSpells: any[] = [];
-        const remoteSpellIds = new Set<string>();
-
-        if (client && client.isConnected) {
-            try {
-                // Fetch World Spells
-                const worldItems = await client.dispatchDocumentSocket('Item', 'get', { broadcast: false });
-                const worldSpells = (worldItems?.result || []).filter((i: any) => i.type === 'Spell');
-
-                // Fetch Compendium Spells (Indices)
-                // ADR-0015 Phase 5 removed compendium readers from the route
-                // client/socket surface. Bootstrap warms CompendiumStore, so
-                // module routes read the active-world index snapshot directly.
-                const packs = compendiumStore.listPackIndices().map(pack => ({
-                    id: pack.id,
-                    metadata: pack.metadata,
-                    index: pack.variant.index,
-                }));
-
-                // Helper to check class match
-                const checkClassMatch = (spellClasses: any) => {
-                    const classes = Array.isArray(spellClasses) ? spellClasses : [spellClasses].filter(Boolean);
-                    return classes.some((c: any) => {
-                        const cStr = String(c).toLowerCase();
-                        // Direct match
-                        if (cStr === normalizedSource) return true;
-                        // UUID match (heuristic)
-                        if (cStr.includes(`.${normalizedSource}.`) || cStr.includes(`/${normalizedSource}/`)) return true;
-                        return false;
+        try {
+            const worldItems = await req.runtime.documents.list('Item', { filter: { type: 'Spell' } });
+            for (const s of (worldItems.rows as any[])) {
+                if (s.type !== 'Spell') continue;
+                if (checkClassMatch(s.system?.class)) {
+                    remoteSpells.push({
+                        name: s.name,
+                        uuid: s.uuid || `Item.${s._id}`,
+                        img: s.img,
+                        tier: s.system?.tier || 0,
+                        system: s.system,
+                        source: 'world'
                     });
-                };
-
-                // Process World Spells
-                for (const s of worldSpells) {
-                    if (checkClassMatch(s.system?.class)) {
-                        remoteSpells.push({
-                            name: s.name,
-                            uuid: s.uuid || `Item.${s._id}`,
-                            img: s.img,
-                            tier: s.system?.tier || 0,
-                            system: s.system,
-                            source: 'world'
-                        });
-                    }
                 }
-
-                // Process Compendium Spells
-                // We need to resolve names for UUIDs here if we want to filter by "Wizard"
-                // But compendium index usually doesn't have "system.class" fully populated or resolved.
-                // We rely on `DataManager` for the bulk of standard spells. 
-                // Remote fetch is mostly for custom world items or non-SRD content.
-
-                // However, user requested robustness. 
-                // Let's iterate packs and check index metadata if available?
-                // V10+ indices can include system fields.
-
-                for (const pack of packs) {
-                    const metadata = pack.metadata || {};
-                    if (metadata.type !== 'Item' && metadata.entity !== 'Item') continue;
-
-                    const index = pack.index || [];
-                    for (const i of index) {
-                        if (i.type !== 'Spell') continue;
-
-                        // Check cached system data in index if available
-                        const tier = i.system?.tier ?? i['system.tier'];
-                        const classes = i.system?.class ?? i['system.class'];
-
-                        if (classes && checkClassMatch(classes)) {
-                            const uuid = `Compendium.${pack.id}.Item.${i._id}`;
-                            if (!remoteSpellIds.has(uuid)) {
-                                remoteSpells.push({
-                                    name: i.name,
-                                    uuid: uuid,
-                                    img: i.img,
-                                    tier: tier || 0,
-                                    system: i.system || {},
-                                    source: 'compendium'
-                                });
-                                remoteSpellIds.add(uuid);
-                            }
-                        }
-                    }
-                }
-
-            } catch (err) {
-                logger.warn('[API] Failed to fetch remote spells:', err);
             }
+        } catch (err) {
+            logger.warn('[API] Failed to fetch world spells:', err);
         }
 
-        // 3. Merge and Deduplicate
-        // Priority: Local (Fast/Standard) -> Remote (Custom/World)
-        // Actually, we usually want to show all unique spells.
-        // If a spell exists in both (same UUID or Name + Tier), which wins?
-        // Let's key by Name + Tier to avoid duplicates like "Light (Tier 0)" vs "Light (Tier 0)"
-
+        // 3. Merge and de-duplicate by Name + Tier (local wins).
         const spellMap = new Map<string, any>();
 
-        const addToMap = (spells: any[], _origin: string) => {
+        const addToMap = (spells: any[]) => {
             for (const s of spells) {
                 const key = `${s.name}-${s.tier || 0}`;
                 if (!spellMap.has(key)) {
                     spellMap.set(key, {
                         ...s,
-                        // Ensure minimal fields
                         uuid: s.uuid || s._id,
                         tier: s.tier || s.system?.tier || 0,
                         img: s.img,
-                        classes: [source] // We know it matches
+                        classes: [source]
                     });
                 }
             }
         };
 
-        addToMap(localSpells, 'local');
-        addToMap(remoteSpells, 'remote');
+        addToMap(localSpells);
+        addToMap(remoteSpells);
 
         const merged = Array.from(spellMap.values()).sort((a, b) => {
             if (a.tier !== b.tier) return a.tier - b.tier;
@@ -198,4 +127,3 @@ export async function handleGetSpellsBySource(request: Request, client?: RouteFo
         return Response.json({ error: getErrorMessage(error) }, { status: 500 });
     }
 }
-

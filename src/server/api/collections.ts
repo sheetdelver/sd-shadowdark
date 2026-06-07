@@ -1,13 +1,14 @@
+import type { ModuleServerRequest } from '@sheet-delver/sdk/server';
 import { shadowdarkAdapter } from '../ShadowdarkAdapter';
 import { getErrorMessage, logger } from '@sheet-delver/sdk';
 
 /**
- * Generic handler to fetch a categorized collection from the warmed system cache.
+ * Generic handler to fetch a categorized collection from the warmed system projection.
  * Supports canonical names like 'ancestries', 'backgrounds', 'classes', etc.
  */
-export async function handleGetCollection(request: Request, id: string, client: any) {
+export async function handleGetCollection(req: ModuleServerRequest, id: string) {
     try {
-        const url = new URL(request.url, 'http://localhost');
+        const url = new URL(req.url, 'http://localhost');
         const summary = url.searchParams.get('summary') === 'true';
 
         logger.debug(`Shadowdark API | Fetching collection: ${id} (summary: ${summary})`);

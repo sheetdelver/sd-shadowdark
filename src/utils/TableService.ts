@@ -119,7 +119,7 @@ export class TableService {
         if (type === 'document' || type === '2') {
             const uuid = target.documentUuid || target.uuid;
             if (uuid) {
-                const resolved = await shadowdarkAdapter.resolveDocument(client, uuid);
+                const resolved = await shadowdarkAdapter.resolveDocument(uuid);
                 if (resolved) {
                     const clean = JSON.parse(JSON.stringify(resolved));
                     if (target.text && !clean.name) clean.name = target.text;

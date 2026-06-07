@@ -1,6 +1,5 @@
 import { getErrorMessage, logger } from '@sheet-delver/sdk';
-import { FoundryClient } from '@core/foundry';
-import type { RouteFoundryClient } from '@server/shared/types/requestContext';
+import type { ModuleRequestRuntime } from '@sheet-delver/sdk/server';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'node:url';
@@ -52,7 +51,7 @@ export class ShadowdarkImporter {
         }
     }
 
-    public async importFromJSON(client: FoundryClient | RouteFoundryClient, json: any): Promise<ImportResult> {
+    public async importFromJSON(runtime: ModuleRequestRuntime, json: any): Promise<ImportResult> {
         const debugLog: string[] = [];
         const log = (msg: string) => {
             debugLog.push(msg);
@@ -69,12 +68,6 @@ export class ShadowdarkImporter {
             log(`[Importer] Starting Import (Server-Side). Name: ${json.name}`);
 
             await this.loadMapping();
-
-            // Ensure connected
-            // @ts-ignore
-            if (!client.isConnected) {
-                return { success: false, errors: ['Not connected to Foundry'] };
-            }
 
             const gear: any[] = [];
             const spells: any[] = [];
@@ -647,7 +640,7 @@ export class ShadowdarkImporter {
 
             // 7. Create Actor and Items
             log(`[Importer] Creating Actor ${actorData.name}...`);
-            const createdActor = await client.createActor(actorData);
+            const createdActor: any = await runtime.documents.create('Actor', actorData);
             if (!createdActor) throw new Error("Failed to create Actor document");
 
             log(`[Importer] Actor Created: ${createdActor._id}`);
@@ -675,8 +668,10 @@ export class ShadowdarkImporter {
             });
 
             if (allItems.length > 0) {
-                log(`[Importer] Creating ${allItems.length} embedded items in parallel chunks...`);
-                await client.createActorItem(createdActor._id, allItems);
+                log(`[Importer] Creating ${allItems.length} embedded items...`);
+                for (const item of allItems) {
+                    await runtime.documents.items.create({ type: 'Actor', id: createdActor._id }, item);
+                }
             }
 
             log(`[Importer] Import Successful: ${createdActor._id}`);

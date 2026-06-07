@@ -1,8 +1,7 @@
-import type { RawActor } from '@server/shared/types/actors';
-import type { RouteFoundryClient } from '@server/shared/types/requestContext';
+import type { ModuleServerRequest } from '@sheet-delver/sdk/server';
 import { logger } from '@sheet-delver/sdk';
 
-type ActorWithNotes = RawActor & {
+interface ActorWithNotes {
     system?: {
         notes?: string;
         details?: {
@@ -11,26 +10,22 @@ type ActorWithNotes = RawActor & {
             };
         };
     };
-};
+}
 
 /**
- * Handle GET request for actor notes
+ * Handle GET request for actor notes.
  */
-export async function handleGetNotes(actorId: string, client: RouteFoundryClient) {
+export async function handleGetNotes(actorId: string, req: ModuleServerRequest) {
     try {
-        // Fetch actor using getActor (normalized) or getActorRaw
-        const actor = await (client.getActorRaw ? client.getActorRaw(actorId) : client.getActor(actorId)) as ActorWithNotes | null | undefined;
+        const actor = await req.runtime.documents.get('Actor', actorId) as ActorWithNotes | null;
 
         if (!actor) {
             throw new Error('Actor not found');
         }
 
-        // Return notes from the appropriate path
         const notes = actor.system?.notes || actor.system?.details?.notes?.value || '';
 
-        return {
-            notes
-        };
+        return { notes };
     } catch (error) {
         logger.error('Error fetching actor notes:', error);
         throw error;
@@ -38,38 +33,23 @@ export async function handleGetNotes(actorId: string, client: RouteFoundryClient
 }
 
 /**
- * Handle POST request to update actor notes
+ * Handle POST request to update actor notes.
  */
-export async function handleUpdateNotes(actorId: string, request: Request, client: RouteFoundryClient) {
+export async function handleUpdateNotes(actorId: string, req: ModuleServerRequest) {
     try {
-        // Parse request body
-        const body = await request.json();
+        const body = await req.json<{ notes?: unknown }>();
         const { notes } = body;
 
         if (typeof notes !== 'string') {
             throw new Error('Invalid notes data: must be a string');
         }
 
-        // Fetch actor to verify it exists
-        const actor = await (client.getActorRaw ? client.getActorRaw(actorId) : client.getActor(actorId)) as ActorWithNotes | null | undefined;
-
-        if (!actor) {
-            throw new Error('Actor not found');
-        }
-
-        // Update actor notes using system.notes path (PC-only)
-        await client.dispatchDocument('Actor', 'update', {
-            updates: [{
-                _id: actorId,
-                'system.notes': notes
-            }]
-        });
+        // Patch the actor's notes via the document store (PC-only field path).
+        await req.runtime.documents.patch('Actor', actorId, { 'system.notes': notes });
 
         logger.info(`Updated notes for actor ${actorId}`);
 
-        return {
-            success: true
-        };
+        return { success: true };
     } catch (error) {
         logger.error('Error updating actor notes:', error);
         throw error;

@@ -1,4 +1,4 @@
-import { ActorSheetData } from '@shared/interfaces';
+import type { ActorSheetData } from '@sheet-delver/sdk';
 import {
     calculateItemSlots,
     calculateMaxSlots,

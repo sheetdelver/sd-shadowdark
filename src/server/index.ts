@@ -1,8 +1,5 @@
-
-
+import type { ModuleServerRequest, ModuleServerParams } from '@sheet-delver/sdk/server';
 import { handleImport } from './api/import';
-import type { ModuleRouteParams } from '@server/shared/types/moduleProxy';
-import { getModuleFoundryClient, getModuleUserSession } from '@server/shared/utils/getModuleFoundryClient';
 import { handleGetLevelUpData, handleRollHP, handleRollGold, handleFinalizeLevelUp, handleRollTalent, handleRollBoon } from "./api/level-up";
 import { handleLearnSpell, handleGetSpellsBySource } from './api/spells';
 import { handleGetDocument } from './api/document';
@@ -11,26 +8,13 @@ import { handleGetCollection } from './api/collections';
 import { handleIndex } from './api/index';
 import { handleGetCustomMaps } from './api/custom-maps';
 import { handleGetNotes, handleUpdateNotes } from './api/notes';
-import { getConfig } from '@core/config';
 import {
     handleRandomizeCharacter,
     handleRandomizeName,
     handleRandomizeStats
 } from './api/randomize-character';
-import { shadowdarkAdapter } from './ShadowdarkAdapter';
 
-// Initialize system adapter
-shadowdarkAdapter.initialize();
-
-function getAuthenticatedModuleClient(request: Request) {
-    const client = getModuleFoundryClient(request);
-    if (!client) {
-        return Response.json({ error: 'Not authenticated' }, { status: 401 });
-    }
-
-    return client;
-}
-
+const actorIdFrom = async (params: ModuleServerParams['params']) => (await params).route[1];
 
 export const apiRoutes = {
     'index': handleIndex,
@@ -39,11 +23,9 @@ export const apiRoutes = {
     // Available fetch-pack IDs:
     // ancestries, backgrounds, classes, deities, patrons, spells,
     // talents, languages, gear, magic-items, conditions, spell-effects
-    'fetch-pack/[id]': async (request: Request, { params }: ModuleRouteParams) => {
-        const { route } = await params;
-        const packId = route[1];
-        const client = getModuleFoundryClient(request);
-        return handleGetCollection(request, packId, client);
+    'fetch-pack/[id]': async (req: ModuleServerRequest, { params }: ModuleServerParams) => {
+        const packId = (await params).route[1];
+        return handleGetCollection(req, packId);
     },
     'document/[uuid]': handleGetDocument,
     // Full-character randomizer (the Generator's "randomize all"); per-field randomize
@@ -51,106 +33,63 @@ export const apiRoutes = {
     'actors/randomize': handleRandomizeCharacter,
     'actors/randomize/name': handleRandomizeName,
     'actors/randomize/stats': handleRandomizeStats,
-    'actors/[id]/level-up/data': async (request: Request, { params }: ModuleRouteParams) => {
-        const { route } = await params;
-        const actorId = route[1]; // Extract [id] from route array
-        return handleGetLevelUpData(actorId, request, getModuleFoundryClient(request));
+    'actors/[id]/level-up/data': async (req: ModuleServerRequest, { params }: ModuleServerParams) => {
+        return handleGetLevelUpData(await actorIdFrom(params), req);
     },
-    'actors/[id]/effects': async (request: Request, { params }: ModuleRouteParams) => {
-        const { route } = await params;
-        const actorId = route[1];
-        const client = getAuthenticatedModuleClient(request);
-        if (client instanceof Response) return client;
-        const result = await handleEffects(actorId, client, 'list');
+    'actors/[id]/effects': async (req: ModuleServerRequest, { params }: ModuleServerParams) => {
+        const result = await handleEffects(await actorIdFrom(params), req.runtime, 'list');
         return Response.json(result);
     },
-    'actors/[id]/effects/create': async (request: Request, { params }: ModuleRouteParams) => {
-        const { route } = await params;
-        const actorId = route[1];
-        const client = getAuthenticatedModuleClient(request);
-        if (client instanceof Response) return client;
-        const data = await request.json();
-        const result = await handleEffects(actorId, client, 'create', data);
+    'actors/[id]/effects/create': async (req: ModuleServerRequest, { params }: ModuleServerParams) => {
+        const data = await req.json();
+        const result = await handleEffects(await actorIdFrom(params), req.runtime, 'create', data);
         return Response.json({ success: true, result });
     },
-    'actors/[id]/effects/update': async (request: Request, { params }: ModuleRouteParams) => {
-        const { route } = await params;
-        const actorId = route[1];
-        const client = getAuthenticatedModuleClient(request);
-        if (client instanceof Response) return client;
-        const data = await request.json();
-        const result = await handleEffects(actorId, client, 'update', data);
+    'actors/[id]/effects/update': async (req: ModuleServerRequest, { params }: ModuleServerParams) => {
+        const data = await req.json();
+        const result = await handleEffects(await actorIdFrom(params), req.runtime, 'update', data);
         return Response.json({ success: true, result });
     },
-    'actors/[id]/effects/delete': async (request: Request, { params }: ModuleRouteParams) => {
-        const { route } = await params;
-        const actorId = route[1];
-        const client = getAuthenticatedModuleClient(request);
-        if (client instanceof Response) return client;
-        const url = new URL(request.url, getConfig().app.url);
+    'actors/[id]/effects/delete': async (req: ModuleServerRequest, { params }: ModuleServerParams) => {
+        const url = new URL(req.url, 'http://localhost');
         const effectId = url.searchParams.get('effectId');
         if (!effectId) return Response.json({ error: 'Missing effectId' }, { status: 400 });
-        const result = await handleEffects(actorId, client, 'delete', { effectId });
+        const result = await handleEffects(await actorIdFrom(params), req.runtime, 'delete', { effectId });
         return Response.json({ success: true, result });
     },
-    'actors/[id]/effects/toggle': async (request: Request, { params }: ModuleRouteParams) => {
-        const { route } = await params;
-        const actorId = route[1];
-        const client = getAuthenticatedModuleClient(request);
-        if (client instanceof Response) return client;
-        const { effectId } = await request.json();
-        const result = await handleEffects(actorId, client, 'toggle', { effectId });
+    'actors/[id]/effects/toggle': async (req: ModuleServerRequest, { params }: ModuleServerParams) => {
+        const { effectId } = await req.json<{ effectId: string }>();
+        const result = await handleEffects(await actorIdFrom(params), req.runtime, 'toggle', { effectId });
         return Response.json({ success: true, result });
     },
-    'actors/[id]/notes': async (request: Request, { params }: ModuleRouteParams) => {
-        const { route } = await params;
-        const actorId = route[1];
-        const client = getAuthenticatedModuleClient(request);
-        if (client instanceof Response) return client;
-
-        if (request.method === 'GET') {
-            const result = await handleGetNotes(actorId, client);
-            return Response.json(result);
-        } else if (request.method === 'POST') {
-            const result = await handleUpdateNotes(actorId, request, client);
-            return Response.json(result);
+    'actors/[id]/notes': async (req: ModuleServerRequest, { params }: ModuleServerParams) => {
+        const actorId = await actorIdFrom(params);
+        if (req.method === 'GET') {
+            return Response.json(await handleGetNotes(actorId, req));
+        } else if (req.method === 'POST') {
+            return Response.json(await handleUpdateNotes(actorId, req));
         }
-
         return Response.json({ error: 'Method not allowed' }, { status: 405 });
     },
-    'actors/[id]/level-up/roll-hp': async (request: Request, { params }: ModuleRouteParams) => {
-        const { route } = await params;
-        const actorId = route[1];
-        return handleRollHP(actorId, request, getModuleFoundryClient(request), getModuleUserSession(request));
+    'actors/[id]/level-up/roll-hp': async (req: ModuleServerRequest, { params }: ModuleServerParams) => {
+        return handleRollHP(await actorIdFrom(params), req);
     },
-    'actors/[id]/level-up/roll-gold': async (request: Request, { params }: ModuleRouteParams) => {
-        const { route } = await params;
-        const actorId = route[1];
-        return handleRollGold(actorId, request, getModuleFoundryClient(request), getModuleUserSession(request));
+    'actors/[id]/level-up/roll-gold': async (req: ModuleServerRequest, { params }: ModuleServerParams) => {
+        return handleRollGold(await actorIdFrom(params), req);
     },
-    'actors/[id]/level-up/finalize': async (request: Request, { params }: ModuleRouteParams) => {
-        const { route } = await params;
-        const actorId = route[1];
-        return handleFinalizeLevelUp(actorId, request, getModuleFoundryClient(request));
+    'actors/[id]/level-up/finalize': async (req: ModuleServerRequest, { params }: ModuleServerParams) => {
+        return handleFinalizeLevelUp(await actorIdFrom(params), req);
     },
-    'actors/[id]/level-up/roll-talent': async (request: Request, { params }: ModuleRouteParams) => {
-        const { route } = await params;
-        const actorId = route[1];
-        return handleRollTalent(actorId, request, getModuleFoundryClient(request));
+    'actors/[id]/level-up/roll-talent': async (req: ModuleServerRequest, { params }: ModuleServerParams) => {
+        return handleRollTalent(await actorIdFrom(params), req);
     },
-    'actors/[id]/level-up/roll-boon': async (request: Request, { params }: ModuleRouteParams) => {
-        const { route } = await params;
-        const actorId = route[1];
-        return handleRollBoon(actorId, request, getModuleFoundryClient(request));
+    'actors/[id]/level-up/roll-boon': async (req: ModuleServerRequest, { params }: ModuleServerParams) => {
+        return handleRollBoon(await actorIdFrom(params), req);
     },
-    'actors/[id]/spells/learn': async (request: Request, { params }: ModuleRouteParams) => {
-        const { route } = await params;
-        const actorId = route[1];
-        return handleLearnSpell(actorId, request, getModuleFoundryClient(request));
+    'actors/[id]/spells/learn': async (req: ModuleServerRequest, { params }: ModuleServerParams) => {
+        return handleLearnSpell(await actorIdFrom(params), req);
     },
-    'spells/list': async (request: Request) => {
-        return handleGetSpellsBySource(request, getModuleFoundryClient(request));
+    'spells/list': async (req: ModuleServerRequest) => {
+        return handleGetSpellsBySource(req);
     }
 };
-
-

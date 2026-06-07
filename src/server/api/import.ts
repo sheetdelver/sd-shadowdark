@@ -1,19 +1,14 @@
+import type { ModuleServerRequest } from '@sheet-delver/sdk/server';
 import { ShadowdarkImporter } from '../importer';
 import { getErrorMessage, logger } from '@sheet-delver/sdk';
-import { getModuleFoundryClient } from '@server/shared/utils/getModuleFoundryClient';
 
-export async function handleImport(request: Request) {
+export async function handleImport(req: ModuleServerRequest) {
     try {
-        const client = getModuleFoundryClient(request);
-        if (!client || !client.isConnected) {
-            return Response.json({ error: 'Not connected to Foundry' }, { status: 503 });
-        }
-
-        const json = await request.json();
+        const json = await req.json();
 
         // Use Module Logic
         const importer = new ShadowdarkImporter();
-        const result = await importer.importFromJSON(client, json);
+        const result = await importer.importFromJSON(req.runtime, json);
 
         if (!result.success) {
             logger.error('[API] Import Failed:', result.errors);
@@ -25,7 +20,7 @@ export async function handleImport(request: Request) {
     } catch (error: unknown) {
         logger.error('[Shadowdark API] Import Error:', error);
         if (error instanceof Error && error.stack) logger.error(error.stack);
-        return Response.json({ 
+        return Response.json({
             error: getErrorMessage(error) || 'Import failed',
             details: error instanceof Error ? error.stack : undefined
         }, { status: 500 });
