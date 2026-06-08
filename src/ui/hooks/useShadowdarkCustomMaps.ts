@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { logger } from '@sheet-delver/sdk';
+import { useSDK } from '@sheet-delver/sdk/react';
 
 const getErrorMessage = (error: unknown, fallback = 'Failed to fetch custom maps'): string => {
     if (error instanceof Error) return error.message;
@@ -19,6 +20,7 @@ interface CustomMaps {
  * the UI decoupled from the primary systemData payload.
  */
 export function useShadowdarkCustomMaps() {
+    const { fetchWithAuth } = useSDK();
     const [maps, setMaps] = useState<CustomMaps | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
@@ -28,7 +30,7 @@ export function useShadowdarkCustomMaps() {
 
         async function fetchMaps() {
             try {
-                const res = await fetch('/api/modules/shadowdark/custom-maps');
+                const res = await fetchWithAuth('/api/modules/shadowdark/custom-maps');
                 if (!res.ok) throw new Error(`Failed to fetch custom maps: ${res.statusText}`);
                 
                 const data = await res.json();
@@ -50,7 +52,7 @@ export function useShadowdarkCustomMaps() {
         return () => {
             isMounted = false;
         };
-    }, []);
+    }, [fetchWithAuth]);
 
     const value = useMemo(() => ({
         maps,

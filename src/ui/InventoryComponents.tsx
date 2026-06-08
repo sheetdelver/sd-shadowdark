@@ -6,7 +6,7 @@ import {
     getSafeDescription,
     formatDescription
 } from './sheet-utils';
-import { useConfig } from '@client/ui/context/ConfigContext';
+import { useSDK } from '@sheet-delver/sdk/react';
 import { useShadowdarkActor } from './context/ShadowdarkActorContext';
 
 
@@ -70,7 +70,7 @@ export interface ItemRowProps {
 }
 
 export function ItemRow({ item, expandedItems, toggleItem, isTreasure, onSell }: ItemRowProps) {
-    const { resolveImageUrl } = useConfig();
+    const { resolveImageUrl } = useSDK();
     const { updateActor, deleteItem, getDraftValue } = useShadowdarkActor();
 
     const itemId = item.id || item._id;

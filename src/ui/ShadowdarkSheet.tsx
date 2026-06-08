@@ -1,16 +1,13 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import RollDialog from '@client/ui/components/RollDialog';
 import ErrorBoundary from './components/ErrorBoundary';
-import LoadingModal from '@client/ui/components/LoadingModal';
 import { shadowdarkTheme } from './themes/shadowdark';
-import { useNotifications, NotificationContainer } from '@client/ui/components/NotificationSystem';
 
 import { calculateSpellBonus } from './sheet-utils';
 import { shouldShowSpellsTab } from '../logic/rules';
 import { Menu, X, Check } from 'lucide-react';
-import { useConfig } from '@client/ui/context/ConfigContext';
+import { useSDK, useSDKComponents } from '@sheet-delver/sdk/react';
 import dynamic from 'next/dynamic';
 import { ShadowdarkUIProvider, useShadowdarkUI } from './context/ShadowdarkUIContext';
 import { useShadowdarkActor } from './context/ShadowdarkActorContext';
@@ -24,9 +21,9 @@ import DetailsTab from './DetailsTab';
 import EffectsTab from './EffectsTab';
 import NotesTab from './NotesTab';
 
-const LevelUpModal = dynamic(() => import('./components/LevelUpModal').then(mod => mod.LevelUpModal), { 
+const LevelUpModal = dynamic(() => import('./components/LevelUpModal').then(mod => mod.LevelUpModal), {
     ssr: false,
-    loading: () => <LoadingModal message="Loading Level Up System..." />
+    loading: () => <div className="p-8 text-center text-white font-sans">Loading Level Up System...</div>
 });
 
 import ShadowdarkPaperSheet from './ShadowdarkPaperSheet';
@@ -59,14 +56,14 @@ export default function ShadowdarkSheet(props: ShadowdarkSheetProps) {
         closeLevelUp
     } = useShadowdarkActor();
     
-    const { resolveImageUrl } = useConfig();
+    const { resolveImageUrl, addNotification } = useSDK();
+    const { RollDialog, LoadingModal } = useSDKComponents();
     const { systemData, loadingSystem, resolveName } = useShadowdarkUI();
 
     // UI state
     const [activeTab, setActiveTab] = useState('details');
     const [menuOpen, setMenuOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
-    const { notifications, addNotification, removeNotification } = useNotifications();
 
     const [viewMode, setViewMode] = useState<'simple' | 'advanced'>(() => {
         if (typeof window !== 'undefined') {
@@ -409,7 +406,7 @@ export default function ShadowdarkSheet(props: ShadowdarkSheetProps) {
                 type={rollDialog.type}
                 defaults={rollDialog.defaults}
                 theme={shadowdarkTheme.rollDialog}
-                onConfirm={(options) => {
+                onConfirm={(options: any) => {
                     if (rollDialog.callback) rollDialog.callback(options);
                 }}
                 onClose={closeRollDialog}
@@ -443,7 +440,6 @@ export default function ShadowdarkSheet(props: ShadowdarkSheetProps) {
                     />
                 )
             }
-            <NotificationContainer notifications={notifications} removeNotification={removeNotification} />
         </div >
     );
 }

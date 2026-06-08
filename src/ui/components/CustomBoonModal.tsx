@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { X, Trash2, Power, Search } from 'lucide-react';
-import { useConfig } from '@client/ui/context/ConfigContext';
+import { useSDK } from '@sheet-delver/sdk/react';
 import { useShadowdarkCustomMaps } from '../hooks/useShadowdarkCustomMaps';
 import { logger } from '@sheet-delver/sdk';
 
@@ -31,7 +31,7 @@ const MODES = [
 ];
 
 export default function CustomBoonModal({ isOpen, onClose, onCreate, onUpdate, initialData, systemConfig: _systemConfig, predefinedEffects: _predefinedEffects }: CustomBoonModalProps) {
-    const { resolveImageUrl } = useConfig();
+    const { resolveImageUrl } = useSDK();
     const { predefinedEffects, boonTypes, effectTranslations } = useShadowdarkCustomMaps();
     const [name, setName] = useState('');
     const [boonType, setBoonType] = useState('blessing');

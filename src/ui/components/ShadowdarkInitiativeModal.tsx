@@ -1,9 +1,10 @@
 import React from 'react';
-import RollDialog from '@client/ui/components/RollDialog';
+import { useSDKComponents } from '@sheet-delver/sdk/react';
 import { getInitiativeFormula } from '../../logic/rules';
 import { shadowdarkTheme } from '../themes/shadowdark';
 
 export default function ShadowdarkInitiativeModal(props: any) {
+    const { RollDialog } = useSDKComponents();
     const { isOpen, title, onClose, onConfirm, actor, theme } = props;
 
     // Use the shared pure logic to get the standardized formula from the actor

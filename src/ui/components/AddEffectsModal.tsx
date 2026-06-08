@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { X, Power, Search } from 'lucide-react';
-import { useConfig } from '@client/ui/context/ConfigContext';
+import { useSDK } from '@sheet-delver/sdk/react';
 import { useShadowdarkCustomMaps } from '../hooks/useShadowdarkCustomMaps';
 import { logger } from '@sheet-delver/sdk';
 
@@ -30,7 +30,7 @@ export default function AddEffectsModal({
     initialData,
     predefinedEffects: _predefinedEffects
 }: AddEffectsModalProps) {
-    const { resolveImageUrl } = useConfig();
+    const { resolveImageUrl } = useSDK();
     const { predefinedEffects, effectTranslations } = useShadowdarkCustomMaps();
     const [loading, setLoading] = useState(false);
 

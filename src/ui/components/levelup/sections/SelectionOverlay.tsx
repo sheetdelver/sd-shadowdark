@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useConfig } from '@client/ui/context/ConfigContext';
+import { useSDK } from '@sheet-delver/sdk/react';
 
 interface Props {
     pendingChoices: {
@@ -13,7 +13,7 @@ interface Props {
 }
 
 export const SelectionOverlay = ({ pendingChoices, onSelect, onClose }: Props) => {
-    const { resolveImageUrl } = useConfig();
+    const { resolveImageUrl } = useSDK();
     const maxSelections = pendingChoices.maxSelections || 1;
     const [selected, setSelected] = useState<any[]>([]);
 

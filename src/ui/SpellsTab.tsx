@@ -5,20 +5,18 @@ import {
     formatDescription,
     getSafeDescription,
 } from './sheet-utils';
-import { useConfig } from '@client/ui/context/ConfigContext';
+import { useSDK } from '@sheet-delver/sdk/react';
 import SpellSelectionModal from './components/SpellSelectionModal';
 
 import { Loader2 } from 'lucide-react';
-import { useNotifications } from '@client/ui/components/NotificationSystem';
 import { logger } from '@sheet-delver/sdk';
 import { useShadowdarkUI } from './context/ShadowdarkUIContext';
 
 import { useShadowdarkActor } from './context/ShadowdarkActorContext';
 
 export default function SpellsTab() {
-    const { addNotification } = useNotifications();
     const { systemData, collections, fetchPack, resolveName, token } = useShadowdarkUI();
-    const { resolveImageUrl } = useConfig();
+    const { resolveImageUrl, addNotification } = useSDK();
     const {
         actor,
         updateActor,

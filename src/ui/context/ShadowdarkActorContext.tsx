@@ -4,7 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { logger } from '@sheet-delver/sdk';
 import { useShadowdarkUI } from './ShadowdarkUIContext';
 import { calculateSpellBonus } from '../sheet-utils';
-import { useNotifications } from '@client/ui/components/NotificationSystem';
+import { useSDK } from '@sheet-delver/sdk/react';
 import { useShadowdarkLevelUp } from '../hooks/useShadowdarkLevelUp';
 
 /**
@@ -92,7 +92,7 @@ export function ShadowdarkActorProvider({
     const [optimisticDeletedIds, setOptimisticDeletedIds] = useState<Set<string>>(new Set());
 
     // Notifications — used by the level-up hook below
-    const { addNotification } = useNotifications();
+    const { addNotification } = useSDK();
 
     const [rollDialog, setRollDialog] = useState<{
         open: boolean;

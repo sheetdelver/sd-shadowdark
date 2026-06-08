@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { X, Search, Check, ChevronDown, ChevronUp } from 'lucide-react';
 import { resolveImage, formatDescription, getSafeDescription } from '../sheet-utils';
-import { useConfig } from '@client/ui/context/ConfigContext';
+import { useSDK } from '@sheet-delver/sdk/react';
 import { logger } from '@sheet-delver/sdk';
 import { useShadowdarkUI } from '../context/ShadowdarkUIContext';
 
@@ -43,7 +43,7 @@ export default function SpellSelectionModal({
     isSaving = false,
     actor
 }: SpellSelectionModalProps) {
-    const { resolveImageUrl } = useConfig();
+    const { resolveImageUrl } = useSDK();
     const { systemData, collections } = useShadowdarkUI();
     const [search, setSearch] = useState('');
     const [selectedUuids, setSelectedUuids] = useState<Set<string>>(new Set());

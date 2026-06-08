@@ -4,10 +4,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 
 import { LevelUpModal } from '../components/LevelUpModal';
 import { logger } from '@sheet-delver/sdk';
-import { useConfig } from '@client/ui/context/ConfigContext';
+import { useSDK, useSDKComponents } from '@sheet-delver/sdk/react';
 import { useShadowdarkUI, ShadowdarkUIProvider } from '../context/ShadowdarkUIContext';
-import { useFoundry } from '@client/ui/context/FoundryContext';
-import LoadingModal from '@client/ui/components/LoadingModal';
 import { enrichItem, resolveSubItems, EnrichmentContext } from '../../logic/actor-enricher';
 
 export default function Generator() {
@@ -22,10 +20,9 @@ export default function Generator() {
 
 function GeneratorContent() {
     const { systemData, collections, fetchPack, resolveName, loadingSystem } = useShadowdarkUI();
-    const { step, system } = useFoundry();
-    const { setFoundryUrl: setConfigFoundryUrl } = useConfig();
+    const { foundryUrl, isConnected } = useSDK();
+    const { LoadingModal } = useSDKComponents();
     const [loading, setLoading] = useState(true);
-    const [foundryUrl, setFoundryUrl] = useState<string>('');
     const [token, setToken] = useState<string | null>(null);
 
     // Load Token
@@ -173,18 +170,13 @@ function GeneratorContent() {
                         window.location.href = '/';
                     }
                 }
-                if (data.url) {
-                    setFoundryUrl(data.url);
-                    setConfigFoundryUrl(data.url);
-                } else {
-                    logger.warn('Generator: No foundryUrl returned from connect');
-                }
+                // foundryUrl comes from the platform via useSDK(); no need to push it back.
             } catch {
                 window.location.href = '/';
             }
         };
         checkConnection();
-    }, [fetchWithAuth, setConfigFoundryUrl]);
+    }, [fetchWithAuth]);
 
     // Load Shards and Index
     useEffect(() => {
@@ -212,7 +204,7 @@ function GeneratorContent() {
 
     // Consolidated Readiness Logic
     const isAppLoading = loading || loadingSystem || !systemData || !collections.ancestries;
-    const isCoreReady = step === 'dashboard' && system?.status === 'active';
+    const isCoreReady = isConnected;
 
     // Handle initial loading state sync
     useEffect(() => {

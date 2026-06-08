@@ -4,8 +4,7 @@ import { useState, useEffect } from 'react';
 import {
     calculateItemSlots,
 } from './sheet-utils';
-import { useConfig } from '@client/ui/context/ConfigContext';
-import { ConfirmationModal } from '@client/ui/components/ConfirmationModal';
+import { useSDK, useSDKComponents } from '@sheet-delver/sdk/react';
 import { shadowdarkTheme } from './themes/shadowdark';
 import { ItemRow } from './InventoryComponents';
 import GemBagModal from './components/GemBagModal';
@@ -16,7 +15,8 @@ import { Gem, Plus } from 'lucide-react';
 import { useShadowdarkActor } from './context/ShadowdarkActorContext';
 
 export default function InventoryTab() {
-    const { resolveImageUrl } = useConfig();
+    const { resolveImageUrl } = useSDK();
+    const { ConfirmationModal } = useSDKComponents();
     const {
         actor,
         updateActor,

@@ -1,14 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useConfig } from '@client/ui/context/ConfigContext';
+import { useSDK } from '@sheet-delver/sdk/react';
 import { useShadowdarkUI } from './context/ShadowdarkUIContext';
 
 import { useShadowdarkActor } from './context/ShadowdarkActorContext';
 
 export default function AbilitiesTab() {
     const { resolveName } = useShadowdarkUI();
-    const { resolveImageUrl } = useConfig();
+    const { resolveImageUrl } = useSDK();
     const {
         actor,
         updateActor,

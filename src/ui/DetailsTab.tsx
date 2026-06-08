@@ -2,17 +2,15 @@
 
 import React, { useState, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
-import { useConfig } from '@client/ui/context/ConfigContext';
+import { useSDK, useSDKComponents } from '@sheet-delver/sdk/react';
 import CustomBoonModal from './components/CustomBoonModal';
 import CompendiumSelectModal from './components/CompendiumSelectModal';
 import LanguageSelectionModal from './components/LanguageSelectionModal';
-import { ConfirmationModal } from '@client/ui/components/ConfirmationModal';
 import { shadowdarkTheme } from './themes/shadowdark';
 import { isRareLanguage } from '../logic/rules';
 import { useShadowdarkUI } from './context/ShadowdarkUIContext';
 import { useShadowdarkActor } from './context/ShadowdarkActorContext';
 import dynamic from 'next/dynamic';
-import LoadingModal from '@client/ui/components/LoadingModal';
 import { LevelUpModal } from './components/LevelUpModal';
 
 interface DetailsTabProps {
@@ -21,7 +19,8 @@ interface DetailsTabProps {
 
 export default function DetailsTab({}: DetailsTabProps) {
     const { systemData, collections, fetchPack, resolveName } = useShadowdarkUI();
-    const { resolveImageUrl } = useConfig();
+    const { resolveImageUrl } = useSDK();
+    const { ConfirmationModal } = useSDKComponents();
     const {
         actor,
         updateActor,

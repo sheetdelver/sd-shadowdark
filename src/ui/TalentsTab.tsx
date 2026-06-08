@@ -5,12 +5,12 @@ import {
     formatDescription,
     getSafeDescription
 } from './sheet-utils';
-import { useConfig } from '@client/ui/context/ConfigContext';
+import { useSDK } from '@sheet-delver/sdk/react';
 
 import { useShadowdarkActor } from './context/ShadowdarkActorContext';
 
 export default function TalentsTab() {
-    const { resolveImageUrl } = useConfig();
+    const { resolveImageUrl } = useSDK();
     const { actor, triggerRollDialog } = useShadowdarkActor();
     const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
 

@@ -5,7 +5,7 @@ import { Flame, Utensils, Info, Check } from 'lucide-react';
 import ItemModal from './components/ItemModal';
 import NotesModal from './components/NotesModal';
 import { LevelUpModal } from './components/LevelUpModal';
-import { useNotifications } from '@client/ui/components/NotificationSystem';
+import { useSDK } from '@sheet-delver/sdk/react';
 import { logger } from '@sheet-delver/sdk';
 import { useShadowdarkLevelUp } from './hooks/useShadowdarkLevelUp';
 import { useShadowdarkUI } from './context/ShadowdarkUIContext';
@@ -25,7 +25,7 @@ export default function ShadowdarkPaperSheet({
     const [selectedItem, setSelectedItem] = useState<any>(null);
     const [notesModalOpen, setNotesModalOpen] = useState(false);
     const [viewMode, setViewMode] = useState<'paper' | 'list'>('paper');
-    const { addNotification } = useNotifications();
+    const { addNotification } = useSDK();
 
     // Shadowdark Level-Up Logic (Consolidated)
     const { showLevelUpModal, levelUpData, triggerLevelUp, closeLevelUp } = useShadowdarkLevelUp(actor, addNotification as any);

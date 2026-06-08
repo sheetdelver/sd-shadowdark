@@ -3,7 +3,6 @@ import { isClassSpellcaster } from '../../../logic/rules';
 import { logger } from '@sheet-delver/sdk';
 import { TALENT_HANDLERS } from '../../../logic/talent-handlers';
 import { useShadowdarkUI } from '../../context/ShadowdarkUIContext';
-import { useConfig } from '@client/ui/context/ConfigContext';
 
 export interface LevelUpProps {
     actorId: string;

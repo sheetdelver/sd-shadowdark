@@ -1,7 +1,7 @@
 import { logger } from '@sheet-delver/sdk';
 import { useState, useEffect, useMemo } from 'react';
 import { X, Search, ChevronDown, ChevronRight, Shield, Backpack, Swords, Sparkles, Sprout, Briefcase, Plus, Flame, Sun, Target } from 'lucide-react';
-import { useConfig } from '@client/ui/context/ConfigContext';
+import { useSDK } from '@sheet-delver/sdk/react';
 import { useShadowdarkUI } from '../context/ShadowdarkUIContext';
 
 interface GearSelectionModalProps {
@@ -23,7 +23,7 @@ const FOLDER_IDS: Record<string, GearCategory> = {
 };
 
 export default function GearSelectionModal({ isOpen, onClose, onCreate }: GearSelectionModalProps) {
-    const { resolveImageUrl } = useConfig();
+    const { resolveImageUrl } = useSDK();
     const { collections, fetchPack, resolveName } = useShadowdarkUI();
     const [searchTerm, setSearchTerm] = useState('');
     const [expandedCategories, setExpandedCategories] = useState<Set<GearCategory>>(new Set(['Basic Gear']));

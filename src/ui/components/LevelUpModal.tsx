@@ -16,7 +16,7 @@ import { SelectionOverlay } from './levelup/sections/SelectionOverlay';
 import { LoadingOverlay } from './levelup/sections/LoadingOverlay';
 import { LevelUpFooter } from './levelup/sections/LevelUpFooter';
 import { ExtraSpellSelectionSection } from './levelup/sections/ExtraSpellSelectionSection';
-import { useConfig } from '@client/ui/context/ConfigContext';
+import { useSDK } from '@sheet-delver/sdk/react';
 
 // ... (imports)
 
@@ -27,7 +27,7 @@ import { useConfig } from '@client/ui/context/ConfigContext';
 
 export const LevelUpModal = (props: LevelUpProps) => {
     const { state, actions } = useLevelUp(props);
-    const { resolveImageUrl } = useConfig();
+    const { resolveImageUrl } = useSDK();
     //const activeClassImage = state.activeClassObj?.img?.startsWith('systems') ? `/${state.activeClassObj.img}` : state.activeClassObj.img;
     //dangerouslySetInnerHTML={{ __html: state.activeClassObj.system?.description?.split('.')[0] + '.' || "Class Archetype" }}
     // Common Shadowdark Class Card Style

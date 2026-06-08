@@ -1,13 +1,14 @@
 // 'use client';
 
-import RichTextEditor from '@client/ui/components/RichTextEditor';
 import { shadowdarkTheme } from './themes/shadowdark';
 import { logger } from '@sheet-delver/sdk';
+import { useSDKComponents } from '@sheet-delver/sdk/react';
 
 import { useShadowdarkActor } from './context/ShadowdarkActorContext';
 import { useShadowdarkUI } from './context/ShadowdarkUIContext';
 
 export default function NotesTab() {
+    const { RichTextEditor } = useSDKComponents();
     const { token } = useShadowdarkUI();
     const { actor, updateActor, getDraftValue } = useShadowdarkActor();
 

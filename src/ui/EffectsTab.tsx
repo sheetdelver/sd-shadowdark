@@ -1,8 +1,7 @@
 // 'use client';
 
 import { useState } from 'react';
-import { ConfirmationModal } from '@client/ui/components/ConfirmationModal';
-import { useConfig } from '@client/ui/context/ConfigContext';
+import { useSDK, useSDKComponents } from '@sheet-delver/sdk/react';
 import { Plus, Edit2 } from 'lucide-react';
 import AddEffectsModal from './components/AddEffectsModal';
 
@@ -10,7 +9,8 @@ import AddEffectsModal from './components/AddEffectsModal';
 import { useShadowdarkActor } from './context/ShadowdarkActorContext';
 
 export default function EffectsTab() {
-    const { resolveImageUrl } = useConfig();
+    const { resolveImageUrl } = useSDK();
+    const { ConfirmationModal } = useSDKComponents();
     const {
         actor,
         toggleEffect,

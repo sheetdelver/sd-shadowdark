@@ -1,17 +1,11 @@
 'use client';
 
-import { useState, useEffect, use, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 
-import SheetRouter from '@client/ui/components/SheetRouter';
-import { useFoundry } from '@client/ui/context/FoundryContext';
-import { useUI } from '@client/ui/context/UIContext';
-import { useConfig } from '@client/ui/context/ConfigContext';
-import type { RealtimeActorChangedPayload } from '@shared/contracts/realtime';
-import { resolveImage, processHtmlContent, getSafeDescription } from '@sheet-delver/sdk';
-import { useNotifications } from '@client/ui/components/NotificationSystem';
-import LoadingModal from '@client/ui/components/LoadingModal';
-import { SharedContentModal } from '@client/ui/components/SharedContentModal';
+import { processHtmlContent } from '@sheet-delver/sdk';
+import { useSDK, useSDKComponents } from '@sheet-delver/sdk/react';
+import ShadowdarkSheet from '../ShadowdarkSheet';
 import { ShadowdarkActorProvider } from '../context/ShadowdarkActorContext';
 import { ShadowdarkUIProvider } from '../context/ShadowdarkUIContext';
 
@@ -21,29 +15,24 @@ export interface ShadowdarkActorPageProps {
 }
 
 /**
- * Shadowdark-specific actor page.
- * Owns all Shadowdark feature handlers (effects, item updates with effect deletion, etc.)
- * Registered in modules/shadowdark/index.ts as actorPage.
+ * Shadowdark actor page (ADR-0027 conformed).
+ *
+ * Owns the Shadowdark feature handlers (effects, item updates with effect deletion, etc.).
+ * Platform access is through `useSDK()` / `useSDKComponents()`; realtime refresh rides the
+ * SDK event bus (`events.on('document:changed')`) instead of the raw socket. Registered as
+ * the module's `actorPage` surface in `module/ui.tsx`.
  */
 export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProps) {
     const router = useRouter();
-    const {
-        token,
-        appSocket
-    } = useFoundry();
-    const { isDiceTrayOpen, toggleDiceTray } = useUI();
-    const { addNotification: addToast } = useNotifications();
-    const { foundryUrl, setFoundryUrl } = useConfig();
+    const { foundryUrl, addNotification: addToast, isDiceTrayOpen, toggleDiceTray, events, fetchWithAuth } = useSDK();
+    const { LoadingModal, SharedContentModal } = useSDKComponents();
+
+    // Auth token for the module's own providers (same source the Generator uses).
+    const token = typeof window !== 'undefined' ? localStorage.getItem('sheet-delver-token') : null;
 
     const [actor, setActor] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
-
-    const fetchWithAuth = useCallback(async (input: string, init?: RequestInit) => {
-        const headers = new Headers(init?.headers);
-        if (token) headers.set('Authorization', `Bearer ${token}`);
-        return fetch(input, { ...init, headers });
-    }, [token]);
 
     const foundryUrlRef = useRef(foundryUrl);
     useEffect(() => { foundryUrlRef.current = foundryUrl; }, [foundryUrl]);
@@ -69,7 +58,6 @@ export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProp
             const data = await res.json();
             if (data && !data.error) {
                 setActor(data);
-                if (data.foundryUrl) setFoundryUrl(data.foundryUrl);
             } else {
                 if (res.status >= 500) {
                     addNotification('Server Error: ' + (data?.error || 'Unknown Error'), 'error');
@@ -82,7 +70,7 @@ export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProp
         } finally {
             if (!silent) setLoading(false);
         }
-    }, [router, fetchWithAuth, addNotification, setFoundryUrl]);
+    }, [router, fetchWithAuth, addNotification]);
 
     const loadingRef = useRef(loading);
     useEffect(() => { loadingRef.current = loading; }, [loading]);
@@ -91,17 +79,12 @@ export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProp
         if (!actorId) return;
         fetchActor(actorId);
 
-        if (appSocket) {
-            const handleActorChanged = (data: RealtimeActorChangedPayload) => {
-                if (data.actorId === actorId) {
-                    fetchActor(actorId, true);
-                }
-            };
-            appSocket.on('actorChanged', handleActorChanged);
-            return () => {
-                appSocket.off('actorChanged', handleActorChanged);
-            };
-        }
+        // Realtime refresh via the SDK event bus (replaces the raw socket actorChanged).
+        const off = events.on('document:changed', ({ type, id }) => {
+            if (type === 'Actor' && id === actorId) {
+                fetchActor(actorId, true);
+            }
+        });
 
         const timeout = setTimeout(() => {
             if (loadingRef.current) {
@@ -110,16 +93,10 @@ export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProp
         }, 15000);
 
         return () => {
+            off();
             clearTimeout(timeout);
         };
-    }, [actorId, fetchActor, addNotification, appSocket]);
-
-    // handleChatSend was unused in original code but is useful context for chat.
-    // However, if logic doesn't call it, it's dead code. Checking...
-    // The lint says it is unused. Let's remove it if it's truly not called.
-
-    // ... wait, handleChatSend is NOT called in the original file I pasted earlier?
-    // Let me check.
+    }, [actorId, fetchActor, addNotification, events]);
 
     const handleRoll = async (type: string, key: string, options: any = {}) => {
         if (!actor) return;
@@ -164,7 +141,6 @@ export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProp
             addNotification('Error updating: ' + e.message, 'error');
         }
     };
-
 
     // --- Shadowdark-specific: Effect handlers ---
 
@@ -317,57 +293,45 @@ export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProp
                 <div className="w-full max-w-5xl mx-auto p-4 pt-20">
                     <ShadowdarkUIProvider token={token}>
                         <ShadowdarkActorProvider
-                        actor={actor}
-                        onUpdate={handleUpdate}
-                        onDeleteItem={handleDeleteItem}
-                        onCreateItem={handleCreateItem}
-                        onUpdateItem={handleUpdateItem}
-                        onRoll={handleRoll}
-                        onToggleEffect={handleToggleEffect}
-                        onDeleteEffect={handleDeleteEffect}
-                        onCreateEffect={async (effectData) => {
-                            const id = actor.id || actor._id;
-                            const res = await fetchWithAuth(`/api/modules/shadowdark/actors/${id}/effects/create`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify(effectData)
-                            });
-                            const data = await res.json();
-                            if (data.success) fetchActor(id, true);
-                        }}
-                        onUpdateEffect={async (effectData) => {
-                            const id = actor.id || actor._id;
-                            const res = await fetchWithAuth(`/api/modules/shadowdark/actors/${id}/effects/update`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify(effectData)
-                            });
-                            const data = await res.json();
-                            if (data.success) fetchActor(id, true);
-                        }}
-                        onAddPredefinedEffect={handleTogglePredefinedEffect}
-                        onRefresh={async () => { await fetchActor(actor.id || actor._id, true) }}
-                    >
-                        <SheetRouter
-                            systemId={actor.systemId || 'shadowdark'}
                             actor={actor}
-                            foundryUrl={actor?.foundryUrl}
-                            token={token}
-                            isOwner={actor?.isOwner ?? true}
-                            onRoll={handleRoll}
                             onUpdate={handleUpdate}
-                            onToggleEffect={handleToggleEffect}
-                            onDeleteEffect={handleDeleteEffect}
                             onDeleteItem={handleDeleteItem}
                             onCreateItem={handleCreateItem}
                             onUpdateItem={handleUpdateItem}
+                            onRoll={handleRoll}
+                            onToggleEffect={handleToggleEffect}
+                            onDeleteEffect={handleDeleteEffect}
+                            onCreateEffect={async (effectData) => {
+                                const id = actor.id || actor._id;
+                                const res = await fetchWithAuth(`/api/modules/shadowdark/actors/${id}/effects/create`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify(effectData)
+                                });
+                                const data = await res.json();
+                                if (data.success) fetchActor(id, true);
+                            }}
+                            onUpdateEffect={async (effectData) => {
+                                const id = actor.id || actor._id;
+                                const res = await fetchWithAuth(`/api/modules/shadowdark/actors/${id}/effects/update`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify(effectData)
+                                });
+                                const data = await res.json();
+                                if (data.success) fetchActor(id, true);
+                            }}
                             onAddPredefinedEffect={handleTogglePredefinedEffect}
-                            onToggleDiceTray={toggleDiceTray}
-                            isDiceTrayOpen={isDiceTrayOpen}
-                        />
-                    </ShadowdarkActorProvider>
-                </ShadowdarkUIProvider>
-            </div>
+                            onRefresh={async () => { await fetchActor(actor.id || actor._id, true); }}
+                        >
+                            <ShadowdarkSheet
+                                token={token}
+                                onToggleDiceTray={toggleDiceTray}
+                                isDiceTrayOpen={isDiceTrayOpen}
+                            />
+                        </ShadowdarkActorProvider>
+                    </ShadowdarkUIProvider>
+                </div>
             )}
 
             <SharedContentModal />
