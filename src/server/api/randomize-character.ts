@@ -1,4 +1,4 @@
-import type { ModuleServerRequest, ModuleRequestRuntime } from '@sheet-delver/sdk/server';
+import { json, error, type ModuleServerRequest, type ModuleRequestRuntime } from '@sheet-delver/sdk/server';
 import { shadowdarkAdapter } from '../../server/ShadowdarkAdapter';
 import { getErrorMessage, logger } from '@sheet-delver/sdk';
 
@@ -307,15 +307,15 @@ export async function handleRandomizeName(req: ModuleServerRequest) {
     try {
         const body = await req.json<any>().catch(() => ({}));
         const name = await getRandomName(body.ancestryUuid);
-        return Response.json({ name });
-    } catch (error: unknown) { return Response.json({ error: getErrorMessage(error) }, { status: 500 }); }
+        return json({ name });
+    } catch (e: unknown) { return error('internal', getErrorMessage(e)); }
 }
 
 export async function handleRandomizeStats(_req: ModuleServerRequest) {
     try {
         const stats = getRandomStats();
-        return Response.json({ stats });
-    } catch (error: unknown) { return Response.json({ error: getErrorMessage(error) }, { status: 500 }); }
+        return json({ stats });
+    } catch (e: unknown) { return error('internal', getErrorMessage(e)); }
 }
 
 
@@ -374,11 +374,11 @@ export async function handleRandomizeCharacter(req: ModuleServerRequest) {
             gold: 0
         };
 
-        return Response.json(result);
+        return json(result);
 
-    } catch (error: unknown) {
-        logger.error(`Randomize Character Error: ${getErrorMessage(error)}`);
-        return Response.json({ error: getErrorMessage(error) }, { status: 500 });
+    } catch (e: unknown) {
+        logger.error(`Randomize Character Error: ${getErrorMessage(e)}`);
+        return error('internal', getErrorMessage(e));
     }
 }
 

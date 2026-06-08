@@ -1,4 +1,4 @@
-import type { ModuleServerRequest, ModuleServerParams } from '@sheet-delver/sdk/server';
+import { json, error, type ModuleServerRequest, type ModuleServerParams } from '@sheet-delver/sdk/server';
 import { handleImport } from './api/import';
 import { handleGetLevelUpData, handleRollHP, handleRollGold, handleFinalizeLevelUp, handleRollTalent, handleRollBoon } from "./api/level-up";
 import { handleLearnSpell, handleGetSpellsBySource } from './api/spells';
@@ -38,38 +38,38 @@ export const apiRoutes = {
     },
     'actors/[id]/effects': async (req: ModuleServerRequest, { params }: ModuleServerParams) => {
         const result = await handleEffects(await actorIdFrom(params), req.runtime, 'list');
-        return Response.json(result);
+        return json(result);
     },
     'actors/[id]/effects/create': async (req: ModuleServerRequest, { params }: ModuleServerParams) => {
         const data = await req.json();
         const result = await handleEffects(await actorIdFrom(params), req.runtime, 'create', data);
-        return Response.json({ success: true, result });
+        return json({ success: true, result });
     },
     'actors/[id]/effects/update': async (req: ModuleServerRequest, { params }: ModuleServerParams) => {
         const data = await req.json();
         const result = await handleEffects(await actorIdFrom(params), req.runtime, 'update', data);
-        return Response.json({ success: true, result });
+        return json({ success: true, result });
     },
     'actors/[id]/effects/delete': async (req: ModuleServerRequest, { params }: ModuleServerParams) => {
         const url = new URL(req.url, 'http://localhost');
         const effectId = url.searchParams.get('effectId');
-        if (!effectId) return Response.json({ error: 'Missing effectId' }, { status: 400 });
+        if (!effectId) return error('validation', 'Missing effectId');
         const result = await handleEffects(await actorIdFrom(params), req.runtime, 'delete', { effectId });
-        return Response.json({ success: true, result });
+        return json({ success: true, result });
     },
     'actors/[id]/effects/toggle': async (req: ModuleServerRequest, { params }: ModuleServerParams) => {
         const { effectId } = await req.json<{ effectId: string }>();
         const result = await handleEffects(await actorIdFrom(params), req.runtime, 'toggle', { effectId });
-        return Response.json({ success: true, result });
+        return json({ success: true, result });
     },
     'actors/[id]/notes': async (req: ModuleServerRequest, { params }: ModuleServerParams) => {
         const actorId = await actorIdFrom(params);
         if (req.method === 'GET') {
-            return Response.json(await handleGetNotes(actorId, req));
+            return json(await handleGetNotes(actorId, req));
         } else if (req.method === 'POST') {
-            return Response.json(await handleUpdateNotes(actorId, req));
+            return json(await handleUpdateNotes(actorId, req));
         }
-        return Response.json({ error: 'Method not allowed' }, { status: 405 });
+        return json({ error: 'Method not allowed' }, { status: 405 });
     },
     'actors/[id]/level-up/roll-hp': async (req: ModuleServerRequest, { params }: ModuleServerParams) => {
         return handleRollHP(await actorIdFrom(params), req);

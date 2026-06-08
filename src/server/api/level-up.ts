@@ -1,4 +1,4 @@
-import type { ModuleServerRequest } from '@sheet-delver/sdk/server';
+import { json, error, type ModuleServerRequest } from '@sheet-delver/sdk/server';
 import { getErrorMessage, logger } from '@sheet-delver/sdk';
 import { shadowdarkAdapter } from '../../server/ShadowdarkAdapter';
 import { assembleFinalItems } from './level-up-engine';
@@ -23,11 +23,11 @@ export async function handleGetLevelUpData(actorId: string | undefined, req: Mod
 
         const data = await shadowdarkAdapter.getLevelUpData(actor, classId || undefined, patronId || undefined);
 
-        return Response.json({ success: true, data });
+        return json({ success: true, data });
 
-    } catch (error: unknown) {
-        logger.error('[API] Level-Up Data Error:', error);
-        return Response.json({ error: getErrorMessage(error) || 'Failed to fetch level-up data' }, { status: 500 });
+    } catch (e: unknown) {
+        logger.error('[API] Level-Up Data Error:', e);
+        return error('internal', getErrorMessage(e) || 'Failed to fetch level-up data');
     }
 }
 
@@ -92,7 +92,7 @@ export async function handleRollHP(actorId: string | undefined, req: ModuleServe
         // Shadowdark Rule: Minimum 1 HP gain
         const total = Math.max(1, result.total || 0);
 
-        return Response.json({
+        return json({
             success: true,
             formula: hitDie,
             total: total,
@@ -103,9 +103,9 @@ export async function handleRollHP(actorId: string | undefined, req: ModuleServe
             }
         });
 
-    } catch (error: unknown) {
-        logger.error('[API] Roll HP Error:', error);
-        return Response.json({ error: getErrorMessage(error) || 'Failed to roll HP' }, { status: 500 });
+    } catch (e: unknown) {
+        logger.error('[API] Roll HP Error:', e);
+        return error('internal', getErrorMessage(e) || 'Failed to roll HP');
     }
 }
 
@@ -135,10 +135,10 @@ export async function handleRollGold(actorId: string | undefined, req: ModuleSer
             speaker: speakerOverride,
         });
 
-        return Response.json({ success: true, roll: { total: result.total } });
-    } catch (error: unknown) {
-        logger.error("Gold Roll Failed", error);
-        return Response.json({ error: getErrorMessage(error) }, { status: 500 });
+        return json({ success: true, roll: { total: result.total } });
+    } catch (e: unknown) {
+        logger.error("Gold Roll Failed", e);
+        return error('internal', getErrorMessage(e));
     }
 }
 
@@ -151,7 +151,7 @@ export async function handleRollTalent(actorId: string | undefined, req: ModuleS
         const { tableUuidOrName, targetLevel } = body;
 
         if (!tableUuidOrName) {
-            return Response.json({ error: 'tableUuidOrName is required' }, { status: 400 });
+            return error('validation', 'tableUuidOrName is required');
         }
 
         // Pre-fetch actor items if checking for duplicates
@@ -187,7 +187,7 @@ export async function handleRollTalent(actorId: string | undefined, req: ModuleS
             attempts++;
             const result = await shadowdarkAdapter.drawTable(tableUuidOrName);
             if (!result) {
-                return Response.json({ error: `RollTable not found: ${tableUuidOrName}` }, { status: 404 });
+                return error('not_found', `RollTable not found: ${tableUuidOrName}`);
             }
 
             finalRollResult = result;
@@ -252,7 +252,7 @@ export async function handleRollTalent(actorId: string | undefined, req: ModuleS
             }
         }
 
-        return Response.json({
+        return json({
             success: true,
             roll: finalRollResult?.total,
             formula: finalRollResult?.formula,
@@ -264,9 +264,9 @@ export async function handleRollTalent(actorId: string | undefined, req: ModuleS
             config
         });
 
-    } catch (error: unknown) {
-        logger.error('[API] Roll Talent Error:', error);
-        return Response.json({ error: getErrorMessage(error) || 'Failed to roll talent' }, { status: 500 });
+    } catch (e: unknown) {
+        logger.error('[API] Roll Talent Error:', e);
+        return error('internal', getErrorMessage(e) || 'Failed to roll talent');
     }
 }
 
@@ -292,7 +292,7 @@ export async function handleFinalizeLevelUp(actorId: string, req: ModuleServerRe
         let actor: any = null;
         if (actorId && actorId !== 'new') {
             actor = await req.runtime.documents.get('Actor', actorId);
-            if (!actor) return Response.json({ error: 'Actor not found' }, { status: 404 });
+            if (!actor) return error('not_found', 'Actor not found');
         }
 
         // Backend assembly and validation
@@ -372,7 +372,7 @@ export async function handleFinalizeLevelUp(actorId: string, req: ModuleServerRe
             }
         }
 
-        return Response.json({
+        return json({
             success: true,
             actorId,
             items: finalItems,
@@ -381,8 +381,8 @@ export async function handleFinalizeLevelUp(actorId: string, req: ModuleServerRe
             goldRoll: gold
         });
 
-    } catch (error: unknown) {
-        logger.error('[API] Finalize Level-Up Error:', error);
-        return Response.json({ error: getErrorMessage(error) || 'Failed to finalize level-up' }, { status: 500 });
+    } catch (e: unknown) {
+        logger.error('[API] Finalize Level-Up Error:', e);
+        return error('internal', getErrorMessage(e) || 'Failed to finalize level-up');
     }
 }

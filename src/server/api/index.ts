@@ -1,4 +1,4 @@
-import type { ModuleServerRequest } from '@sheet-delver/sdk/server';
+import { json, error, type ModuleServerRequest } from '@sheet-delver/sdk/server';
 import { shadowdarkAdapter } from '../ShadowdarkAdapter';
 import { getErrorMessage, logger } from '@sheet-delver/sdk';
 
@@ -8,9 +8,9 @@ export async function handleIndex(_req: ModuleServerRequest) {
 
         logger.debug(`[ShadowdarkAPI] Responding with system data. Keys: ${Object.keys(systemData || {}).join(', ')}, IndexSize: ${Object.keys(systemData?.nameIndex || {}).length}`);
 
-        return Response.json(systemData);
-    } catch (error: unknown) {
-        logger.error('Failed to get Shadowdark system data', error);
-        return Response.json({ error: getErrorMessage(error) }, { status: 500 });
+        return json(systemData);
+    } catch (e: unknown) {
+        logger.error('Failed to get Shadowdark system data', e);
+        return error('internal', getErrorMessage(e));
     }
 }

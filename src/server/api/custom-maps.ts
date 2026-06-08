@@ -1,4 +1,4 @@
-import type { ModuleServerRequest } from '@sheet-delver/sdk/server';
+import { json, error, type ModuleServerRequest } from '@sheet-delver/sdk/server';
 import { SYSTEM_PREDEFINED_EFFECTS, BOON_TYPE_MAP, EFFECT_TRANSLATIONS_MAP } from '../../data/talent-effects';
 import { getErrorMessage, logger } from '@sheet-delver/sdk';
 
@@ -16,9 +16,9 @@ export async function handleGetCustomMaps(_req: ModuleServerRequest) {
             generatedAt: new Date().toISOString()
         };
 
-        return Response.json(payload);
-    } catch (error: unknown) {
-        logger.error('Failed to generate Shadowdark custom maps', error);
-        return Response.json({ error: getErrorMessage(error) }, { status: 500 });
+        return json(payload);
+    } catch (e: unknown) {
+        logger.error('Failed to generate Shadowdark custom maps', e);
+        return error('internal', getErrorMessage(e));
     }
 }

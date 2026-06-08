@@ -1,4 +1,4 @@
-import type { ModuleServerRequest } from '@sheet-delver/sdk/server';
+import { json, error, type ModuleServerRequest } from '@sheet-delver/sdk/server';
 import { getErrorMessage, logger } from '@sheet-delver/sdk';
 import { shadowdarkAdapter } from '../../server/ShadowdarkAdapter';
 
@@ -11,14 +11,14 @@ export async function handleLearnSpell(actorId: string, req: ModuleServerRequest
         const { spellUuid } = await req.json<{ spellUuid?: string }>();
 
         if (!spellUuid) {
-            return Response.json({ error: 'Spell UUID is required' }, { status: 400 });
+            return error('validation', 'Spell UUID is required');
         }
 
         // 1. Fetch Spell Data (unified resolver, runtime-backed)
         const spellData = await shadowdarkAdapter.resolveDocument(spellUuid);
 
         if (!spellData) {
-            return Response.json({ error: 'Spell not found' }, { status: 404 });
+            return error('not_found', 'Spell not found');
         }
 
         // 2. Create the spell Item on the actor via the document store.
@@ -34,11 +34,11 @@ export async function handleLearnSpell(actorId: string, req: ModuleServerRequest
 
         const result = await req.runtime.documents.items.create({ type: 'Actor', id: actorId }, creationData);
 
-        return Response.json({ success: true, data: result });
+        return json({ success: true, data: result });
 
-    } catch (error: unknown) {
-        logger.error('[API] Learn Spell Error:', error);
-        return Response.json({ error: getErrorMessage(error) || 'Failed to learn spell' }, { status: 500 });
+    } catch (e: unknown) {
+        logger.error('[API] Learn Spell Error:', e);
+        return error('internal', getErrorMessage(e) || 'Failed to learn spell');
     }
 }
 
@@ -53,7 +53,7 @@ export async function handleGetSpellsBySource(req: ModuleServerRequest) {
         const source = searchParams.get('source'); // e.g. "Wizard", "Priest"
 
         if (!source) {
-            return Response.json({ error: 'Source parameter is required (e.g. Wizard)' }, { status: 400 });
+            return error('validation', 'Source parameter is required (e.g. Wizard)');
         }
 
         const normalizedSource = source.toLowerCase();
@@ -120,10 +120,10 @@ export async function handleGetSpellsBySource(req: ModuleServerRequest) {
             return a.name.localeCompare(b.name);
         });
 
-        return Response.json({ success: true, spells: merged });
+        return json({ success: true, spells: merged });
 
-    } catch (error: unknown) {
-        logger.error('[API] Fetch Spells Error:', error);
-        return Response.json({ error: getErrorMessage(error) }, { status: 500 });
+    } catch (e: unknown) {
+        logger.error('[API] Fetch Spells Error:', e);
+        return error('internal', getErrorMessage(e));
     }
 }
