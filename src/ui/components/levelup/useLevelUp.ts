@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { isClassSpellcaster } from '../../../logic/rules';
 import { logger } from '@sheet-delver/sdk';
+import { useSDK } from '@sheet-delver/sdk/react';
 import { TALENT_HANDLERS } from '../../../logic/talent-handlers';
 import { useShadowdarkUI } from '../../context/ShadowdarkUIContext';
 
@@ -53,6 +54,7 @@ export const useLevelUp = (props: LevelUpProps) => {
     } = props;
 
     const { systemData, collections, resolveUuid } = useShadowdarkUI();
+    const { fetchWithAuth } = useSDK();
 
     const availableClasses = useMemo(() => {
         if (propsAvailableClasses && propsAvailableClasses.length > 0) return propsAvailableClasses;
@@ -165,23 +167,11 @@ export const useLevelUp = (props: LevelUpProps) => {
 
     const totalRequiredBoons = startingBoons + grantedBoons;
 
-    // Session State
-    const [token, setToken] = useState<string | null>(null);
-
-    // Load token on mount
-    useEffect(() => {
-        const stored = localStorage.getItem('sheet-delver-token');
-        if (stored) setToken(stored);
-    }, []);
-
-
-
     const fetchByUuid = useCallback(async (uuid: string) => {
         try {
             const headers: any = {};
-            if (token) headers['Authorization'] = `Bearer ${token}`;
 
-            const res = await fetch(`/api/foundry/document?uuid=${encodeURIComponent(uuid)}`, { headers });
+            const res = await fetchWithAuth(`/api/foundry/document?uuid=${encodeURIComponent(uuid)}`, { headers });
             if (!res.ok) return null;
             const data = await res.json();
             return data.document;
@@ -189,7 +179,7 @@ export const useLevelUp = (props: LevelUpProps) => {
             logger.error(`[LevelUp] Failed to fetch document: ${uuid}`, e);
             return null;
         }
-    }, [token]);
+    }, [fetchWithAuth]);
 
     const fetchDocument = fetchByUuid;
 
@@ -205,9 +195,8 @@ export const useLevelUp = (props: LevelUpProps) => {
             if (queryString) url += `?${queryString}`;
 
             const headers: any = { 'Content-Type': 'application/json' };
-            if (token) headers['Authorization'] = `Bearer ${token}`;
 
-            const res = await fetch(url, { headers, cache: 'no-store' });
+            const res = await fetchWithAuth(url, { headers, cache: 'no-store' });
             const json = await res.json();
 
             if (json.success && json.data) {
@@ -245,7 +234,7 @@ export const useLevelUp = (props: LevelUpProps) => {
             logger.error("Failed to fetch level up data", e);
             setStatuses(prev => ({ ...prev, class: 'ERROR' }));
         }
-    }, [actorId, token, selectedPatronUuid]);
+    }, [actorId, fetchWithAuth, selectedPatronUuid]);
 
     const handlePatronChange = useCallback((uuid: string) => {
         setSelectedPatronUuid(uuid);
@@ -262,9 +251,8 @@ export const useLevelUp = (props: LevelUpProps) => {
             const cId = activeClassObj?.uuid || targetClassUuid || classUuid;
 
             const headers: any = { 'Content-Type': 'application/json' };
-            if (token) headers['Authorization'] = `Bearer ${token}`;
 
-            const res = await fetch(`/api/modules/shadowdark/actors/${actorId || 'new'}/level-up/roll-hp`, {
+            const res = await fetchWithAuth(`/api/modules/shadowdark/actors/${actorId || 'new'}/level-up/roll-hp`, {
                 method: 'POST',
                 headers,
                 body: JSON.stringify({ isReroll, classId: cId })
@@ -292,9 +280,8 @@ export const useLevelUp = (props: LevelUpProps) => {
             const cId = activeClassObj?.uuid || targetClassUuid || classUuid;
 
             const headers: any = { 'Content-Type': 'application/json' };
-            if (token) headers['Authorization'] = `Bearer ${token}`;
 
-            const res = await fetch(`/api/modules/shadowdark/actors/${actorId || 'new'}/level-up/roll-gold`, {
+            const res = await fetchWithAuth(`/api/modules/shadowdark/actors/${actorId || 'new'}/level-up/roll-gold`, {
                 method: 'POST',
                 headers,
                 body: JSON.stringify({ isReroll, classId: cId })
@@ -323,9 +310,8 @@ export const useLevelUp = (props: LevelUpProps) => {
         setError(null);
         try {
             const headers: any = { 'Content-Type': 'application/json' };
-            if (token) headers['Authorization'] = `Bearer ${token}`;
 
-            const res = await fetch(`/api/modules/shadowdark/actors/${actorId || 'new'}/level-up/roll-talent`, {
+            const res = await fetchWithAuth(`/api/modules/shadowdark/actors/${actorId || 'new'}/level-up/roll-talent`, {
                 method: 'POST',
                 headers,
                 body: JSON.stringify({
@@ -371,9 +357,8 @@ export const useLevelUp = (props: LevelUpProps) => {
         setError(null);
         try {
             const headers: any = { 'Content-Type': 'application/json' };
-            if (token) headers['Authorization'] = `Bearer ${token}`;
 
-            const res = await fetch(`/api/modules/shadowdark/actors/${actorId || 'new'}/level-up/roll-boon`, {
+            const res = await fetchWithAuth(`/api/modules/shadowdark/actors/${actorId || 'new'}/level-up/roll-boon`, {
                 method: 'POST',
                 headers,
                 body: JSON.stringify({
@@ -449,10 +434,9 @@ export const useLevelUp = (props: LevelUpProps) => {
 
                     const iterations = raw.type === 'PatronBoonTwice' ? 2 : 1;
                     const headers: any = { 'Content-Type': 'application/json' };
-                    if (token) headers['Authorization'] = `Bearer ${token}`;
 
                     for (let i = 0; i < iterations; i++) {
-                        const res = await fetch(`/api/modules/shadowdark/actors/${actorId || 'new'}/level-up/roll-boon`, {
+                        const res = await fetchWithAuth(`/api/modules/shadowdark/actors/${actorId || 'new'}/level-up/roll-boon`, {
                             method: 'POST',
                             headers,
                             body: JSON.stringify({
@@ -506,9 +490,8 @@ export const useLevelUp = (props: LevelUpProps) => {
                 if (!isDistribute && (raw.type === 'RollTable' || raw.documentCollection === 'RollTable' || raw.documentType === 'RollTable')) {
                     const uuid = raw.documentUuid || raw.uuid || `Compendium.${raw.collection}.${raw.documentId}`;
                     const headers: any = { 'Content-Type': 'application/json' };
-                    if (token) headers['Authorization'] = `Bearer ${token}`;
 
-                    const res = await fetch(`/api/modules/shadowdark/actors/${actorId || 'new'}/level-up/roll-talent`, {
+                    const res = await fetchWithAuth(`/api/modules/shadowdark/actors/${actorId || 'new'}/level-up/roll-talent`, {
                         method: 'POST',
                         headers,
                         body: JSON.stringify({
@@ -634,9 +617,8 @@ export const useLevelUp = (props: LevelUpProps) => {
         try {
             const uuid = item.documentUuid || item.uuid || item._id;
             const headers: any = { 'Content-Type': 'application/json' };
-            if (token) headers['Authorization'] = `Bearer ${token}`;
 
-            const res = await fetch(`/api/modules/shadowdark/actors/${actorId || 'new'}/level-up/roll-talent`, {
+            const res = await fetchWithAuth(`/api/modules/shadowdark/actors/${actorId || 'new'}/level-up/roll-talent`, {
                 method: 'POST',
                 headers,
                 body: JSON.stringify({
@@ -739,9 +721,8 @@ export const useLevelUp = (props: LevelUpProps) => {
         setStatuses(prev => ({ ...prev, class: 'LOADING' }));
         try {
             const headers: any = { 'Content-Type': 'application/json' };
-            if (token) headers['Authorization'] = `Bearer ${token}`;
 
-            const res = await fetch(`/api/modules/shadowdark/actors/${actorId || 'new'}/level-up/finalize`, {
+            const res = await fetchWithAuth(`/api/modules/shadowdark/actors/${actorId || 'new'}/level-up/finalize`, {
                 method: 'POST',
                 headers,
                 body: JSON.stringify({
@@ -797,7 +778,6 @@ export const useLevelUp = (props: LevelUpProps) => {
                 hasPropClass: !!classObj,
                 targetClassUuid,
                 classUuid,
-                token: !!token
             });
             */
 
@@ -859,15 +839,6 @@ export const useLevelUp = (props: LevelUpProps) => {
                 }
 
                 if (needsFetch && !classLoaded) {
-                    // We must wait for token for any server-side document fetch
-                    if (!token) {
-                        setStatuses(prev => {
-                            if (prev.class === 'LOADING') return prev;
-                            return { ...prev, class: 'LOADING' };
-                        });
-                        return;
-                    }
-
                     if (statuses.class !== 'LOADING') setStatuses(prev => ({ ...prev, class: 'LOADING' }));
                     const fetchUuid = targetClassUuid || classUuid;
 
@@ -907,8 +878,8 @@ export const useLevelUp = (props: LevelUpProps) => {
                     }
                 }
 
-                // Authenticated Data fetches (Needs Token and a valid Class)
-                if (token && classLoaded && currentClass) {
+                // Authenticated data fetches use the host-managed session cookie.
+                if (classLoaded && currentClass) {
                     // logger.debug("[LevelUp] Triggering authenticated data fetches...");
                     if (actorId || effectiveClassUuid) {
                         await fetchLevelUpData(effectiveClassUuid);
@@ -1020,7 +991,7 @@ export const useLevelUp = (props: LevelUpProps) => {
                     setRequiredTalents(talentTotal);
                 }
 
-                // Reset selections on init (safe to do even without token/API)
+                // Reset selections on init after the class data settles.
                 // Only if everything is settled
                 if (classLoaded) {
                     setStatSelection(prev => (prev.required === 0 && prev.selected.length === 0) ? prev : { required: 0, selected: [] });
@@ -1053,7 +1024,7 @@ export const useLevelUp = (props: LevelUpProps) => {
             }
         };
         init();
-    }, [classObj, actorId, targetLevel, targetClassUuid, selectedPatronUuid, patronUuid, availableClasses, availablePatrons, collections, classUuid, currentLevel, fetchDocument, fetchLevelUpData, token, activeClassObj, statuses.class]);
+    }, [classObj, actorId, targetLevel, targetClassUuid, selectedPatronUuid, patronUuid, availableClasses, availablePatrons, collections, classUuid, currentLevel, fetchDocument, fetchLevelUpData, activeClassObj, statuses.class]);
 
     // Fetch Extra Spells if needed
     useEffect(() => {
@@ -1061,9 +1032,8 @@ export const useLevelUp = (props: LevelUpProps) => {
             const fetchSpells = async () => {
                 try {
                     const headers: any = { 'Content-Type': 'application/json' };
-                    if (token) headers['Authorization'] = `Bearer ${token}`;
 
-                    const res = await fetch(`/api/modules/shadowdark/spells/list?source=${extraSpellSelection.source}`, { headers });
+                    const res = await fetchWithAuth(`/api/modules/shadowdark/spells/list?source=${extraSpellSelection.source}`, { headers });
                     const json = await res.json();
                     if (json.success) {
                         setExtraSpellsList(json.spells);
@@ -1074,7 +1044,7 @@ export const useLevelUp = (props: LevelUpProps) => {
             };
             fetchSpells();
         }
-    }, [extraSpellSelection.active, extraSpellSelection.source, extraSpellsList.length, token]);
+    }, [extraSpellSelection.active, extraSpellSelection.source, extraSpellsList.length, fetchWithAuth]);
 
 
 

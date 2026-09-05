@@ -4,10 +4,9 @@ import React from 'react';
 import { X } from 'lucide-react';
 import { shadowdarkTheme } from '../themes/shadowdark';
 import { logger } from '@sheet-delver/sdk';
-import { useSDKComponents } from '@sheet-delver/sdk/react';
+import { useSDK, useSDKComponents } from '@sheet-delver/sdk/react';
 
 import { useShadowdarkActor } from '../context/ShadowdarkActorContext';
-import { useShadowdarkUI } from '../context/ShadowdarkUIContext';
 
 interface NotesModalProps {
     isOpen: boolean;
@@ -19,7 +18,7 @@ export default function NotesModal({
     onClose
 }: NotesModalProps) {
     const { RichTextEditor } = useSDKComponents();
-    const { token } = useShadowdarkUI();
+    const { fetchWithAuth } = useSDK();
     const { actor, updateActor } = useShadowdarkActor();
     if (!isOpen) return null;
 
@@ -27,12 +26,9 @@ export default function NotesModal({
 
     const handleSave = async (html: string) => {
         try {
-            const res = await fetch(`/api/modules/shadowdark/actors/${actor.id}/notes`, {
+            const res = await fetchWithAuth(`/api/modules/shadowdark/actors/${actor.id}/notes`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ notes: html })
             });
 

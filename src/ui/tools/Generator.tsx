@@ -9,10 +9,8 @@ import { useShadowdarkUI, ShadowdarkUIProvider } from '../context/ShadowdarkUICo
 import { enrichItem, resolveSubItems, EnrichmentContext } from '../../logic/actor-enricher';
 
 export default function Generator() {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('sheet-delver-token') : null;
-
     return (
-        <ShadowdarkUIProvider token={token}>
+        <ShadowdarkUIProvider>
             <GeneratorContent />
         </ShadowdarkUIProvider>
     );
@@ -20,23 +18,9 @@ export default function Generator() {
 
 function GeneratorContent() {
     const { systemData, collections, fetchPack, resolveName, loadingSystem } = useShadowdarkUI();
-    const { foundryUrl, isConnected } = useSDK();
+    const { foundryUrl, isConnected, navigate, replace, fetchWithAuth } = useSDK();
     const { LoadingModal } = useSDKComponents();
     const [loading, setLoading] = useState(true);
-    const [token, setToken] = useState<string | null>(null);
-
-    // Load Token
-    useEffect(() => {
-        const stored = localStorage.getItem('sheet-delver-token');
-        if (stored) setToken(stored);
-    }, []);
-
-    const fetchWithAuth = useCallback(async (input: string, init?: RequestInit) => {
-        const headers = new Headers(init?.headers);
-        const currentToken = token || localStorage.getItem('sheet-delver-token');
-        if (currentToken) headers.set('Authorization', `Bearer ${currentToken}`);
-        return fetch(input, { ...init, headers });
-    }, [token]);
 
     // Randomize All
     const skipLanguageReset = useRef(false);
@@ -167,16 +151,16 @@ function GeneratorContent() {
                 if (isBadState || isSetupMode) {
                     // Only redirect if we aren't already waiting for a world to start
                     if (data.system?.status !== 'startup' && data.system?.status !== 'initializing') {
-                        window.location.href = '/';
+                        replace('/');
                     }
                 }
                 // foundryUrl comes from the platform via useSDK(); no need to push it back.
             } catch {
-                window.location.href = '/';
+                replace('/');
             }
         };
         checkConnection();
-    }, [fetchWithAuth]);
+    }, [fetchWithAuth, replace]);
 
     // Load Shards and Index
     useEffect(() => {
@@ -199,8 +183,8 @@ function GeneratorContent() {
             }
         };
 
-        if (token) loadRequiredData();
-    }, [token, fetchPack]);
+        loadRequiredData();
+    }, [fetchPack]);
 
     // Consolidated Readiness Logic
     const isAppLoading = loading || loadingSystem || !systemData || !collections.ancestries;
@@ -911,19 +895,15 @@ function GeneratorContent() {
 
             // 3. Send to API
 
-            const headers: any = { 'Content-Type': 'application/json' };
-            const token = localStorage.getItem('sheet-delver-token');
-            if (token) headers['Authorization'] = `Bearer ${token}`;
 
             // --- DIRECT PERSISTENCE ---
             // Following the "Lean" strategy: The Registry now serves full data
             // to the Builder, so we can POST directly to Core.
             logger.info("[Generator] Transmitting unaltered character data to Core...");
-            const res = await fetch('/api/actors', {
+            const res = await fetchWithAuth('/api/actors', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify(actorData)
             });
@@ -932,7 +912,7 @@ function GeneratorContent() {
             if (result.success) {
                 // Redirect to sheet - Wait 500ms for backend stabilization
                 setTimeout(() => {
-                    window.location.href = `/actors/${result.id}`;
+                    navigate(`/actors/${result.id}`);
                 }, 500);
             } else {
                 setCreationError('Creation Failed: ' + result.error);
@@ -974,7 +954,7 @@ function GeneratorContent() {
             {/* Top Navigation Bar */}
             <nav className="fixed top-0 left-0 right-0 z-50 bg-neutral-900 border-b border-neutral-800 px-4 py-3 shadow-md flex items-center justify-between backdrop-blur-sm bg-opacity-95">
                 <button
-                    onClick={() => window.location.href = '/'}
+                    onClick={() => navigate('/')}
                     className="flex items-center gap-2 text-neutral-400 hover:text-amber-500 transition-colors font-semibold group text-sm uppercase tracking-wide"
                 >
                     <span className="group-hover:-translate-x-1 transition-transform">←</span>

@@ -15,8 +15,8 @@ import { useShadowdarkUI } from './context/ShadowdarkUIContext';
 import { useShadowdarkActor } from './context/ShadowdarkActorContext';
 
 export default function SpellsTab() {
-    const { systemData, collections, fetchPack, resolveName, token } = useShadowdarkUI();
-    const { resolveImageUrl, addNotification } = useSDK();
+    const { systemData, collections, fetchPack, resolveName } = useShadowdarkUI();
+    const { resolveImageUrl, addNotification, fetchWithAuth } = useSDK();
     const {
         actor,
         updateActor,
@@ -118,12 +118,9 @@ export default function SpellsTab() {
 
     const handleAddSpell = async (spell: any) => {
         try {
-            const headers: any = { 'Content-Type': 'application/json' };
-            if (token) headers['Authorization'] = `Bearer ${token}`;
-
-            await fetch(`/api/modules/shadowdark/actors/${actor._id || actor.id}/spells/learn`, {
+            await fetchWithAuth(`/api/modules/shadowdark/actors/${actor._id || actor.id}/spells/learn`, {
                 method: 'POST',
-                headers,
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ spellUuid: spell.uuid })
             });
         } catch (e) {
@@ -825,7 +822,6 @@ export default function SpellsTab() {
                     onSave={handleManageSpells}
                     onClose={() => setIsAddModalOpen(false)}
                     maxSelections={maxSelections}
-                    token={token}
                     isSaving={isSaving}
                     actor={actor}
                 />

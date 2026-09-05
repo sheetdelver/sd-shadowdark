@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { logger } from '@sheet-delver/sdk';
+import { useSDK } from '@sheet-delver/sdk/react';
 
 /**
  * ARCHITECTURAL SAFEGUARD:
@@ -22,18 +23,12 @@ interface ShadowdarkUIState {
     fetchPack: (packId: string) => Promise<any>;
     resolveName: (value: string, collection?: string) => string;
     resolveUuid: (nameOrValue: string, collection: string) => string;
-    token?: string | null;
 }
 
 const ShadowdarkUIContext = createContext<ShadowdarkUIState | undefined>(undefined);
 
-export function ShadowdarkUIProvider({ 
-    children, 
-    token 
-}: { 
-    children: React.ReactNode; 
-    token?: string | null;
-}) {
+export function ShadowdarkUIProvider({ children }: { children: React.ReactNode }) {
+    const { fetchWithAuth } = useSDK();
     const [systemData, setSystemData] = useState<any>(null);
     const [collections, setCollections] = useState<Record<string, any[]>>({});
     const [loadingSystem, setLoadingSystem] = useState(true);
@@ -44,11 +39,9 @@ export function ShadowdarkUIProvider({
         if (collections[packId]) return collections[packId];
 
         try {
-            const headers: any = {};
-            if (token) headers['Authorization'] = `Bearer ${token}`;
 
             // We use the standard fetch-pack endpoint
-            const res = await fetch(`/api/modules/shadowdark/fetch-pack/${packId}`, { headers });
+            const res = await fetchWithAuth(`/api/modules/shadowdark/fetch-pack/${packId}`);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
             const data = await res.json();
@@ -69,17 +62,15 @@ export function ShadowdarkUIProvider({
             logger.error(`[ShadowdarkUIContext] Failed to fetch pack ${packId}:`, err);
             return null;
         }
-    }, [collections, token]);
+    }, [collections, fetchWithAuth]);
 
     // Initial fetch of the Lean Index manifest
     useEffect(() => {
         setLoadingSystem(true);
-        const headers: any = {};
-        if (token) headers['Authorization'] = `Bearer ${token}`;
 
         const fetchData = async (retries = 3, delay = 1000) => {
             try {
-                const res = await fetch('/api/modules/shadowdark/index', { headers });
+                const res = await fetchWithAuth('/api/modules/shadowdark/index');
                 
                 // Handle system initialization state
                 if (res.status === 503 && retries > 0) {
@@ -107,7 +98,7 @@ export function ShadowdarkUIProvider({
         };
 
         fetchData();
-    }, [token]);
+    }, [fetchWithAuth]);
 
     // Helper to resolve a name from a UUID or ID across Lean Index and Shards
     const resolveName = useCallback((value: any, collection?: string): string => {
@@ -154,8 +145,7 @@ export function ShadowdarkUIProvider({
         loadingSystem,
         fetchPack,
         resolveName,
-        resolveUuid,
-        token
+        resolveUuid
     };
 
     return (

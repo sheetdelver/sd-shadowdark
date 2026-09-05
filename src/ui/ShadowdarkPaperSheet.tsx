@@ -20,7 +20,7 @@ interface ShadowdarkPaperSheetProps {
 export default function ShadowdarkPaperSheet({
     onToggleView
 }: ShadowdarkPaperSheetProps) {
-    const { systemData, collections, resolveName, token } = useShadowdarkUI();
+    const { systemData, collections, resolveName } = useShadowdarkUI();
     const { actor, updateActor, triggerRollDialog, refreshActor } = useShadowdarkActor();
     const [selectedItem, setSelectedItem] = useState<any>(null);
     const [notesModalOpen, setNotesModalOpen] = useState(false);

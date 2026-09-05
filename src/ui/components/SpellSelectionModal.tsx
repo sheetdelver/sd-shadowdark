@@ -25,7 +25,6 @@ interface SpellSelectionModalProps {
     classKey?: string;
     knownSpells: SpellOption[];
     maxSelections?: number;
-    token?: string | null;
     isSaving?: boolean;
     actor?: any;
 }
@@ -39,7 +38,6 @@ export default function SpellSelectionModal({
     classKey,
     knownSpells,
     maxSelections,
-    token,
     isSaving = false,
     actor
 }: SpellSelectionModalProps) {

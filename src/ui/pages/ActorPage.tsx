@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useRouter } from 'next/navigation';
 
 import { processHtmlContent } from '@sheet-delver/sdk';
 import { useSDK, useSDKComponents } from '@sheet-delver/sdk/react';
@@ -11,7 +10,6 @@ import { ShadowdarkUIProvider } from '../context/ShadowdarkUIContext';
 
 export interface ShadowdarkActorPageProps {
     actorId: string;
-    token?: string | null;
 }
 
 /**
@@ -23,12 +21,8 @@ export interface ShadowdarkActorPageProps {
  * the module's `actorPage` surface in `module/ui.tsx`.
  */
 export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProps) {
-    const router = useRouter();
-    const { foundryUrl, addNotification: addToast, isDiceTrayOpen, toggleDiceTray, events, fetchWithAuth } = useSDK();
+    const { foundryUrl, addNotification: addToast, isDiceTrayOpen, toggleDiceTray, events, fetchWithAuth, navigate } = useSDK();
     const { LoadingModal, SharedContentModal } = useSDKComponents();
-
-    // Auth token for the module's own providers (same source the Generator uses).
-    const token = typeof window !== 'undefined' ? localStorage.getItem('sheet-delver-token') : null;
 
     const [actor, setActor] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -47,7 +41,7 @@ export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProp
         try {
             const res = await fetchWithAuth(`/api/actors/${id}`);
             if (res.status === 503 || res.status === 401) {
-                router.push('/');
+                navigate('/');
                 return;
             }
             if (res.status === 404) {
@@ -70,7 +64,7 @@ export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProp
         } finally {
             if (!silent) setLoading(false);
         }
-    }, [router, fetchWithAuth, addNotification]);
+    }, [navigate, fetchWithAuth, addNotification]);
 
     const loadingRef = useRef(loading);
     useEffect(() => { loadingRef.current = loading; }, [loading]);
@@ -278,7 +272,7 @@ export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProp
         <main className="min-h-screen font-sans selection:bg-amber-900 pb-20">
             <nav className="fixed top-0 left-0 right-0 z-50 bg-neutral-900 border-b border-neutral-800 px-4 py-3 shadow-md flex items-center justify-between backdrop-blur-sm bg-opacity-95">
                 <button
-                    onClick={() => router.push('/')}
+                    onClick={() => navigate('/')}
                     className="flex items-center gap-2 text-neutral-400 hover:text-amber-500 transition-colors font-semibold group text-sm uppercase tracking-wide cursor-pointer"
                 >
                     <span className="group-hover:-translate-x-1 transition-transform">←</span>
@@ -291,7 +285,7 @@ export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProp
 
             {actor && (
                 <div className="w-full max-w-5xl mx-auto p-4 pt-20">
-                    <ShadowdarkUIProvider token={token}>
+                    <ShadowdarkUIProvider>
                         <ShadowdarkActorProvider
                             actor={actor}
                             onUpdate={handleUpdate}
@@ -325,7 +319,6 @@ export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProp
                             onRefresh={async () => { await fetchActor(actor.id || actor._id, true); }}
                         >
                             <ShadowdarkSheet
-                                token={token}
                                 onToggleDiceTray={toggleDiceTray}
                                 isDiceTrayOpen={isDiceTrayOpen}
                             />
@@ -343,7 +336,7 @@ export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProp
                         <h2 className="text-2xl font-bold text-white mb-2 font-serif">Character Deleted</h2>
                         <p className="text-neutral-400 mb-8">This character has been deleted from the world.</p>
                         <button
-                            onClick={() => router.push('/')}
+                            onClick={() => navigate('/')}
                             className="bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 px-8 rounded shadow-lg uppercase tracking-widest transition-all w-full"
                         >
                             Return to Dashboard

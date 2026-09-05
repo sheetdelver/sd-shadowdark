@@ -30,14 +30,12 @@ import ShadowdarkPaperSheet from './ShadowdarkPaperSheet';
 import { logger } from '@sheet-delver/sdk';
 
 interface ShadowdarkSheetProps {
-    token?: string | null;
     onToggleDiceTray?: () => void;
     isDiceTrayOpen?: boolean;
 }
 
 export default function ShadowdarkSheet(props: ShadowdarkSheetProps) {
     const { 
-        token, 
         onToggleDiceTray, 
         isDiceTrayOpen 
     } = props;
