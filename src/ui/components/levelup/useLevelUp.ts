@@ -33,6 +33,29 @@ const getErrorMessage = (error: unknown, fallback = 'An unexpected error occurre
     if (error instanceof Error) return error.message;
     return typeof error === 'string' ? error : fallback;
 };
+const getRollTotal = (payload: any, label: string): number => {
+    const total = Number(payload?.roll?.total ?? payload?.total);
+    if (!Number.isFinite(total) || total <= 0) throw new Error(`${label} returned an invalid total`);
+    return total;
+};
+const withDecisionMetadata = (item: any, payload: any) => {
+    if (!item) return item;
+
+    const action = payload?.action ?? item.action;
+    const config = payload?.config ?? item.config;
+    return {
+        ...item,
+        ...(action !== undefined ? { action } : {}),
+        ...(config !== undefined ? { config } : {})
+    };
+};
+const getTalentDecision = (item: any) => {
+    const handler = TALENT_HANDLERS.find(candidate => candidate.matches(item));
+    return {
+        action: item?.action ?? handler?.action,
+        config: item?.config ?? handler?.config
+    };
+};
 
 export const useLevelUp = (props: LevelUpProps) => {
     const {
@@ -259,7 +282,7 @@ export const useLevelUp = (props: LevelUpProps) => {
             });
             const json = await res.json();
             if (json.success) {
-                setHpRoll(json.roll.total);
+                setHpRoll(getRollTotal(json, 'Hit point roll'));
                 if (json.formula) setHpFormula(json.formula);
                 setConfirmReroll(false);
                 setStatuses(prev => ({ ...prev, hp: 'COMPLETE' }));
@@ -288,7 +311,7 @@ export const useLevelUp = (props: LevelUpProps) => {
             });
             const json = await res.json();
             if (json.success) {
-                setGoldRoll(json.roll.total);
+                setGoldRoll(getRollTotal(json, 'Starting gold roll'));
                 setStatuses(prev => ({ ...prev, gold: 'COMPLETE' }));
             } else {
                 setError(json.error || "Failed to roll Gold");
@@ -326,7 +349,8 @@ export const useLevelUp = (props: LevelUpProps) => {
             }
 
             const data = await res.json();
-            const { item, needsChoice, choiceOptions, choiceCount } = data;
+            const { item: responseItem, needsChoice, choiceOptions, choiceCount } = data;
+            const item = withDecisionMetadata(responseItem, data);
 
             if (needsChoice) {
                 setPendingChoices({
@@ -373,7 +397,8 @@ export const useLevelUp = (props: LevelUpProps) => {
             }
 
             const data = await res.json();
-            const { item, needsChoice, choiceOptions, choiceCount } = data;
+            const { item: responseItem, needsChoice, choiceOptions, choiceCount } = data;
+            const item = withDecisionMetadata(responseItem, data);
 
             if (needsChoice) {
                 setPendingChoices({
@@ -423,7 +448,7 @@ export const useLevelUp = (props: LevelUpProps) => {
                 const raw = selection.original || selection;
 
                 // Special handling for Distribute to Stats (Table Result)
-                const isDistribute = raw.name === "Distribute to Stats";
+                const isDistribute = getTalentDecision(raw).action === 'stat-pool';
                 const isPatronBoon = raw.type === 'PatronBoon' || raw.type === 'PatronBoonTwice';
 
                 if (isPatronBoon) {
@@ -447,7 +472,8 @@ export const useLevelUp = (props: LevelUpProps) => {
 
                         if (res.ok) {
                             const data = await res.json();
-                            const { item: resultItem, needsChoice, choiceOptions, choiceCount } = data;
+                            const { item: responseItem, needsChoice, choiceOptions, choiceCount } = data;
+                            const resultItem = withDecisionMetadata(responseItem, data);
 
                             if (needsChoice) {
                                 setPendingChoices({
@@ -462,8 +488,8 @@ export const useLevelUp = (props: LevelUpProps) => {
                                 if (context === 'boon') {
                                     setRolledBoons(prev => {
                                         const next = [...prev];
-                                        // If x2, and we have replaceIndex... logic is ambiguous. 
-                                        // Assume append for safety unless explicit single replacement.
+                                        // A single result replaces its placeholder; multi-boon
+                                        // results expand the choice by appending each result.
                                         if (iterations === 1 && replaceIndex !== undefined && replaceIndex !== null && replaceIndex < next.length) {
                                             next[replaceIndex] = resultItem;
                                             return next;
@@ -502,11 +528,11 @@ export const useLevelUp = (props: LevelUpProps) => {
 
                     if (res.ok) {
                         const data = await res.json();
-                        const { item, needsChoice, choiceOptions, choiceCount } = data;
+                        const { item: responseItem, needsChoice, choiceOptions, choiceCount } = data;
+                        const item = withDecisionMetadata(responseItem, data);
 
                         if (needsChoice) {
-                            // WARNING: If multiple selections trigger choices, the last one wins.
-                            // Ideally we would queue them, but for Bard 12 this is rare.
+                            // The state currently represents one pending selection overlay.
                             setPendingChoices({
                                 header: item?.name || "Select an Option",
                                 options: choiceOptions,
@@ -519,26 +545,8 @@ export const useLevelUp = (props: LevelUpProps) => {
                                 if (context === 'boon') {
                                     setRolledBoons(prev => {
                                         const next = [...prev];
-                                        // Use splice to insert if array, or replace?
-                                        // For multi-select, replaceIndex implies replacing ONE slot.
-                                        // But we have multiple items. 
-                                        // We should replace the FIRST one, and push the rest?
-                                        // Or just push all?
-                                        // If we are replacing a slot (e.g. from a previous choice that was "Choose 1"),
-                                        // and now we chose 2 things... we probably shouldn't be here?
-                                        // ReplaceIndex is usually for "Roll Table" result that says "Choose 1".
-                                        // If that result became "Choose 2", effectively we are expanding that slot.
-
-                                        // Simple logic: Replace at index with first item, push others.
-                                        // Actually, simpler: Just push all. 
-                                        // But duplicate handling?
-
-                                        // If replaceIndex is set, it means we are resolving an existing slot.
-                                        // We should probably just append all for now to be safe, filtering out the original placeholder?
-                                        // The original placeholder is likely already in the array if we are resolving a nested choice.
-                                        // Wait, handleResolveNested calls this.
-
-                                        // For now, let's just append if multi-select, or replace if single.
+                                        // One resolved selection replaces its placeholder;
+                                        // multi-select results are appended.
                                         if (selections.length === 1 && replaceIndex < next.length) {
                                             next[replaceIndex] = item;
                                             return next;
@@ -604,6 +612,10 @@ export const useLevelUp = (props: LevelUpProps) => {
 
     const handleResetTalents = () => {
         setRolledTalents([]);
+        setError(null);
+    };
+
+    const handleResetBoons = () => {
         setRolledBoons([]);
         setError(null);
     };
@@ -615,6 +627,25 @@ export const useLevelUp = (props: LevelUpProps) => {
         }));
 
         try {
+            const decision = getTalentDecision(item);
+            if (decision.action === 'stat-pool') {
+                const total = Number(decision.config?.total);
+                if (!Number.isFinite(total) || total <= 0) {
+                    throw new Error('Stat allocation is missing a valid point total');
+                }
+
+                const maxPerStat = Number(decision.config?.maxPerStat);
+                setStatPool(prev => ({
+                    total,
+                    allocated: prev.total === total
+                        ? prev.allocated
+                        : { str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 },
+                    talentIndex: context === 'talent' ? index : null,
+                    ...(Number.isFinite(maxPerStat) && maxPerStat > 0 ? { maxPerStat } : {})
+                }));
+                return;
+            }
+
             const uuid = item.documentUuid || item.uuid || item._id;
             const headers: any = { 'Content-Type': 'application/json' };
 
@@ -629,7 +660,8 @@ export const useLevelUp = (props: LevelUpProps) => {
 
             if (res.ok) {
                 const data = await res.json();
-                const { item: resultItem, needsChoice, choiceOptions, choiceCount } = data;
+                const { item: responseItem, needsChoice, choiceOptions, choiceCount } = data;
+                const resultItem = withDecisionMetadata(responseItem, data);
 
                 if (needsChoice) {
                     setPendingChoices({
@@ -698,18 +730,6 @@ export const useLevelUp = (props: LevelUpProps) => {
 
     const handleRemoveTalent = (index: number) => {
         setRolledTalents(prev => prev.filter((_, i) => i !== index));
-
-        // Sync statPool
-        if (statPool.talentIndex === index) {
-            setStatPool({ total: 0, allocated: {}, talentIndex: null });
-        } else if (statPool.talentIndex !== null && statPool.talentIndex > index) {
-            setStatPool(prev => ({ ...prev, talentIndex: prev.talentIndex! - 1 }));
-        }
-
-        // Cleanup other selections (one per level-up usually)
-        if (weaponMasterySelection.required > 0) setWeaponMasterySelection({ required: 0, selected: [] });
-        if (armorMasterySelection.required > 0) setArmorMasterySelection({ required: 0, selected: [] });
-        if (extraSpellSelection.active) setExtraSpellSelection({ active: false, maxTier: 0, source: '', selected: [] });
     };
 
     const handleRemoveBoon = (index: number) => {
@@ -751,8 +771,8 @@ export const useLevelUp = (props: LevelUpProps) => {
 
             onComplete({
                 items: json.items || [],
-                hpRoll: json.hpRoll || hpRoll || 0,
-                gold: json.goldRoll || goldRoll || 0,
+                hpRoll: json.hpRoll ?? hpRoll ?? 0,
+                gold: json.goldRoll ?? goldRoll ?? 0,
                 languages: selectedLanguages,
                 patronUuid: selectedPatronUuid
             });
@@ -1111,25 +1131,25 @@ export const useLevelUp = (props: LevelUpProps) => {
         let esSource = 'Wizard';
 
         const processItem = (item: any, index: number | null) => {
-            const handler = TALENT_HANDLERS.find(h => h.matches(item));
-            if (handler?.action) {
-                switch (handler.action) {
+            const decision = getTalentDecision(item);
+            if (decision.action) {
+                switch (decision.action) {
                     case 'stat-pool':
-                        poolTotal += handler.config?.total || 0;
-                        if (handler.config?.maxPerStat) maxPerStat = handler.config.maxPerStat;
+                        poolTotal += decision.config?.total || 0;
+                        if (decision.config?.maxPerStat) maxPerStat = decision.config.maxPerStat;
                         if (index !== null) {
                             talentIndex = index;
                             hasDist = true;
                         }
                         break;
                     case 'stat-selection':
-                        selectionReq += handler.config?.required || 0;
+                        selectionReq += decision.config?.required || 0;
                         break;
                     case 'weapon-mastery':
-                        wmReq += handler.config?.required || 0;
+                        wmReq += decision.config?.required || 0;
                         break;
                     case 'armor-mastery':
-                        amReq += handler.config?.required || 0;
+                        amReq += decision.config?.required || 0;
                         break;
                     case 'extra-spell':
                         esActive = true;
@@ -1232,7 +1252,6 @@ export const useLevelUp = (props: LevelUpProps) => {
         if (rolledTalents.length < requiredTalents) return false;
 
         // 2. Boons & Choices
-        // 2. Boons & Choices
         // Core requirement (Level 1 Warlock = 1) + Granted via Talent (e.g. Boon x2 = +2)
         // If we have choices available, we can use them for talents OR boons.
         // But granted boons MUST be used for boons.
@@ -1324,7 +1343,6 @@ export const useLevelUp = (props: LevelUpProps) => {
         hpRoll, goldRoll, totalRequiredBoons
     ]);
 
-    // HP Formula & Max
     // HP Formula & Max Sync
     useEffect(() => {
         if (!activeClassObj) return;
@@ -1420,6 +1438,7 @@ export const useLevelUp = (props: LevelUpProps) => {
             setSelectedLanguages,
             handleStatPoolChange,
             handleResetTalents,
+            handleResetBoons,
             handleResolveNested,
             isComplete // Expose isComplete in actions as well for signature match
         }

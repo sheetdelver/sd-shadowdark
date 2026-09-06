@@ -82,7 +82,12 @@ export const TalentBoonSection = ({
 
                     <div className="grid grid-cols-1 gap-2 mb-4">
                         {rolledTalents.map((t, i) => {
-                            const isNestedTable = t.type === 'RollTable' || t.documentCollection === 'RollTable' || t.name === "Distribute to Stats" || (t.text || "").toLowerCase().includes("distribute +2");
+                            const isNestedTable = t.type === 'RollTable' || t.documentCollection === 'RollTable';
+                            const text = String(t.text || t.description || '').toLowerCase();
+                            const isStatPoolChoice = t.action === 'stat-pool'
+                                || t.name === 'Distribute to Stats'
+                                || (text.includes('distribute') && text.includes('+2') && text.includes('stat'));
+                            const hasResolutionAction = isNestedTable || isStatPoolChoice;
 
                             return (
                                 <div key={i} className="bg-neutral-50 border-2 border-black p-3 animate-in slide-in-from-left-2 duration-200 group flex flex-col gap-2">
@@ -104,7 +109,7 @@ export const TalentBoonSection = ({
                                         </div>
                                     </div>
 
-                                    {isNestedTable && onResolveNested && (
+                                    {hasResolutionAction && onResolveNested && (
                                         <button
                                             onClick={() => onResolveNested(i, t, 'talent')}
                                             className="ml-9 text-xs font-bold bg-black text-white py-1 px-3 hover:bg-neutral-800 transition-colors self-start uppercase tracking-wider flex items-center gap-2"
@@ -112,7 +117,7 @@ export const TalentBoonSection = ({
                                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
                                             </svg>
-                                            {t.name === "Distribute to Stats" ? "Select Stats" : `Select from ${t.name}`}
+                                            {isStatPoolChoice ? "Select Stats" : `Select from ${t.name}`}
                                         </button>
                                     )}
                                 </div>

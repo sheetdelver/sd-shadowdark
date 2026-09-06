@@ -663,7 +663,7 @@ function GeneratorContent() {
     const [creationError, setCreationError] = useState<string | null>(null);
 
     // Create Character
-    const createCharacter = async (extraItems: any[] = [], extraData: any = {}) => {
+    const createCharacter = async (extraItems: any[] = [], extraData: any = {}, levelUpComplete = false) => {
         setCreationError(null);
         setFormErrors({});
 
@@ -679,12 +679,7 @@ function GeneratorContent() {
             errors.ancestryTalents = true;
         }
 
-        // Language Validation
-        // User must select enough languages to meet Common + Rare Points
-        // Ideally we track common/rare spending. Current simple UI (which we assume exists or will be verified)
-        // just collects 'selected'. If we don't differentiate in UI, we just check total count?
-        // Shadowdark rules are loose, usually "Common + 2 others".
-        // Let's check total count vs total points.
+        // Validate the aggregate selections against the configured language pools.
         const totalPoints = languageConfig.common + languageConfig.rare + languageConfig.ancestry.count + languageConfig.class.count;
         const totalSelected = knownLanguages.selected.common.length + knownLanguages.selected.rare.length + knownLanguages.selected.ancestry.length + knownLanguages.selected.class.length;
 
@@ -706,7 +701,7 @@ function GeneratorContent() {
         }
 
         // Level 1 Intercept
-        if (!formData.level0 && extraItems.length === 0) {
+        if (!formData.level0 && !levelUpComplete) {
             setShowLevelUp(true);
             return;
         }
@@ -796,23 +791,6 @@ function GeneratorContent() {
             // Add any items discovered via description @UUID links
             if (enrichmentContext.discoveredItems && enrichmentContext.discoveredItems.length > 0) {
                 items.push(...enrichmentContext.discoveredItems);
-            }
-
-
-            if (!formData.level0) {
-                // Class already added above? No, wait.
-                // Originally lines 757 added Class if !formData.level0.
-                // Wait, I see lines 885 `if (!formData.level0) await addItem(formData.class);`.
-                // Why is it duplicated in original code? (Line 757 and 885).
-                // Ah, line 757 was checking `!formData.level0` too.
-                // Let's remove the redundant call at 885 since we handled it at 757 (and handled duplication).
-                // Actually, line 885 in original was OUTSIDE the extraItems loop.
-                // My replacement covers up to 884.
-                // I need to ensure line 885 is handled or compatible.
-                // The original code had `if (!formData.level0) { await addItem(formData.class); }` AFTER the loop.
-                // But it ALSO had it BEFORE the loop at line 757.
-                // This explains the TRIPLICATION! One from line 757, one from Backend (LevelUp), one from line 885.
-                // My deduplication logic will fix it regardless, but removing the logical redundancy is good too.
             }
 
             // Collect Language UUIDs for system.languages array.
@@ -1419,10 +1397,6 @@ function GeneratorContent() {
                                         if (s.allMeleeWeapons) parts.push("All melee weapons");
                                         if (s.allRangedWeapons) parts.push("All ranged weapons");
                                         if (s.weapons && Array.isArray(s.weapons)) {
-                                            // Check if we have standard weapon permissions (All, Melee, Ranged)
-                                            // If so, and the list is empty/UUIDs, we prefer the general text?
-                                            // Actually, usually it's additive.
-                                            // But if we have resolved names, use them.
                                             if (weaponNames.length > 0) {
                                                 parts.push(weaponNames.join(", "));
                                             } else if (s.weapons.length > 0) {
@@ -1803,7 +1777,7 @@ function GeneratorContent() {
                             ];
                             // Deduplicate
                             const uniqueLanguageUuids = [...new Set(genLanguageUuids)];
-                            createCharacter(data.items, { ...data, languages: uniqueLanguageUuids });
+                            createCharacter(data.items, { ...data, languages: uniqueLanguageUuids }, true);
                         }}
                         onCancel={() => {
                             setShowLevelUp(false);

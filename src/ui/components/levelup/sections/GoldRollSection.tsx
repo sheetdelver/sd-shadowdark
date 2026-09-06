@@ -55,7 +55,7 @@ export const GoldRollSection = ({
                         {isManual ? (
                             <input
                                 type="number"
-                                value={goldRoll || ''}
+                                value={goldRoll ?? ''}
                                 onChange={handleManualInput}
                                 className="w-32 bg-neutral-100 border-b-4 border-black text-center focus:outline-none appearance-none p-2"
                                 placeholder="-"
@@ -64,7 +64,7 @@ export const GoldRollSection = ({
                             />
                         ) : (
                             <>
-                                {goldRoll || '--'}
+                                {goldRoll ?? '--'}
                                 <span className="text-2xl text-neutral-400 font-bold ml-2 self-end mb-2">gp</span>
                             </>
                         )}

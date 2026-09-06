@@ -56,7 +56,7 @@ export const HPRollSection = ({
                         {isManual ? (
                             <input
                                 type="number"
-                                value={hpRoll || ''}
+                                value={hpRoll ?? ''}
                                 onChange={handleManualInput}
                                 className="w-32 bg-neutral-100 border-b-4 border-black text-center focus:outline-none appearance-none p-2"
                                 placeholder="-"
@@ -64,7 +64,7 @@ export const HPRollSection = ({
                                 max={hpMax}
                             />
                         ) : (
-                            hpRoll || '--'
+                            hpRoll ?? '--'
                         )}
                     </div>
                 </div>

@@ -8,6 +8,10 @@ export function sanitizeItem(item: any): any {
     
     const clean = { ...item };
 
+    // These fields drive Sheet Delver's level-up UI and are not Foundry Item data.
+    delete clean.action;
+    delete clean.config;
+
     // Standardize internal types to 'Talent' for consistent UI categorization if required 
     // (Existing logic: keeps it for now for compatibility with non-Foundry source data)
     if (clean.type === 'text' || clean.type === 0 || clean.type === 'PatronBoon' || clean.type === 'PatronBoonTwice' || clean.type === 'synthetic') {

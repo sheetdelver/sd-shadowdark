@@ -18,19 +18,9 @@ import { LevelUpFooter } from './levelup/sections/LevelUpFooter';
 import { ExtraSpellSelectionSection } from './levelup/sections/ExtraSpellSelectionSection';
 import { useSDK } from '@sheet-delver/sdk/react';
 
-// ... (imports)
-
-// ... (inside component)
-
-// ... (imports deleted)
-
-
 export const LevelUpModal = (props: LevelUpProps) => {
     const { state, actions } = useLevelUp(props);
     const { resolveImageUrl } = useSDK();
-    //const activeClassImage = state.activeClassObj?.img?.startsWith('systems') ? `/${state.activeClassObj.img}` : state.activeClassObj.img;
-    //dangerouslySetInnerHTML={{ __html: state.activeClassObj.system?.description?.split('.')[0] + '.' || "Class Archetype" }}
-    // Common Shadowdark Class Card Style
 
     const ClassCard = state.activeClassObj ? (
         <div className="bg-white border-2 border-black p-4 flex items-center gap-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] mb-6">
@@ -131,7 +121,7 @@ export const LevelUpModal = (props: LevelUpProps) => {
                                         onRemoveTalent={actions.handleRemoveTalent}
                                         onRemoveBoon={actions.handleRemoveBoon}
                                         onResetTalents={actions.handleResetTalents}
-                                        onResetBoons={actions.handleResetTalents}
+                                        onResetBoons={actions.handleResetBoons}
                                         onResolveNested={actions.handleResolveNested}
                                         patronName={state.fetchedPatron?.name || state.availablePatrons.find((p: any) => (p.uuid || p._id) === state.selectedPatronUuid)?.name}
                                         isPatronSelected={!!state.selectedPatronUuid}

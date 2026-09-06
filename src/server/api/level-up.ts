@@ -5,6 +5,14 @@ import { assembleFinalItems } from './level-up-engine';
 import * as levelUpEngine from './level-up-engine';
 import { TALENT_HANDLERS } from '../../logic/talent-handlers';
 
+function requirePositiveRollTotal(value: unknown, label: string): number {
+    const total = Number(value);
+    if (!Number.isFinite(total) || total <= 0) {
+        throw new Error(`${label} did not return a valid total`);
+    }
+    return total;
+}
+
 /**
  * GET /api/shadowdark/actors/[id]/level-up/data
  * Fetch level-up data for the modal.
@@ -89,8 +97,9 @@ export async function handleRollHP(actorId: string | undefined, req: ModuleServe
             speaker: speakerOverride,
         });
 
-        // Shadowdark Rule: Minimum 1 HP gain
-        const total = Math.max(1, result.total || 0);
+        // A hit-die roll cannot be zero. Fail visibly if the SDK contract is broken
+        // instead of silently turning a missing result into one hit point.
+        const total = Math.max(1, requirePositiveRollTotal(result.total, 'Hit point roll'));
 
         return json({
             success: true,
@@ -135,7 +144,7 @@ export async function handleRollGold(actorId: string | undefined, req: ModuleSer
             speaker: speakerOverride,
         });
 
-        return json({ success: true, roll: { total: result.total } });
+        return json({ success: true, roll: { total: requirePositiveRollTotal(result.total, 'Starting gold roll') } });
     } catch (e: unknown) {
         logger.error("Gold Roll Failed", e);
         return error('internal', getErrorMessage(e));
