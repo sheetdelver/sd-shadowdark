@@ -14,6 +14,16 @@ While not yet feature-complete, offers robust support for Shadowdark it Sheet De
 <img src="https://github.com/sheetdelver/sheetdelver/blob/main/images/sheets/shadowdark/sd-character-sheet.png" width="25%">
 <img src="https://github.com/sheetdelver/sheetdelver/blob/main/images/sheets/shadowdark/sd-paper-view.png" width="25%">
 
+### Distribution
+
+Pull requests and changes to `main` validate the module contract and build its
+distribution package using the pinned Sheet Delver toolchain. To publish a
+release, first set the workflow's Sheet Delver reference to a stable core
+release tag, update `info.json`, and push the matching module tag (for example,
+module version `0.7` uses tag `v0.7`). The release workflow publishes the
+archive, checksum, and `sheet-delver-manifest.json` consumed by the module
+catalog.
+
 ### Third-Party Licenses
 
 **Shadowdark RPG**
