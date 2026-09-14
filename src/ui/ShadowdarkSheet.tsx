@@ -8,7 +8,6 @@ import { calculateSpellBonus } from './sheet-utils';
 import { shouldShowSpellsTab } from '../logic/rules';
 import { Menu, X, Check } from 'lucide-react';
 import { useSDK, useSDKComponents } from '@sheet-delver/sdk/react';
-import dynamic from 'next/dynamic';
 import { ShadowdarkUIProvider, useShadowdarkUI } from './context/ShadowdarkUIContext';
 import { useShadowdarkActor } from './context/ShadowdarkActorContext';
 
@@ -20,11 +19,8 @@ import AbilitiesTab from './AbilitiesTab';
 import DetailsTab from './DetailsTab';
 import EffectsTab from './EffectsTab';
 import NotesTab from './NotesTab';
+import { LevelUpModal } from './components/LevelUpModal';
 
-const LevelUpModal = dynamic(() => import('./components/LevelUpModal').then(mod => mod.LevelUpModal), {
-    ssr: false,
-    loading: () => <div className="p-8 text-center text-white font-sans">Loading Level Up System...</div>
-});
 
 import ShadowdarkPaperSheet from './ShadowdarkPaperSheet';
 import { logger } from '@sheet-delver/sdk';

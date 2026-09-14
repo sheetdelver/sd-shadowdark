@@ -10,7 +10,6 @@ import { shadowdarkTheme } from './themes/shadowdark';
 import { isRareLanguage } from '../logic/rules';
 import { useShadowdarkUI } from './context/ShadowdarkUIContext';
 import { useShadowdarkActor } from './context/ShadowdarkActorContext';
-import dynamic from 'next/dynamic';
 import { LevelUpModal } from './components/LevelUpModal';
 
 interface DetailsTabProps {
