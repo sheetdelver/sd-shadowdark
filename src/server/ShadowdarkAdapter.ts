@@ -1,5 +1,10 @@
 import { BaseSystemAdapter, logger } from '@sheet-delver/sdk';
-import type { ActorSheetData } from '@sheet-delver/sdk';
+import type {
+    ActorPreparationContext,
+    ActorSheetData,
+    FoundryActor,
+    PreparedActorData,
+} from '@sheet-delver/sdk';
 import type { ModuleRuntime } from '@sheet-delver/sdk/server';
 import { ShadowdarkRegistry } from './Registry';
 import { ShadowdarkNormalizer, resolveDocumentName } from '../logic/normalization';
@@ -88,6 +93,13 @@ export class ShadowdarkAdapter extends BaseSystemAdapter {
             actor.system?.abilities?.str !== undefined;
 
         return actor.systemId === 'shadowdark' || (hasShadowdarkType && hasShadowdarkSystem);
+    }
+
+    prepareActorData(
+        actor: FoundryActor,
+        context: Readonly<ActorPreparationContext>,
+    ): PreparedActorData {
+        return super.prepareActorData(actor, context);
     }
 
     async getSystemData(_options?: { minimal?: boolean }): Promise<any> {
