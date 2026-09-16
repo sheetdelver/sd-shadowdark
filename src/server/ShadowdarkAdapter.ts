@@ -65,11 +65,11 @@ export class ShadowdarkAdapter extends BaseSystemAdapter {
         }
     }
 
-    getInitiativeFormula(actor: any): string {
+    getInitiativeFormula(actor: PreparedActorData): string {
         return getInitiativeFormula(actor);
     }
 
-    getActorCardData(actor: any): any {
+    getActorCardData(actor: PreparedActorData): any {
         const s = actor.system || {};
         const names = actor.computed?.resolvedNames || {};
 
@@ -245,7 +245,7 @@ export class ShadowdarkAdapter extends BaseSystemAdapter {
         };
     }
 
-    getRollData(actor: any, type: string, key: string, options: any = {}): { formula: string; type: string; label: string; flags?: any } | null {
+    getRollData(actor: PreparedActorData, type: string, key: string, options: any = {}): { formula: string; type: string; label: string; flags?: any } | null {
         if (options.manualValue !== undefined && options.manualValue !== null) {
             let label = 'Manual Roll';
             if (type === 'ability') label = `${key.toUpperCase().replace('ABILITY', '')} (Manual)`;
