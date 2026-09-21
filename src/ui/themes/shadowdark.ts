@@ -10,7 +10,7 @@ export const shadowdarkTheme = {
         success: 'bg-green-800 hover:bg-green-700'
     },
     chat: {
-        container: "bg-white border-2 border-black",
+        container: "text-black bg-white border-2 border-black",
         header: "text-black text-sm font-bold uppercase mb-4 border-b-2 border-black pb-2 font-serif tracking-widest",
         msgContainer: (isRoll: boolean) => `p-2 border-2 border-black mb-1 shadow-sm ${isRoll ? 'bg-neutral-100' : 'bg-white'}`,
         user: "font-serif font-bold text-black text-xs uppercase tracking-wider",
@@ -29,10 +29,10 @@ export const shadowdarkTheme = {
         sendBtn: "bg-black hover:bg-neutral-800 text-white px-4 py-1.5 rounded-none text-xs font-bold font-serif transition-colors uppercase tracking-widest shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:shadow-none active:translate-y-[2px]"
     },
     diceTray: {
-        container: "bg-white border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] p-4",
+        container: "text-black bg-white border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] p-4",
         header: "text-black text-sm font-bold uppercase border-b-2 border-black pb-2 font-serif tracking-widest mb-4",
         textarea: "w-full h-24 bg-white border-2 border-black p-3 font-serif text-lg text-black focus:bg-neutral-50 outline-none resize-none",
-        clearBtn: "absolute top-2 right-2 text-xs text-neutral-400 hover:text-red-600 uppercase font-bold font-serif",
+        clearBtn: "absolute top-2 right-2 text-xs text-neutral-600 hover:text-red-600 uppercase font-bold font-serif",
         diceRow: "flex flex-wrap justify-between gap-2 bg-neutral-50 p-2 border-2 border-black mb-4",
         diceBtn: "w-10 h-10 flex items-center justify-center bg-white hover:bg-black hover:text-white active:bg-neutral-200 border-2 border-black rounded-lg shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] text-xs font-bold font-serif transition-all text-black",
         modGroup: "flex gap-1",
@@ -48,7 +48,7 @@ export const shadowdarkTheme = {
             return base + "bg-red-600 text-white";
         },
         sendBtn: "flex-1 bg-black hover:bg-neutral-800 text-white font-bold uppercase tracking-widest py-3 border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] transition-all text-xl font-serif",
-        helpText: "text-[10px] text-neutral-400 text-center mt-2 uppercase tracking-widest font-bold"
+        helpText: "text-[10px] text-neutral-600 text-center mt-2 uppercase tracking-widest font-bold"
     },
     modal: {
         overlay: "absolute inset-0 bg-black/60 backdrop-blur-sm",

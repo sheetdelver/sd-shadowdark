@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { processHtmlContent } from '@sheet-delver/sdk';
 import { useSDK, useSDKComponents } from '@sheet-delver/sdk/react';
 import ShadowdarkSheet from '../ShadowdarkSheet';
+import { postActorRoll } from './postActorRoll';
 import { ShadowdarkActorProvider } from '../context/ShadowdarkActorContext';
 import { ShadowdarkUIProvider } from '../context/ShadowdarkUIContext';
 
@@ -94,30 +95,10 @@ export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProp
 
     const handleRoll = async (type: string, key: string, options: any = {}) => {
         if (!actor) return;
-        const rollMode = localStorage.getItem('sheetdelver_roll_mode') || 'publicroll';
-        const rollOptions = {
-            ...options,
-            rollMode: options.rollMode || rollMode,
-            speaker: options.speaker || { actor: actor.id, alias: actor.name }
-        };
-
-        try {
-            const res = await fetchWithAuth(`/api/actors/${actor.id}/roll`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ type, key, options: rollOptions })
-            });
-            const data = await res.json();
-            if (data.success) {
-                if (data.html) addNotification(data.html, 'success');
-                else if (data.result?.total !== undefined) addNotification(`Rolled ${data.label || 'Result'}: ${data.result.total}`, 'success');
-                else addNotification(`${data.label || 'Item'} used`, 'success');
-            } else {
-                addNotification('Roll failed: ' + data.error, 'error');
-            }
-        } catch (e: any) {
-            addNotification('Error: ' + e.message, 'error');
-        }
+        await postActorRoll(
+            { fetchWithAuth, addNotification: addToast }, actor, type, key, options,
+            localStorage.getItem('sheetdelver_roll_mode') || 'publicroll',
+        );
     };
 
     const handleUpdate = async (path: string, value: any) => {
