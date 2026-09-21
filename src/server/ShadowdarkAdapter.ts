@@ -8,7 +8,6 @@ import type {
 import type { ModuleRuntime } from '@sheet-delver/sdk/server';
 import { ShadowdarkRegistry } from './Registry';
 import { ShadowdarkNormalizer, resolveDocumentName } from '../logic/normalization';
-import { shadowdarkTheme } from '../ui/themes/shadowdark';
 import { getInitiativeFormula, isClassSpellcaster } from '../logic/rules';
 import { TALENT_GRANTED_SPELLS } from '../data/talent-effects';
 
@@ -26,8 +25,6 @@ export class ShadowdarkAdapter extends BaseSystemAdapter {
     private static instance: ShadowdarkAdapter;
     private readonly _registry = new ShadowdarkRegistry();
 
-    theme = shadowdarkTheme.colors;
-    componentStyles = shadowdarkTheme as any;
 
     constructor() {
         super();

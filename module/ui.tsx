@@ -1,5 +1,6 @@
 import React from 'react';
 import type { ModuleInfo, UIModuleManifest } from '@sheet-delver/sdk';
+import { shadowdarkTheme } from '../src/ui/themes/shadowdark';
 import infoJson from '../info.json';
 
 const info = infoJson as ModuleInfo;
@@ -17,6 +18,8 @@ const ShadowdarkLoading = () => (
 
 const uiManifest: UIModuleManifest = {
     info,
+    componentStyles: shadowdarkTheme,
+    theme: shadowdarkTheme.colors,
     sheet: () => import('../src/ui/ShadowdarkSheet'),
     rollModal: () => import('../src/ui/components/ShadowdarkInitiativeModal'),
     tools: {

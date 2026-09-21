@@ -39,3 +39,18 @@ catalog.
 
 **Shadowdark RPG**
 This product is an independent product published under the Shadowdark RPG Third-Party License and is not affiliated with The Arcane Library, LLC. Shadowdark RPG © 2023 The Arcane Library, LLC.
+
+## SDK Feedback Compatibility
+
+The UI manifest now owns shared chat/dice themes and requires
+`ui-extension-api >=1.3.0 <2.0.0` (SDK 1.5.0). CI runs module regressions.
+CI and release packaging use Core `v0.13.0`, which supports these client-owned
+theme exports. Notification progress/lifecycle adoption is not required.
+
+Successful sheet rolls are presented by Core chat/dice, without a second success
+notification. Roll failures and item/effect feedback remain visible. Run the
+offline regression from the Core checkout:
+
+```sh
+npx tsx data/local/modules/shadowdark/src/tests/roll-feedback.test.ts
+```
