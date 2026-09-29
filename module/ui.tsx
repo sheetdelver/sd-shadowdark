@@ -1,20 +1,8 @@
-import React from 'react';
 import type { ModuleInfo, UIModuleManifest } from '@sheet-delver/sdk';
 import { shadowdarkTheme } from '../src/ui/themes/shadowdark';
 import infoJson from '../info.json';
 
 const info = infoJson as ModuleInfo;
-
-// Module-level loading fallback (the manifest entry can't use hooks). Self-contained markup
-// so it pulls in no platform component.
-const ShadowdarkLoading = () => (
-    <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-md">
-        <div className="relative z-10 p-8 rounded-2xl bg-neutral-900/95 backdrop-blur-xl border border-white/10 shadow-2xl text-center space-y-4 max-w-sm w-full mx-4">
-            <div className="w-12 h-12 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto" />
-            <div className="text-xl font-bold text-white font-sans">Loading Shadowdark Tools...</div>
-        </div>
-    </div>
-);
 
 const uiManifest: UIModuleManifest = {
     info,
@@ -25,8 +13,11 @@ const uiManifest: UIModuleManifest = {
     tools: {
         'generator': () => import('../src/ui/tools/Generator')
     },
-    dashboardTools: () => import('../src/ui/ShadowdarkDashboardTools'),
-    dashboardLoading: ShadowdarkLoading,
+    dashboardActions: [
+        { id: 'generator', label: 'Character Generator', kind: 'tool', toolId: 'generator' },
+        { id: 'importer', label: 'Import From Shadowdarklings.net', kind: 'dialog',
+            dialog: () => import('../src/ui/components/ShadowdarkImportDashboardDialog') },
+    ],
     actorPage: () => import('../src/ui/pages/ActorPage')
 };
 
