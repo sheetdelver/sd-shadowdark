@@ -1,12 +1,11 @@
-
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { logger } from '@sheet-delver/sdk';
 import { useSDK } from '@sheet-delver/sdk/react';
 
-interface ShadowdarkImportModalProps {
-    onClose: () => void;
+interface ShadowdarkImportFormProps {
+    onCancel: () => void;
     onImportSuccess: (id: string) => void;
 }
 
@@ -16,9 +15,7 @@ interface ImportError {
     error: string;
 }
 
-import { createPortal } from 'react-dom';
-
-export default function ShadowdarkImportModal({ onClose, onImportSuccess }: ShadowdarkImportModalProps) {
+export default function ShadowdarkImportForm({ onCancel, onImportSuccess }: ShadowdarkImportFormProps) {
     const { fetchWithAuth } = useSDK();
     const [jsonInput, setJsonInput] = useState('');
     const [loading, setLoading] = useState(false);
@@ -37,7 +34,7 @@ export default function ShadowdarkImportModal({ onClose, onImportSuccess }: Shad
                 logger.error("Failed to cleanup actor", e);
             }
         }
-        onClose();
+        onCancel();
     };
 
     const handleImport = async () => {
@@ -74,7 +71,7 @@ export default function ShadowdarkImportModal({ onClose, onImportSuccess }: Shad
             });
 
             const data = await res.json();
-            logger.debug('[Import Modal] API Response:', data);
+            logger.debug('[Import Page] API Response:', data);
 
             if (data.debug && Array.isArray(data.debug)) {
                 data.debug.forEach((log: string) => logger.debug(`[Importer] ${log}`));
@@ -105,43 +102,65 @@ export default function ShadowdarkImportModal({ onClose, onImportSuccess }: Shad
 
                 // Otherwise show the results (with errors)
                 setImportedId(data.id);
+            } else {
+                throw new Error(data.error || 'Import failed');
             }
 
         } catch (e: any) {
             setError(e.message);
+        } finally {
             setLoading(false);
         }
     };
 
-    const modalContent = (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 h-full w-full animate-in fade-in duration-300">
-            <div className={`bg-neutral-50 border-4 border-black shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] max-w-xl w-full flex flex-col max-h-[90vh] font-serif transition-all ${importedId ? 'scale-100' : 'scale-100'} animate-in zoom-in-95 duration-300`}>
+    return (
+        <main className="flex min-h-screen flex-col bg-neutral-100 pb-24 font-crimson font-inter font-sans text-black">
+            <nav className="fixed top-0 left-0 right-0 z-50 bg-neutral-900 border-b border-neutral-800 px-4 py-3 shadow-md flex items-center justify-between backdrop-blur-sm bg-opacity-95">
+                <button
+                    type="button"
+                    onClick={handleCancel}
+                    className="flex items-center gap-2 text-neutral-400 hover:text-amber-500 transition-colors font-semibold group text-sm uppercase tracking-wide"
+                >
+                    <span className="group-hover:-translate-x-1 transition-transform">←</span>
+                    Back to Dashboard
+                </button>
+                <div className="text-xs text-neutral-600 font-mono hidden md:block">Importing Character</div>
+            </nav>
 
-                {/* Header */}
-                <div className="bg-black p-6 flex justify-center items-center border-b-4 border-neutral-900">
-                    <h2 className="text-3xl font-black uppercase tracking-widest text-white font-serif drop-shadow-md">Shadowdarklings Importer</h2>
+            <header className="bg-neutral-900 text-white shadow-md sticky top-[45px] z-10 flex items-center justify-between px-6 border-b-4 border-black h-24 mt-[45px]">
+                <div className="flex items-center gap-6">
+                    <div className="w-16 h-16 bg-neutral-800 border-2 border-white/10 flex items-center justify-center rounded">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-8 h-8 opacity-50" aria-hidden="true">
+                            <path d="M12 3a.75.75 0 0 1 .75.75v9.69l2.72-2.72a.75.75 0 1 1 1.06 1.06l-4 4a.75.75 0 0 1-1.06 0l-4-4a.75.75 0 0 1 1.06-1.06l2.72 2.72V3.75A.75.75 0 0 1 12 3ZM4.75 15a.75.75 0 0 1 .75.75v3.5h13v-3.5a.75.75 0 0 1 1.5 0V20a.75.75 0 0 1-.75.75H4.75A.75.75 0 0 1 4 20v-4.25a.75.75 0 0 1 .75-.75Z" />
+                        </svg>
+                    </div>
+                    <div className="py-2">
+                        <h1 className="text-3xl font-serif font-bold leading-none tracking-tight">Import Character</h1>
+                        <p className="text-xs text-neutral-400 font-sans tracking-widest uppercase mt-1">Shadowdark RPG</p>
+                    </div>
                 </div>
+            </header>
 
-                {/* Content */}
-                <div className="p-8 flex-1 overflow-y-auto bg-neutral-100">
+            <div className="flex-1 px-4 max-w-5xl mx-auto w-full pt-6 mb-20 space-y-8">
+                <section className="bg-white p-6 border-2 border-black shadow-sm">
+                    <h2 className="text-black font-black font-serif text-xl border-b-2 border-black mb-4 pb-1">Shadowdarklings.net Importer</h2>
 
                     {/* View: Input */}
                     {!importedId && (
                         <>
                             <div className="mb-6">
-                                <p className="text-neutral-900 font-black mb-2 uppercase text-sm tracking-widest font-serif">Paste JSON Export</p>
-                                <button className="bg-black text-white px-6 py-2 inline-block absolute bottom-28 right-0 border-r-4 border-b-4 border-white shadow-sm z-10 cursor-pointer uppercase" onClick={() => {
-                                    window.open('https://shadowdarklings.net/create#!', '_blank');
-                                }}>
-                                    Go to Shadowdarklings.net
-                                </button>
+                                <label htmlFor="shadowdark-import-json" className="block text-neutral-900 font-black mb-2 uppercase text-sm tracking-widest font-serif">Paste Character JSON</label>
                                 <textarea
+                                    id="shadowdark-import-json"
                                     value={jsonInput}
                                     onChange={(e) => setJsonInput(e.target.value)}
                                     className="w-full h-64 bg-white border-2 border-neutral-300 p-4 text-xs font-mono text-neutral-900 focus:outline-none focus:border-black focus:ring-1 focus:ring-black shadow-inner resize-none transition-all"
                                     placeholder='{ "name": "Character Name", ... }'
                                     disabled={loading}
                                 />
+                                <a className="mt-4 inline-block border-2 border-black bg-white px-4 py-2 font-bold uppercase text-black shadow-sm hover:bg-neutral-100" href="https://shadowdarklings.net/create#!" target="_blank" rel="noopener noreferrer">
+                                    Go to Shadowdarklings.net
+                                </a>
                             </div>
                             {error && (
                                 <div className="p-3 mb-4 bg-red-100 border border-red-500 text-red-900 text-sm font-bold">
@@ -236,39 +255,40 @@ export default function ShadowdarkImportModal({ onClose, onImportSuccess }: Shad
                         </div>
                     )}
 
-                </div>
+                </section>
 
-                {/* Footer */}
-                <div className="p-6 border-t-4 border-black bg-neutral-100 flex justify-center gap-6">
+                <div className="bg-neutral-900 text-white p-8 border-2 border-black shadow-lg flex flex-col items-center justify-center gap-4">
+                    <p className="text-neutral-400 font-serif italic text-lg opacity-80">&quot;Protect the light!&quot;</p>
+                    <div className="flex w-full max-w-md flex-col-reverse gap-3 sm:flex-row">
                     <button
+                        type="button"
                         onClick={handleCancel}
-                        className="px-8 py-3 rounded-none border-2 border-neutral-300 text-neutral-500 hover:text-black hover:border-black font-bold uppercase tracking-widest transition-all"
+                        className="px-8 py-3 border-2 border-neutral-600 text-neutral-300 hover:text-white hover:border-white font-bold uppercase tracking-widest transition-all"
                     >
                         Cancel
                     </button>
 
                     {importedId ? (
                         <button
+                            type="button"
                             onClick={() => onImportSuccess(importedId)}
-                            className="px-10 py-3 rounded-none bg-black text-white hover:bg-neutral-900 font-black shadow-lg hover:shadow-xl hover:-translate-y-1 active:translate-y-0 active:shadow-none transition-all uppercase tracking-widest flex items-center gap-2"
+                            className="flex-1 bg-amber-600 hover:bg-amber-500 text-white font-bold py-4 rounded shadow-lg uppercase tracking-widest text-lg transition-all hover:scale-105"
                         >
                             Continue to Sheet
                         </button>
                     ) : (
                         <button
+                            type="button"
                             onClick={handleImport}
                             disabled={loading || !jsonInput}
-                            className="px-10 py-3 rounded-none bg-amber-600 hover:bg-amber-500 text-white font-black shadow-lg hover:shadow-xl hover:-translate-y-1 active:translate-y-0 active:shadow-none transition-all uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed transform"
+                            className="flex-1 bg-amber-600 hover:bg-amber-500 text-white font-bold py-4 rounded shadow-lg uppercase tracking-widest text-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105"
                         >
                             {loading ? 'Reading Scroll...' : 'Import Character'}
                         </button>
                     )}
+                    </div>
                 </div>
             </div>
-        </div>
+        </main>
     );
-
-    // Use Portal to escape stacking contexts
-    if (typeof document === 'undefined') return null;
-    return createPortal(modalContent, document.body);
 }

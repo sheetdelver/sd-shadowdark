@@ -1,11 +1,6 @@
 import { getErrorMessage, logger } from '@sheet-delver/sdk';
 import type { ModuleRequestRuntime } from '@sheet-delver/sdk/server';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'node:url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import shadowdarklingMapping from '../data/shadowdarkling/map-shadowdarkling.json';
 import { findEffectUuid, SYSTEM_PREDEFINED_EFFECTS } from '../data/talent-effects';
 import { shadowdarkAdapter } from '../server/ShadowdarkAdapter';
 import { sanitizeItem, sanitizeItems, createEffect } from '../utils/Sanitizer';
@@ -22,34 +17,7 @@ export interface ImportResult {
 
 export class ShadowdarkImporter {
 
-    private mapping: any;
-
-    constructor() {
-        this.mapping = null;
-    }
-
-    private async loadMapping() {
-        if (this.mapping) return;
-        try {
-            // Dynamically resolve module root by looking for info.json upwards from this file
-            const findModuleRoot = (startDir: string): string => {
-                let current = startDir;
-                while (current !== path.dirname(current)) {
-                    if (fs.existsSync(path.join(current, 'info.json'))) return current;
-                    current = path.dirname(current);
-                }
-                throw new Error(`Could not find module root starting from ${startDir}`);
-            };
-
-            const moduleRoot = findModuleRoot(__dirname);
-            const mappingPath = path.join(moduleRoot, 'data/shadowdarkling/map-shadowdarkling.json');
-            const fileContent = await fs.promises.readFile(mappingPath, 'utf-8');
-            this.mapping = JSON.parse(fileContent);
-        } catch (error) {
-            logger.error('[ShadowdarkImporter] Failed to load mapping file', error);
-            throw new Error('Failed to load import mappings');
-        }
-    }
+    private mapping: any = shadowdarklingMapping;
 
     public async importFromJSON(runtime: ModuleRequestRuntime, json: any): Promise<ImportResult> {
         const debugLog: string[] = [];
@@ -66,8 +34,6 @@ export class ShadowdarkImporter {
 
         try {
             log(`[Importer] Starting Import (Server-Side). Name: ${json.name}`);
-
-            await this.loadMapping();
 
             const gear: any[] = [];
             const spells: any[] = [];

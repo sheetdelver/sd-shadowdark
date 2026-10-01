@@ -44,8 +44,9 @@ This product is an independent product published under the Shadowdark RPG Third-
 
 The module requires SheetDelver Core `>=0.14.2` and
 `ui-extension-api >=2.0.0 <3.0.0` (SDK 2.0.0). Core renders the dashboard's
-generator and importer cards; this module retains its generator page, importer
-dialog, sheets, and shared chat/dice theme. CI and release packaging use Core
+generator and importer cards; both open module-owned tool pages. The importer
+no longer depends on a packaged `react-dom` portal. Sheets and shared chat/dice
+themes remain module-owned. CI and release packaging use Core
 `v0.14.2`. Notification progress/lifecycle adoption is not required.
 
 Successful sheet rolls are presented by Core chat/dice, without a second success
