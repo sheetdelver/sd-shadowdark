@@ -11,12 +11,12 @@ const uiManifest: UIModuleManifest = {
     sheet: () => import('../src/ui/ShadowdarkSheet'),
     rollModal: () => import('../src/ui/components/ShadowdarkInitiativeModal'),
     tools: {
-        'generator': () => import('../src/ui/tools/Generator')
+        'generator': () => import('../src/ui/tools/Generator'),
+        'importer': () => import('../src/ui/tools/ShadowdarkImportPage'),
     },
     dashboardActions: [
         { id: 'generator', label: 'Character Generator', kind: 'tool', toolId: 'generator' },
-        { id: 'importer', label: 'Import From Shadowdarklings.net', kind: 'dialog',
-            dialog: () => import('../src/ui/components/ShadowdarkImportDashboardDialog') },
+        { id: 'importer', label: 'Import From Shadowdarklings.net', kind: 'tool', toolId: 'importer' },
     ],
     actorPage: () => import('../src/ui/pages/ActorPage')
 };
