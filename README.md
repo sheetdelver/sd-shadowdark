@@ -42,12 +42,14 @@ This product is an independent product published under the Shadowdark RPG Third-
 
 ## SDK Feedback Compatibility
 
-The module requires SheetDelver Core `>=0.14.2` and
-`ui-extension-api >=2.0.0 <3.0.0` (SDK 2.0.0). Core renders the dashboard's
+The module requires SheetDelver Core `>=0.15.1` and
+`ui-extension-api >=2.1.0 <3.0.0` (SDK 2.1.0). Core renders the dashboard's
 generator and importer cards; both open module-owned tool pages. The importer
 no longer depends on a packaged `react-dom` portal. Sheets and shared chat/dice
 themes remain module-owned. CI and release packaging use Core
-`v0.14.2`. Notification progress/lifecycle adoption is not required.
+`v0.15.1`. Notification progress/lifecycle adoption is not required.
+Core owns player-world readiness and interruption presentation; module pages
+only manage Shadowdark resource loading and Actor-specific errors.
 
 Successful sheet rolls are presented by Core chat/dice, without a second success
 notification. Roll failures and item/effect feedback remain visible. Run the

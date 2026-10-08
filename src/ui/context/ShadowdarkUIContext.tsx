@@ -28,7 +28,7 @@ interface ShadowdarkUIState {
 const ShadowdarkUIContext = createContext<ShadowdarkUIState | undefined>(undefined);
 
 export function ShadowdarkUIProvider({ children }: { children: React.ReactNode }) {
-    const { fetchWithAuth } = useSDK();
+    const { fetchWithAuth, isConnected } = useSDK();
     const [systemData, setSystemData] = useState<any>(null);
     const [collections, setCollections] = useState<Record<string, any[]>>({});
     const [loadingSystem, setLoadingSystem] = useState(true);
@@ -66,6 +66,7 @@ export function ShadowdarkUIProvider({ children }: { children: React.ReactNode }
 
     // Initial fetch of the Lean Index manifest
     useEffect(() => {
+        if (!isConnected || systemData) return;
         setLoadingSystem(true);
 
         const fetchData = async (retries = 3, delay = 1000) => {
@@ -91,14 +92,15 @@ export function ShadowdarkUIProvider({ children }: { children: React.ReactNode }
                 if (retries > 0) {
                     setTimeout(() => fetchData(retries - 1, delay * 2), delay);
                 } else {
-                    setSystemData({});
+                    // Keep the manifest absent so a later Core-ready transition
+                    // can retry it; an empty manifest would look successfully loaded.
                     setLoadingSystem(false);
                 }
             }
         };
 
         fetchData();
-    }, [fetchWithAuth]);
+    }, [fetchWithAuth, isConnected, systemData]);
 
     // Helper to resolve a name from a UUID or ID across Lean Index and Shards
     const resolveName = useCallback((value: any, collection?: string): string => {

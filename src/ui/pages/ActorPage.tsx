@@ -22,11 +22,12 @@ export interface ShadowdarkActorPageProps {
  * the module's `actorPage` surface in `module/ui.tsx`.
  */
 export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProps) {
-    const { foundryUrl, addNotification: addToast, isDiceTrayOpen, toggleDiceTray, events, fetchWithAuth, navigate } = useSDK();
+    const { foundryUrl, addNotification: addToast, isDiceTrayOpen, toggleDiceTray, events, fetchWithAuth, navigate, isConnected } = useSDK();
     const { LoadingModal, SharedContentModal } = useSDKComponents();
 
     const [actor, setActor] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [actorError, setActorError] = useState<string | null>(null);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
 
     const foundryUrlRef = useRef(foundryUrl);
@@ -41,31 +42,33 @@ export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProp
         if (!silent) setLoading(true);
         try {
             const res = await fetchWithAuth(`/api/actors/${id}`);
-            if (res.status === 503 || res.status === 401) {
-                navigate('/');
+            if (res.status === 404) {
+                setActor(null);
+                setActorError(null);
+                setShowDeleteModal(true);
                 return;
             }
-            if (res.status === 404) {
-                setShowDeleteModal(true);
+            if (!res.ok) {
+                if (!silent) setActorError(res.status === 503
+                    ? 'Character data is temporarily unavailable.'
+                    : 'Could not load this character.');
                 return;
             }
 
             const data = await res.json();
             if (data && !data.error) {
                 setActor(data);
+                setActorError(null);
+                setShowDeleteModal(false);
             } else {
-                if (res.status >= 500) {
-                    addNotification('Server Error: ' + (data?.error || 'Unknown Error'), 'error');
-                } else {
-                    setShowDeleteModal(true);
-                }
+                if (!silent) setActorError(data?.error || 'Could not load this character.');
             }
         } catch (e: any) {
-            addNotification('Connection Error: ' + e.message, 'error');
+            if (!silent) setActorError('Character data is temporarily unavailable.');
         } finally {
             if (!silent) setLoading(false);
         }
-    }, [navigate, fetchWithAuth, addNotification]);
+    }, [fetchWithAuth]);
 
     const loadingRef = useRef(loading);
     useEffect(() => { loadingRef.current = loading; }, [loading]);
@@ -92,6 +95,14 @@ export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProp
             clearTimeout(timeout);
         };
     }, [actorId, fetchActor, addNotification, events]);
+
+    // Core owns the world outage overlay. Revalidate this module-local Actor
+    // once the same world becomes ready again without remounting its sheet.
+    const wasConnected = useRef(isConnected);
+    useEffect(() => {
+        if (isConnected && !wasConnected.current && actorId) fetchActor(actorId, true);
+        wasConnected.current = isConnected;
+    }, [actorId, fetchActor, isConnected]);
 
     const handleRoll = async (type: string, key: string, options: any = {}) => {
         if (!actor) return;
@@ -247,7 +258,7 @@ export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProp
     };
 
     if (loading) return <LoadingModal message="Loading Codex..." />;
-    if (!actor && !showDeleteModal) return null;
+    if (!actor && !showDeleteModal && !actorError) return null;
 
     return (
         <main className="min-h-screen font-sans selection:bg-amber-900 pb-20">
@@ -305,6 +316,12 @@ export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProp
                             />
                         </ShadowdarkActorProvider>
                     </ShadowdarkUIProvider>
+                </div>
+            )}
+
+            {!actor && actorError && !showDeleteModal && (
+                <div className="w-full max-w-5xl mx-auto p-4 pt-20 text-center text-neutral-300" role="alert">
+                    {actorError}
                 </div>
             )}
 
