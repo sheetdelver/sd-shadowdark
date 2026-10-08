@@ -18,7 +18,7 @@ export default function Generator() {
 
 function GeneratorContent() {
     const { systemData, collections, fetchPack, resolveName, loadingSystem } = useShadowdarkUI();
-    const { foundryUrl, isConnected, navigate, replace, fetchWithAuth } = useSDK();
+    const { foundryUrl, isConnected, navigate, fetchWithAuth } = useSDK();
     const { LoadingModal } = useSDKComponents();
     const [loading, setLoading] = useState(true);
 
@@ -134,36 +134,9 @@ function GeneratorContent() {
         return null;
     }, [fetchWithAuth, collections, systemData]);
 
-    // Verify Connection on Mount
-    useEffect(() => {
-        const checkConnection = async () => {
-            try {
-                const res = await fetchWithAuth('/api/session/connect');
-                const data = await res.json();
-
-
-
-                // Only redirect if we are CERTAIN we shouldn't be here.
-                // If it's just 'startup' or 'initializing', we wait.
-                const isBadState = !data.isAuthenticated || (data.system && data.system.id !== 'shadowdark');
-                const isSetupMode = data.system?.id === 'setup';
-                
-                if (isBadState || isSetupMode) {
-                    // Only redirect if we aren't already waiting for a world to start
-                    if (data.system?.status !== 'startup' && data.system?.status !== 'initializing') {
-                        replace('/');
-                    }
-                }
-                // foundryUrl comes from the platform via useSDK(); no need to push it back.
-            } catch {
-                replace('/');
-            }
-        };
-        checkConnection();
-    }, [fetchWithAuth, replace]);
-
     // Load Shards and Index
     useEffect(() => {
+        if (!isConnected || collections.ancestries) return;
         const loadRequiredData = async () => {
             try {
                 setLoading(true);
@@ -184,18 +157,16 @@ function GeneratorContent() {
         };
 
         loadRequiredData();
-    }, [fetchPack]);
+    }, [fetchPack, isConnected, collections.ancestries]);
 
     // Consolidated Readiness Logic
     const isAppLoading = loading || loadingSystem || !systemData || !collections.ancestries;
-    const isCoreReady = isConnected;
-
     // Handle initial loading state sync
     useEffect(() => {
-        if (systemData && collections.ancestries && isCoreReady) {
+        if (systemData && collections.ancestries) {
             setLoading(false);
         }
-    }, [systemData, collections.ancestries, isCoreReady]);
+    }, [systemData, collections.ancestries]);
 
 
 
@@ -904,14 +875,12 @@ function GeneratorContent() {
     };
 
     // 3. Main Render
-    if (!isCoreReady || isAppLoading) {
+    if (isAppLoading) {
         // Use the standard application loading aesthetic requested by the user
-        const bootstrapMessage = !isCoreReady ? "World Starting..." : 
-                                 loadingSystem ? "Loading Manifest..." : 
+        const bootstrapMessage = loadingSystem ? "Loading Manifest..." :
                                  "Hydrating Rules...";
         
-        const bootstrapSubmessage = !isCoreReady ? "Please wait while the world launches" :
-                                    loadingSystem ? "Reading the ancient scrolls..." :
+        const bootstrapSubmessage = loadingSystem ? "Reading the ancient scrolls..." :
                                     "Consulting the oracles...";
 
         return (
