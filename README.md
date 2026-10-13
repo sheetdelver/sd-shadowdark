@@ -42,12 +42,16 @@ This product is an independent product published under the Shadowdark RPG Third-
 
 ## SDK Feedback Compatibility
 
-The module requires SheetDelver Core `>=0.15.1` and
-`ui-extension-api >=2.1.0 <3.0.0` (SDK 2.1.0). Core renders the dashboard's
-generator and importer cards; both open module-owned tool pages. The importer
-no longer depends on a packaged `react-dom` portal. Sheets and shared chat/dice
-themes remain module-owned. CI and release packaging use Core
-`v0.15.1`. Notification progress/lifecycle adoption is not required.
+The development checkout requires SheetDelver Core `>=0.17.0` and
+`ui-extension-api >=3.0.0 <4.0.0` (SDK 3.0.0). The UI API gate keeps it
+incompatible with released Core 0.17.0. Before module release, raise the
+Core minimum to `>=0.18.0` after Core 0.18.0 is published. Core renders the
+dashboard's generator and importer cards; both open module-owned tool pages.
+The importer no longer depends on a packaged `react-dom` portal. Sheets and shared chat/dice
+themes remain module-owned. Its combat-HUD initiative modal presents Core's
+resolved formula and returns only a roll mode or manual final total. CI and
+release packaging target Core `v0.18.0`; publish Core first.
+Notification progress/lifecycle adoption is not required.
 Core owns player-world readiness and interruption presentation; module pages
 only manage Shadowdark resource loading and Actor-specific errors.
 
