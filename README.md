@@ -7,6 +7,10 @@ While not yet feature-complete, offers robust support for Shadowdark it Sheet De
 - **Inventory Management**: Drag-and-drop equipment, slot tracking, and toggleable states (Equipped/Stashed/Light).
 - **Treasure & Wealth**: Dedicated section for treasure items with total wealth tracking and "Sell" functionality.
 - **Gear Selection**: Integrated compendium browser for quickly adding standard gear, armor, and weapons.
+  Phone/tablet rows show complete wrapping names/descriptions and labelled cost/
+  slots; desktop retains columns. A native modal dialog keeps its header above
+  HUD stacking contexts with 44px close/Add controls, Escape and focus restoration.
+  No portal dependency or additional SDK minimum is required.
 - **Interactive Toggles**: Custom icons for managing item states directly from the inventory list.
 - **Formatted Chat**: Rich chat messages for rolls and abilities with inline roll buttons.
 - **Character Import**: Import characters via JSON from Shadowdarklings.
@@ -35,8 +39,9 @@ by the `>=0.17.0` minimum. On Core with ADR-0062's persistent media host,
 that compatibility component is inert and produces no duplicate overlay.
 Core 0.16.0 first provided the required module-api 1.3 combat-stat manifest
 contract; this branch targets the user-approved Core 0.17.0 minimum and
-validation/release toolchain. Responsive review and a fresh generated wizard
-remain acceptance checks.
+validation/release toolchain. The user accepted this correction iteration on
+October 13, 2026, including the responsive Gear picker. Automated generator
+fixtures pass; an exhaustive fresh-wizard/native matrix is not claimed.
 
 From this module's local checkout inside the Sheet Delver repository, run the
 behavior-preserving contract check with `npx tsx src/tests/prepared-actor.test.ts`.

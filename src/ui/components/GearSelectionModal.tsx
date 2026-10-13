@@ -1,5 +1,5 @@
 import { logger } from '@sheet-delver/sdk';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { X, Search, ChevronDown, ChevronRight, Shield, Backpack, Swords, Sparkles, Sprout, Briefcase, Plus, Flame, Sun, Target } from 'lucide-react';
 import { useSDK } from '@sheet-delver/sdk/react';
 import { useShadowdarkUI } from '../context/ShadowdarkUIContext';
@@ -28,6 +28,21 @@ export default function GearSelectionModal({ isOpen, onClose, onCreate }: GearSe
     const [searchTerm, setSearchTerm] = useState('');
     const [expandedCategories, setExpandedCategories] = useState<Set<GearCategory>>(new Set(['Basic Gear']));
     const [loading, setLoading] = useState(false);
+    const dialogRef = useRef<HTMLDialogElement>(null);
+
+    useEffect(() => {
+        if (!isOpen || !dialogRef.current) return;
+        const dialog = dialogRef.current;
+        const previousFocus = document.activeElement;
+        const previousOverflow = document.body.style.overflow;
+        dialog.showModal();
+        document.body.style.overflow = 'hidden';
+        return () => {
+            dialog.close();
+            document.body.style.overflow = previousOverflow;
+            if (previousFocus instanceof HTMLElement && previousFocus.isConnected) previousFocus.focus();
+        };
+    }, [isOpen]);
 
     // Combine and apply existing filtering logic to the cached collections
     const items = useMemo(() => {
@@ -151,16 +166,19 @@ export default function GearSelectionModal({ isOpen, onClose, onCreate }: GearSe
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <div className="bg-neutral-100 w-full max-w-4xl h-[85vh] flex flex-col border-2 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] overflow-hidden">
+        <dialog ref={dialogRef} aria-labelledby="shadowdark-gear-title"
+            className="m-auto w-[calc(100%-1rem)] max-w-4xl max-h-[calc(100dvh-1rem)] border-0 p-0 bg-transparent text-black backdrop:bg-black/60 backdrop:backdrop-blur-sm"
+            onCancel={event => { event.preventDefault(); onClose(); }}
+            onClick={event => { if (event.target === event.currentTarget) onClose(); }}>
+            <div className="bg-neutral-100 w-full h-[min(85dvh,calc(100dvh-1rem))] flex flex-col border-2 border-black overflow-hidden">
 
                 {/* Header */}
                 <div className="bg-black text-white p-4 flex justify-between items-center shrink-0">
-                    <h2 className="font-serif font-bold text-xl uppercase tracking-widest flex items-center gap-2">
+                    <h2 id="shadowdark-gear-title" className="font-serif font-bold text-lg sm:text-xl uppercase tracking-wide flex items-center gap-2">
                         <Backpack size={24} />
                         Gear Selection
                     </h2>
-                    <button onClick={onClose} className="hover:text-red-400 transition-colors">
+                    <button type="button" aria-label="Close gear selection" onClick={onClose} className="shrink-0 min-h-11 min-w-11 flex items-center justify-center hover:text-red-400 transition-colors">
                         <X size={24} />
                     </button>
                 </div>
@@ -180,7 +198,7 @@ export default function GearSelectionModal({ isOpen, onClose, onCreate }: GearSe
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                <div className="min-h-0 flex-1 overflow-y-auto p-2 sm:p-4 space-y-4">
                     {loading ? (
                         <div className="flex justify-center items-center h-full">
                             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-black"></div>
@@ -211,7 +229,7 @@ export default function GearSelectionModal({ isOpen, onClose, onCreate }: GearSe
                                     {isExpanded && (
                                         <div className="divide-y divide-neutral-100">
                                             {/* Column Headers */}
-                                            <div className="grid grid-cols-12 gap-2 text-[10px] font-bold uppercase tracking-widest text-neutral-400 px-4 py-2 border-b border-neutral-100">
+                                            <div className="hidden lg:grid grid-cols-12 gap-2 text-[10px] font-bold uppercase tracking-widest text-neutral-400 px-4 py-2 border-b border-neutral-100">
                                                 <div className="col-span-4 pl-12">Name</div>
                                                 <div className="col-span-2 text-center">Cost</div>
                                                 <div className="col-span-1 text-center">Slots</div>
@@ -250,25 +268,27 @@ export default function GearSelectionModal({ isOpen, onClose, onCreate }: GearSe
                                                 }
 
                                                 return (
-                                                    <div key={item._id} className="grid grid-cols-12 gap-2 p-3 items-stretch hover:bg-neutral-50 group">
+                                                    <div key={item._id} className="grid grid-cols-[minmax(0,1fr)_2.75rem] lg:grid-cols-12 gap-3 lg:gap-2 p-3 items-stretch hover:bg-neutral-50 group">
 
                                                         {/* Name & Description Column */}
-                                                        <div className="col-span-4 flex gap-3 items-start relative">
+                                                        <div className="col-start-1 row-start-1 lg:col-start-auto lg:row-start-auto lg:col-span-4 min-w-0 flex gap-3 items-start relative">
                                                             <div className="w-12 h-12 border border-neutral-300 bg-neutral-100 shrink-0">
                                                                 <img src={resolveImageUrl(item.img)} alt={item.name} className="w-full h-full object-cover" />
                                                             </div>
                                                             <div className="min-w-0 flex flex-col justify-center h-full gap-1">
-                                                                <div className="font-bold font-serif text-lg leading-tight truncate">{item.name}</div>
+                                                                <div className="font-bold font-serif text-lg leading-tight break-words">{item.name}</div>
                                                                 {/* Description */}
                                                                 <div
-                                                                    className="text-[11px] text-neutral-500 line-clamp-2 leading-tight"
+                                                                    className="text-sm lg:text-xs text-neutral-600 leading-relaxed break-words"
                                                                     dangerouslySetInnerHTML={{ __html: item.system?.description || '' }}
                                                                 />
                                                             </div>
                                                         </div>
 
+                                                        <div className="col-start-1 row-start-2 flex flex-wrap items-center gap-x-4 gap-y-2 lg:contents">
                                                         {/* Cost Column */}
-                                                        <div className="col-span-2 flex items-center justify-center font-mono text-sm text-neutral-600">
+                                                        <div className="lg:col-span-2 flex flex-wrap gap-1 items-center lg:justify-center font-mono text-sm text-neutral-600">
+                                                            <span className="lg:hidden font-semibold">Cost:</span>
                                                             {item.system?.cost?.gp > 0 && <span>{item.system.cost.gp} gp</span>}
                                                             {item.system?.cost?.sp > 0 && <span>{item.system.cost.sp} sp</span>}
                                                             {item.system?.cost?.cp > 0 && <span>{item.system.cost.cp} cp</span>}
@@ -276,34 +296,38 @@ export default function GearSelectionModal({ isOpen, onClose, onCreate }: GearSe
                                                         </div>
 
                                                         {/* Slots Column */}
-                                                        <div className="col-span-1 flex items-center justify-center">
+                                                        <div className="lg:col-span-1 flex items-center lg:justify-center gap-1">
+                                                            <span className="lg:hidden text-sm text-neutral-600 font-semibold">Slots:</span>
                                                             <span className="font-bold bg-neutral-200 text-neutral-700 rounded px-2 py-0.5 text-xs">
                                                                 {item.system?.slots?.slots_used || 0}
                                                             </span>
                                                         </div>
 
                                                         {/* Type Icons Column */}
-                                                        <div className="col-span-1 flex items-center justify-center gap-1.5">
+                                                        <div className="lg:col-span-1 flex flex-wrap items-center lg:justify-center gap-1.5">
                                                             {item.system?.isAmmunition && <span title="Ammunition" className="text-orange-500"><Target size={20} /></span>}
                                                             {item.system?.light?.isSource && <span title="Light Source" className="text-yellow-600"><Flame size={20} /></span>}
                                                             {item.system?.magicItem && <span title="Magic Item" className="text-purple-600"><Sparkles size={20} /></span>}
                                                             {item.system?.treasure && <span title="Treasure" className="text-amber-500"><Sun size={20} /></span>}
                                                         </div>
+                                                        </div>
 
                                                         {/* Properties Column */}
-                                                        <div className="col-span-3 flex flex-wrap gap-1 content-center">
+                                                        <div className="col-start-1 row-start-3 lg:col-start-auto lg:row-start-auto lg:col-span-3 min-w-0 flex flex-wrap gap-1 content-center">
                                                             {properties.map((prop, idx) => (
-                                                                <span key={idx} className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded-sm whitespace-nowrap ${prop.color}`}>
+                                                                <span key={idx} className={`text-xs uppercase font-bold px-1.5 py-0.5 rounded-sm break-words ${prop.color}`}>
                                                                     {prop.label}
                                                                 </span>
                                                             ))}
                                                         </div>
 
                                                         {/* Add Button Column */}
-                                                        <div className="col-span-1 flex items-stretch">
+                                                        <div className="col-start-2 row-start-1 row-span-3 lg:col-start-auto lg:row-start-auto lg:row-span-1 lg:col-span-1 flex items-start lg:items-stretch">
                                                             <button
+                                                                type="button"
                                                                 onClick={() => handleAdd(item)}
-                                                                className="w-full bg-black text-white hover:bg-neutral-800 transition-colors rounded-sm flex items-center justify-center"
+                                                                aria-label={`Add ${item.name} to inventory`}
+                                                                className="w-full min-h-11 bg-black text-white hover:bg-neutral-800 transition-colors rounded-sm flex items-center justify-center"
                                                                 title="Add to Inventory"
                                                             >
                                                                 <Plus size={20} strokeWidth={3} />
@@ -321,13 +345,13 @@ export default function GearSelectionModal({ isOpen, onClose, onCreate }: GearSe
                 </div>
 
                 {/* Footer Key - Color Coded */}
-                <div className="p-3 border-t border-neutral-300 bg-neutral-50 text-xs flex gap-6 justify-center">
+                <div className="shrink-0 p-3 border-t border-neutral-300 bg-neutral-50 text-xs flex flex-wrap gap-x-4 gap-y-2 justify-center">
                     <span className="flex items-center gap-1.5 text-orange-500 font-bold"><Target size={16} /> Ammunition</span>
                     <span className="flex items-center gap-1.5 text-yellow-600 font-bold"><Flame size={16} /> Light Source</span>
                     <span className="flex items-center gap-1.5 text-purple-600 font-bold"><Sparkles size={16} /> Magic Item</span>
                     <span className="flex items-center gap-1.5 text-amber-500 font-bold"><Sun size={16} /> Treasure</span>
                 </div>
             </div>
-        </div>
+        </dialog>
     );
 }
