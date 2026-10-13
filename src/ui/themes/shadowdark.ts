@@ -64,9 +64,9 @@ export const shadowdarkTheme = {
     rollDialog: {
         overlay: "absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity",
         container: "w-full max-w-md relative z-10 bg-black border-[4px] border-black shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden",
-        header: "bg-black p-4 flex justify-between items-center",
+        header: "bg-black p-4 flex justify-between items-center text-white",
         title: "font-serif text-xl font-bold uppercase tracking-widest text-white mx-auto",
-        body: "bg-white p-6 border-t-[4px] border-black space-y-4",
+        body: "bg-white p-6 border-t-[4px] border-black space-y-4 text-neutral-900",
         inputGroup: "grid grid-cols-3 items-center gap-4",
         label: "col-span-1 font-bold text-xs uppercase tracking-widest text-neutral-500",
         input: "col-span-2 p-2 border-2 border-black font-serif text-lg outline-none focus:bg-neutral-50 transition-colors text-black",
