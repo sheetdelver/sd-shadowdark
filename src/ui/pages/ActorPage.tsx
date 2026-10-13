@@ -23,7 +23,7 @@ export interface ShadowdarkActorPageProps {
  */
 export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProps) {
     const { foundryUrl, addNotification: addToast, isDiceTrayOpen, toggleDiceTray, events, fetchWithAuth, navigate, isConnected } = useSDK();
-    const { LoadingModal, SharedContentModal } = useSDKComponents();
+    const { LoadingModal } = useSDKComponents();
 
     const [actor, setActor] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -325,7 +325,6 @@ export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProp
                 </div>
             )}
 
-            <SharedContentModal />
 
             {showDeleteModal && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in duration-300">

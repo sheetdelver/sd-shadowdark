@@ -16,11 +16,25 @@ While not yet feature-complete, offers robust support for Shadowdark it Sheet De
 
 ### Prepared Actor Lifecycle
 
-This module requires Sheet Delver `module-api >=1.1.0`. Its runtime-backed
+This module requires SheetDelver `module-api >=1.3.0` for its optional Combat
+Manager stat suggestions. HP, AC, and level are suggested before Player ability
+scores; the GM's saved selection takes precedence. Its runtime-backed
 registry is warmed during initialization, then the adapter deterministically
 prepares each source Actor once per source revision. Dashboard, sheet, card,
 roll, and initiative paths consume that shared prepared model; preparation
 does not write derived values back to Foundry.
+NPC preparation preserves the monster's explicit AC instead of deriving it
+from DEX and equipment; the Lizardfolk fixture checks this value.
+
+The generator and importer do not turn a spell's description links (including
+Light's three optional light-source templates) into starting inventory. Those
+description references are preserved; existing Actor inventory is not changed.
+
+The ADR-0062 development checkpoint removes the sheet's shared-media mount in
+favor of Core's persistent host. Before release, either retain the compatible
+SDK mount or raise the minimum Core version to the release supplying that host;
+the current `>=0.15.1` range also admits Core without it. Responsive review and
+a fresh generated wizard remain acceptance checks.
 
 From this module's local checkout inside the Sheet Delver repository, run the
 behavior-preserving contract check with `npx tsx src/tests/prepared-actor.test.ts`.

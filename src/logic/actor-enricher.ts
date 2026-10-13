@@ -78,6 +78,9 @@ export async function resolveLinkedItems(
     resolveDocFn: (uuid: string) => Promise<any>,
     context: EnrichmentContext
 ): Promise<void> {
+    // Spell descriptions link cast-time effects and light-source templates.
+    // Those references are not starting inventory or granted abilities.
+    if (String(item.type || '').toLowerCase() === 'spell') return;
     const rawDesc = item.system?.description?.value || item.system?.description || "";
     const description = typeof rawDesc === 'string' ? rawDesc : "";
     

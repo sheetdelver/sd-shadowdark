@@ -117,7 +117,7 @@ export default function ShadowdarkPaperSheet({
                     <div className="w-full md:col-span-8 flex items-center justify-center pt-2">
                         {/* ShadowDark Logo Construction */}
                         <div className="flex flex-col items-center gap-2 w-full text-center">
-                            <h1 className="text-4xl sm:text-5xl md:text-6xl font-black tracking-tighter uppercase leading-none break-words w-full">
+                            <h1 className="text-[clamp(2rem,5vw,3.75rem)] font-black tracking-tighter uppercase leading-none whitespace-nowrap w-full">
                                 ShadowDark
                             </h1>
                             <button
