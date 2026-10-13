@@ -86,7 +86,7 @@ async function getRandomGear(runtime: ModuleRequestRuntime, level0: boolean) {
 
     try {
         const table = await runtime.documents.fetchByUuid(GEAR_TABLE_UUID);
-        if (table && table.results) {
+        if (table && Array.isArray(table.results)) {
             const results = table.results;
             const max = Math.max(...results.map((r: any) => (r.range?.[1] || 0)));
 

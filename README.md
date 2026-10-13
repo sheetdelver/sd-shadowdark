@@ -30,11 +30,13 @@ The generator and importer do not turn a spell's description links (including
 Light's three optional light-source templates) into starting inventory. Those
 description references are preserved; existing Actor inventory is not changed.
 
-The ADR-0062 development checkpoint removes the sheet's shared-media mount in
-favor of Core's persistent host. Before release, either retain the compatible
-SDK mount or raise the minimum Core version to the release supplying that host;
-the current `>=0.15.1` range also admits Core without it. Responsive review and
-a fresh generated wizard remain acceptance checks.
+The sheet retains its SDK `SharedContentModal` mount for Core versions admitted
+by the `>=0.17.0` minimum. On Core with ADR-0062's persistent media host,
+that compatibility component is inert and produces no duplicate overlay.
+Core 0.16.0 first provided the required module-api 1.3 combat-stat manifest
+contract; this branch targets the user-approved Core 0.17.0 minimum and
+validation/release toolchain. Responsive review and a fresh generated wizard
+remain acceptance checks.
 
 From this module's local checkout inside the Sheet Delver repository, run the
 behavior-preserving contract check with `npx tsx src/tests/prepared-actor.test.ts`.
@@ -56,12 +58,12 @@ This product is an independent product published under the Shadowdark RPG Third-
 
 ## SDK Feedback Compatibility
 
-The module requires SheetDelver Core `>=0.15.1` and
-`ui-extension-api >=2.1.0 <3.0.0` (SDK 2.1.0). Core renders the dashboard's
+The module requires SheetDelver Core `>=0.17.0` and
+`ui-extension-api >=2.1.0 <3.0.0` (SDK 2.2.0). Core renders the dashboard's
 generator and importer cards; both open module-owned tool pages. The importer
 no longer depends on a packaged `react-dom` portal. Sheets and shared chat/dice
 themes remain module-owned. CI and release packaging use Core
-`v0.15.1`. Notification progress/lifecycle adoption is not required.
+`v0.17.0`. Notification progress/lifecycle adoption is not required.
 Core owns player-world readiness and interruption presentation; module pages
 only manage Shadowdark resource loading and Actor-specific errors.
 

@@ -36,9 +36,9 @@ export function run(): void {
         },
         items: [],
         effects: [],
-    } as unknown as FoundryActor;
+    };
 
-    const prepared = new ShadowdarkAdapter().prepareActorData(source, context);
+    const prepared = new ShadowdarkAdapter().prepareActorData(source as unknown as FoundryActor, context);
 
     assert.equal(prepared._id, 'crawler');
     assert.equal(prepared.id, 'crawler');
@@ -51,7 +51,7 @@ export function run(): void {
     const combatStats = manifest.info.combatTracking?.attributes ?? [];
     const readPath = (path: string): unknown => path.split('.').reduce<unknown>((value, key) =>
         value && typeof value === 'object' ? (value as Record<string, unknown>)[key] : undefined, prepared);
-    assert.equal(readPath(combatStats[0].path), prepared.system.attributes.hp);
+    assert.deepEqual(readPath(combatStats[0].path), { value: 4, max: 6 });
     assert.equal(readPath(combatStats[1].path), 12);
     assert.equal(readPath(combatStats[2].path), 1);
     for (const stat of combatStats.slice(3)) {
@@ -69,8 +69,8 @@ export function run(): void {
         }, level: { value: 2 } },
     } as unknown as FoundryActor, context);
     assert.equal(npc.derived.ac, 14);
-    assert.equal(npc.system.attributes.hp.value, 11);
-    assert.equal(npc.system.level.value, 2);
+    assert.deepEqual(npc.system.attributes, { ac: { value: 14 }, hp: { value: 11, max: 11 } });
+    assert.deepEqual(npc.system.level, { value: 2 });
 
     console.log('shadowdark prepared Actor parity: PASS');
 }
