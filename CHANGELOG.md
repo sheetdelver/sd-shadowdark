@@ -5,6 +5,7 @@ Historical entries are reconstructed from [published releases](https://github.co
 ## Unreleased
 
 - Reused themed HUD roller
+- Preserved explicit initiative modifiers
 
 ## 0.9.2
 

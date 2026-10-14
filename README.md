@@ -72,9 +72,21 @@ The importer no longer depends on a packaged `react-dom` portal. Sheets and shar
 themes remain module-owned. Its combat-HUD initiative modal reuses the same
 SDK roller frame/theme as sheet rolls: square frame, X close control, fields
 and footer. Core's formula/audience are read-only; it returns only a roll
-choice or manual final total. No sheet bonus or audience selector is copied
-into the HUD. CI and
-release packaging target Core `v0.18.0`; publish Core first.
+choice or final total via **Input Manually**. Core resolves an explicit GM
+override first, otherwise this module's formula, then its generic fallback.
+Shadowdark preparation computes `derived.initiative.value`/`advantage` using
+Player DEX score (bounded −4 to 4), explicit NPC DEX modifier, initiative bonus
+and enabled supported numeric effects. The signed modifier remains explicit
+even when zero (`1d20+0`, or keep-highest/lowest with `+0`); the displayed and
+executed expression is not simplified away. Native 4.0.6 uses
+`system.roll.initiative.bonus`/`advantage`; a modern zero advantage value wins
+over legacy advantage arrays. No source fields are written or fabricated.
+`system.attributes.init.value` is not a native 4.0.6 field; a GM override using
+it must validate actual availability. `@derived.initiative.value` can reference
+the module-prepared modifier. This is a deterministic preparation port, not
+execution of native Foundry browser hooks or universal effect-mode parity.
+No sheet bonus or audience selector is copied into the HUD. CI and release
+packaging target Core `v0.18.0`; publish Core first.
 Notification progress/lifecycle adoption is not required.
 ADR-0061 hardening verification (October 14): offline module tests, explicit
 source typing and isolated packaging pass on the integrated SDK/UI 3.1 host.
