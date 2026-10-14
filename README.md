@@ -7,6 +7,10 @@ While not yet feature-complete, offers robust support for Shadowdark it Sheet De
 - **Inventory Management**: Drag-and-drop equipment, slot tracking, and toggleable states (Equipped/Stashed/Light).
 - **Treasure & Wealth**: Dedicated section for treasure items with total wealth tracking and "Sell" functionality.
 - **Gear Selection**: Integrated compendium browser for quickly adding standard gear, armor, and weapons.
+  Phone/tablet rows show complete wrapping names/descriptions and labelled cost/
+  slots; desktop retains columns. A native modal dialog keeps its header above
+  HUD stacking contexts with 44px close/Add controls, Escape and focus restoration.
+  No portal dependency or additional SDK minimum is required.
 - **Interactive Toggles**: Custom icons for managing item states directly from the inventory list.
 - **Formatted Chat**: Rich chat messages for rolls and abilities with inline roll buttons.
 - **Character Import**: Import characters via JSON from Shadowdarklings.
@@ -16,11 +20,28 @@ While not yet feature-complete, offers robust support for Shadowdark it Sheet De
 
 ### Prepared Actor Lifecycle
 
-This module requires Sheet Delver `module-api >=1.1.0`. Its runtime-backed
+This module requires SheetDelver `module-api >=1.3.0` for its optional Combat
+Manager stat suggestions. HP, AC, and level are suggested before Player ability
+scores; the GM's saved selection takes precedence. Its runtime-backed
 registry is warmed during initialization, then the adapter deterministically
 prepares each source Actor once per source revision. Dashboard, sheet, card,
 roll, and initiative paths consume that shared prepared model; preparation
 does not write derived values back to Foundry.
+NPC preparation preserves the monster's explicit AC instead of deriving it
+from DEX and equipment; the Lizardfolk fixture checks this value.
+
+The generator and importer do not turn a spell's description links (including
+Light's three optional light-source templates) into starting inventory. Those
+description references are preserved; existing Actor inventory is not changed.
+
+The sheet retains its SDK `SharedContentModal` mount for Core versions admitted
+by the `>=0.17.0` minimum. On Core with ADR-0062's persistent media host,
+that compatibility component is inert and produces no duplicate overlay.
+Core 0.16.0 first provided the required module-api 1.3 combat-stat manifest
+contract; this branch targets the user-approved Core 0.17.0 minimum and
+validation/release toolchain. The user accepted this correction iteration on
+October 13, 2026, including the responsive Gear picker. Automated generator
+fixtures pass; an exhaustive fresh-wizard/native matrix is not claimed.
 
 From this module's local checkout inside the Sheet Delver repository, run the
 behavior-preserving contract check with `npx tsx src/tests/prepared-actor.test.ts`.
@@ -43,8 +64,8 @@ This product is an independent product published under the Shadowdark RPG Third-
 ## SDK Feedback Compatibility
 
 The development checkout requires SheetDelver Core `>=0.17.0` and
-`ui-extension-api >=3.0.0 <4.0.0` (SDK 3.0.0). The UI API gate keeps it
-incompatible with released Core 0.17.0. Before module release, raise the
+`ui-extension-api >=3.0.0 <4.0.0` (SDK 3.x). The UI API gate keeps it
+incompatible with released Core 0.17.x. Before module release, raise the
 Core minimum to `>=0.18.0` after Core 0.18.0 is published. Core renders the
 dashboard's generator and importer cards; both open module-owned tool pages.
 The importer no longer depends on a packaged `react-dom` portal. Sheets and shared chat/dice

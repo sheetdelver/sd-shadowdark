@@ -11,6 +11,25 @@ import { ShadowdarkNormalizer, resolveDocumentName } from '../logic/normalizatio
 import { getInitiativeFormula, isClassSpellcaster } from '../logic/rules';
 import { TALENT_GRANTED_SPELLS } from '../data/talent-effects';
 
+// SDK source/prepared bags are intentionally system-neutral. These module-owned
+// views describe only fields already consumed by Shadowdark's card/roll hooks.
+interface ShadowdarkHookSystem extends Record<string, unknown> {
+    level?: { value?: number };
+    abilities?: Record<string, { mod: number }>;
+    bonuses?: { attackBonus?: number; meleeAttackBonus?: number; rangedAttackBonus?: number };
+}
+interface ShadowdarkHookComputed {
+    resolvedNames?: { ancestry?: string; class?: string };
+    spellcastingAbility?: string;
+}
+interface ShadowdarkRollItemSystem {
+    ability?: string;
+    properties?: string[];
+    type?: string;
+    range?: string;
+    bonuses?: { attackBonus?: number };
+}
+
 /**
  * ShadowdarkAdapter — the Shadowdark system adapter (ADR-0027 conformed).
  *
@@ -67,8 +86,8 @@ export class ShadowdarkAdapter extends BaseSystemAdapter {
     }
 
     getActorCardData(actor: PreparedActorData): any {
-        const s = actor.system || {};
-        const names = actor.computed?.resolvedNames || {};
+        const s = (actor.system || {}) as ShadowdarkHookSystem;
+        const names = (actor.computed as ShadowdarkHookComputed | undefined)?.resolvedNames || {};
 
         const resolve = (val: any) => resolveDocumentName(val, this._registry.getCachedSystemData());
 
@@ -243,6 +262,8 @@ export class ShadowdarkAdapter extends BaseSystemAdapter {
     }
 
     getRollData(actor: PreparedActorData, type: string, key: string, options: any = {}): { formula: string; type: string; label: string; flags?: any } | null {
+        const system = actor.system as ShadowdarkHookSystem;
+        const computed = actor.computed as ShadowdarkHookComputed | undefined;
         if (options.manualValue !== undefined && options.manualValue !== null) {
             let label = 'Manual Roll';
             if (type === 'ability') label = `${key.toUpperCase().replace('ABILITY', '')} (Manual)`;
@@ -273,7 +294,7 @@ export class ShadowdarkAdapter extends BaseSystemAdapter {
             if (options.abilityBonus !== undefined) {
                 mod = Number(options.abilityBonus);
             } else {
-                const abilities = actor.system.abilities || {};
+                const abilities = system.abilities || {};
                 if (abilities[key]) mod = abilities[key].mod;
             }
             if (options.talentBonus) mod += Number(options.talentBonus);
@@ -291,6 +312,7 @@ export class ShadowdarkAdapter extends BaseSystemAdapter {
             if (!item && options.itemData) item = options.itemData;
 
             if (item) {
+                const itemSystem = item.system as ShadowdarkRollItemSystem | undefined;
                 let totalBonus = 0;
                 let label = '';
 
@@ -299,24 +321,24 @@ export class ShadowdarkAdapter extends BaseSystemAdapter {
                     if (options.abilityBonus !== undefined) {
                         totalBonus += Number(options.abilityBonus);
                     } else {
-                        const statKey = item.system?.ability || actor.computed?.spellcastingAbility?.toLowerCase() || 'int';
-                        totalBonus += actor.system.abilities?.[statKey]?.mod || 0;
+                        const statKey = itemSystem?.ability || computed?.spellcastingAbility?.toLowerCase() || 'int';
+                        totalBonus += system.abilities?.[statKey]?.mod || 0;
                     }
                 } else if (item.type === 'Weapon') {
                     label = `${item.name} Attack`;
                     if (options.abilityBonus !== undefined && options.itemBonus !== undefined) {
                         totalBonus = Number(options.abilityBonus) + Number(options.itemBonus);
                     } else {
-                        const isFinesse = item.system?.properties?.some((p: any) => p.toLowerCase().includes('finesse'));
-                        const isRanged = item.system?.type === 'ranged' || item.system?.range === 'near' || item.system?.range === 'far';
+                        const isFinesse = itemSystem?.properties?.some((p: string) => p.toLowerCase().includes('finesse'));
+                        const isRanged = itemSystem?.type === 'ranged' || itemSystem?.range === 'near' || itemSystem?.range === 'far';
 
-                        const str = actor.system.abilities?.str?.mod || 0;
-                        const dex = actor.system.abilities?.dex?.mod || 0;
-                        const itemAtkBonus = Number(item.system?.bonuses?.attackBonus || 0);
+                        const str = system.abilities?.str?.mod || 0;
+                        const dex = system.abilities?.dex?.mod || 0;
+                        const itemAtkBonus = Number(itemSystem?.bonuses?.attackBonus || 0);
 
-                        const globalAttackBonus = Number(actor.system?.bonuses?.attackBonus || 0);
-                        const meleeAttackBonus = Number(actor.system?.bonuses?.meleeAttackBonus || 0);
-                        const rangedAttackBonus = Number(actor.system?.bonuses?.rangedAttackBonus || 0);
+                        const globalAttackBonus = Number(system.bonuses?.attackBonus || 0);
+                        const meleeAttackBonus = Number(system.bonuses?.meleeAttackBonus || 0);
+                        const rangedAttackBonus = Number(system.bonuses?.rangedAttackBonus || 0);
 
                         let mod = 0;
                         if (isRanged) mod = dex + globalAttackBonus + rangedAttackBonus;
