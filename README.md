@@ -69,10 +69,20 @@ incompatible with released Core 0.17.x. Before module release, raise the
 Core minimum to `>=0.18.0` after Core 0.18.0 is published. Core renders the
 dashboard's generator and importer cards; both open module-owned tool pages.
 The importer no longer depends on a packaged `react-dom` portal. Sheets and shared chat/dice
-themes remain module-owned. Its combat-HUD initiative modal presents Core's
-resolved formula and returns only a roll mode or manual final total. CI and
+themes remain module-owned. Its combat-HUD initiative modal reuses the same
+SDK roller frame/theme as sheet rolls: square frame, X close control, fields
+and footer. Core's formula/audience are read-only; it returns only a roll
+choice or manual final total. No sheet bonus or audience selector is copied
+into the HUD. CI and
 release packaging target Core `v0.18.0`; publish Core first.
 Notification progress/lifecycle adoption is not required.
+ADR-0061 hardening verification (October 14): offline module tests, explicit
+source typing and isolated packaging pass on the integrated SDK/UI 3.1 host.
+The actual wrapper preserves a supplied keep-highest formula in the rendered
+HUD fixture; native Shadowdark participation still needs operator acceptance.
+The October 14 presentation correction is rendered at320/375/1280 in both
+Core appearances; the module skin is retained. This is not released-Core
+compatibility or native rules-parity certification.
 Core owns player-world readiness and interruption presentation; module pages
 only manage Shadowdark resource loading and Actor-specific errors.
 
