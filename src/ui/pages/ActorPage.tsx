@@ -325,7 +325,6 @@ export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProp
                 </div>
             )}
 
-            <SharedContentModal />
 
             {showDeleteModal && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in duration-300">
@@ -342,6 +341,7 @@ export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProp
                     </div>
                 </div>
             )}
+            <SharedContentModal />
         </main>
     );
 }

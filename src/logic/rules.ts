@@ -155,6 +155,11 @@ export const calculateGemSlots = (gems: any[]) => {
 };
 
 export const calculateAC = (actor: any, items: any[]) => {
+    // Shadowdark NPCs store their finished AC directly. Rebuilding it from
+    // DEX and embedded equipment can discard their monster-specific value.
+    const explicitNpcAC = Number(actor.system?.attributes?.ac?.value);
+    if (String(actor.type || '').toLowerCase() === 'npc'
+        && Number.isFinite(explicitNpcAC) && explicitNpcAC > 0) return explicitNpcAC;
     // 1. Base AC = 10 + Dex Mod
     const abilities = actor.system?.abilities || {};
     const dex = abilities.dex || abilities.DEX || { mod: 0 };

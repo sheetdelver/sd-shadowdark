@@ -8,12 +8,25 @@
         "server": "module/server"
     },
     "compatibility": {
-        "coreVersion": ">=0.15.1",
+        "coreVersion": ">=0.17.0",
         "apiContracts": {
-            "module-api": ">=1.1.0 <2.0.0",
+            "module-api": ">=1.3.0 <2.0.0",
             "ui-extension-api": ">=2.1.0 <3.0.0",
             "roll-engine-api": ">=1.0.0 <2.0.0"
         }
+    },
+    "combatTracking": {
+        "attributes": [
+            { "key": "hp", "label": "HP", "path": "system.attributes.hp", "kind": "resource", "showInRoster": true },
+            { "key": "ac", "label": "AC", "path": "derived.ac", "kind": "number", "showInRoster": true },
+            { "key": "level", "label": "Level", "path": "system.level.value", "kind": "number" },
+            { "key": "str", "label": "STR", "path": "system.abilities.str.base", "kind": "number", "actorTypes": ["Player"] },
+            { "key": "dex", "label": "DEX", "path": "system.abilities.dex.base", "kind": "number", "actorTypes": ["Player"] },
+            { "key": "con", "label": "CON", "path": "system.abilities.con.base", "kind": "number", "actorTypes": ["Player"] },
+            { "key": "int", "label": "INT", "path": "system.abilities.int.base", "kind": "number", "actorTypes": ["Player"] },
+            { "key": "wis", "label": "WIS", "path": "system.abilities.wis.base", "kind": "number", "actorTypes": ["Player"] },
+            { "key": "cha", "label": "CHA", "path": "system.abilities.cha.base", "kind": "number", "actorTypes": ["Player"] }
+        ]
     },
     "compendiumPacks": {
         "packs": [
