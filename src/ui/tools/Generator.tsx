@@ -7,6 +7,7 @@ import { logger } from '@sheet-delver/sdk';
 import { useSDK, useSDKComponents } from '@sheet-delver/sdk/react';
 import { useShadowdarkUI, ShadowdarkUIProvider } from '../context/ShadowdarkUIContext';
 import { enrichItem, resolveSubItems, EnrichmentContext } from '../../logic/actor-enricher';
+import { assertResolvedTalentChoices } from '../../logic/talent-choices';
 
 export default function Generator() {
     return (
@@ -765,6 +766,7 @@ function GeneratorContent() {
             }
 
             // Collect Language UUIDs for system.languages array.
+            assertResolvedTalentChoices(items);
             // Use extraData.languages if it is a non-empty array (provided by the LevelUp modal or Generator injection).
             // Fall back to knownLanguages state if the array is absent OR empty (e.g. modal was skipped).
             const languageUuids: string[] = (extraData.languages && extraData.languages.length > 0)
@@ -899,7 +901,7 @@ function GeneratorContent() {
         <div className={`flex flex-col min-h-screen font-crimson font-inter font-sans bg-neutral-100 text-black pb-24`}>
 
             {/* Top Navigation Bar */}
-            <nav className="fixed top-0 left-0 right-0 z-50 bg-neutral-900 border-b border-neutral-800 px-4 py-3 shadow-md flex items-center justify-between backdrop-blur-sm bg-opacity-95">
+            <nav className="relative bg-neutral-900 border-b border-neutral-800 px-4 py-3 shadow-md flex items-center justify-between backdrop-blur-sm bg-opacity-95">
                 <button
                     onClick={() => navigate('/')}
                     className="flex items-center gap-2 text-neutral-400 hover:text-amber-500 transition-colors font-semibold group text-sm uppercase tracking-wide"
@@ -913,7 +915,7 @@ function GeneratorContent() {
             </nav>
 
             {/* Main Header (Subheader) - Controls & Title */}
-            <div className="bg-neutral-900 text-white shadow-md sticky top-[45px] z-10 flex items-center justify-between px-6 border-b-4 border-black h-24 mt-[45px]">
+            <div className="bg-neutral-900 text-white shadow-md relative flex items-center justify-between px-6 border-b-4 border-black h-24">
                 <div className="flex items-center gap-6">
                     <div className="w-16 h-16 bg-neutral-800 border-2 border-white/10 flex items-center justify-center rounded">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-8 h-8 opacity-50">

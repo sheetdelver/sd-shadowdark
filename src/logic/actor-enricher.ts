@@ -2,6 +2,7 @@ import { TALENT_HANDLERS } from '../logic/talent-handlers';
 import { SYSTEM_PREDEFINED_EFFECTS } from '../data/talent-effects';
 import { createEffect, sanitizeItem } from '../utils/Sanitizer';
 import { logger } from '@sheet-delver/sdk';
+import { applyMasteryChoice, masteryKind } from './talent-choices';
 
 export interface EnrichmentContext {
     addedSourceIds: Set<string>;
@@ -25,9 +26,25 @@ export async function enrichItem(item: any, context: EnrichmentContext): Promise
     if (!item) return null;
     
     // 1. DEEP CLONE: Prevent cache poisoning of shared shard data or server cache
-    const enriched = JSON.parse(JSON.stringify(item));
+    let enriched = JSON.parse(JSON.stringify(item));
+    const choiceKind = masteryKind(enriched);
+    let choice = context.bonusTo;
+    if (choiceKind && !choice && context.bonuses && context.mapping?.bonus) {
+        const id = String(enriched.uuid || enriched._id || '').split('.').pop();
+        const matches = context.bonuses.filter(bonus => {
+            const keys = [bonus.bonusName, bonus.name, `${bonus.bonusName}_${bonus.bonusTo}`, `${bonus.bonusTo}_${bonus.bonusName}`, bonus.bonusTo];
+            return keys.some(key => String(context.mapping.bonus[key] || '').split('.').pop() === id);
+        });
+        if (matches.length === 1) choice = matches[0].bonusTo;
+        // Multiple imported selections are handled individually in the later
+        // bonus pass; don't create an unresolved fixed-class duplicate first.
+        if (matches.length > 1) return null;
+    }
+    if (choiceKind && choice) enriched = applyMasteryChoice(enriched, choice, choiceKind);
     
     const sourceId = enriched.uuid || enriched.flags?.core?.sourceId || enriched._id;
+    const sourceKey = choiceKind && enriched.system?.bonuses?.[`${choiceKind}Mastery`]
+        ? `${sourceId}:${enriched.system.bonuses[`${choiceKind}Mastery`]}` : sourceId;
     const itemName = enriched.name || "Unnamed";
 
     // Standardize type ONLY if missing
@@ -37,7 +54,7 @@ export async function enrichItem(item: any, context: EnrichmentContext): Promise
 
     // 2. Prevent Duplicates
     const typeNameKey = `${enriched.type}:${itemName}`;
-    if (sourceId && context.addedSourceIds.has(sourceId)) return null;
+    if (sourceKey && context.addedSourceIds.has(sourceKey)) return null;
     if (context.addedNames.has(typeNameKey)) return null;
     
     // 3. Ensure ID exists
@@ -63,7 +80,7 @@ export async function enrichItem(item: any, context: EnrichmentContext): Promise
         logger.debug(`[ActorEnricher] Applied talentClass hint '${context.defaultTalentClass}' to ${enriched.name}`);
     }
 
-    if (sourceId) context.addedSourceIds.add(sourceId);
+    if (sourceKey) context.addedSourceIds.add(sourceKey);
     context.addedNames.add(`${enriched.type}:${enriched.name}`);
     
     return enriched;

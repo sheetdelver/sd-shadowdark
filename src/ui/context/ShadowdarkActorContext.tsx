@@ -6,6 +6,7 @@ import { useShadowdarkUI } from './ShadowdarkUIContext';
 import { calculateSpellBonus } from '../sheet-utils';
 import { useSDK } from '@sheet-delver/sdk/react';
 import { useShadowdarkLevelUp } from '../hooks/useShadowdarkLevelUp';
+import { prepareWeaponAttack } from '../../logic/weapon-rules';
 
 /**
  * ShadowdarkActorContext
@@ -338,26 +339,12 @@ export function ShadowdarkActorProvider({
                 } else {
                     dialogType = 'attack';
                     title = `Roll Attack with ${item.name}`;
-                    const isFinesse = item.system?.properties?.some((p: any) => p.toLowerCase().includes('finesse'));
-                    const isThrown = item.system?.properties?.some((p: any) => typeof p === 'string' && p.toLowerCase().includes('thrown'));
-                    const isRangedType = item.system?.type === 'ranged';
-                    const hasRange = item.system?.range === 'near' || item.system?.range === 'far';
-
-                    let isRanged = options.attackType === 'Ranged' || options.attackType === 'ranged';
-
-                    if (options.attackType === undefined || options.attackType === null) {
-                        isRanged = isRangedType || hasRange || (item.system?.type === 'melee' && isThrown);
-                    }
-
-                    const str = actor.stats?.str?.mod || actor.stats?.STR?.mod || 0;
-                    const dex = actor.stats?.dex?.mod || actor.stats?.DEX?.mod || 0;
-
-                    let statBonus = str;
-                    if (isRanged) statBonus = dex;
-                    else if (isFinesse) statBonus = Math.max(str, dex);
-
-                    defaults.abilityBonus = statBonus;
-                    defaults.itemBonus = item.system?.bonuses?.attackBonus || 0;
+                    const attack = prepareWeaponAttack(actor, item, options);
+                    defaults.abilityBonus = attack.abilityBonus;
+                    defaults.itemBonus = attack.itemBonus;
+                    defaults.talentBonus = attack.talentBonus;
+                    defaults.attackType = attack.attackType;
+                    defaults.handedness = attack.handedness;
                 }
             }
         }
@@ -371,6 +358,7 @@ export function ShadowdarkActorProvider({
                 const finalOptions = { ...rollOptions };
                 if (defaults.itemData) finalOptions.itemData = defaults.itemData;
                 if (defaults.handedness) finalOptions.handedness = defaults.handedness;
+                if (defaults.attackType) finalOptions.attackType = defaults.attackType;
                 performRoll(type, key, finalOptions);
                 closeRollDialog();
             }

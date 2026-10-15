@@ -10,6 +10,7 @@ import { ShadowdarkRegistry } from './Registry';
 import { ShadowdarkNormalizer, resolveDocumentName } from '../logic/normalization';
 import { getInitiativeFormula, isClassSpellcaster } from '../logic/rules';
 import { TALENT_GRANTED_SPELLS } from '../data/talent-effects';
+import { prepareWeaponAttack } from '../logic/weapon-rules';
 
 // SDK source/prepared bags are intentionally system-neutral. These module-owned
 // views describe only fields already consumed by Shadowdark's card/roll hooks.
@@ -324,32 +325,17 @@ export class ShadowdarkAdapter extends BaseSystemAdapter {
                         const statKey = itemSystem?.ability || computed?.spellcastingAbility?.toLowerCase() || 'int';
                         totalBonus += system.abilities?.[statKey]?.mod || 0;
                     }
-                } else if (item.type === 'Weapon') {
+                } else if (item.type === 'Weapon' || item.type === 'NPC Attack') {
                     label = `${item.name} Attack`;
-                    if (options.abilityBonus !== undefined && options.itemBonus !== undefined) {
-                        totalBonus = Number(options.abilityBonus) + Number(options.itemBonus);
-                    } else {
-                        const isFinesse = itemSystem?.properties?.some((p: string) => p.toLowerCase().includes('finesse'));
-                        const isRanged = itemSystem?.type === 'ranged' || itemSystem?.range === 'near' || itemSystem?.range === 'far';
-
-                        const str = system.abilities?.str?.mod || 0;
-                        const dex = system.abilities?.dex?.mod || 0;
-                        const itemAtkBonus = Number(itemSystem?.bonuses?.attackBonus || 0);
-
-                        const globalAttackBonus = Number(system.bonuses?.attackBonus || 0);
-                        const meleeAttackBonus = Number(system.bonuses?.meleeAttackBonus || 0);
-                        const rangedAttackBonus = Number(system.bonuses?.rangedAttackBonus || 0);
-
-                        let mod = 0;
-                        if (isRanged) mod = dex + globalAttackBonus + rangedAttackBonus;
-                        else if (isFinesse) mod = Math.max(str, dex) + globalAttackBonus + meleeAttackBonus;
-                        else mod = str + globalAttackBonus + meleeAttackBonus;
-
-                        totalBonus = mod + itemAtkBonus;
-                    }
+                    const attack = prepareWeaponAttack(actor, item, options);
+                    // Dialog fields replace individual defaults; absent fields
+                    // retain the exact same module-prepared attack components.
+                    totalBonus = Number(options.abilityBonus ?? attack.abilityBonus)
+                        + Number(options.itemBonus ?? attack.itemBonus)
+                        + Number(options.talentBonus ?? attack.talentBonus);
                 }
 
-                if (options.talentBonus) totalBonus += Number(options.talentBonus);
+                if (!['Weapon', 'NPC Attack'].includes(item.type) && options.talentBonus) totalBonus += Number(options.talentBonus);
 
                 const sign = totalBonus >= 0 ? '+' : '';
                 return {

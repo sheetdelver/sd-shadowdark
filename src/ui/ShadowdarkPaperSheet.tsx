@@ -241,7 +241,7 @@ export default function ShadowdarkPaperSheet({
                                             <span className="truncate text-xs font-bold uppercase flex-1">{atk.name}</span>
                                             <div className="flex gap-2 ml-1 text-xs font-bold">
                                                 <span>{atk.derived?.toHit}</span>
-                                                <span>{atk.derived?.damage}</span>
+                                                <span title={atk.derived?.warnings?.join(' ')}>{atk.derived?.damage}</span>
                                             </div>
                                         </div>
                                         <span className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">{atk._displayType} • {atk.derived?.handedness}</span>

@@ -5,6 +5,7 @@ import { resolveBaggage, resolveGear } from './gear-resolver';
 import { ROLL_TABLE_FILTER } from '../../data/roll-table-patterns';
 import { TableService } from '../../utils/TableService';
 import { sanitizeItems } from '../../utils/Sanitizer';
+import { applyMasteryChoice, assertResolvedTalentChoices, masteryKind } from '../../logic/talent-choices';
 
 interface RollResultProcessorOptions {
     result: any;
@@ -186,7 +187,14 @@ export async function validateState(state: LevelUpState, requirements: any, acto
  */
 export async function assembleFinalItems(state: LevelUpState, targetLevel: number, classObj: any, ancestry?: any, background?: any, patron?: any, client?: any, actor?: any) {
     const items: any[] = [];
-    const baggageUuids = new Set<string>();
+    // A template UUID identifies a source, not a grant. Each roll is independent;
+    // repeated references within one fixed class/ancestry grant are aliases.
+    type Origin = { source: 'fixed' | 'rolled' | 'other'; grant: string };
+    const origins = new WeakMap<object, Origin>();
+    const append = (item: any, source: Origin['source'], grant: string) => {
+        origins.set(item, { source, grant });
+        items.push(item);
+    };
     const baggageNames = new Set<string>();
 
     const existingItems = actor?.items || [];
@@ -195,10 +203,9 @@ export async function assembleFinalItems(state: LevelUpState, targetLevel: numbe
 
     // 1. Process Talents and Boons
     const allRolled = [...state.rolledTalents, ...state.rolledBoons];
-    const rolledUuids = new Set(allRolled.map(i => i.uuid || i.documentUuid).filter(Boolean));
     const displacedUuids = new Set<string>();
 
-    for (const rawItem of allRolled) {
+    for (const [index, rawItem] of allRolled.entries()) {
         // DEEP CLONE: Prevent cache poisoning and ensure mutations stay local to this level-up session
         const item = JSON.parse(JSON.stringify(rawItem));
         
@@ -212,7 +219,7 @@ export async function assembleFinalItems(state: LevelUpState, targetLevel: numbe
         for (const handler of TALENT_HANDLERS) {
             if (handler.matches(item)) {
                 // If handler will resolve separate items, mark this one for displacement
-                if (handler.resolveItems) {
+                if (handler.resolveItems && !masteryKind(item)) {
                     const uuid = item.uuid || item.documentUuid;
                     if (uuid) displacedUuids.add(uuid);
                 }
@@ -228,16 +235,16 @@ export async function assembleFinalItems(state: LevelUpState, targetLevel: numbe
                 }
             }
         }
-        items.push(item);
+        append(item, 'rolled', `rolled:${index}`);
     }
 
     // 2. Resolve additional items from handlers
     for (const handler of TALENT_HANDLERS) {
-        if (handler.resolveItems) {
+        if (handler.resolveItems && !['weapon-mastery', 'armor-mastery'].includes(handler.action ?? '')) {
             const extra = await handler.resolveItems(state, targetLevel, async (uuid: string) => {
                 return shadowdarkAdapter.resolveDocument(uuid);
             });
-            items.push(...extra);
+            extra.forEach((item, index) => append(item, 'other', `${handler.id}:${index}`));
         }
     }
 
@@ -245,12 +252,12 @@ export async function assembleFinalItems(state: LevelUpState, targetLevel: numbe
     for (const spell of [...state.selectedSpells, ...(state.extraSpellSelection?.selected || [])]) {
         const cleaned = { ...spell };
         delete cleaned._id;
-        items.push(cleaned);
+        append(cleaned, 'other', `spell:${items.length}`);
     }
 
     // 4. Baggage (Level 1 / Swap only)
     if (targetLevel === 1) {
-        const processBaggageGroup = async (doc: any, resolveFn: any) => {
+        const processBaggageGroup = async (doc: any, resolveFn: any, group: string) => {
             if (!doc) return;
             
             const baggage = await resolveFn(doc, client);
@@ -264,9 +271,8 @@ export async function assembleFinalItems(state: LevelUpState, targetLevel: numbe
                     continue;
                 }
 
-                if (uuid) baggageUuids.add(uuid);
                 if (name) baggageNames.add(name);
-                items.push(item);
+                append(item, 'fixed', `${group}:${uuid || `${item.type}:${name}`}`);
             }
         };
 
@@ -278,11 +284,11 @@ export async function assembleFinalItems(state: LevelUpState, targetLevel: numbe
                  const cleanClass = JSON.parse(JSON.stringify(classObj));
                  delete cleanClass._id;
                  if (classObj.uuid) cleanClass.uuid = classObj.uuid;
-                 items.push(cleanClass);
+                 append(cleanClass, 'other', 'class');
             }
 
-            await processBaggageGroup(classObj, resolveGear);
-            await processBaggageGroup(classObj, resolveBaggage);
+            await processBaggageGroup(classObj, resolveGear, 'class');
+            await processBaggageGroup(classObj, resolveBaggage, 'class');
         }
         if (ancestry) {
             // Include the Ancestry item itself IF not already present
@@ -292,23 +298,24 @@ export async function assembleFinalItems(state: LevelUpState, targetLevel: numbe
                 const cleanAncestry = JSON.parse(JSON.stringify(ancestry));
                 delete cleanAncestry._id;
                 if (ancestry.uuid) cleanAncestry.uuid = ancestry.uuid;
-                items.push(cleanAncestry);
+                append(cleanAncestry, 'other', 'ancestry');
             }
 
-            await processBaggageGroup(ancestry, resolveGear);
-            await processBaggageGroup(ancestry, resolveBaggage);
+            await processBaggageGroup(ancestry, resolveGear, 'ancestry');
+            await processBaggageGroup(ancestry, resolveBaggage, 'ancestry');
         }
         if (background) {
-            await processBaggageGroup(background, resolveBaggage);
+            await processBaggageGroup(background, resolveBaggage, 'background');
         }
         if (patron) {
-            await processBaggageGroup(patron, resolveBaggage);
+            await processBaggageGroup(patron, resolveBaggage, 'patron');
         }
     }
 
     // 5. Final pass (Resolution & Categorization)
     const resolvedItems: any[] = [];
     const seenUuids = new Set<string>();
+    const seenMasteryGrants = new Set<string>();
     // baggageNames now populated during Baggage pass above
 
     for (const item of items) {
@@ -320,26 +327,8 @@ export async function assembleFinalItems(state: LevelUpState, targetLevel: numbe
             continue;
         }
 
-        // UUID DEDUPLICATION: Skip if we've already resolved this exact UUID
-        if (uuid && seenUuids.has(uuid)) {
-            continue;
-        }
-
-        // NAME-BASED DEDUPLICATION: 
-        // If this is a ROLLED talent and it matches a BAGGAGE name, skip IF it's not a stacker
-        const isRolled = allRolled.some(r => (r.uuid || r.documentUuid) === uuid);
-        if (isRolled && baggageNames.has(name)) {
-            // Check if it's a known stacking candidate
-            const isStacker = name.startsWith("+1") || name.startsWith("+2") || name.includes("improvement");
-            if (!isStacker) {
-                logger.info(`[LevelUpEngine] Deduplicating rolled talent matching baggage: ${item.name}`);
-                continue;
-            }
-        }
-
-        if (uuid) seenUuids.add(uuid);
-
-        let clean = { ...item };
+        const origin = origins.get(item)!;
+        let clean = JSON.parse(JSON.stringify(item));
         const type = String(item.type || "");
         const isShallow = !item.system || Object.keys(item.system).length === 0;
         const needsResolution = (type === 'document' || type === '2' || isShallow) && uuid;
@@ -382,13 +371,28 @@ export async function assembleFinalItems(state: LevelUpState, targetLevel: numbe
             }
         }
 
+        // Resolve before deduplication: a shallow template may conceal a required
+        // mastery choice. Only the same fixed grant may be collapsed, never two
+        // rolled grants or a fixed and rolled grant sharing a source template.
+        if (masteryKind(clean)) {
+            if (seenMasteryGrants.has(origin.grant)) continue;
+            seenMasteryGrants.add(origin.grant);
+        } else {
+            if (uuid && seenUuids.has(uuid)) continue;
+            if (origin.source === 'rolled' && baggageNames.has(name)) {
+                const isStacker = name.startsWith('+1') || name.startsWith('+2') || name.includes('improvement');
+                if (!isStacker) continue;
+            }
+            if (uuid) seenUuids.add(uuid);
+        }
+
         // TAGGING: Tag advancements as 'level' if they lack any classification
         // Trust compendium/resolution metadata (talentClass) if it exists.
         // If targetLevel is 0 (Character Generation), we don't default to 'level' 
         // to avoid botching ancestry items resolved during generation.
         const isLevelAdvancement = targetLevel > 0;
-        const existsAsRolled = rolledUuids.has(uuid || "");
-        const existsAsBaggage = baggageUuids.has(uuid || "");
+        const existsAsRolled = origin.source === 'rolled';
+        const existsAsBaggage = origin.source === 'fixed';
 
         if (isLevelAdvancement && existsAsRolled && !existsAsBaggage && !clean.system?.talentClass) {
             if (!clean.system) clean.system = {};
@@ -399,5 +403,26 @@ export async function assembleFinalItems(state: LevelUpState, targetLevel: numbe
         resolvedItems.push(clean);
     }
 
-    return sanitizeItems(resolvedItems);
+    const required = { weapon: 0, armor: 0 };
+    for (const item of resolvedItems) {
+        const kind = masteryKind(item);
+        if (kind) required[kind]++;
+    }
+    for (const kind of ['weapon', 'armor'] as const) {
+        const selection = kind === 'weapon' ? state.weaponMasterySelection : state.armorMasterySelection;
+        if ((selection?.selected?.length ?? 0) !== required[kind]
+            || (selection?.required !== undefined && selection.required !== required[kind])) {
+            throw new Error(`Choose a valid ${kind} for each mastery grant: ${required[kind]} required choices; refresh stale selections before creating Items.`);
+        }
+    }
+    const selectionsUsed = { weapon: 0, armor: 0 };
+    const finalized = resolvedItems.map(item => {
+        const kind = masteryKind(item);
+        if (!kind) return item;
+        const selection = kind === 'weapon' ? state.weaponMasterySelection : state.armorMasterySelection;
+        const selected = selection?.selected?.[selectionsUsed[kind]++];
+        return applyMasteryChoice(item, selected, kind);
+    });
+    assertResolvedTalentChoices(finalized);
+    return sanitizeItems(finalized);
 }

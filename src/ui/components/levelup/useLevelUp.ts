@@ -4,6 +4,7 @@ import { logger } from '@sheet-delver/sdk';
 import { useSDK } from '@sheet-delver/sdk/react';
 import { TALENT_HANDLERS } from '../../../logic/talent-handlers';
 import { useShadowdarkUI } from '../../context/ShadowdarkUIContext';
+import { fixedTalentReferences, masteryKind } from '../../../logic/talent-choices';
 
 export interface LevelUpProps {
     actorId: string;
@@ -205,6 +206,32 @@ export const useLevelUp = (props: LevelUpProps) => {
     }, [fetchWithAuth]);
 
     const fetchDocument = fetchByUuid;
+    const fixedChoiceKey = JSON.stringify([targetLevel, activeClassObj?.uuid, activeClassObj?.system?.talents,
+        activeClassObj?.system?.features, activeClassObj?.system?.abilities, activeClassObj?.system?.classAbilities, ancestry]);
+    const [fixedChoices, setFixedChoices] = useState<{ key: string; items: any[]; error?: string } | null>(null);
+    useEffect(() => {
+        let current = true;
+        const load = async () => {
+            try {
+                if (targetLevel !== 1) { if (current) setFixedChoices({ key: fixedChoiceKey, items: [] }); return; }
+                const ancestryDoc = typeof ancestry === 'string' ? await fetchDocument(ancestry) : ancestry;
+                // Aliases in one fixed source are duplicates; class/ancestry and
+                // rolled grants remain independent even with the same UUID.
+                const refs = [activeClassObj, ancestryDoc].flatMap(doc => [...new Set(fixedTalentReferences(doc))]);
+                const docs = await Promise.all(refs.map(ref => fetchDocument(ref)));
+                if (docs.some(doc => !doc)) throw new Error('Required class or ancestry talents are unavailable. Retry after their data loads.');
+                if (current) setFixedChoices({ key: fixedChoiceKey, items: docs.filter(doc => masteryKind(doc)) });
+            } catch (error) {
+                if (current) {
+                    const message = getErrorMessage(error);
+                    setFixedChoices({ key: fixedChoiceKey, items: [], error: message });
+                    setError(message);
+                }
+            }
+        };
+        void load();
+        return () => { current = false; };
+    }, [fixedChoiceKey, targetLevel, activeClassObj, ancestry, fetchDocument]);
 
     const fetchLevelUpData = useCallback(async (classUuidOverride?: string) => {
         if (!actorId && !classUuidOverride) return;
@@ -1015,8 +1042,6 @@ export const useLevelUp = (props: LevelUpProps) => {
                 // Only if everything is settled
                 if (classLoaded) {
                     setStatSelection(prev => (prev.required === 0 && prev.selected.length === 0) ? prev : { required: 0, selected: [] });
-                    setWeaponMasterySelection(prev => (prev.required === 0 && prev.selected.length === 0) ? prev : { required: 0, selected: [] });
-                    setArmorMasterySelection(prev => (prev.required === 0 && prev.selected.length === 0) ? prev : { required: 0, selected: [] });
                 }
 
             } catch (error: any) {
@@ -1170,6 +1195,7 @@ export const useLevelUp = (props: LevelUpProps) => {
 
         rolledTalents.forEach((item, index) => processItem(item, index));
         rolledBoons.forEach((item) => processItem(item, null));
+        if (fixedChoices?.key === fixedChoiceKey) fixedChoices.items.forEach(item => processItem(item, null));
 
         setStatPool(prev => {
             if (prev.total !== poolTotal) {
@@ -1223,7 +1249,7 @@ export const useLevelUp = (props: LevelUpProps) => {
             return prev;
         });
 
-    }, [rolledTalents, rolledBoons, targetLevel]);
+    }, [rolledTalents, rolledBoons, targetLevel, fixedChoices, fixedChoiceKey]);
 
     useEffect(() => {
         if (targetClassUuid && targetClassUuid !== classUuid) {
@@ -1233,6 +1259,7 @@ export const useLevelUp = (props: LevelUpProps) => {
 
     // Validation
     const isComplete = useCallback(() => {
+        if (!fixedChoices || fixedChoices.key !== fixedChoiceKey || fixedChoices.error) return false;
         // 1. Talents
         for (const handler of TALENT_HANDLERS) {
             if (handler.isBlocked && handler.isBlocked({
@@ -1334,7 +1361,7 @@ export const useLevelUp = (props: LevelUpProps) => {
 
         return true;
     }, [
-        rolledTalents, requiredTalents, targetLevel, existingItems, statSelection, statPool, weaponMasterySelection, armorMasterySelection, activeClassObj,
+        rolledTalents, requiredTalents, targetLevel, existingItems, statSelection, statPool, weaponMasterySelection, armorMasterySelection, activeClassObj, fixedChoices, fixedChoiceKey,
         rolledBoons, choiceRolls,
         extraSpellSelection,
         languageGroups, availableLanguages, fixedLanguages, selectedLanguages, knownLanguages,

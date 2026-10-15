@@ -1,4 +1,5 @@
 import { Swords } from 'lucide-react';
+import { MASTERY_WEAPONS } from '../../../../logic/talent-choices';
 
 interface WeaponSelectionSectionProps {
     required: number;
@@ -6,13 +7,7 @@ interface WeaponSelectionSectionProps {
     onSelectionChange: (selected: string[]) => void;
 }
 
-const WEAPONS = [
-    "Dagger", "Staff", "Club", "Mace",
-    "Shortsword", "Longsword", "Bastard Sword",
-    "Greatsword", "Greataxe", "Warhammer",
-    "Spear", "Javelin",
-    "Shortbow", "Longbow", "Crossbow", "Sling"
-];
+const WEAPONS = MASTERY_WEAPONS;
 
 export const WeaponSelectionSection: React.FC<WeaponSelectionSectionProps> = ({
     required,

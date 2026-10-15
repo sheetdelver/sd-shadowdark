@@ -1,6 +1,7 @@
 import { SYSTEM_PREDEFINED_EFFECTS } from '../data/talent-effects';
 import { logger } from '@sheet-delver/sdk';
 import { createEffect } from '../utils/Sanitizer';
+import { applyMasteryChoice } from './talent-choices';
 
 export interface TalentHandler {
     id: string;
@@ -193,18 +194,7 @@ export const TALENT_HANDLERS: TalentHandler[] = [
                     // SELECTIVE NAME MUTATION (Match Original Module behavior)
                     enriched.name = `${enriched.name} (${selection})`;
 
-                    // UPDATE EFFECTS (Additive)
-                    if (enriched.effects) {
-                        enriched.effects.forEach((effect: any) => {
-                            if (effect.changes) {
-                                effect.changes.forEach((c: any) => {
-                                    if (c.value === 'REPLACEME') c.value = selection.toLowerCase();
-                                });
-                            }
-                        });
-                    }
-
-                    items.push(enriched);
+                    items.push(applyMasteryChoice(enriched, selection, 'weapon'));
                 }
             }
             return items;
@@ -245,18 +235,7 @@ export const TALENT_HANDLERS: TalentHandler[] = [
                     // SELECTIVE NAME MUTATION (Match Original Module behavior)
                     enriched.name = `${enriched.name} (${selection})`;
 
-                    // UPDATE EFFECTS (Additive)
-                    if (enriched.effects) {
-                        enriched.effects.forEach((effect: any) => {
-                            if (effect.changes) {
-                                effect.changes.forEach((c: any) => {
-                                    if (c.value === 'REPLACEME') c.value = selection.toLowerCase();
-                                });
-                            }
-                        });
-                    }
-
-                    items.push(enriched);
+                    items.push(applyMasteryChoice(enriched, selection, 'armor'));
                 }
             }
             return items;

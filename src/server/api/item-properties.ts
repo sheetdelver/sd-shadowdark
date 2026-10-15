@@ -3,47 +3,10 @@ import { logger } from '@sheet-delver/sdk';
 
 // Map of Item ID (or Source ID) to Overrides
 const ITEM_OVERRIDES: Record<string, (item: any) => void> = {
-    // Staff (Gear)
-    '9eTpsuEuzL3Vaxge': (item: any) => {
-        // Remove Two-Handed
-        if (item.system.properties) {
-            item.system.properties = item.system.properties.filter((p: string) => !p.includes('b6Gm2ULKj2qyy2xJ'));
-            // Add Versatile if not present
-            if (!item.system.properties.some((p: string) => p.includes('qEIYaQ9j2EUmSrx6'))) {
-                item.system.properties.push('Compendium.shadowdark.properties.Item.qEIYaQ9j2EUmSrx6');
-            }
-        }
-        // Fix Damage
-        if (item.system.damage) {
-            item.system.damage.oneHanded = 'd4';
-            item.system.damage.twoHanded = 'd6';
-        }
-    },
-    // Warhammer (Gear)
-    'z98LNu4yOIe1B1eg': (item: any) => {
-        if (item.system.properties) {
-            item.system.properties = item.system.properties.filter((p: string) => !p.includes('b6Gm2ULKj2qyy2xJ'));
-            if (!item.system.properties.some((p: string) => p.includes('qEIYaQ9j2EUmSrx6'))) {
-                item.system.properties.push('Compendium.shadowdark.properties.Item.qEIYaQ9j2EUmSrx6');
-            }
-        }
-        if (item.system.damage) {
-            item.system.damage.oneHanded = 'd8';
-            item.system.damage.twoHanded = 'd10';
-        }
-    },
     // Staff of Healing (Magic Item)
     'jEeDexWHYy7wKsfa': (item: any) => {
-        if (item.system.properties) {
-            item.system.properties = item.system.properties.filter((p: string) => !p.includes('b6Gm2ULKj2qyy2xJ'));
-            if (!item.system.properties.some((p: string) => p.includes('qEIYaQ9j2EUmSrx6'))) {
-                item.system.properties.push('Compendium.shadowdark.properties.Item.qEIYaQ9j2EUmSrx6');
-            }
-        }
-        if (item.system.damage) {
-            item.system.damage.oneHanded = 'd4';
-            item.system.damage.twoHanded = 'd6';
-        }
+        // Description-link repair only. Weapon damage/properties always come
+        // from the source Item, never name/ID-specific rules overrides.
         // Inject Spell Link if missing - Standardizing to long UUID with .Item.
         const spellLink = '@UUID[Compendium.shadowdark.spells.Item.N9NvonT0RL6PyiiV]{Cure Wounds}';
         if (item.system.description && !item.system.description.includes('Compendium.shadowdark.spells.Item.N9NvonT0RL6PyiiV')) {
@@ -98,9 +61,7 @@ export function applyItemDataOverrides(item: any) {
 
     // Fallback: Name matching
     if (!key) {
-        if (item.name === 'Staff') key = '9eTpsuEuzL3Vaxge';
-        else if (item.name === 'Warhammer') key = 'z98LNu4yOIe1B1eg';
-        else if (item.name === 'Staff of Healing') key = 'jEeDexWHYy7wKsfa';
+        if (item.name === 'Staff of Healing') key = 'jEeDexWHYy7wKsfa';
         else if (item.name === 'Scroll of Burning Hands') key = 'N27A6nb0epkHZ3lR';
         else if (item.name === 'Scroll of Hold Portal') key = 'mXkpNk8z0eZU8kKj';
         else if (item.name === 'Wand of Blind/Deafen') key = 'yyUwr6H9imWcJ9YS';
