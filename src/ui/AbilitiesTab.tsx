@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSDK } from '@sheet-delver/sdk/react';
 import { useShadowdarkUI } from './context/ShadowdarkUIContext';
 
@@ -162,7 +162,7 @@ export default function AbilitiesTab() {
                                         <span className="font-bold font-serif text-lg leading-none">{item.name}</span>
                                     </div>
                                     <div className="text-sm text-neutral-700 font-sans mt-1">
-                                        <span className="font-bold">{item.derived?.toHit}</span> to hit, <span className="font-bold">{item.derived?.damage}</span> dmg
+                                        <span className="font-bold">{item.derived?.toHit}</span> to hit, <span title={item.derived?.warnings?.join(' ')} className="font-bold">{item.derived?.damage}</span> dmg
                                     </div>
                                     {/* Property Pills */}
                                     {item.derived?.properties && item.derived.properties.length > 0 && (
@@ -222,7 +222,7 @@ export default function AbilitiesTab() {
                                         )}
                                     </div>
                                     <div className="text-sm text-neutral-700 font-sans mt-1">
-                                        <span className="font-bold">{item.derived?.toHit}</span> to hit, <span className="font-bold">{item.derived?.damage}</span> dmg
+                                        <span className="font-bold">{item.derived?.toHit}</span> to hit, <span title={item.derived?.warnings?.join(' ')} className="font-bold">{item.derived?.damage}</span> dmg
                                     </div>
                                     {/* Property Pills */}
                                     {item.derived?.properties && item.derived.properties.length > 0 && (

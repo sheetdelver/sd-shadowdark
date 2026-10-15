@@ -68,6 +68,7 @@ jobs:
       - name: Run module regression tests
         run: |
           npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/prepared-actor.test.ts"
+          npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/weapon-rules.test.ts"
           npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/actor-enricher.test.ts"
           npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/presentation.test.ts"
           npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/roll-feedback.test.ts"

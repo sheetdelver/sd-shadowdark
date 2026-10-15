@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     calculateItemSlots,
     getSafeDescription,
@@ -8,6 +8,7 @@ import {
 } from './sheet-utils';
 import { useSDK } from '@sheet-delver/sdk/react';
 import { useShadowdarkActor } from './context/ShadowdarkActorContext';
+import { prepareWeaponBase, prepareWeaponAttack, weaponProperties } from '../logic/weapon-rules';
 
 
 export interface QuantityControlProps {
@@ -71,7 +72,7 @@ export interface ItemRowProps {
 
 export function ItemRow({ item, expandedItems, toggleItem, isTreasure, onSell }: ItemRowProps) {
     const { resolveImageUrl } = useSDK();
-    const { updateActor, deleteItem, getDraftValue } = useShadowdarkActor();
+    const { actor, updateActor, deleteItem, getDraftValue } = useShadowdarkActor();
 
     const itemId = item.id || item._id;
 
@@ -103,13 +104,14 @@ export function ItemRow({ item, expandedItems, toggleItem, isTreasure, onSell }:
 
     // Also check properties for 'light' keyword
     const props = item.system?.properties;
-    const hasLightProp = Array.isArray(props) ? props.some((p: any) => p.includes('light')) : (props?.light);
+    const hasLightProp = Array.isArray(props) ? weaponProperties(item, actor?.computed?.weaponPropertyNames).includes('light') : props?.light;
 
     // Weapon Details
-    const isWeapon = item.type === 'Weapon';
+    const isWeapon = item.type === 'Weapon' || item.type === 'NPC Attack';
     const isArmor = item.type === 'Armor';
-    const weaponType = item.system?.type === 'melee' ? 'Melee' : item.system?.type === 'ranged' ? 'Ranged' : '';
-    const range = item.system?.range ? item.system?.range.charAt(0).toUpperCase() + item.system?.range.slice(1) : '-';
+    const weaponType = item.type === 'NPC Attack' ? 'NPC attack' : item.system?.type === 'melee' ? 'Melee' : item.system?.type === 'ranged' ? 'Ranged' : '';
+    const ranges = item.type === 'NPC Attack' ? item.system?.ranges ?? [] : [item.system?.range].filter(Boolean);
+    const range = ranges.map((range: string) => range.charAt(0).toUpperCase() + range.slice(1)).join('/') || '-';
 
     // Properties Logic
     const rawProps = item.system?.properties;
@@ -120,23 +122,15 @@ export function ItemRow({ item, expandedItems, toggleItem, isTreasure, onSell }:
         propertiesDisplay = Object.keys(rawProps).filter(k => rawProps[k]);
     }
 
-    const isVersatile = propertiesDisplay.some((p: any) => p.toLowerCase().includes('versatile') || p.includes('qEIYaQ9j2EUmSrx6'));
-    const isTwoHanded = propertiesDisplay.some((p: any) => p.toLowerCase().includes('two-handed') || p.includes('b6Gm2ULKj2qyy2xJ'));
+    const base = isWeapon ? prepareWeaponBase(item, {}, actor?.computed?.weaponPropertyNames) : null;
+    const attack = isWeapon ? prepareWeaponAttack(actor ?? {}, item) : null;
+    if (base) propertiesDisplay = base.properties;
 
     // Description
     const rawDesc = getSafeDescription(item.system);
     const description = rawDesc;
 
-    let damage = item.system?.damage?.value;
-    if (!damage) {
-        if (isVersatile) {
-            damage = `${item.system?.damage?.oneHanded || 'd4'}/${item.system?.damage?.twoHanded || 'd6'}`;
-        } else if (isTwoHanded) {
-            damage = item.system?.damage?.twoHanded || item.system?.damage?.oneHanded || 'd4';
-        } else {
-            damage = item.system?.damage?.oneHanded || 'd4';
-        }
-    }
+    const handsLabel = item.type === 'NPC Attack' ? '' : ` (${base?.handedness.toUpperCase()})`;
 
     // Cost Formatter
     const formatCost = (cost: any) => {
@@ -290,9 +284,13 @@ export function ItemRow({ item, expandedItems, toggleItem, isTreasure, onSell }:
             {/* Expanded Description */}
             {isExpanded && (
                 <div className="px-4 py-2 bg-neutral-50 text-sm border-t border-b border-neutral-200 col-span-12 font-serif">
-                    <div className="flex gap-2 mb-2 text-xs font-bold uppercase text-neutral-500">
+                    <div className="flex flex-wrap gap-2 mb-2 text-xs font-bold uppercase text-neutral-500">
                         <span className="bg-neutral-200 px-1 rounded">{item.type}</span>
-                        {isWeapon && <span>{weaponType} • {range} • {damage}</span>}
+                        {base && attack && <>
+                            <span>{weaponType} • {range}</span>
+                            <span data-weapon-damage="base" title={base.warnings.join(' ')}>Base damage{handsLabel}: {base.damage ?? 'Damage unavailable'}</span>
+                            <span data-weapon-damage="actor" title={attack.warnings.join(' ')}>Actor damage{handsLabel}: {attack.damage ?? 'Damage unavailable'}</span>
+                        </>}
                         {isArmor && <span>AC +{item.system?.ac?.base || 0}</span>}
                         {propertiesDisplay.map((p, pIdx) => (
                             <span key={`${p}-${pIdx}`} className="bg-neutral-200 px-1 rounded">{p}</span>

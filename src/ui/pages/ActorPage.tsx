@@ -262,7 +262,7 @@ export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProp
 
     return (
         <main className="min-h-screen font-sans selection:bg-amber-900 pb-20">
-            <nav className="fixed top-0 left-0 right-0 z-50 bg-neutral-900 border-b border-neutral-800 px-4 py-3 shadow-md flex items-center justify-between backdrop-blur-sm bg-opacity-95">
+            <nav className="relative bg-neutral-900 border-b border-neutral-800 px-4 py-3 shadow-md flex items-center justify-between backdrop-blur-sm bg-opacity-95">
                 <button
                     onClick={() => navigate('/')}
                     className="flex items-center gap-2 text-neutral-400 hover:text-amber-500 transition-colors font-semibold group text-sm uppercase tracking-wide cursor-pointer"
@@ -276,7 +276,7 @@ export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProp
             </nav>
 
             {actor && (
-                <div className="w-full max-w-5xl mx-auto p-4 pt-20">
+                <div className="w-full max-w-5xl mx-auto p-4">
                     <ShadowdarkUIProvider>
                         <ShadowdarkActorProvider
                             actor={actor}
@@ -320,7 +320,7 @@ export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProp
             )}
 
             {!actor && actorError && !showDeleteModal && (
-                <div className="w-full max-w-5xl mx-auto p-4 pt-20 text-center text-neutral-300" role="alert">
+                <div className="w-full max-w-5xl mx-auto p-4 text-center text-neutral-300" role="alert">
                     {actorError}
                 </div>
             )}

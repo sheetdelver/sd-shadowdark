@@ -2,7 +2,12 @@
 
 Historical entries are reconstructed from [published releases](https://github.com/sheetdelver/sd-shadowdark/releases), their tags, and merged changes. Version numbers follow the published tags; unreleased branch work is excluded.
 
-## Unreleased
+## 0.9.4
+- Corrected weapon preparation
+- Preserved required mastery choices
+- Ordered numeric damage effects
+- Unified authoritative damage displays
+- Cleared combat HUD navigation
 
 ## 0.9.3
 

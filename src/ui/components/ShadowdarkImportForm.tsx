@@ -115,7 +115,7 @@ export default function ShadowdarkImportForm({ onCancel, onImportSuccess }: Shad
 
     return (
         <main className="flex min-h-screen flex-col bg-neutral-100 pb-24 font-crimson font-inter font-sans text-black">
-            <nav className="fixed top-0 left-0 right-0 z-50 bg-neutral-900 border-b border-neutral-800 px-4 py-3 shadow-md flex items-center justify-between backdrop-blur-sm bg-opacity-95">
+            <nav className="relative bg-neutral-900 border-b border-neutral-800 px-4 py-3 shadow-md flex items-center justify-between backdrop-blur-sm bg-opacity-95">
                 <button
                     type="button"
                     onClick={handleCancel}
@@ -127,7 +127,7 @@ export default function ShadowdarkImportForm({ onCancel, onImportSuccess }: Shad
                 <div className="text-xs text-neutral-600 font-mono hidden md:block">Importing Character</div>
             </nav>
 
-            <header className="bg-neutral-900 text-white shadow-md sticky top-[45px] z-10 flex items-center justify-between px-6 border-b-4 border-black h-24 mt-[45px]">
+            <header className="bg-neutral-900 text-white shadow-md relative flex items-center justify-between px-6 border-b-4 border-black h-24">
                 <div className="flex items-center gap-6">
                     <div className="w-16 h-16 bg-neutral-800 border-2 border-white/10 flex items-center justify-center rounded">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-8 h-8 opacity-50" aria-hidden="true">

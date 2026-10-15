@@ -5,6 +5,7 @@ import { findEffectUuid, SYSTEM_PREDEFINED_EFFECTS } from '../data/talent-effect
 import { shadowdarkAdapter } from '../server/ShadowdarkAdapter';
 import { sanitizeItem, sanitizeItems, createEffect } from '../utils/Sanitizer';
 import { enrichItem, resolveSubItems, EnrichmentContext } from '../logic/actor-enricher';
+import { assertResolvedTalentChoices } from '../logic/talent-choices';
 
 export interface ImportResult {
     success: boolean;
@@ -605,6 +606,7 @@ export class ShadowdarkImporter {
             }
 
             // 7. Create Actor and Items
+            assertResolvedTalentChoices([...gear, ...classAbilities, ...spells, ...talents, ...(enrichmentContext.discoveredItems ?? [])]);
             log(`[Importer] Creating Actor ${actorData.name}...`);
             const createdActor: any = await runtime.documents.create('Actor', actorData);
             if (!createdActor) throw new Error("Failed to create Actor document");

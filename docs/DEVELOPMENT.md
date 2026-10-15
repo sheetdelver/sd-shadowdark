@@ -34,6 +34,51 @@ Foundry browser hooks or import the sheet's bonus/audience controls into the HUD
 
 ## Validation
 
+### Weapon and creation corrections (ADR-0063)
+
+Native 4.0.6 weapon preparation is shared by attack summaries, sheet dialog
+defaults and server attack rolls in `logic/weapon-rules.ts`. Resolve properties
+by exact declared-pack UUID/name-index lookup; use native 1h/2h damage and
+never add STR to damage implicitly. Missing damage remains unavailable.
+`prepareWeaponBase` reads the selected native hand only; blank handedness derives
+from an exact Two-Handed property or an absent one-handed/present two-handed die.
+Player `damage.value` is not a substitute. Native `NPC Attack` uses its separate
+`damage.value`, ranges and item bonuses, without Player mastery/ability modifiers.
+Inventory rows and paper item details label **Base damage** separately from
+**Actor damage**; Abilities/paper attacks show Actor-adjusted damage. Missing
+damage carries the exact source field diagnostic rather than invented dice.
+Thrown melee/ranged modes are distinct. Numeric roll effects support native
+selectors, ADD/MULTIPLY/OVERRIDE and bounded arithmetic references (including
+`1+floor(@level.value/2)`). Situational effects remain unselected; unsupported
+effects carry preparation warnings. This is not full Foundry hook/effect parity
+or a migration to the supplied 4.1.0 reference.
+Numeric damage effects aggregate ADD, then MULTIPLY, then ordered OVERRIDE across
+all effects/Items. Prepared weapon calculations retain Actor-only effect
+provenance separately from the sheet's flattened effect display, so Actor effects
+are not lost and Item effects are not counted twice. The server item-roll hook
+executes the attack roll only; this does not add automatic native damage chains.
+
+Fixed class/ancestry mastery talents join the existing advancement selection
+UI. New generator/import/advancement items resolve validated choice keys while
+preserving formula values, and reject remaining required placeholders before
+creation. Original templates and existing Actors are not repaired or rewritten.
+Sheet/tool navigation flows below Core's HUD without assuming its height.
+Final assembly tracks rolled occurrences and fixed-source grants. A class-fixed
+mastery plus a rolled mastery requires two choices, not one; two rolled copies
+also require two. Repeated aliases within one fixed source collapse, while
+independent class/ancestry grants remain separate. Required/selected cardinality
+must match exactly before any Actor/Item writes. The UI counts the same grants.
+Already-resolved custom-template choices survive generator enrichment; importer
+source-plus-choice deduplication stays unchanged. No existing Actor repair.
+
+`npx tsx data/local/modules/shadowdark/src/tests/weapon-rules.test.ts` adds the
+versioned attack, formula and mastery creation fixtures to the checks below.
+It includes tracked React server-render checks of actual inventory/item modal,
+Abilities and paper components using the same fourteen versioned fixtures as
+the normalizer/helper/server checks. Optional local browser evidence additionally
+checks actual provider dialog defaults and responsive layouts; no browser is
+required at application runtime or added as a backend dependency.
+
 From the Core checkout with this module in `data/local/modules/shadowdark`:
 
 ```sh

@@ -1,5 +1,6 @@
 
 import { TALENT_GRANTED_SPELLS } from '../data/talent-effects';
+import { prepareWeaponAttack } from './weapon-rules';
 
 function finiteNumber(value: unknown): number | null {
     if (value === null || value === undefined || value === '' || typeof value === 'boolean') return null;
@@ -261,6 +262,9 @@ export const applyEffects = (systemData: any, effects: any[]) => {
         for (const change of changes) {
             const { key, value, mode } = change;
             if (!key) continue;
+            // Native weapon roll selectors are evaluated against the actual
+            // weapon once, not flattened into source scalar fields here.
+            if (/^system\.roll\.(attack|melee|ranged)\./.test(key)) continue;
 
             let path = key;
             if (path.startsWith('system.')) path = path.substring(7);
@@ -312,53 +316,24 @@ export const calculateAbilities = (systemData: any) => {
 /**
  * Calculates attack summaries (to-hit, damage) for an actor's weapons.
  */
-export const calculateAttacks = (actor: any, items: any[]) => {
+export const calculateAttacks = (actor: any, items: any[], nameIndex: Record<string, string> = {}) => {
     const melee: any[] = [];
     const ranged: any[] = [];
 
-    const stats = actor.computed?.abilities || actor.stats || {};
-    const strMod = Number(stats.str?.mod || stats.STR?.mod || 0);
-    const dexMod = Number(stats.dex?.mod || stats.DEX?.mod || 0);
-
-    const weapons = items.filter(i => i.type === 'Weapon' && i.system?.equipped);
+    const weapons = items.filter(i => (i.type === 'Weapon' && i.system?.equipped) || i.type === 'NPC Attack');
 
     for (const w of weapons) {
-        const s = w.system || {};
-        const isFinesse = (s.properties || []).some((p: string) => p.toLowerCase().includes('finesse'));
-        const isThrown = (s.properties || []).some((p: string) => p.toLowerCase().includes('thrown'));
-        const isRangedType = s.type === 'ranged';
-        const attackBonus = Number(s.bonuses?.attackBonus || 0);
-        const damageBonus = Number(s.bonuses?.damageBonus || 0);
-
-        // Determine To-Hit
-        let toHit = attackBonus;
-        if (isRangedType) toHit += dexMod;
-        else if (isFinesse) toHit += Math.max(strMod, dexMod);
-        else toHit += strMod;
-
-        const toHitStr = `${toHit >= 0 ? '+' : ''}${toHit}`;
-
-        // Damage
-        const dmgDie = s.damage?.melee || s.damage?.ranged || '1d4';
-        let dmgMod = damageBonus;
-        if (!isRangedType) dmgMod += strMod; // Strength adds to melee damage in SD
-
-        const dmgStr = `${dmgDie}${dmgMod !== 0 ? (dmgMod > 0 ? '+' : '') + dmgMod : ''}`;
-
-        const attackData = {
-            id: w._id || w.id,
-            name: w.name,
-            img: w.img,
-            derived: {
-                toHit: toHitStr,
-                damage: dmgStr,
-                handedness: s.handedness || 'one-handed',
-            },
-            properties: s.properties || []
-        };
-
-        if (isRangedType || isThrown) ranged.push(attackData);
-        if (!isRangedType) melee.push(attackData);
+        const base = prepareWeaponAttack(actor, w, {}, nameIndex);
+        const modes = base.attackType === 'ranged' ? ['ranged'] : base.properties.includes('thrown') ? ['melee', 'ranged'] : ['melee'];
+        for (const attackType of modes) {
+            const attack = prepareWeaponAttack(actor, w, { attackType }, nameIndex);
+            const attackData = { ...w, id: w._id || w.id, derived: {
+                ...attack, toHit: `${attack.toHit >= 0 ? '+' : ''}${attack.toHit}`,
+                damage: attack.damage ?? 'Damage unavailable',
+                handedness: w.type === 'NPC Attack' ? 'NPC attack' : attack.handedness === '2h' ? 'two-handed' : 'one-handed',
+            } };
+            (attackType === 'ranged' ? ranged : melee).push(attackData);
+        }
     }
 
     return { melee, ranged };
@@ -646,12 +621,20 @@ export const normalizeActorData = (actor: any, items: any[] = [], systemData: an
     // Also include actor's own effects
     const actorEffects = actor.effects?.contents || (Array.isArray(actor.effects) ? actor.effects : []);
     allEffects.push(...actorEffects);
+    // The sheet's effects list also includes embedded Item effects for display.
+    // Retain the actual Actor-only source separately for weapon recalculation;
+    // otherwise dialogs lose Actor effects and count transferred Item effects twice.
+    computed.weaponActorEffects = JSON.parse(JSON.stringify(actorEffects));
 
     applyEffects(effectApplied, allEffects);
 
     // Re-calculate abilities after effects
     stats = calculateAbilities(effectApplied);
     computed.abilities = stats;
+    computed.weaponPropertyNames = Object.fromEntries(items.filter(item => item.type === 'Weapon')
+        .flatMap(item => item.system?.properties ?? []).filter((id: unknown) => typeof id === 'string' && systemData?.nameIndex?.[id])
+        .map((id: string) => [id, systemData.nameIndex[id]]));
+    computed.attackBonuses = { ...(effectApplied.bonuses ?? {}) };
     // Effect-applied rules remain in the prepared model, not source Actor data.
     computed.initiative = calculateInitiative({ ...actor, system: effectApplied });
 
@@ -759,7 +742,7 @@ export const normalizeActorData = (actor: any, items: any[] = [], systemData: an
     computed.showSpellsTab = shouldShowSpellsTab(actorProxy);
 
     // 8. Attacks & Combat
-    computed.attacks = calculateAttacks(actorProxy, items);
+    computed.attacks = calculateAttacks(actorProxy, items, computed.weaponPropertyNames);
 
     // 9. Inventory Categorization (for UI components)
     // Exclude non-physical items like Spells, Talents, etc.

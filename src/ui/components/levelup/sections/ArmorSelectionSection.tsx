@@ -1,4 +1,5 @@
 import { Shield } from 'lucide-react';
+import { MASTERY_ARMOR } from '../../../../logic/talent-choices';
 
 interface ArmorSelectionSectionProps {
     required: number;
@@ -6,9 +7,7 @@ interface ArmorSelectionSectionProps {
     onSelectionChange: (selected: string[]) => void;
 }
 
-const ARMOR_TYPES = [
-    "Leather", "Chainmail", "Plate", "Shield"
-];
+const ARMOR_TYPES = MASTERY_ARMOR;
 
 export const ArmorSelectionSection: React.FC<ArmorSelectionSectionProps> = ({
     required,

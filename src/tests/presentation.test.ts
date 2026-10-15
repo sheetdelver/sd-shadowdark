@@ -30,7 +30,8 @@ assert.match(importerPage, /Shadowdark RPG/);
 assert.doesNotMatch(importerPage, /Shadowdarklings Export/);
 assert.match(importerPage, /&quot;Protect the light!&quot;/);
 assert.ok(importerPage.indexOf('<textarea') < importerPage.indexOf('Go to Shadowdarklings.net'));
-assert.match(importerPage, /sticky top-\[45px\]/);
+assert.doesNotMatch(importerPage, /fixed top-0|sticky top-\[45px\]|mt-\[45px\]/,
+    'importer navigation flows below the Core HUD');
 assert.match(importerPage, /Paste Character JSON/);
 assert.equal('dashboardTools' in manifest, false);
 assert.equal(typeof manifest.componentStyles?.chat?.msgContainer, 'function');

@@ -3,6 +3,7 @@ import { X, Flame, Utensils, Shield, Sword, Package, Archive, Minus, Plus } from
 import { useShadowdarkUI } from '../context/ShadowdarkUIContext';
 
 import { useShadowdarkActor } from '../context/ShadowdarkActorContext';
+import { prepareWeaponBase, prepareWeaponAttack } from '../../logic/weapon-rules';
 
 interface ItemModalProps {
     isOpen: boolean;
@@ -41,7 +42,7 @@ export default function ItemModal({
         return name.includes('ration');
     };
 
-    const isWeapon = item.type === 'Weapon';
+    const isWeapon = item.type === 'Weapon' || item.type === 'NPC Attack';
     const isArmor = item.type === 'Armor';
 
     const getStatusText = (item: any) => {
@@ -51,32 +52,24 @@ export default function ItemModal({
     };
 
     const getQualifiers = () => {
-        const qualifiers: { label: string; value: string }[] = [];
+        const qualifiers: { label: string; value: string; diagnostic?: string }[] = [];
 
         if (isWeapon) {
-            // Damage
-            if (item.system?.damage?.value) {
-                qualifiers.push({ label: 'Damage', value: item.system.damage.value });
-            } else if (item.system?.damage?.oneHanded) {
-                let dmg = item.system.damage.oneHanded;
-                if (item.system.damage.twoHanded) dmg += ` / ${item.system.damage.twoHanded} (2H)`;
-                qualifiers.push({ label: 'Damage', value: dmg });
-            }
+            const base = prepareWeaponBase(item, {}, actor?.computed?.weaponPropertyNames);
+            const attack = prepareWeaponAttack(actor ?? {}, item);
+            const hands = item.type === 'NPC Attack' ? '' : ` (${base.handedness.toUpperCase()})`;
+            qualifiers.push({ label: `Base damage${hands}`, value: base.damage ?? 'Damage unavailable', diagnostic: base.warnings.join(' ') });
+            qualifiers.push({ label: `Actor damage${hands}`, value: attack.damage ?? 'Damage unavailable', diagnostic: attack.warnings.join(' ') });
 
             // Range
-            if (item.system?.range && item.system.range !== 'none') {
-                qualifiers.push({ label: 'Range', value: item.system.range.charAt(0).toUpperCase() + item.system.range.slice(1) });
-            }
+            const ranges = item.type === 'NPC Attack' ? item.system?.ranges ?? [] : [item.system?.range].filter(Boolean);
+            const range = ranges.filter((value: string) => value !== 'none')
+                .map((value: string) => value.charAt(0).toUpperCase() + value.slice(1)).join('/');
+            if (range) qualifiers.push({ label: 'Range', value: range });
 
             // Properties
             if (item.system?.properties?.length > 0) {
-                const props = item.system.properties
-                    .map((p: any) => {
-                        const resolved = resolveName(p, 'properties');
-                        return resolved;
-                    })
-                    .filter(Boolean)
-                    .join(', ');
+                const props = base.properties.join(', ');
                 if (props) qualifiers.push({ label: 'Properties', value: props });
             }
 
@@ -189,7 +182,8 @@ export default function ItemModal({
                     {getQualifiers().length > 0 && (
                         <div className="flex flex-wrap gap-2 pt-2">
                             {getQualifiers().map((q, i) => (
-                                <div key={i} className="flex items-center bg-black/5 px-2 py-1 border border-black/20 rounded-sm">
+                                <div key={i} title={q.diagnostic} data-weapon-damage={q.label.startsWith('Base damage') ? 'base' : q.label.startsWith('Actor damage') ? 'actor' : undefined}
+                                    className="flex min-w-0 flex-wrap break-words items-center bg-black/5 px-2 py-1 border border-black/20 rounded-sm">
                                     <span className="text-[8px] font-black uppercase tracking-tighter text-black/40 mr-1.5">{q.label}</span>
                                     <span className="text-[10px] font-black uppercase text-black">{q.value}</span>
                                 </div>
