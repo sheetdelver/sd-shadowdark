@@ -7,8 +7,8 @@ import { shadowdarkTheme as theme } from '../ui/themes/shadowdark';
 import ShadowdarkImportPage from '../ui/tools/ShadowdarkImportPage';
 
 assert.equal(manifest.componentStyles, theme, 'UI manifest must own shared styles');
-assert.equal(manifest.info.compatibility?.coreVersion, '>=0.17.0');
-assert.equal(manifest.info.compatibility?.apiContracts?.['ui-extension-api'], '>=2.1.0 <3.0.0');
+assert.equal(manifest.info.compatibility?.coreVersion, '>=0.18.0');
+assert.equal(manifest.info.compatibility?.apiContracts?.['ui-extension-api'], '>=3.1.0 <4.0.0');
 assert.equal(manifest.info.compatibility?.apiContracts?.['module-api'], '>=1.3.0 <2.0.0');
 assert.equal(manifest.info.combatTracking?.attributes?.[0]?.path, 'system.attributes.hp');
 assert.equal(manifest.info.combatTracking?.attributes?.[1]?.path, 'derived.ac');

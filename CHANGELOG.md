@@ -2,6 +2,14 @@
 
 Historical entries are reconstructed from [published releases](https://github.com/sheetdelver/sd-shadowdark/releases), their tags, and merged changes. Version numbers follow the published tags; unreleased branch work is excluded.
 
+## Unreleased
+
+## 0.9.3
+
+- Reused themed HUD roller
+- Preserved explicit initiative modifiers
+- Required Core 0.18.0
+
 ## 0.9.2
 
 - Delegated world lifecycle to Core

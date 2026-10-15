@@ -1,24 +1,37 @@
 
 import { TALENT_GRANTED_SPELLS } from '../data/talent-effects';
 
-/**
- * Get the standardized initiative formula for an actor
- */
-export function getInitiativeFormula(actor: any): string {
-    let dexMod = 0;
+function finiteNumber(value: unknown): number | null {
+    if (value === null || value === undefined || value === '' || typeof value === 'boolean') return null;
+    const number = Number(value);
+    return Number.isFinite(number) ? number : null;
+}
+
+/** Native 4.0.6 initiative: prepared DEX + roll bonus, with signed advantage. */
+function calculateInitiative(actor: any): { value: number; advantage: number } {
     const s = actor?.system || {};
-    const c = actor?.computed || {};
+    const dex = s.abilities?.dex || {};
+    let dexMod = finiteNumber(dex.mod) ?? 0;
+    // NPCs store an explicit modifier; Players derive a bounded modifier from
+    // their score. Never let a stale serialized Player .mod override its score.
+    if (actor?.type !== 'NPC') {
+        const base = finiteNumber(dex.base);
+        const score = finiteNumber(dex.value) ?? (base !== null ? base + (finiteNumber(dex.bonus) ?? 0) : null);
+        if (score !== null) dexMod = Math.min(4, Math.max(-4, Math.floor((score - 10) / 2)));
+    }
+    const advantage = finiteNumber(s.roll?.initiative?.advantage)
+        ?? (Array.isArray(s.bonuses?.advantage) && s.bonuses.advantage.includes('initiative') ? 1 : 0);
+    return { value: dexMod + (finiteNumber(s.roll?.initiative?.bonus) ?? 0), advantage };
+}
 
-    if (s.abilities?.dex?.mod !== undefined) dexMod = Number(s.abilities.dex.mod);
-    else if (c.abilities?.dex?.mod !== undefined) dexMod = Number(c.abilities.dex.mod);
-    else if (s.abilities?.dex?.value !== undefined) dexMod = Math.floor((Number(s.abilities.dex.value) - 10) / 2);
-
-    if (isNaN(dexMod)) dexMod = 0;
-    const hasAdvantage = Array.isArray(s.bonuses?.advantage) && s.bonuses.advantage.includes('initiative');
-    const baseDie = hasAdvantage ? '2d20kh1' : '1d20';
-    const sign = dexMod >= 0 ? '+' : '';
-
-    return dexMod !== 0 ? `${baseDie}${sign}${dexMod}` : baseDie;
+/** Module-owned formula; Core consumes it unchanged when no GM override exists. */
+export function getInitiativeFormula(actor: any): string {
+    const prepared = actor?.derived?.initiative ?? actor?.computed?.initiative;
+    const initiative = typeof prepared?.value === 'number' && Number.isFinite(prepared.value)
+        && typeof prepared?.advantage === 'number' && Number.isFinite(prepared.advantage)
+        ? prepared : calculateInitiative(actor);
+    const baseDie = initiative.advantage > 0 ? '2d20kh1' : initiative.advantage < 0 ? '2d20kl1' : '1d20';
+    return `${baseDie}${initiative.value >= 0 ? '+' : ''}${initiative.value}`;
 }
 
 /**
@@ -639,6 +652,8 @@ export const normalizeActorData = (actor: any, items: any[] = [], systemData: an
     // Re-calculate abilities after effects
     stats = calculateAbilities(effectApplied);
     computed.abilities = stats;
+    // Effect-applied rules remain in the prepared model, not source Actor data.
+    computed.initiative = calculateInitiative({ ...actor, system: effectApplied });
 
     // 2.5 Compute Free Spells from Talents (TALENT_GRANTED_SPELLS mapping)
     const freeSpellUuids: string[] = [];

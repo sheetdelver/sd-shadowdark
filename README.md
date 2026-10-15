@@ -63,12 +63,41 @@ This product is an independent product published under the Shadowdark RPG Third-
 
 ## SDK Feedback Compatibility
 
-The module requires SheetDelver Core `>=0.17.0` and
-`ui-extension-api >=2.1.0 <3.0.0` (SDK 2.2.0). Core renders the dashboard's
-generator and importer cards; both open module-owned tool pages. The importer
-no longer depends on a packaged `react-dom` portal. Sheets and shared chat/dice
-themes remain module-owned. CI and release packaging use Core
-`v0.17.0`. Notification progress/lifecycle adoption is not required.
+This release requires SheetDelver Core `>=0.18.0` and
+`ui-extension-api >=3.1.0 <4.0.0` (SDK 3.x), including the initiative choice
+that preserves Core's resolved formula by default. Core 0.17.x is incompatible.
+Core renders the
+dashboard's generator and importer cards; both open module-owned tool pages.
+The importer no longer depends on a packaged `react-dom` portal. Sheets and shared chat/dice
+themes remain module-owned. Its combat-HUD initiative modal reuses the same
+SDK roller frame/theme as sheet rolls: square frame, X close control, fields
+and footer. Core's formula/audience are read-only; it returns only a roll
+choice or final total via **Input Manually**. Core resolves an explicit GM
+override first, otherwise this module's formula, then its generic fallback.
+Shadowdark preparation computes `derived.initiative.value`/`advantage` using
+Player DEX score (bounded −4 to 4), explicit NPC DEX modifier, initiative bonus
+and enabled supported numeric effects. The signed modifier remains explicit
+even when zero (`1d20+0`, or keep-highest/lowest with `+0`); the displayed and
+executed expression is not simplified away. Native 4.0.6 uses
+`system.roll.initiative.bonus`/`advantage`; a modern zero advantage value wins
+over legacy advantage arrays. No source fields are written or fabricated.
+`system.attributes.init.value` is not a native 4.0.6 field; a GM override using
+it must validate actual availability. `@derived.initiative.value` can reference
+the module-prepared modifier. This is a deterministic preparation port, not
+execution of native Foundry browser hooks or universal effect-mode parity.
+No sheet bonus or audience selector is copied into the HUD. CI and release
+packaging target Core `v0.18.0`; publish Core first.
+Notification progress/lifecycle adoption is not required.
+ADR-0061 hardening verification (October 14): offline module tests, explicit
+source typing and isolated packaging pass on the integrated SDK3.2/UI3.1 host.
+The actual wrapper preserves a supplied keep-highest formula in the rendered
+HUD fixture; the user accepts the native-themed roller. Final approved local
+Foundry13.351/Shadowdark4.0.6 tests verify tokenless owner initiative/turn writes
+without GM sockets online, and current caller-bound Core HTTP verifies module
+formula/total, owner chat authorship, phase/policy/privacy and queue/Skip behavior.
+The October 14 presentation correction is rendered at320/375/1280 in both
+Core appearances; the module skin is retained. This is not released-Core
+compatibility, every-build support or native rules-parity certification.
 Core owns player-world readiness and interruption presentation; module pages
 only manage Shadowdark resource loading and Actor-specific errors.
 
