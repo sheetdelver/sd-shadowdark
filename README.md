@@ -89,12 +89,15 @@ No sheet bonus or audience selector is copied into the HUD. CI and release
 packaging target Core `v0.18.0`; publish Core first.
 Notification progress/lifecycle adoption is not required.
 ADR-0061 hardening verification (October 14): offline module tests, explicit
-source typing and isolated packaging pass on the integrated SDK/UI 3.1 host.
+source typing and isolated packaging pass on the integrated SDK3.2/UI3.1 host.
 The actual wrapper preserves a supplied keep-highest formula in the rendered
-HUD fixture; native Shadowdark participation still needs operator acceptance.
+HUD fixture; the user accepts the native-themed roller. Final approved local
+Foundry13.351/Shadowdark4.0.6 tests verify tokenless owner initiative/turn writes
+without GM sockets online, and current caller-bound Core HTTP verifies module
+formula/total, owner chat authorship, phase/policy/privacy and queue/Skip behavior.
 The October 14 presentation correction is rendered at320/375/1280 in both
 Core appearances; the module skin is retained. This is not released-Core
-compatibility or native rules-parity certification.
+compatibility, every-build support or native rules-parity certification.
 Core owns player-world readiness and interruption presentation; module pages
 only manage Shadowdark resource loading and Actor-specific errors.
 
