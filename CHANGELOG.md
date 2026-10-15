@@ -4,8 +4,11 @@ Historical entries are reconstructed from [published releases](https://github.co
 
 ## Unreleased
 
+## 0.9.3
+
 - Reused themed HUD roller
 - Preserved explicit initiative modifiers
+- Required Core 0.18.0
 
 ## 0.9.2
 

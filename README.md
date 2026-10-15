@@ -63,10 +63,10 @@ This product is an independent product published under the Shadowdark RPG Third-
 
 ## SDK Feedback Compatibility
 
-The development checkout requires SheetDelver Core `>=0.17.0` and
-`ui-extension-api >=3.0.0 <4.0.0` (SDK 3.x). The UI API gate keeps it
-incompatible with released Core 0.17.x. Before module release, raise the
-Core minimum to `>=0.18.0` after Core 0.18.0 is published. Core renders the
+This release requires SheetDelver Core `>=0.18.0` and
+`ui-extension-api >=3.1.0 <4.0.0` (SDK 3.x), including the initiative choice
+that preserves Core's resolved formula by default. Core 0.17.x is incompatible.
+Core renders the
 dashboard's generator and importer cards; both open module-owned tool pages.
 The importer no longer depends on a packaged `react-dom` portal. Sheets and shared chat/dice
 themes remain module-owned. Its combat-HUD initiative modal reuses the same
