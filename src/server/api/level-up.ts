@@ -4,6 +4,52 @@ import { shadowdarkAdapter } from '../../server/ShadowdarkAdapter';
 import { assembleFinalItems } from './level-up-engine';
 import * as levelUpEngine from './level-up-engine';
 import { TALENT_HANDLERS } from '../../logic/talent-handlers';
+import { canonicalUuid } from '../../logic/identity';
+import { hitPointRollFormula } from '../../logic/actions';
+import { prepareActorCore } from '../../logic/actor-preparation';
+
+/**
+ * Rolled talents/boons and chosen spells are re-read from their exact source.
+ * Selection wrappers produced by table handlers (stat choices) keep only
+ * name/type/system metadata; their effects are rebuilt by the server handlers.
+ */
+async function verifyGrants(body: any, classObj: any, req: ModuleServerRequest) {
+    const resolveGrant = async (entry: any, allowed: string[]) => {
+        const uuid = canonicalUuid(entry?.documentUuid ?? entry?.uuid);
+        if (uuid) {
+            const doc = await shadowdarkAdapter.resolveDocumentFor(uuid, req.runtime);
+            if (!doc) throw new Error(`${entry?.name || uuid} is not available.`);
+            if (doc.type === 'RollTable') return { name: doc.name, type: 'Talent', uuid, system: { ...(entry?.system ?? {}) }, effects: [] };
+            if (!allowed.includes(doc.type)) throw new Error(`${doc.name} is a ${doc.type}, not ${allowed.join('/')}.`);
+            return { ...doc, uuid, system: { ...(doc.system ?? {}), ...(entry?.system?.level !== undefined ? { level: entry.system.level } : {}),
+                ...(entry?.system?.talentClass ? { talentClass: entry.system.talentClass } : {}) } };
+        }
+        // Module table markers ("Patron Boon", "Choose One") are instructions, not grants.
+        if (['PatronBoon', 'PatronBoonTwice', 'synthetic'].includes(entry?.type)
+            && !TALENT_HANDLERS.some(handler => handler.action && handler.matches(entry))) return null;
+        if (!TALENT_HANDLERS.some(handler => handler.action && handler.matches(entry))) {
+            throw new Error(`${entry?.name || 'A rolled result'} has no source document and no supported selection.`);
+        }
+        return { name: entry.name ?? entry.text, type: 'Talent', system: { ...(entry?.system ?? {}) }, effects: [] };
+    };
+    const classUuid = canonicalUuid(classObj?.uuid);
+    const resolveSpell = async (entry: any, requireClass: boolean) => {
+        const uuid = canonicalUuid(entry?.uuid);
+        if (!uuid) throw new Error(`${entry?.name || 'A selected spell'} has no source reference.`);
+        const doc = await shadowdarkAdapter.resolveDocumentFor(uuid, req.runtime);
+        if (!doc || doc.type !== 'Spell') throw new Error(`${entry?.name || uuid} is not an available Spell.`);
+        if (requireClass && classUuid && !(doc.system?.class ?? []).some((value: unknown) => canonicalUuid(value) === classUuid)) {
+            throw new Error(`${doc.name} is not on the ${classObj.name} spell list.`);
+        }
+        return { ...doc, uuid };
+    };
+    return {
+        rolledTalents: (await Promise.all((body.rolledTalents ?? []).map((entry: any) => resolveGrant(entry, ['Talent'])))).filter(Boolean),
+        rolledBoons: (await Promise.all((body.rolledBoons ?? []).map((entry: any) => resolveGrant(entry, ['Boon', 'Talent'])))).filter(Boolean),
+        selectedSpells: await Promise.all((body.selectedSpells ?? []).map((entry: any) => resolveSpell(entry, true))),
+        extraSpells: await Promise.all((body.extraSpellSelection?.selected ?? []).map((entry: any) => resolveSpell(entry, false))),
+    };
+}
 
 function requirePositiveRollTotal(value: unknown, label: string): number {
     const total = Number(value);
@@ -29,7 +75,7 @@ export async function handleGetLevelUpData(actorId: string | undefined, req: Mod
             actor = await req.runtime.documents.get('Actor', actorId);
         }
 
-        const data = await shadowdarkAdapter.getLevelUpData(actor, classId || undefined, patronId || undefined);
+        const data = await shadowdarkAdapter.getLevelUpData(actor, classId || undefined, patronId || undefined, req.runtime);
 
         return json({ success: true, data });
 
@@ -66,7 +112,7 @@ export async function handleRollHP(actorId: string | undefined, req: ModuleServe
         // Fallback: Use classId override if provided (e.g. for Level 1 creation)
         if (hitDie === '1d4' && classId) {
             try {
-                const classDoc = await shadowdarkAdapter.resolveDocument(classId);
+                const classDoc = await shadowdarkAdapter.resolveDocumentFor(classId, req.runtime);
                 if (classDoc?.system?.hitPoints) {
                     hitDie = classDoc.system.hitPoints;
                 }
@@ -82,6 +128,10 @@ export async function handleRollHP(actorId: string | undefined, req: ModuleServe
         } else if (/^d\d+$/i.test(str)) {
             hitDie = `1${str}`;           // "d6" -> "1d6"
         }
+
+        // Native LevelUpSD applies system.roll.hp.advantage to the hit die (e.g. Stout).
+        const prepared = hitPointRollFormula(actor ? prepareActorCore(actor, shadowdarkAdapter.lookups()) : null, hitDie);
+        hitDie = prepared.formula;
 
         // Build speaker override from the already-fetched actor (or session for new chars).
         let speakerOverride: Record<string, unknown> | undefined = undefined;
@@ -158,9 +208,10 @@ export async function handleRollTalent(actorId: string | undefined, req: ModuleS
     try {
         const body = await req.json<any>();
         const { tableUuidOrName, targetLevel } = body;
+        const tableUuid = canonicalUuid(tableUuidOrName);
 
-        if (!tableUuidOrName) {
-            return error('validation', 'tableUuidOrName is required');
+        if (!tableUuid) {
+            return error('validation', 'A RollTable UUID is required; table names are not resolved.');
         }
 
         // Pre-fetch actor items if checking for duplicates
@@ -194,9 +245,9 @@ export async function handleRollTalent(actorId: string | undefined, req: ModuleS
 
         while (attempts < maxAttempts) {
             attempts++;
-            const result = await shadowdarkAdapter.drawTable(tableUuidOrName);
+            const result = await shadowdarkAdapter.drawTable(tableUuid);
             if (!result) {
-                return error('not_found', `RollTable not found: ${tableUuidOrName}`);
+                return error('not_found', `RollTable not available: ${tableUuid}`);
             }
 
             finalRollResult = result;
@@ -304,16 +355,24 @@ export async function handleFinalizeLevelUp(actorId: string, req: ModuleServerRe
             if (!actor) return error('not_found', 'Actor not found');
         }
 
-        // Backend assembly and validation
-        const classObj = body.classObj || (body.classUuid ? (await shadowdarkAdapter.resolveDocument(body.classUuid)) : null);
-        const ancestry = body.ancestryObj || (body.ancestryUuid ? (await shadowdarkAdapter.resolveDocument(body.ancestryUuid)) : null);
-        const background = body.backgroundObj || (body.backgroundUuid ? (await shadowdarkAdapter.resolveDocument(body.backgroundUuid)) : null);
-        const patron = body.patronObj || (body.patronUuid ? (await shadowdarkAdapter.resolveDocument(body.patronUuid)) : null);
+        // Server assembly resolves every source by exact identity through the
+        // caller; client-supplied document bodies never establish identity.
+        const resolveTyped = async (uuid: unknown, type: string) => {
+            if (uuid === undefined || uuid === null || uuid === '') return null;
+            const doc = await shadowdarkAdapter.resolveDocumentFor(String(uuid), req.runtime);
+            if (!doc || doc.type !== type) throw new Error(`${type} ${String(uuid)} is not available.`);
+            return { ...doc, uuid: canonicalUuid(uuid) ?? doc.uuid };
+        };
+        const classObj = await resolveTyped(body.classUuid, 'Class');
+        const ancestry = await resolveTyped(body.ancestryUuid, 'Ancestry');
+        const background = await resolveTyped(body.backgroundUuid, 'Background');
+        const patron = await resolveTyped(body.patronUuid, 'Patron');
+        const verified = await verifyGrants(body, classObj, req);
 
         const state = {
-            rolledTalents: body.rolledTalents || [],
-            rolledBoons: body.rolledBoons || [],
-            selectedSpells: body.selectedSpells || [],
+            rolledTalents: verified.rolledTalents,
+            rolledBoons: verified.rolledBoons,
+            selectedSpells: verified.selectedSpells,
             selectedLanguages: body.languages || [],
             hpRoll: body.hpRoll,
             goldRoll: gold,
@@ -321,7 +380,7 @@ export async function handleFinalizeLevelUp(actorId: string, req: ModuleServerRe
             statPool: body.statPool || { total: 0, allocated: {}, talentIndex: null },
             weaponMasterySelection: body.weaponMasterySelection || { required: 0, selected: [] },
             armorMasterySelection: body.armorMasterySelection || { required: 0, selected: [] },
-            extraSpellSelection: body.extraSpellSelection || { active: false, maxTier: 0, source: '', selected: [] }
+            extraSpellSelection: { ...(body.extraSpellSelection || { active: false, maxTier: 0, source: '' }), selected: verified.extraSpells }
         };
 
         const targetLevel = body.targetLevel || (actor?.system?.level?.value || 0) + 1;
@@ -353,19 +412,11 @@ export async function handleFinalizeLevelUp(actorId: string, req: ModuleServerRe
                 actorUpdates['system.languages'] = newLangs;
             }
 
-            if (patron) {
-                const patronUuid = patron.uuid || body.patronUuid;
-                actorUpdates['system.patron'] = patronUuid;
-                actorUpdates['system.patronUuid'] = patronUuid;
-            }
+            if (patron) actorUpdates['system.patron'] = patron.uuid;
 
             if (targetLevel === 1) {
-                if (classObj) {
-                    actorUpdates['system.class'] = classObj.uuid || body.classUuid;
-                }
-                if (ancestry) {
-                    actorUpdates['system.ancestry'] = ancestry.uuid || body.ancestryUuid;
-                }
+                if (classObj) actorUpdates['system.class'] = classObj.uuid;
+                if (ancestry) actorUpdates['system.ancestry'] = ancestry.uuid;
             }
 
             if (Object.keys(actorUpdates).length > 0) {
@@ -373,10 +424,15 @@ export async function handleFinalizeLevelUp(actorId: string, req: ModuleServerRe
                 await req.runtime.documents.patch('Actor', actorId, actorUpdates);
             }
 
-            if (finalItems.length > 0) {
-                logger.info(`[API] Creating ${finalItems.length} items for actor ${actorId}`);
-                for (const item of finalItems) {
+            // Multi-document writes are sequential, not atomic: report exactly what
+            // was written if a later write fails.
+            const created: string[] = [];
+            for (const item of finalItems) {
+                try {
                     await req.runtime.documents.items.create({ type: 'Actor', id: actorId }, item);
+                    created.push(item.name);
+                } catch (e) {
+                    return error('internal', `Level-up partially applied: Actor updated and ${created.length} of ${finalItems.length} items created (${created.join(', ') || 'none'}). ${getErrorMessage(e)}`);
                 }
             }
         }

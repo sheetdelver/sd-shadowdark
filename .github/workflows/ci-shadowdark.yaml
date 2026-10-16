@@ -73,6 +73,9 @@ jobs:
           npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/presentation.test.ts"
           npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/roll-feedback.test.ts"
           npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/importer-mapping.test.ts"
+          npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/native-alignment.test.ts"
+          npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/boundaries.test.ts"
+          npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/effect-conformance.test.ts"
 
       - name: Verify distributable package
         run: npm run module:package -- 'shadowdark'

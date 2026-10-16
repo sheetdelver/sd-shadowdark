@@ -56,7 +56,7 @@ export function run(): void {
     assert.deepEqual(readPath(combatStats[0].path), { value: 4, max: 6 });
     assert.equal(readPath(combatStats[1].path), 12);
     assert.equal(readPath(combatStats[2].path), 1);
-    for (const stat of combatStats.slice(3)) {
+    for (const stat of combatStats.slice(3).filter(entry => entry.kind === 'number')) {
         assert.equal(stat.actorTypes?.includes('Player'), true);
         assert.equal(typeof readPath(stat.path), 'number', `${stat.key} must exist on prepared Players`);
     }
@@ -103,12 +103,15 @@ export function run(): void {
     ] }, { disabled: true, changes: [{ key: 'system.roll.initiative.bonus', mode: 2, value: '100' }] }];
     assert.equal(adapter.getInitiativeFormula(adapter.prepareActorData(affected, context)), '2d20kh1+6');
     assert.equal(affected.system.roll.initiative.bonus, 1);
+    // Native 4.0.6 PlayerSD has no `system.bonuses` field (Update_251001_1 migrated
+    // `bonuses.advantage: initiative` to `system.roll.initiative.advantage`), so a
+    // stale pre-4.0 array is ignored exactly as natively; only roll data counts.
     const legacy = structuredClone(source) as any;
     legacy.system.bonuses = { advantage: ['initiative'] };
-    assert.equal(adapter.getInitiativeFormula(adapter.prepareActorData(legacy, context)), '2d20kh1+2');
-    legacy.system.roll = { initiative: { advantage: 0, bonus: 0 } };
-    assert.equal(adapter.getInitiativeFormula(adapter.prepareActorData(legacy, context)), '1d20+2',
-        'modern zero advantage overrides a legacy array');
+    assert.equal(adapter.getInitiativeFormula(adapter.prepareActorData(legacy, context)), '1d20+2');
+    legacy.system.roll = { initiative: { advantage: 1, bonus: 0 } };
+    assert.equal(adapter.getInitiativeFormula(adapter.prepareActorData(legacy, context)), '2d20kh1+2',
+        'native roll.initiative.advantage applies');
     const bonusNpc = { ...npc, system: { ...npc.system, roll: { initiative: { bonus: 2, advantage: -1 } } },
         computed: {}, derived: {} } as unknown as FoundryActor;
     assert.equal(adapter.getInitiativeFormula(adapter.prepareActorData(bonusNpc, context)), '2d20kl1+3');

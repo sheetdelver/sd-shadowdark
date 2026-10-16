@@ -1,63 +1,38 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import {
-    calculateItemSlots,
-    getSafeDescription,
-    formatDescription
-} from './sheet-utils';
+import React, { useMemo } from 'react';
 import { useSDK } from '@sheet-delver/sdk/react';
 import { useShadowdarkActor } from './context/ShadowdarkActorContext';
-import { prepareWeaponBase, prepareWeaponAttack, weaponProperties } from '../logic/weapon-rules';
+import { presentDescription } from '../logic/description';
+import { RANGE_LABELS } from '../logic/resource-cards';
+import type { PreparedAction } from '../logic/actions';
+import { itemControls, type ItemControl } from '../logic/inventory-controls';
 
-
+/**
+ * Inventory rows render prepared item views (`actor.derived.items`) and prepared
+ * attack actions; they do not compute slots, properties or damage. Writes address
+ * the exact embedded Item id with only the changed field.
+ */
 export interface QuantityControlProps {
     itemId: string;
-    path: string;
     value: number;
-    max: number;
+    label: string;
 }
 
-export function QuantityControl({ itemId, path, value, max }: QuantityControlProps) {
-    const { updateActor, getDraftValue } = useShadowdarkActor();
-    const displayValue = getDraftValue(path, value);
-
-    const handleUpdate = (e: React.MouseEvent, change: number) => {
-        e.stopPropagation(); // Stop row expansion
-
-        let newValue = displayValue + change;
-
-        // Clamp
-        newValue = Math.max(0, newValue);
-        if (max > 1) {
-            newValue = Math.min(newValue, max);
-        }
-
-        if (newValue === displayValue) return;
-
-        // Trigger context update
-        updateActor(path, newValue);
+export function QuantityControl({ itemId, value, label }: QuantityControlProps) {
+    const { updateItem } = useShadowdarkActor();
+    const change = (event: React.MouseEvent, delta: number) => {
+        event.stopPropagation();
+        const next = Math.max(0, value + delta);
+        if (next !== value) updateItem(itemId, { 'system.quantity': next });
     };
-
     return (
         <div className="flex items-center gap-1 text-xs bg-neutral-100 rounded px-1">
-            <button
-                onClick={(e) => handleUpdate(e, -1)}
-                className="hover:bg-neutral-300 rounded w-8 h-8 flex items-center justify-center transition-colors touch-manipulation"
-                disabled={displayValue <= 0}
-            >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M5 12h14" /></svg>
-            </button>
-            <span className="mx-1 min-w-[30px] text-center font-bold">
-                {displayValue} <span className="text-neutral-300">/</span> {max}
-            </span>
-            <button
-                onClick={(e) => handleUpdate(e, 1)}
-                className="hover:bg-neutral-300 rounded w-8 h-8 flex items-center justify-center transition-colors touch-manipulation"
-                disabled={max > 1 && displayValue >= max}
-            >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M12 5v14M5 12h14" /></svg>
-            </button>
+            <button type="button" onClick={(e) => change(e, -1)} disabled={value <= 0} aria-label={`Decrease ${label} quantity`}
+                className="hover:bg-neutral-300 rounded w-9 h-9 flex items-center justify-center touch-manipulation disabled:opacity-30">−</button>
+            <span className="mx-1 min-w-[2ch] text-center font-bold" aria-label={`${label} quantity`}>{value}</span>
+            <button type="button" onClick={(e) => change(e, 1)} aria-label={`Increase ${label} quantity`}
+                className="hover:bg-neutral-300 rounded w-9 h-9 flex items-center justify-center touch-manipulation">+</button>
         </div>
     );
 }
@@ -68,239 +43,111 @@ export interface ItemRowProps {
     toggleItem: (id: string) => void;
     isTreasure?: boolean;
     onSell?: (item: any) => void;
+    onDelete?: (item: any) => void;
 }
 
-export function ItemRow({ item, expandedItems, toggleItem, isTreasure, onSell }: ItemRowProps) {
-    const { resolveImageUrl } = useSDK();
-    const { actor, updateActor, deleteItem, getDraftValue } = useShadowdarkActor();
+const formatCost = (cost: any) => {
+    const parts = (['gp', 'sp', 'cp'] as const).filter(unit => Number(cost?.[unit] ?? 0) > 0).map(unit => `${cost[unit]} ${unit}`);
+    return parts.length ? parts.join(', ') : '-';
+};
 
-    const itemId = item.id || item._id;
-
-    // Use Context for drafted states
-    const equipped = getDraftValue(`items.${itemId}.system.equipped`, item.system?.equipped || false);
-    const stashed = getDraftValue(`items.${itemId}.system.stashed`, item.system?.stashed || false);
-    const lightActive = getDraftValue(`items.${itemId}.system.light.active`, item.system?.light?.active || false);
-
-    const handleToggleEquip = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        updateActor(`items.${itemId}.system.equipped`, !equipped, { immediate: true });
-    };
-
-    const handleToggleStash = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        updateActor(`items.${itemId}.system.stashed`, !stashed, { immediate: true });
-    };
-
-    const handleToggleLight = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        updateActor(`items.${itemId}.system.light.active`, !lightActive, { immediate: true });
-    };
+export function ItemRow({ item, expandedItems, toggleItem, isTreasure, onSell, onDelete }: ItemRowProps) {
+    const { resolveImageUrl, foundryUrl } = useSDK();
+    const { actor, deleteItem, openCard, runItemControl } = useShadowdarkActor();
+    const itemId = String(item.id ?? item._id);
+    const view = (actor?.derived?.items ?? []).find((entry: any) => entry.id === itemId);
+    // Unavailable modes (e.g. a two-handed grip with a shield) are not listed; the card explains them.
+    const attacks: PreparedAction[] = (actor?.derived?.actions ?? []).filter((action: PreparedAction) => action.itemId === itemId && action.kind === 'attack' && action.available);
+    const description = useMemo(() => presentDescription(item.system?.description, foundryUrl), [item.system?.description, foundryUrl]);
+    const equipped = view?.equipped ?? item.system?.equipped === true;
+    const stashed = view?.stashed ?? item.system?.stashed === true;
+    const lit = item.system?.light?.active === true;
+    const controls = itemControls(actor?.derived?.items ?? [], actor?.items ?? [], itemId);
+    const control = (id: ItemControl['id']) => controls.find(entry => entry.id === id);
     const isExpanded = expandedItems.has(itemId);
+    const hands = view?.weapon ? ` (${view.weapon.baseHandedness.toUpperCase()})` : '';
 
-    // Attribute logic
-    const light = item.system?.light;
-    const isLightSource = light?.isSource || light?.hasLight;
-    const remaining = light?.remaining;
-
-    // Also check properties for 'light' keyword
-    const props = item.system?.properties;
-    const hasLightProp = Array.isArray(props) ? weaponProperties(item, actor?.computed?.weaponPropertyNames).includes('light') : props?.light;
-
-    // Weapon Details
-    const isWeapon = item.type === 'Weapon' || item.type === 'NPC Attack';
-    const isArmor = item.type === 'Armor';
-    const weaponType = item.type === 'NPC Attack' ? 'NPC attack' : item.system?.type === 'melee' ? 'Melee' : item.system?.type === 'ranged' ? 'Ranged' : '';
-    const ranges = item.type === 'NPC Attack' ? item.system?.ranges ?? [] : [item.system?.range].filter(Boolean);
-    const range = ranges.map((range: string) => range.charAt(0).toUpperCase() + range.slice(1)).join('/') || '-';
-
-    // Properties Logic
-    const rawProps = item.system?.properties;
-    let propertiesDisplay: string[] = [];
-    if (Array.isArray(rawProps)) {
-        propertiesDisplay = rawProps.map(String);
-    } else if (typeof rawProps === 'object' && rawProps !== null) {
-        propertiesDisplay = Object.keys(rawProps).filter(k => rawProps[k]);
-    }
-
-    const base = isWeapon ? prepareWeaponBase(item, {}, actor?.computed?.weaponPropertyNames) : null;
-    const attack = isWeapon ? prepareWeaponAttack(actor ?? {}, item) : null;
-    if (base) propertiesDisplay = base.properties;
-
-    // Description
-    const rawDesc = getSafeDescription(item.system);
-    const description = rawDesc;
-
-    const handsLabel = item.type === 'NPC Attack' ? '' : ` (${base?.handedness.toUpperCase()})`;
-
-    // Cost Formatter
-    const formatCost = (cost: any) => {
-        if (!cost) return '-';
-        const parts = [];
-        if (cost.gp) parts.push(`${cost.gp} gp`);
-        if (cost.sp) parts.push(`${cost.sp} sp`);
-        if (cost.cp) parts.push(`${cost.cp} cp`);
-        return parts.length > 0 ? parts.join(', ') : '-';
-    };
+    const run = (event: React.MouseEvent, entry: ItemControl | undefined) => { event.stopPropagation(); if (entry) runItemControl(entry); };
+    const button = 'w-10 h-10 flex items-center justify-center rounded hover:bg-neutral-200 touch-manipulation focus-visible:outline focus-visible:outline-2 focus-visible:outline-black';
 
     return (
-        <div
-            className="group cursor-pointer hover:bg-neutral-100 transition-colors"
-            onClick={(e) => {
-                // Check for button clicks first
-                const target = e.target as HTMLElement;
-                const rollBtn = target.closest('button[data-action]');
-                if (rollBtn) {
-                    e.stopPropagation();
-                    return;
-                }
-                toggleItem(itemId);
-            }}
-        >
+        <div className="group hover:bg-neutral-100">
             <div className="grid grid-cols-12 p-2 gap-2 items-center font-serif text-sm">
-                <div className="col-span-6 font-bold flex items-center">
-                    {/* Thumbnail */}
-                    <img
-                        src={resolveImageUrl(item.img)}
-                        alt={item.name}
-                        className="w-8 h-8 object-cover border border-black mr-2 bg-neutral-200"
-                    />
-                    <div className="flex items-center">
-                        <span>{item.name}</span>
-                        {/* Light Source Indicator */}
-                        {item.isLightSource && (
-                            <div className="ml-2 flex items-center gap-1 group/light relative">
-                                <span
-                                    className={`text-xs tracking-tighter ${lightActive
-                                        ? 'text-amber-500 font-bold animate-pulse'
-                                        : 'text-neutral-300'
-                                        }`}
-                                >
-                                    {item.lightSourceProgress || (lightActive ? 'Active' : 'Inactive')}
-                                    <span className="ml-1 text-[10px] text-neutral-500">
-                                        ({item.lightSourceTimeRemaining || (remaining ? `${remaining}m` : '')})
-                                    </span>
-                                </span>
-                            </div>
-                        )}
-                    </div>
+                <button type="button" className="col-span-12 sm:col-span-6 font-bold flex items-center text-left min-h-11" aria-expanded={isExpanded}
+                    onClick={() => toggleItem(itemId)}>
+                    <img src={resolveImageUrl(item.img)} alt="" className="w-8 h-8 object-cover border border-black mr-2 bg-neutral-200 shrink-0" />
+                    <span className="break-words">{item.name}</span>
+                    {view?.lightSource && <span className={`ml-2 text-xs ${lit ? 'text-amber-700 font-bold' : 'text-neutral-500'}`}>{lit ? 'Lit' : 'Unlit'}</span>}
+                    {view && !view.identified && <span className="ml-2 text-[10px] uppercase border border-black px-1">Unidentified</span>}
+                </button>
+                <div className="col-span-4 sm:col-span-2 text-center font-bold text-neutral-600 flex justify-center items-center">
+                    {isTreasure ? <span className="text-amber-700">{formatCost(item.system?.cost)}</span>
+                        : view && (item.system?.isAmmunition || Number(item.system?.slots?.per_slot ?? 1) > 1 || view.quantity !== 1)
+                            ? <QuantityControl itemId={itemId} value={view.quantity} label={item.name} /> : ''}
                 </div>
-                <div className="col-span-2 text-center font-bold text-neutral-500 flex justify-center items-center gap-1">
-                    {isTreasure ? (
-                        <span className="text-amber-600">{formatCost(item.system?.cost)}</span>
-                    ) : (
-                        (item.system?.slots?.per_slot || 1) > 1 ? (
-                            <QuantityControl
-                                itemId={itemId}
-                                path={`items.${itemId}.system.quantity`}
-                                value={item.system?.quantity ?? 1}
-                                max={item.system?.slots?.per_slot || 0}
-                            />
-                        ) : (
-                            item.showQuantity ? (item.system?.quantity || 1) : ''
-                        )
-                    )}
-                </div>
-                <div className="col-span-2 text-center">{calculateItemSlots(item) === 0 ? '-' : calculateItemSlots(item)}</div>
-                <div className="col-span-2 flex justify-center items-center gap-1">
-                    {/* Light Toggle (Only if NOT stashed) */}
-                    {(!stashed) && (isLightSource || hasLightProp) && (
-                        <button
-                            onClick={handleToggleLight}
-                            title={lightActive ? "Extinguish" : "Light"}
-                            className={`w-10 h-10 flex items-center justify-center rounded hover:bg-neutral-200 transition-colors touch-manipulation ${lightActive ? 'text-amber-600' : 'text-neutral-300'}`}
-                        >
-                            <svg width="22" height="22" viewBox="0 0 24 24" fill={lightActive ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.1.2-2.2.6-3a1 1 0 0 1 .9 2.5z"></path>
-                            </svg>
+                <div className="col-span-2 text-center" aria-label="Slots">{view ? (view.slotsUsed === 0 ? '-' : view.slotsUsed) : '-'}</div>
+                <div className="col-span-6 sm:col-span-2 flex justify-end sm:justify-center items-center gap-1 flex-wrap">
+                    {!stashed && control('light') && (
+                        <button type="button" onClick={(e) => run(e, control('light'))} className={`${button} ${lit ? 'text-amber-700' : 'text-neutral-500'}`}
+                            title={control('light')!.title} aria-pressed={lit}
+                            aria-label={lit ? `Extinguish ${item.name}` : `Light ${item.name}`}>
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill={lit ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.1.2-2.2.6-3a1 1 0 0 1 .9 2.5z" /></svg>
                         </button>
                     )}
-
-                    {/* Equip Toggle (Only if NOT stashed) */}
-                    {(!stashed) && ['Weapon', 'Armor', 'Shield'].includes(item.type) && (
-                        <button
-                            onClick={handleToggleEquip}
-                            title={equipped ? "Unequip" : "Equip"}
-                            className={`w-10 h-10 flex items-center justify-center rounded hover:bg-neutral-200 transition-colors touch-manipulation ${equipped ? 'text-green-700 fill-green-700' : 'text-neutral-300'}`}
-                        >
-                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-                            </svg>
+                    {!stashed && control('equip') && (
+                        <button type="button" onClick={(e) => run(e, control('equip'))} aria-pressed={equipped} title={control('equip')!.title}
+                            className={`${button} ${equipped ? 'text-green-800' : 'text-neutral-500'}`} aria-label={equipped ? `Unequip ${item.name}` : `Equip ${item.name}`}>
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill={equipped ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>
                         </button>
                     )}
-
-                    {/* Stash Toggle (Hide if Equipped because equipped items are conceptually 'on person') */}
-                    {!equipped && (
-                        <button
-                            onClick={handleToggleStash}
-                            title={stashed ? "Retrieve" : "Stash"}
-                            className={`w-10 h-10 flex items-center justify-center rounded hover:bg-neutral-200 transition-colors touch-manipulation ${stashed ? 'text-blue-600' : 'text-neutral-300'}`}
-                        >
-                            <svg width="22" height="22" viewBox="0 0 24 24" fill={stashed ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path>
-                                <path d="m3.3 7 8.7 5 8.7-5"></path>
-                                <path d="M12 22V12"></path>
-                            </svg>
+                    {!equipped && control('stash') && (
+                        <button type="button" onClick={(e) => run(e, control('stash'))} aria-pressed={stashed}
+                            className={`${button} ${stashed ? 'text-blue-700' : 'text-neutral-500'}`} aria-label={stashed ? `Retrieve ${item.name}` : `Stash ${item.name}`}>
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill={stashed ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" /></svg>
                         </button>
                     )}
-
-                    {/* Sell Button (Treasure Only) */}
                     {isTreasure && onSell && (
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onSell(item);
-                            }}
-                            title="Sell Treasure"
-                            className="w-10 h-10 flex items-center justify-center rounded hover:bg-amber-100 text-neutral-300 hover:text-amber-600 transition-colors group/sell touch-manipulation"
-                        >
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <circle cx="8" cy="8" r="6" />
-                                <path d="M18.09 10.37A6 6 0 1 1 10.34 18" />
-                                <path d="M7 6h1v4" />
-                                <path d="m16.71 13.88.7 .71-2.82 2.82" />
-                            </svg>
+                        <button type="button" onClick={(e) => { e.stopPropagation(); onSell(item); }} className={`${button} text-amber-800`} aria-label={`Sell ${item.name}`}>
+                            <span aria-hidden="true" className="font-bold">$</span>
                         </button>
                     )}
-
-                    {/* Trash / Delete Item (Carried or Stashed only) */}
                     {!equipped && (
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                deleteItem(itemId);
-                            }}
-                            title="Delete Item"
-                            className="w-10 h-10 flex items-center justify-center rounded hover:bg-red-100 text-neutral-300 hover:text-red-600 transition-colors group/trash touch-manipulation"
-                        >
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <polyline points="3 6 5 6 21 6"></polyline>
-                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                            </svg>
+                        <button type="button" onClick={(e) => { e.stopPropagation(); onDelete ? onDelete(item) : deleteItem(itemId); }}
+                            className={`${button} text-neutral-500 hover:text-red-700`} aria-label={`Delete ${item.name}`}>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
                         </button>
                     )}
                 </div>
             </div>
 
-            {/* Expanded Description */}
             {isExpanded && (
-                <div className="px-4 py-2 bg-neutral-50 text-sm border-t border-b border-neutral-200 col-span-12 font-serif">
-                    <div className="flex flex-wrap gap-2 mb-2 text-xs font-bold uppercase text-neutral-500">
+                <div className="px-4 py-2 bg-neutral-50 text-sm border-t border-b border-neutral-200 font-serif">
+                    <div className="flex flex-wrap gap-2 mb-2 text-xs font-bold uppercase text-neutral-600">
                         <span className="bg-neutral-200 px-1 rounded">{item.type}</span>
-                        {base && attack && <>
-                            <span>{weaponType} • {range}</span>
-                            <span data-weapon-damage="base" title={base.warnings.join(' ')}>Base damage{handsLabel}: {base.damage ?? 'Damage unavailable'}</span>
-                            <span data-weapon-damage="actor" title={attack.warnings.join(' ')}>Actor damage{handsLabel}: {attack.damage ?? 'Damage unavailable'}</span>
+                        {view?.weapon && <>
+                            <span>{item.system?.type === 'ranged' ? 'Ranged' : 'Melee'} • {RANGE_LABELS[item.system?.range] ?? item.system?.range ?? '-'}</span>
+                            <span data-weapon-damage="base" title={view.weapon.baseWarnings.join(' ')}>Base damage{hands}: {view.weapon.baseDamage ?? 'Damage unavailable'}</span>
+                            {attacks.map(action => (
+                                <span key={action.id} data-weapon-damage="actor" title={[...(action.damage?.warnings ?? []), ...action.diagnostics].join(' ')}>
+                                    Actor damage ({action.attack?.mode ?? 'attack'}): {action.damage?.formula ?? 'Damage unavailable'}
+                                </span>
+                            ))}
+                            {!attacks.length && <span data-weapon-damage="actor">Actor damage{hands}: {view.weapon.baseDamage ?? 'Damage unavailable'}</span>}
                         </>}
-                        {isArmor && <span>AC +{item.system?.ac?.base || 0}</span>}
-                        {propertiesDisplay.map((p, pIdx) => (
-                            <span key={`${p}-${pIdx}`} className="bg-neutral-200 px-1 rounded">{p}</span>
+                        {item.type === 'NPC Attack' && <>
+                            <span>{(item.system?.ranges ?? []).map((range: string) => RANGE_LABELS[range] ?? range).join('/') || '-'}</span>
+                            <span data-weapon-damage="base">Base damage: {item.system?.damage?.value || 'Damage unavailable'}</span>
+                            {attacks.map(action => (
+                                <span key={action.id} data-weapon-damage="actor" title={(action.damage?.warnings ?? []).join(' ')}>Attack damage: {action.damage?.formula ?? 'Damage unavailable'}</span>
+                            ))}
+                        </>}
+                        {item.type === 'Armor' && <span>AC {item.system?.ac?.base ? `${item.system.ac.base}${item.system.ac.attribute ? ` + ${String(item.system.ac.attribute).toUpperCase()}` : ''}` : ''}{item.system?.ac?.modifier ? ` ${item.system.ac.modifier > 0 ? '+' : ''}${item.system.ac.modifier}` : ''}</span>}
+                        {(view?.properties ?? []).map((property: any, index: number) => (
+                            <span key={`${property.slug}-${index}`} className="bg-neutral-200 px-1 rounded">{property.name ?? 'Unresolved property'}</span>
                         ))}
                     </div>
-
-                    <div
-                        dangerouslySetInnerHTML={{ __html: formatDescription(description) }}
-                        className="prose prose-sm max-w-none"
-                    />
+                    <div dangerouslySetInnerHTML={{ __html: description }} className="prose prose-sm max-w-none break-words" />
+                    <button type="button" onClick={() => openCard({ kind: 'item', itemId })} className="mt-2 text-xs font-bold uppercase underline min-h-11">Open details</button>
                 </div>
             )}
         </div>

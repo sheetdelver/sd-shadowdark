@@ -1,127 +1,69 @@
 import { json, error, type ModuleServerRequest } from '@sheet-delver/sdk/server';
-import { getErrorMessage, logger } from '@sheet-delver/sdk';
+import { getErrorMessage, isSdkError, logger } from '@sheet-delver/sdk';
 import { shadowdarkAdapter } from '../../server/ShadowdarkAdapter';
+import { canonicalUuid, ownedCopy } from '../../logic/identity';
 
 /**
  * POST /api/modules/shadowdark/actors/[id]/spells/learn
- * Learn a spell by UUID or ID.
+ * Adds a copy of an exact Spell document to the Actor. The source is read
+ * through the caller, must be a Spell, and is copied with all fields/effects and
+ * its source identity. Core's write ownership still governs the create.
  */
 export async function handleLearnSpell(actorId: string, req: ModuleServerRequest) {
     try {
         const { spellUuid } = await req.json<{ spellUuid?: string }>();
+        const canonical = canonicalUuid(spellUuid);
+        if (!canonical) return error('validation', 'A Spell UUID is required');
 
-        if (!spellUuid) {
-            return error('validation', 'Spell UUID is required');
-        }
+        const actor = await req.runtime.documents.get('Actor', actorId, { minOwnership: 'owner' });
+        if (!actor) return error('not_found', 'Actor not found or not owned');
 
-        // 1. Fetch Spell Data (unified resolver, runtime-backed)
-        const spellData = await shadowdarkAdapter.resolveDocument(spellUuid);
+        const spellData = await shadowdarkAdapter.resolveDocumentFor(canonical, req.runtime);
+        if (!spellData) return error('not_found', `Spell not available: ${canonical}`);
+        if (spellData.type !== 'Spell') return error('validation', `${spellData.name} is a ${spellData.type}, not a Spell`);
 
-        if (!spellData) {
-            return error('not_found', 'Spell not found');
-        }
-
-        // 2. Create the spell Item on the actor via the document store.
-        const creationData = {
-            name: spellData.name,
-            type: 'Spell',
-            img: spellData.img,
-            system: spellData.system,
-            flags: {
-                core: { sourceId: spellUuid } // Link back to source
-            }
-        };
-
-        const result = await req.runtime.documents.items.create({ type: 'Actor', id: actorId }, creationData);
-
+        const result = await req.runtime.documents.items.create({ type: 'Actor', id: actorId }, ownedCopy(spellData, canonical));
         return json({ success: true, data: result });
-
     } catch (e: unknown) {
+        if (isSdkError(e)) return error(e.code, e.message);
         logger.error('[API] Learn Spell Error:', e);
         return error('internal', getErrorMessage(e) || 'Failed to learn spell');
     }
 }
 
 /**
- * GET /api/modules/shadowdark/spells/list?source=...
- * Fetch spells filtered by class source (e.g. "Wizard"): declared-compendium spells plus any
- * custom world spells.
+ * GET /api/modules/shadowdark/spells/list?class=<Class UUID>
+ * Spells whose `system.class` contains the exact class UUID: declared-compendium
+ * spells plus caller-visible world spells. Distinct documents stay distinct even
+ * when they share a name and tier.
  */
 export async function handleGetSpellsBySource(req: ModuleServerRequest) {
     try {
         const { searchParams } = new URL(req.url, 'http://localhost');
-        const source = searchParams.get('source'); // e.g. "Wizard", "Priest"
+        const classUuid = canonicalUuid(searchParams.get('class'));
+        if (!classUuid) return error('validation', 'class must be an exact Class UUID');
 
-        if (!source) {
-            return error('validation', 'Source parameter is required (e.g. Wizard)');
-        }
-
-        const normalizedSource = source.toLowerCase();
-
-        const checkClassMatch = (spellClasses: any) => {
-            const classes = Array.isArray(spellClasses) ? spellClasses : [spellClasses].filter(Boolean);
-            return classes.some((c: any) => {
-                const cStr = String(c).toLowerCase();
-                if (cStr === normalizedSource) return true;
-                // UUID match (heuristic)
-                if (cStr.includes(`.${normalizedSource}.`) || cStr.includes(`/${normalizedSource}/`)) return true;
-                return false;
-            });
-        };
-
-        // 1. Declared-compendium spells (offline, identity-stamped).
-        const localSpells = await shadowdarkAdapter.getSpellsBySource(source);
-
-        // 2. Custom world spells (the declared compendium is already covered above, so we only
-        //    pull world Item spells here via the document store).
-        const remoteSpells: any[] = [];
+        const local = await shadowdarkAdapter.getSpellsForClass(classUuid);
+        const world: any[] = [];
         try {
             const worldItems = await req.runtime.documents.list('Item', { filter: { type: 'Spell' } });
-            for (const s of (worldItems.rows as any[])) {
-                if (s.type !== 'Spell') continue;
-                if (checkClassMatch(s.system?.class)) {
-                    remoteSpells.push({
-                        name: s.name,
-                        uuid: s.uuid || `Item.${s._id}`,
-                        img: s.img,
-                        tier: s.system?.tier || 0,
-                        system: s.system,
-                        source: 'world'
-                    });
+            for (const spell of worldItems.rows as any[]) {
+                if (spell.type !== 'Spell') continue;
+                if ((spell.system?.class ?? []).some((value: unknown) => canonicalUuid(value) === classUuid)) {
+                    world.push({ ...spell, uuid: canonicalUuid(spell.uuid) ?? `Item.${spell._id}`, source: 'world' });
                 }
             }
         } catch (err) {
             logger.warn('[API] Failed to fetch world spells:', err);
         }
 
-        // 3. Merge and de-duplicate by Name + Tier (local wins).
-        const spellMap = new Map<string, any>();
-
-        const addToMap = (spells: any[]) => {
-            for (const s of spells) {
-                const key = `${s.name}-${s.tier || 0}`;
-                if (!spellMap.has(key)) {
-                    spellMap.set(key, {
-                        ...s,
-                        uuid: s.uuid || s._id,
-                        tier: s.tier || s.system?.tier || 0,
-                        img: s.img,
-                        classes: [source]
-                    });
-                }
-            }
-        };
-
-        addToMap(localSpells);
-        addToMap(remoteSpells);
-
-        const merged = Array.from(spellMap.values()).sort((a, b) => {
-            if (a.tier !== b.tier) return a.tier - b.tier;
-            return a.name.localeCompare(b.name);
-        });
-
+        const byUuid = new Map<string, any>();
+        for (const spell of [...local, ...world]) {
+            const uuid = canonicalUuid(spell.uuid);
+            if (uuid && !byUuid.has(uuid)) byUuid.set(uuid, { ...spell, uuid, tier: spell.system?.tier ?? null });
+        }
+        const merged = [...byUuid.values()].sort((a, b) => (a.tier ?? 0) - (b.tier ?? 0) || String(a.name).localeCompare(String(b.name)));
         return json({ success: true, spells: merged });
-
     } catch (e: unknown) {
         logger.error('[API] Fetch Spells Error:', e);
         return error('internal', getErrorMessage(e));

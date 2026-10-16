@@ -1,8 +1,15 @@
-import { SYSTEM_PREDEFINED_EFFECTS } from '../data/talent-effects';
-import { logger } from '@sheet-delver/sdk';
+import { NATIVE_PREDEFINED_EFFECTS } from '../data/native-predefined-effects';
 import { createEffect } from '../utils/Sanitizer';
-import { applyMasteryChoice } from './talent-choices';
+import { applyMasteryChoice, masteryKind, pendingChoiceKind, type ChoiceCatalog } from './talent-choices';
 
+/**
+ * Level-up/generation selection handlers. Native 4.0.6 talent tables return
+ * talent documents that already carry their native effects; these handlers only
+ * collect explicit player choices the module UI offers (stat selections, mastery
+ * choices, an extra spell). They never synthesize effects by name or with
+ * pre-4.0 keys: stat choices use the native predefined `abilityImprovement*`
+ * definitions (`system.abilities.<key>.value`, ADD).
+ */
 export interface TalentHandler {
     id: string;
     description: string;
@@ -12,8 +19,46 @@ export interface TalentHandler {
     config?: any;
     onInit?: (context: { actor: any, targetLevel: number }) => { requiredTalents?: number; choiceRolls?: number };
     isBlocked?: (state: any) => boolean;
-    resolveItems?: (state: any, targetLevel: number, resolveDocFn?: (uuid: string) => Promise<any>) => Promise<any[]>;
+    resolveItems?: (state: any, targetLevel: number, resolveDocFn?: (uuid: string) => Promise<any>, catalog?: ChoiceCatalog) => Promise<any[]>;
     mutateItem?: (item: any, state: any) => void;
+}
+
+const ABILITY_EFFECT: Record<string, string> = {
+    str: 'abilityImprovementStr', dex: 'abilityImprovementDex', con: 'abilityImprovementCon',
+    int: 'abilityImprovementInt', wis: 'abilityImprovementWis', cha: 'abilityImprovementCha',
+};
+
+/** Native predefined ability improvement as an effect with the chosen amount. */
+function abilityImprovementEffect(stat: string, amount: number, sourceName: string) {
+    const definition = NATIVE_PREDEFINED_EFFECTS[ABILITY_EFFECT[stat]];
+    if (!definition) throw new Error(`Unknown ability ${stat}.`);
+    return createEffect(definition.label, definition.icon, [{ key: definition.key, mode: definition.mode, value: amount }], { sourceName });
+}
+
+function distributeAllocations(item: any, state: any, sourceName: string) {
+    const allocated = state.statPool?.allocated ?? {};
+    item.effects = (Array.isArray(item.effects) ? item.effects : []).filter((effect: any) =>
+        effect?.flags?.shadowdark?.sourceName !== sourceName);
+    for (const [stat, raw] of Object.entries(allocated)) {
+        const value = Number(raw);
+        if (value > 0) item.effects.push(abilityImprovementEffect(stat, value, sourceName));
+    }
+}
+
+const SPELL_CLASS_FROM_NAME = /\blearn(?:\s+an?)?(?:\s+extra)?\s+(\w+)\s+spell\b/i;
+
+/** Resolve a fixed mastery template for a selection using the declared-data catalog. */
+async function masteryTemplate(kind: 'weapon' | 'armor', state: any, targetLevel: number,
+    resolveDocFn?: (uuid: string) => Promise<any>, catalog?: ChoiceCatalog) {
+    const selection = kind === 'weapon' ? state.weaponMasterySelection : state.armorMasterySelection;
+    if (!selection?.selected?.length || !resolveDocFn) return [];
+    const uuid = kind === 'weapon' ? 'Compendium.shadowdark.talents.Item.5bpWuaT0KTNzuzCu' : 'Compendium.shadowdark.talents.Item.BsRPGhKXYwJBI9ex';
+    const doc = await resolveDocFn(uuid);
+    if (!doc) throw new Error(`The native ${kind === 'weapon' ? 'Weapon' : 'Armor'} Mastery talent (${uuid}) is unavailable.`);
+    const template = JSON.parse(JSON.stringify(doc));
+    delete template._id;
+    template.system = { ...(template.system ?? {}), level: targetLevel };
+    return [applyMasteryChoice(template, selection.selected[0], kind, catalog ?? {})];
 }
 
 export const TALENT_HANDLERS: TalentHandler[] = [
@@ -27,324 +72,63 @@ export const TALENT_HANDLERS: TalentHandler[] = [
         action: 'stat-selection',
         config: { required: 2 },
         mutateItem: (item: any, state: any) => {
-            if (state.statSelection && state.statSelection.selected.length > 0) {
-                const selectionMap: Record<string, string> = {
-                    'str': 'abilityImprovementStr',
-                    'dex': 'abilityImprovementDex',
-                    'con': 'abilityImprovementCon',
-                    'int': 'abilityImprovementInt',
-                    'wis': 'abilityImprovementWis',
-                    'cha': 'abilityImprovementCha'
-                };
-
-                const effects = state.statSelection.selected
-                    .map((s: string) => selectionMap[s])
-                    .filter((s: string) => s)
-                    .join(',');
-
-                if (effects) {
-                    if (!item.system) item.system = {};
-                    item.system.predefinedEffects = effects;
-
-                    if (!item.effects) item.effects = [];
-
-                    state.statSelection.selected.forEach((stat: string) => {
-                        const effectConfig = SYSTEM_PREDEFINED_EFFECTS[selectionMap[stat]];
-
-                        if (effectConfig) {
-                            item.effects.push(createEffect(
-                                `Ability Score Improvement (${effectConfig.label})`,
-                                effectConfig.icon,
-                                [{ key: effectConfig.key, value: effectConfig.value }],
-                                { sourceName: "Stat Improvement" }
-                            ));
-                        }
-                    });
-                }
-            }
+            const selected: string[] = state.statSelection?.selected ?? [];
+            if (!selected.length) return;
+            item.effects = (Array.isArray(item.effects) ? item.effects : []).filter((effect: any) =>
+                effect?.flags?.shadowdark?.sourceName !== 'Stat Improvement');
+            for (const stat of selected) item.effects.push(abilityImprovementEffect(stat, 1, 'Stat Improvement'));
         }
     },
     {
         id: 'stat-distribution',
         description: "Distribute +2 points across any stats",
         matches: (item: any) => {
-            // Check for direct Table match (nested table result)
             if (item.name === "Distribute to Stats") return true;
-
             const text = (item.text || item.description || "").toLowerCase();
             return text.includes("distribute") && text.includes("+2") && text.includes("stat");
         },
         action: 'stat-pool',
         config: { total: 2 },
         mutateItem: (item: any, state: any) => {
-            if (state.statPool && state.statPool.total > 0) {
-                const allocated = state.statPool.allocated;
-                const effects: string[] = [];
-
-                if (!item.effects) item.effects = [];
-                item.effects = (item.effects || []).filter((e: any) =>
-                    !e.name.startsWith("Stat Distribution") &&
-                    !e.name.startsWith("Ability Score Improvement")
-                );
-
-                Object.entries(allocated).forEach(([stat, val]) => {
-                    const value = Number(val);
-                    if (value > 0) {
-                        const statName = stat.charAt(0).toUpperCase() + stat.slice(1);
-                        const effectKey = `abilityImprovement${statName}`;
-                        effects.push(effectKey);
-
-                        const config = SYSTEM_PREDEFINED_EFFECTS[effectKey];
-                        if (config) {
-                            item.effects.push(createEffect(
-                                `Ability Score Improvement (${config.label})`,
-                                config.icon,
-                                [{ key: config.key, value: value }],
-                                { sourceName: "Stat Distribution" }
-                            ));
-                        }
-                    }
-                });
-
-                if (effects.length > 0) {
-                    if (!item.system) item.system = {};
-                    item.system.predefinedEffects = effects.join(',');
-                }
-            }
+            if (state.statPool && state.statPool.total > 0) distributeAllocations(item, state, 'Stat Distribution');
         }
     },
     {
         id: 'stat-distribution-warlock',
         description: "Distribute +2 points (max 1 per stat)",
-        matches: (item: any) => {
-            return item.name === "Distribute to Stats (Warlock)";
-        },
+        matches: (item: any) => item.name === "Distribute to Stats (Warlock)",
         action: 'stat-pool',
         config: { total: 2, maxPerStat: 1 },
         mutateItem: (item: any, state: any) => {
-            // Re-use logic from stat-distribution
-            if (state.statPool && state.statPool.total > 0) {
-                const allocated = state.statPool.allocated;
-                const effects: string[] = [];
-
-                if (!item.effects) item.effects = [];
-                item.effects = (item.effects || []).filter((e: any) =>
-                    !e.name.startsWith("Stat Distribution") &&
-                    !e.name.startsWith("Ability Score Improvement")
-                );
-
-                Object.entries(allocated).forEach(([stat, val]) => {
-                    const value = Number(val);
-                    if (value > 0) {
-                        const statName = stat.charAt(0).toUpperCase() + stat.slice(1);
-                        const effectKey = `abilityImprovement${statName}`;
-                        effects.push(effectKey);
-
-                        const config = SYSTEM_PREDEFINED_EFFECTS[effectKey];
-                        if (config) {
-                            item.effects.push(createEffect(
-                                `Ability Score Improvement (${config.label})`,
-                                config.icon,
-                                [{ key: config.key, value: value }],
-                                { sourceName: "Stat Distribution (Warlock)" }
-                            ));
-                        }
-                    }
-                });
-
-                if (effects.length > 0) {
-                    if (!item.system) item.system = {};
-                    item.system.predefinedEffects = effects.join(',');
-                }
-            }
+            if (state.statPool && state.statPool.total > 0) distributeAllocations(item, state, 'Stat Distribution (Warlock)');
         }
     },
     {
         id: 'weapon-mastery',
         description: "Choose one type of weapon",
-        matches: (item: any) => {
-            const name = (item.name || item.text || item.description || "").toLowerCase();
-            return name === 'weapon mastery' || item._id === '5bpWuaT0KTNzuzCu' || item.uuid?.endsWith('5bpWuaT0KTNzuzCu');
-        },
+        matches: (item: any) => masteryKind(item) === 'weapon' || pendingChoiceKind(item) === 'weapon'
+            || String(item?.name ?? item?.text ?? '').toLowerCase() === 'weapon mastery',
         action: 'weapon-mastery',
         config: { required: 1 },
-        resolveItems: async (state: any, targetLevel: number, resolveDocFn?: (uuid: string) => Promise<any>) => {
-            const items = [];
-            if (state.weaponMasterySelection && state.weaponMasterySelection.selected.length > 0) {
-                const selection = state.weaponMasterySelection.selected[0];
-                const uuid = 'Compendium.shadowdark.talents.Item.5bpWuaT0KTNzuzCu';
-
-                let doc = null;
-                if (resolveDocFn) {
-                    doc = await resolveDocFn(uuid);
-                }
-
-                if (doc) {
-                    // CLONE AND AUGMENT (Additive)
-                    const enriched = JSON.parse(JSON.stringify(doc));
-                    delete enriched._id;
-                    
-                    if (!enriched.system) enriched.system = {};
-                    enriched.system.level = targetLevel;
-
-                    // SYNC BONUSES (Additive)
-                    if (!enriched.system.bonuses) enriched.system.bonuses = {};
-                    enriched.system.bonuses.weaponMastery = selection.toLowerCase();
-                    
-                    // SELECTIVE NAME MUTATION (Match Original Module behavior)
-                    enriched.name = `${enriched.name} (${selection})`;
-
-                    items.push(applyMasteryChoice(enriched, selection, 'weapon'));
-                }
-            }
-            return items;
-        }
+        resolveItems: (state, targetLevel, resolveDocFn, catalog) => masteryTemplate('weapon', state, targetLevel, resolveDocFn, catalog),
     },
     {
         id: 'armor-mastery',
         description: "Choose one type of armor",
-        matches: (item: any) => {
-            const name = (item.name || item.text || item.description || "").toLowerCase();
-            return name === 'armor mastery' || item._id === 'BsRPGhKXYwJBI9ex' || item.uuid?.endsWith('BsRPGhKXYwJBI9ex');
-        },
+        matches: (item: any) => masteryKind(item) === 'armor' || pendingChoiceKind(item) === 'armor'
+            || String(item?.name ?? item?.text ?? '').toLowerCase() === 'armor mastery',
         action: 'armor-mastery',
         config: { required: 1 },
-        resolveItems: async (state: any, targetLevel: number, resolveDocFn?: (uuid: string) => Promise<any>) => {
-            const items = [];
-            if (state.armorMasterySelection && state.armorMasterySelection.selected.length > 0) {
-                const selection = state.armorMasterySelection.selected[0];
-                const uuid = 'Compendium.shadowdark.talents.Item.BsRPGhKXYwJBI9ex';
-
-                let doc = null;
-                if (resolveDocFn) {
-                    doc = await resolveDocFn(uuid);
-                }
-
-                if (doc) {
-                    // CLONE AND AUGMENT (Additive)
-                    const enriched = JSON.parse(JSON.stringify(doc));
-                    delete enriched._id;
-                    
-                    if (!enriched.system) enriched.system = {};
-                    enriched.system.level = targetLevel;
-
-                    // SYNC BONUSES (Additive)
-                    if (!enriched.system.bonuses) enriched.system.bonuses = {};
-                    enriched.system.bonuses.armorMastery = selection.toLowerCase();
-                    
-                    // SELECTIVE NAME MUTATION (Match Original Module behavior)
-                    enriched.name = `${enriched.name} (${selection})`;
-
-                    items.push(applyMasteryChoice(enriched, selection, 'armor'));
-                }
-            }
-            return items;
-        }
+        resolveItems: (state, targetLevel, resolveDocFn, catalog) => masteryTemplate('armor', state, targetLevel, resolveDocFn, catalog),
     },
     {
         id: 'extra-spell-handler',
         description: "Learn an extra spell",
-        matches: (item: any) => {
-            const name = (item.name || item.text || item.description || "").toLowerCase();
-            return name.includes("learn") && name.includes("spell");
-        },
+        matches: (item: any) => SPELL_CLASS_FROM_NAME.test(String(item.name || item.text || item.description || '')),
         action: 'extra-spell',
         config: { active: true, count: 1 },
-        mutateItem: (item: any) => {
-            const name = (item.name || "").toLowerCase();
-            const classes = ['wizard', 'priest', 'witch', 'warlock', 'ranger', 'bard', 'druid', 'seer'];
-            let foundCls = '';
-            for (const cls of classes) {
-                if (name.includes(cls)) {
-                    foundCls = cls;
-                    break;
-                }
-            }
-
-            if (foundCls) {
-                if (!item.system) item.system = {};
-                item.system.predefinedEffects = 'spellcastingClasses';
-
-                const effectConfig = SYSTEM_PREDEFINED_EFFECTS.spellcastingClasses;
-                if (!item.effects) item.effects = [];
-
-                const hasEffect = item.effects.some((e: any) =>
-                    e.name === "Bonus Spellcasting Class" ||
-                    e.changes?.some((c: any) => c.key === effectConfig.key)
-                );
-
-                if (!hasEffect) {
-                    item.effects.push(createEffect(
-                        "Bonus Spellcasting Class",
-                        effectConfig.icon,
-                        [{ key: effectConfig.key, value: foundCls }],
-                        { sourceName: "Class Feature" }
-                    ));
-                }
-            }
-        }
-    },
-    {
-        id: 'missing-effects',
-        description: "Apply standard effects from SYSTEM_PREDEFINED_EFFECTS if missing or invalid",
-        matches: (item: any) => {
-            const effects = item.effects;
-            const hasInvalidEffects = effects && Array.isArray(effects) && effects.length > 0 && typeof effects[0] === 'string';
-            if (hasInvalidEffects) return true;
-
-            const name = (item.name || "").toLowerCase();
-            const hasDefinition = Object.values(SYSTEM_PREDEFINED_EFFECTS).some((def: any) =>
-                name.includes(def.label.toLowerCase()) ||
-                def.label.toLowerCase().includes(name)
-            );
-
-            const isMissingEffects = !effects || (Array.isArray(effects) && effects.length === 0);
-            return isMissingEffects && hasDefinition;
-        },
-        mutateItem: (item: any) => {
-            const name = (item.name || "").toLowerCase();
-            const predefinedMatch = Object.values(SYSTEM_PREDEFINED_EFFECTS).find((def: any) =>
-                name.includes(def.label.toLowerCase()) ||
-                def.label.toLowerCase().includes(name)
-            );
-
-            if (predefinedMatch) {
-                if (!item.effects) item.effects = [];
-                const exists = item.effects.some((e: any) => e.name === predefinedMatch.label);
-                if (!exists) {
-                    item.effects.push(createEffect(
-                        predefinedMatch.label,
-                        predefinedMatch.icon || "icons/svg/aura.svg",
-                        predefinedMatch.changes || [{
-                            key: predefinedMatch.key,
-                            value: predefinedMatch.value
-                        }],
-                        { sourceName: "Predefined Definition" }
-                    ));
-                }
-            }
-        }
-    },
-    {
-        id: 'add-wis-to-rolls',
-        description: "Add Wisdom modifier to rolls (Warlock/Kytheros)",
-        matches: (item: any) => {
-            const name = (item.name || "").toLowerCase();
-            return name.includes("addwistorolls") || name.includes("wisdom to rolls");
-        },
-        mutateItem: (item: any) => {
-            if (!item.effects) item.effects = [];
-            // Kytheros Boon: Add Wisdom mod to Spellcasting checks
-            const effect = createEffect(
-                "Wisdom to Spellcasting",
-                "icons/magic/control/sihouette-hold-beam-green.webp",
-                [{ key: "system.bonuses.spellcastingCheckBonusAttribute", value: "wis" }],
-                { sourceName: "Kytheros Boon" }
-            );
-            if (!item.effects.some((e: any) => e.name === effect.name)) {
-                item.effects.push(effect);
-            }
-        }
+        // Native "Learn … Spell" talents have no effects; the selected spell is the
+        // only grant. No spellcasting class is added on the player's behalf.
     },
     {
         id: 'generic-choice',
@@ -352,15 +136,15 @@ export const TALENT_HANDLERS: TalentHandler[] = [
         matches: (item: any) => {
             const name = (item.name || "").toLowerCase();
             const text = (item.text || item.description || "").toLowerCase();
-            // Match "Choose one:", "Select one:", or names containing " or " (e.g. Weapon Mastery or Armor Mastery)
-            // Pattern also catches "1 CHOOSE 1" which comes from some roll tables
             const regex = /(?:choose|select)\s+(?:one|1)|\s+or\s+/i;
             return regex.test(name) || regex.test(text);
         },
-        action: undefined, // Handled implicitly by choice system
-        mutateItem: (_item: any) => {
-            // This is mostly handled by the UI modal forcing a selection
-            // but we keep the matcher for consistency
-        }
+        action: undefined,
     }
 ];
+
+/** The spell class named by a "Learn … Spell" talent, used only to filter the offered list. */
+export function extraSpellClassName(item: any): string | null {
+    const name = SPELL_CLASS_FROM_NAME.exec(String(item?.name || item?.text || item?.description || ''))?.[1]?.toLowerCase() ?? null;
+    return name && name !== 'extra' ? name : null;
+}

@@ -13,10 +13,12 @@ const uiManifest: UIModuleManifest = {
     tools: {
         'generator': () => import('../src/ui/tools/Generator'),
         'importer': () => import('../src/ui/tools/ShadowdarkImportPage'),
+        'bestiary': () => import('../src/ui/tools/Bestiary'),
     },
     dashboardActions: [
         { id: 'generator', label: 'Character Generator', kind: 'tool', toolId: 'generator' },
         { id: 'importer', label: 'Import From Shadowdarklings.net', kind: 'tool', toolId: 'importer' },
+        { id: 'bestiary', label: 'Bestiary', kind: 'tool', toolId: 'bestiary' },
     ],
     actorPage: () => import('../src/ui/pages/ActorPage')
 };

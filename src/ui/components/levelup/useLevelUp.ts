@@ -2,9 +2,10 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { isClassSpellcaster } from '../../../logic/rules';
 import { logger } from '@sheet-delver/sdk';
 import { useSDK } from '@sheet-delver/sdk/react';
-import { TALENT_HANDLERS } from '../../../logic/talent-handlers';
+import { TALENT_HANDLERS, extraSpellClassName } from '../../../logic/talent-handlers';
 import { useShadowdarkUI } from '../../context/ShadowdarkUIContext';
 import { fixedTalentReferences, masteryKind } from '../../../logic/talent-choices';
+import { slugify } from '../../../logic/foundry';
 
 export interface LevelUpProps {
     actorId: string;
@@ -77,7 +78,7 @@ export const useLevelUp = (props: LevelUpProps) => {
         onComplete,
     } = props;
 
-    const { systemData, collections, resolveUuid } = useShadowdarkUI();
+    const { systemData, collections, fetchPack } = useShadowdarkUI();
     const { fetchWithAuth } = useSDK();
 
     const availableClasses = useMemo(() => {
@@ -164,7 +165,7 @@ export const useLevelUp = (props: LevelUpProps) => {
     const [statPool, setStatPool] = useState<{ total: number; allocated: Record<string, number>; talentIndex: number | null; maxPerStat?: number }>({ total: 0, allocated: { str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 }, talentIndex: null });
     const [weaponMasterySelection, setWeaponMasterySelection] = useState<{ required: number; selected: string[] }>({ required: 0, selected: [] });
     const [armorMasterySelection, setArmorMasterySelection] = useState<{ required: number; selected: string[] }>({ required: 0, selected: [] });
-    const [extraSpellSelection, setExtraSpellSelection] = useState<{ active: boolean; maxTier: number; source: string; selected: any[] }>({ active: false, maxTier: 0, source: 'Wizard', selected: [] });
+    const [extraSpellSelection, setExtraSpellSelection] = useState<{ active: boolean; maxTier: number; source: string; selected: any[] }>({ active: false, maxTier: 0, source: '', selected: [] });
     const [extraSpellsList, setExtraSpellsList] = useState<any[]>([]);
 
     const [isSpellcaster, setIsSpellcaster] = useState(false);
@@ -1078,7 +1079,12 @@ export const useLevelUp = (props: LevelUpProps) => {
                 try {
                     const headers: any = { 'Content-Type': 'application/json' };
 
-                    const res = await fetchWithAuth(`/api/modules/shadowdark/spells/list?source=${extraSpellSelection.source}`, { headers });
+                    // The talent names a class; its exact UUID comes from declared class
+                    // data by the native slugified-name identity, never a substring.
+                    const classes = collections?.classes ?? await fetchPack('classes') ?? [];
+                    const classDoc = (classes as any[]).find(entry => slugify(entry.name ?? '') === slugify(extraSpellSelection.source));
+                    if (!classDoc?.uuid) { logger.warn(`No declared class matches ${extraSpellSelection.source}`); setExtraSpellsList([]); return; }
+                    const res = await fetchWithAuth(`/api/modules/shadowdark/spells/list?class=${encodeURIComponent(classDoc.uuid)}`, { headers });
                     const json = await res.json();
                     if (json.success) {
                         setExtraSpellsList(json.spells);
@@ -1089,7 +1095,7 @@ export const useLevelUp = (props: LevelUpProps) => {
             };
             fetchSpells();
         }
-    }, [extraSpellSelection.active, extraSpellSelection.source, extraSpellsList.length, fetchWithAuth]);
+    }, [extraSpellSelection.active, extraSpellSelection.source, extraSpellsList.length, fetchWithAuth, collections?.classes, fetchPack]);
 
 
 
@@ -1153,7 +1159,7 @@ export const useLevelUp = (props: LevelUpProps) => {
         let amReq = 0;
 
         let esActive = false;
-        let esSource = 'Wizard';
+        let esSource = '';
 
         const processItem = (item: any, index: number | null) => {
             const decision = getTalentDecision(item);
@@ -1179,15 +1185,8 @@ export const useLevelUp = (props: LevelUpProps) => {
                     case 'extra-spell':
                         esActive = true;
 
-                        // Attempt to infer source class from item name
-                        const name = (item.name || "").toLowerCase();
-                        const classes = ['wizard', 'priest', 'witch', 'warlock', 'ranger', 'bard', 'druid', 'seer'];
-                        for (const cls of classes) {
-                            if (name.includes(cls)) {
-                                esSource = cls.charAt(0).toUpperCase() + cls.slice(1);
-                                break;
-                            }
-                        }
+                        // Only an explicitly named class filters the offered list.
+                        esSource = extraSpellClassName(item) ?? '';
                         break;
                 }
             }
@@ -1235,10 +1234,11 @@ export const useLevelUp = (props: LevelUpProps) => {
 
         setExtraSpellSelection(prev => {
             if (prev.active !== esActive || (esActive && prev.source !== esSource)) {
-                if (!esActive) return { active: false, maxTier: 0, source: 'Wizard', selected: [] };
+                if (!esActive) return { active: false, maxTier: 0, source: '', selected: [] };
 
-                const level = targetLevel || 1;
-                const maxTier = Math.min(5, Math.ceil(level / 2));
+                // Native 4.0.6 does not encode which tiers a "learn a spell" talent
+                // allows, so no tier limit is invented here.
+                const maxTier = 5;
                 return {
                     active: true,
                     maxTier,

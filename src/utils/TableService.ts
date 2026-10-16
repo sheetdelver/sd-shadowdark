@@ -136,7 +136,9 @@ export class TableService {
             if (!name.trim()) return false;
             return !name.includes("choose 1") && !name.includes("choose one") && !name.includes("or (can");
         }).map(r => {
-            if (mapDistribute) {
+            // Document results are native talents with native effects; only text
+            // instructions may become module selection markers.
+            if (mapDistribute && !r.documentUuid && !r.documentId) {
                 const name = (r.text || r.name || "").toLowerCase();
                 if (name.includes("+2 points") || name.includes("distribute") || name.includes("+2 to") || name.includes("+1 to")) {
                     return this.createSyntheticDistributeStats(true);

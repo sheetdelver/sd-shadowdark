@@ -94,7 +94,7 @@ export default function CompendiumSelectModal({ isOpen, onClose, onSelect, title
                                                 {opt.name}
                                             </span>
                                             {opt.description && (
-                                                <span className={`text-[10px] font-medium line-clamp-1 ${isSelected ? 'text-white/60' : 'text-neutral-500'}`} dangerouslySetInnerHTML={{ __html: opt.description.replace(/<[^>]*>?/gm, '') }} />
+                                                <span className={`text-[10px] font-medium line-clamp-1 ${isSelected ? 'text-white/60' : 'text-neutral-500'}`}>{String(opt.description ?? '').replace(/<[^>]*>?/gm, '')}</span>
                                             )}
                                         </div>
                                         <div className="shrink-0 ml-4">

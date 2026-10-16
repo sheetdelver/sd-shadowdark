@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 
-import { processHtmlContent } from '@sheet-delver/sdk';
+import { getErrorMessage, processHtmlContent } from '@sheet-delver/sdk';
 import { useSDK, useSDKComponents } from '@sheet-delver/sdk/react';
 import ShadowdarkSheet from '../ShadowdarkSheet';
 import { postActorRoll } from './postActorRoll';
@@ -38,10 +38,18 @@ export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProp
         addToast(content, type, { html: true });
     }, [addToast]);
 
+    // Only the newest request for the current Actor may update state.
+    const requestSeq = useRef(0);
+    const currentActorId = useRef(actorId);
+    useEffect(() => { currentActorId.current = actorId; setActor(null); setActorError(null); setShowDeleteModal(false); }, [actorId]);
+
     const fetchActor = useCallback(async (id: string, silent = false) => {
+        const seq = ++requestSeq.current;
+        const stale = () => seq !== requestSeq.current || currentActorId.current !== id;
         if (!silent) setLoading(true);
         try {
             const res = await fetchWithAuth(`/api/actors/${id}`);
+            if (stale()) return;
             if (res.status === 404) {
                 setActor(null);
                 setActorError(null);
@@ -56,17 +64,16 @@ export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProp
             }
 
             const data = await res.json();
+            if (stale()) return;
             if (data && !data.error) {
                 setActor(data);
                 setActorError(null);
                 setShowDeleteModal(false);
-            } else {
-                if (!silent) setActorError(data?.error || 'Could not load this character.');
-            }
-        } catch (e: any) {
-            if (!silent) setActorError('Character data is temporarily unavailable.');
+            } else if (!silent) setActorError(data?.error || 'Could not load this character.');
+        } catch {
+            if (!silent && !stale()) setActorError('Character data is temporarily unavailable.');
         } finally {
-            if (!silent) setLoading(false);
+            if (!silent && !stale()) setLoading(false);
         }
     }, [fetchWithAuth]);
 
@@ -104,6 +111,22 @@ export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProp
         wasConnected.current = isConnected;
     }, [actorId, fetchActor, isConnected]);
 
+    /** JSON request that rejects with the server's message on any failure. */
+    const request = useCallback(async (url: string, init: RequestInit = {}) => {
+        const res = await fetchWithAuth(url, { ...init, headers: { 'Content-Type': 'application/json', ...(init.headers ?? {}) } });
+        let data: any = null;
+        try { data = await res.json(); } catch { /* empty body */ }
+        if (!res.ok || data?.success === false || data?.error) {
+            throw new Error(getErrorMessage(data?.error ?? `HTTP ${res.status}`));
+        }
+        return data;
+    }, [fetchWithAuth]);
+
+    const refreshAfter = useCallback(async <T,>(run: () => Promise<T>): Promise<T> => {
+        try { return await run(); }
+        finally { if (currentActorId.current) fetchActor(currentActorId.current, true); }
+    }, [fetchActor]);
+
     const handleRoll = async (type: string, key: string, options: any = {}) => {
         if (!actor) return;
         await postActorRoll(
@@ -112,150 +135,42 @@ export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProp
         );
     };
 
-    const handleUpdate = async (path: string, value: any) => {
-        if (!actor) return;
-        try {
-            const res = await fetchWithAuth(`/api/actors/${actor.id}/update`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ [path]: value })
-            });
-            const data = await res.json();
-            if (data.success) fetchActor(actor.id, true);
-            else addNotification('Update failed: ' + data.error, 'error');
-        } catch (e: any) {
-            addNotification('Error updating: ' + e.message, 'error');
+    const id = actor?.id || actor?._id;
+    const moduleBase = `/api/modules/shadowdark/actors/${id}`;
+
+    const handleUpdate = (path: string, value: any) => refreshAfter(() =>
+        request(`/api/actors/${id}/update`, { method: 'POST', body: JSON.stringify({ [path]: value }) }));
+
+    const handleDeleteItem = (itemId: string) => refreshAfter(() =>
+        request(`/api/actors/${id}/items?itemId=${encodeURIComponent(itemId)}`, { method: 'DELETE' }));
+
+    const handleCreateItem = (itemData: any) => refreshAfter(async () => {
+        await request(`/api/actors/${id}/items`, { method: 'POST', body: JSON.stringify(itemData) });
+        if (itemData.name) addNotification(`Created ${itemData.name}`, 'success');
+    });
+
+    /** Item edits send only changed paths for one exact embedded id. */
+    const handleUpdateItem = (itemId: string, patch: Record<string, unknown>, deletedEffectRefs: string[] = []) => refreshAfter(async () => {
+        for (const ref of deletedEffectRefs) {
+            await request(`${moduleBase}/effects/delete?ref=${encodeURIComponent(ref)}`, { method: 'DELETE' });
         }
-    };
-
-    // --- Shadowdark-specific: Effect handlers ---
-
-    const handleToggleEffect = async (effectId: string, enabled: boolean) => {
-        if (!actor) return;
-        try {
-            const id = actor.id || actor._id;
-            const res = await fetchWithAuth(`/api/modules/shadowdark/actors/${id}/effects/update`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ _id: effectId, disabled: !enabled })
-            });
-            const data = await res.json();
-            if (data.success) {
-                fetchActor(actor.id, true);
-                addNotification(enabled ? 'Effect Enabled' : 'Effect Disabled', 'success');
-            } else {
-                addNotification('Failed to toggle effect: ' + data.error, 'error');
-            }
-        } catch (e: any) {
-            addNotification('Error: ' + e.message, 'error');
+        if (Object.keys(patch).length) {
+            await request(`/api/actors/${id}/items`, { method: 'PUT', body: JSON.stringify({ _id: itemId, ...patch }) });
         }
-    };
+    });
 
-    const handleDeleteEffect = async (effectId: string) => {
-        if (!actor) return;
-        try {
-            const id = actor.id || actor._id;
-            const res = await fetchWithAuth(`/api/modules/shadowdark/actors/${id}/effects/delete?effectId=${effectId}`, {
-                method: 'DELETE'
-            });
-            const data = await res.json();
-            if (data.success) {
-                fetchActor(actor.id, true);
-                addNotification('Effect Deleted', 'success');
-            } else {
-                addNotification('Failed to delete effect: ' + data.error, 'error');
-            }
-        } catch (e: any) {
-            addNotification('Error: ' + e.message, 'error');
-        }
-    };
-
-    const handleTogglePredefinedEffect = async (effectId: string) => {
-        if (!actor) return;
-        try {
-            const id = actor.id || actor._id;
-            const res = await fetchWithAuth(`/api/modules/shadowdark/actors/${id}/effects/toggle`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ effectId })
-            });
-            const data = await res.json();
-            if (data.success) {
-                fetchActor(id, true);
-                addNotification('Effect toggled', 'success');
-            } else {
-                addNotification('Failed to toggle effect: ' + data.error, 'error');
-            }
-        } catch (e: any) {
-            addNotification('Error: ' + e.message, 'error');
-        }
-    };
-
-    // --- Common item handlers ---
-
-    const handleDeleteItem = async (itemId: string) => {
-        if (!actor) return;
-        try {
-            const res = await fetchWithAuth(`/api/actors/${actor.id}/items?itemId=${itemId}`, {
-                method: 'DELETE'
-            });
-            const data = await res.json();
-            if (data.success) {
-                fetchActor(actor.id, true);
-                addNotification('Item Deleted', 'success');
-            } else {
-                addNotification('Failed to delete item: ' + data.error, 'error');
-            }
-        } catch (e: any) {
-            addNotification('Error: ' + e.message, 'error');
-        }
-    };
-
-    const handleCreateItem = async (itemData: any) => {
-        if (!actor) return;
-        try {
-            const res = await fetchWithAuth(`/api/actors/${actor.id}/items`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(itemData)
-            });
-            const data = await res.json();
-            if (data.success) {
-                fetchActor(actor.id, true);
-                if (itemData.name) addNotification(`Created ${itemData.name}`, 'success');
-            } else {
-                addNotification('Failed to create item: ' + data.error, 'error');
-            }
-        } catch (e: any) {
-            addNotification('Error: ' + e.message, 'error');
-        }
-    };
-
-    const handleUpdateItem = async (itemData: any, deletedEffectIds: string[] = []) => {
-        if (!actor) return;
-        try {
-            // Shadowdark: delete any effects removed during item edit
-            if (deletedEffectIds.length > 0) {
-                await Promise.all(deletedEffectIds.map(effId =>
-                    fetchWithAuth(`/api/modules/shadowdark/actors/${actor.id || actor._id}/effects/delete?effectId=${effId}`, { method: 'DELETE' })
-                ));
-            }
-            const res = await fetchWithAuth(`/api/actors/${actor.id}/items`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(itemData)
-            });
-            const data = await res.json();
-            if (data.success) {
-                fetchActor(actor.id, true);
-                if (itemData.name) addNotification(`Updated ${itemData.name}`, 'success');
-            } else {
-                addNotification('Failed to update item: ' + data.error, 'error');
-            }
-        } catch (e: any) {
-            addNotification('Error: ' + e.message, 'error');
-        }
-    };
+    const handleToggleEffect = (ref: string, enabled: boolean) => refreshAfter(() =>
+        request(`${moduleBase}/effects/toggle`, { method: 'POST', body: JSON.stringify({ ref, enabled }) }));
+    const handleDeleteEffect = (ref: string) => refreshAfter(() =>
+        request(`${moduleBase}/effects/delete?ref=${encodeURIComponent(ref)}`, { method: 'DELETE' }));
+    const handleCreateEffect = (payload: any) => refreshAfter(() =>
+        request(`${moduleBase}/effects/create`, { method: 'POST', body: JSON.stringify(payload) }));
+    const handleUpdateEffect = (ref: string, patch: any) => refreshAfter(() =>
+        request(`${moduleBase}/effects/update`, { method: 'POST', body: JSON.stringify({ ref, patch }) }));
+    const handleAction = (body: any) => refreshAfter(() => request(`${moduleBase}/actions`, {
+        method: 'POST',
+        body: JSON.stringify({ ...body, rollMode: body.rollMode ?? (localStorage.getItem('sheetdelver_roll_mode') || 'publicroll') }),
+    }));
 
     if (loading) return <LoadingModal message="Loading Codex..." />;
     if (!actor && !showDeleteModal && !actorError) return null;
@@ -285,29 +200,11 @@ export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProp
                             onCreateItem={handleCreateItem}
                             onUpdateItem={handleUpdateItem}
                             onRoll={handleRoll}
+                            onAction={handleAction}
                             onToggleEffect={handleToggleEffect}
                             onDeleteEffect={handleDeleteEffect}
-                            onCreateEffect={async (effectData) => {
-                                const id = actor.id || actor._id;
-                                const res = await fetchWithAuth(`/api/modules/shadowdark/actors/${id}/effects/create`, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify(effectData)
-                                });
-                                const data = await res.json();
-                                if (data.success) fetchActor(id, true);
-                            }}
-                            onUpdateEffect={async (effectData) => {
-                                const id = actor.id || actor._id;
-                                const res = await fetchWithAuth(`/api/modules/shadowdark/actors/${id}/effects/update`, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify(effectData)
-                                });
-                                const data = await res.json();
-                                if (data.success) fetchActor(id, true);
-                            }}
-                            onAddPredefinedEffect={handleTogglePredefinedEffect}
+                            onCreateEffect={handleCreateEffect}
+                            onUpdateEffect={handleUpdateEffect}
                             onRefresh={async () => { await fetchActor(actor.id || actor._id, true); }}
                         >
                             <ShadowdarkSheet

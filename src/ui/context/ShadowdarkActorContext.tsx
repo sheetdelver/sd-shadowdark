@@ -1,54 +1,73 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { logger } from '@sheet-delver/sdk';
-import { useShadowdarkUI } from './ShadowdarkUIContext';
-import { calculateSpellBonus } from '../sheet-utils';
 import { useSDK } from '@sheet-delver/sdk/react';
 import { useShadowdarkLevelUp } from '../hooks/useShadowdarkLevelUp';
-import { prepareWeaponAttack } from '../../logic/weapon-rules';
+import type { PreparedAction, ActionRequest } from '../../logic/actions';
+import type { ItemControl } from '../../logic/inventory-controls';
 
 /**
- * ShadowdarkActorContext
- * 
- * Centralized state management for the active Shadowdark character.
- * Handles:
- * 1. Actor state synchronization.
- * 2. Drafting system for numeric/text inputs (prevents race conditions).
- * 3. Unified transactional handlers (Rolls, Updates, CRUD).
- * 4. Global saving indicators.
+ * ShadowdarkActorContext — client state for one Actor sheet.
+ *
+ * - Rules come only from the prepared view (`actor.derived`); this context never
+ *   recomputes bonuses, damage or spell abilities.
+ * - Drafts and debounce timers are scoped to the current Actor id and cancelled
+ *   on Actor change/unmount; an immediate write cancels a pending debounce for
+ *   the same path.
+ * - `pending` counts in-flight operations; failures reject, notify and roll back
+ *   optimistic state.
+ * - Actions open the SDK RollDialog with prepared defaults; spells, Class
+ *   Abilities and potions execute through the module action route, guarded
+ *   against duplicate submission.
  */
+export interface ActionResponse {
+    success: boolean;
+    outcome?: { total: number; natural: number | null; success: boolean | null; criticalSuccess: boolean; criticalFailure: boolean } | null;
+    consequences?: Array<{ description: string; status: 'applied' | 'failed'; error?: string }>;
+    pending?: string[];
+    error?: string;
+}
+
+export type CardTarget = { kind: 'item'; itemId: string } | { kind: 'document'; uuid: string };
+
+interface RollDialogState {
+    open: boolean;
+    title: string;
+    type: 'attack' | 'ability' | 'spell';
+    defaults: any;
+    callback: ((options: any) => void) | null;
+}
 
 interface ShadowdarkActorState {
     actor: any | null;
     isSaving: boolean;
-    // Handlers
-    updateActor: (path: string, value: any, options?: { immediate?: boolean }) => Promise<void>;
-    updateItem: (itemData: any, deletedEffectIds?: string[]) => Promise<void>;
-    deleteItem: (itemId: string) => Promise<void>;
-    createItem: (itemData: any) => Promise<void>;
+    pending: number;
+    updateActor: (path: string, value: any, options?: { immediate?: boolean }) => Promise<boolean>;
+    updateItem: (itemId: string, patch: Record<string, unknown>, deletedEffectRefs?: string[]) => Promise<boolean>;
+    deleteItem: (itemId: string) => Promise<boolean>;
+    createItem: (itemData: any) => Promise<boolean>;
     performRoll: (type: string, key: string, options?: any) => Promise<void>;
-    // Active Effects
-    toggleEffect: (effectId: string, enabled: boolean) => Promise<void>;
-    deleteEffect: (effectId: string) => Promise<void>;
-    createEffect: (effectData: any) => Promise<void>;
-    updateEffect: (effectData: any) => Promise<void>;
-    addPredefinedEffect: (effectId: string) => Promise<void>;
-    // Helper to get a value that might be in a "draft" state
+    toggleEffect: (ref: string, enabled: boolean) => Promise<boolean>;
+    deleteEffect: (ref: string) => Promise<boolean>;
+    createEffect: (payload: any) => Promise<boolean>;
+    updateEffect: (ref: string, patch: any) => Promise<boolean>;
     getDraftValue: (path: string, fallback: any) => any;
-    // Roll Dialog
-    rollDialog: {
-        open: boolean;
-        title: string;
-        type: 'attack' | 'ability' | 'spell';
-        defaults: any;
-        callback: ((options: any) => void) | null;
-    };
+    rollDialog: RollDialogState;
+    /** Open the roll flow for a prepared action (dialog, confirmation or direct use). */
+    startAction: (action: PreparedAction, options?: { focus?: boolean; onSettled?: (result: ActionResponse | null) => void }) => void;
+    /** Compatibility: roll dialog for an ability key or an item id. */
     triggerRollDialog: (type: string, key: string, options?: any) => void;
     closeRollDialog: () => void;
-    // Refresh
+    isActionBusy: (actionId: string) => boolean;
+    /** Apply a native inventory control (equip/stash/light) and its side effects. */
+    runItemControl: (control: ItemControl) => Promise<boolean>;
+    pendingConfirmation: { title: string; message: string; onConfirm: () => void } | null;
+    cancelConfirmation: () => void;
     refreshActor: () => Promise<void>;
-    // Level-Up (single shared instance — no redundant hook calls in children)
+    card: CardTarget | null;
+    openCard: (target: CardTarget) => void;
+    closeCard: () => void;
     triggerLevelUp: () => void;
     showLevelUpModal: boolean;
     levelUpData: any;
@@ -57,349 +76,268 @@ interface ShadowdarkActorState {
 
 const ShadowdarkActorContext = createContext<ShadowdarkActorState | undefined>(undefined);
 
-export function ShadowdarkActorProvider({ 
-    children, 
+const noopAsync = async () => {};
+const requestId = () => (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`).replace(/[^\w-]/g, '');
+
+export function ShadowdarkActorProvider({
+    children,
     actor: initialActor,
     onUpdate,
     onDeleteItem,
     onCreateItem,
     onUpdateItem,
     onRoll,
+    onAction,
     onToggleEffect,
     onDeleteEffect,
     onCreateEffect,
     onUpdateEffect,
-    onAddPredefinedEffect,
     onRefresh
-}: { 
-    children: React.ReactNode; 
+}: {
+    children: React.ReactNode;
     actor: any;
     onUpdate: (path: string, value: any) => Promise<void>;
     onDeleteItem: (itemId: string) => Promise<void>;
     onCreateItem: (itemData: any) => Promise<void>;
-    onUpdateItem: (itemData: any, deletedEffectIds?: string[]) => Promise<void>;
+    onUpdateItem: (itemId: string, patch: Record<string, unknown>, deletedEffectRefs?: string[]) => Promise<void>;
     onRoll: (type: string, key: string, options?: any) => Promise<void>;
-    onToggleEffect: (effectId: string, enabled: boolean) => Promise<void>;
-    onDeleteEffect: (effectId: string) => Promise<void>;
-    onCreateEffect: (effectData: any) => Promise<void>;
-    onUpdateEffect: (effectData: any) => Promise<void>;
-    onAddPredefinedEffect: (effectId: string) => Promise<void>;
+    onAction?: (body: any) => Promise<ActionResponse>;
+    onToggleEffect: (ref: string, enabled: boolean) => Promise<void>;
+    onDeleteEffect: (ref: string) => Promise<void>;
+    onCreateEffect: (payload: any) => Promise<void>;
+    onUpdateEffect: (ref: string, patch: any) => Promise<void>;
+    onAddPredefinedEffect?: unknown;
     onRefresh: () => Promise<void>;
 }) {
-    const [actor, setActor] = useState(initialActor);
-    const { resolveName } = useShadowdarkUI();
-    const [isSaving, setIsSaving] = useState(false);
-    const [drafts, setDrafts] = useState<Record<string, any>>({});
-    const [optimisticDeletedIds, setOptimisticDeletedIds] = useState<Set<string>>(new Set());
-
-    // Notifications — used by the level-up hook below
+    const actorId = String(initialActor?.id ?? initialActor?._id ?? '');
     const { addNotification } = useSDK();
+    const [pending, setPending] = useState(0);
+    const [drafts, setDrafts] = useState<{ actorId: string; values: Record<string, any> }>({ actorId, values: {} });
+    const [optimisticDeletedIds, setOptimisticDeletedIds] = useState<Set<string>>(new Set());
+    const [busyActions, setBusyActions] = useState<Set<string>>(new Set());
+    const [card, setCard] = useState<CardTarget | null>(null);
+    const [pendingConfirmation, setPendingConfirmation] = useState<ShadowdarkActorState['pendingConfirmation']>(null);
+    const [rollDialog, setRollDialog] = useState<RollDialogState>({ open: false, title: '', type: 'attack', defaults: {}, callback: null });
+    const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+    const actorIdRef = useRef(actorId);
+    const mounted = useRef(true);
 
-    const [rollDialog, setRollDialog] = useState<{
-        open: boolean;
-        title: string;
-        type: 'attack' | 'ability' | 'spell';
-        defaults: any;
-        callback: ((options: any) => void) | null;
-    }>({
-        open: false,
-        title: '',
-        type: 'attack',
-        defaults: {},
-        callback: null
-    });
-    
-    // Use refs for debouncing to prevent stale closures
-    const updateTimeoutRef = useRef<Record<string, NodeJS.Timeout>>({});
+    useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
 
-    // Sync state when props change (socket updates)
+    // A different Actor discards drafts, timers, optimistic state, dialogs and cards.
     useEffect(() => {
-        setActor(initialActor);
-        
-        // When the server updates, we check if any drafts have been reconciled
-        // If the server value matches the draft value, we can "clear" the draft 
-        // to avoid staying in a stale visual state.
-        setDrafts(prev => {
-            const next = { ...prev };
-            let changed = false;
-            
-            Object.keys(next).forEach(path => {
-                const serverVal = getDeepValue(initialActor, path);
-                if (serverVal === next[path]) {
-                    delete next[path];
-                    changed = true;
-                }
-            });
-            
-            return changed ? next : prev;
-        });
-    }, [initialActor]);
-
-    // Unified Update Handler
-    const updateActor = useCallback(async (path: string, value: any, options: { immediate?: boolean } = {}) => {
-        // Update local draft immediately for UI responsiveness
-        setDrafts(prev => ({ ...prev, [path]: value }));
-        
-        if (options.immediate) {
-            setIsSaving(true);
-            try {
-                await onUpdate(path, value);
-            } catch (err) {
-                logger.error(`[ShadowdarkActorContext] Failed to update ${path}:`, err);
-            } finally {
-                setIsSaving(false);
-            }
-        } else {
-            // Debounced update
-            if (updateTimeoutRef.current[path]) {
-                clearTimeout(updateTimeoutRef.current[path]);
-            }
-            
-            updateTimeoutRef.current[path] = setTimeout(async () => {
-                setIsSaving(true);
-                try {
-                    await onUpdate(path, value);
-                } catch (err) {
-                    logger.error(`[ShadowdarkActorContext] Debounced update failed for ${path}:`, err);
-                } finally {
-                    setIsSaving(false);
-                    delete updateTimeoutRef.current[path];
-                }
-            }, 1000); // 1s debounce for typing
-        }
-    }, [onUpdate]);
-
-    const updateItem = useCallback(async (itemData: any, deletedEffectIds?: string[]) => {
-        setIsSaving(true);
-        try {
-            await onUpdateItem(itemData, deletedEffectIds);
-        } finally {
-            setIsSaving(false);
-        }
-    }, [onUpdateItem]);
-
-    const deleteItem = useCallback(async (itemId: string) => {
-        setIsSaving(true);
-        setOptimisticDeletedIds(prev => new Set(prev).add(itemId));
-        try {
-            await onDeleteItem(itemId);
-        } finally {
-            setIsSaving(false);
-        }
-    }, [onDeleteItem]);
-
-    const createItem = useCallback(async (itemData: any) => {
-        setIsSaving(true);
-        try {
-            await onCreateItem(itemData);
-        } finally {
-            setIsSaving(false);
-        }
-    }, [onCreateItem]);
-
-    const performRoll = useCallback(async (type: string, key: string, options?: any) => {
-        // We don't track isSaving for rolls as they are non-transactional to state
-        await onRoll(type, key, options);
-    }, [onRoll]);
-
-    const toggleEffect = useCallback(async (effectId: string, enabled: boolean) => {
-        setIsSaving(true);
-        try {
-            await onToggleEffect(effectId, enabled);
-        } finally {
-            setIsSaving(false);
-        }
-    }, [onToggleEffect]);
-
-    const deleteEffect = useCallback(async (effectId: string) => {
-        setIsSaving(true);
-        try {
-            await onDeleteEffect(effectId);
-        } finally {
-            setIsSaving(false);
-        }
-    }, [onDeleteEffect]);
-
-    const createEffect = useCallback(async (effectData: any) => {
-        setIsSaving(true);
-        try {
-            await onCreateEffect(effectData);
-        } finally {
-            setIsSaving(false);
-        }
-    }, [onCreateEffect]);
-
-    const updateEffect = useCallback(async (effectData: any) => {
-        setIsSaving(true);
-        try {
-            await onUpdateEffect(effectData);
-        } finally {
-            setIsSaving(false);
-        }
-    }, [onUpdateEffect]);
-
-    const addPredefinedEffect = useCallback(async (effectId: string) => {
-        setIsSaving(true);
-        try {
-            await onAddPredefinedEffect(effectId);
-        } finally {
-            setIsSaving(false);
-        }
-    }, [onAddPredefinedEffect]);
-
-    const refreshActor = useCallback(async () => {
-        setIsSaving(true);
-        try {
-            await onRefresh();
-        } finally {
-            setIsSaving(false);
-        }
-    }, [onRefresh]);
-
-    // Level-Up — single shared instance for the entire sheet tree
-    const { triggerLevelUp, showLevelUpModal, levelUpData, closeLevelUp } =
-        useShadowdarkLevelUp(actor, addNotification as any);
-
-    const getDraftValue = useCallback((path: string, fallback: any) => {
-        return drafts[path] !== undefined ? drafts[path] : fallback;
-    }, [drafts]);
-
-    const closeRollDialog = useCallback(() => {
+        actorIdRef.current = actorId;
+        setDrafts({ actorId, values: {} });
+        setOptimisticDeletedIds(new Set());
+        setCard(null);
         setRollDialog(prev => ({ ...prev, open: false, callback: null }));
+        const active = timers.current;
+        return () => { for (const timer of Object.values(active)) clearTimeout(timer); timers.current = {}; };
+    }, [actorId]);
+
+    // Drop drafts the server now reflects; prune optimistic deletions it confirmed.
+    useEffect(() => {
+        setDrafts(prev => {
+            if (prev.actorId !== actorId) return { actorId, values: {} };
+            const next = { ...prev.values };
+            let changed = false;
+            for (const path of Object.keys(next)) {
+                if (!timers.current[path] && getDeepValue(initialActor, path) === next[path]) { delete next[path]; changed = true; }
+            }
+            return changed ? { actorId, values: next } : prev;
+        });
+        setOptimisticDeletedIds(prev => {
+            if (!prev.size) return prev;
+            const present = new Set((initialActor?.items ?? []).map((item: any) => String(item.id ?? item._id)));
+            const next = new Set([...prev].filter(id => present.has(id)));
+            return next.size === prev.size ? prev : next;
+        });
+    }, [initialActor, actorId]);
+
+    const track = useCallback(async <T,>(label: string, run: () => Promise<T>): Promise<{ ok: true; value: T } | { ok: false }> => {
+        setPending(count => count + 1);
+        try {
+            return { ok: true, value: await run() };
+        } catch (error) {
+            logger.error(`[ShadowdarkActorContext] ${label} failed:`, error);
+            if (mounted.current) addNotification(`${label} failed: ${(error as Error)?.message ?? 'Unknown error'}`, 'error');
+            return { ok: false };
+        } finally {
+            if (mounted.current) setPending(count => Math.max(0, count - 1));
+        }
+    }, [addNotification]);
+
+    const clearDraft = useCallback((path: string) => {
+        setDrafts(prev => {
+            if (!(path in prev.values)) return prev;
+            const next = { ...prev.values };
+            delete next[path];
+            return { ...prev, values: next };
+        });
     }, []);
 
-    const triggerRollDialog = useCallback((type: string, key: string, options: any = {}) => {
-        let dialogType: 'attack' | 'ability' | 'spell' = 'attack';
-        let title = '';
-        const defaults: any = {};
-
-        if (options.handedness) defaults.handedness = options.handedness;
-
-        if (type === 'ability') {
-            dialogType = 'ability';
-            title = `${key.toUpperCase().replace('ABILITY', '')} Ability Check`;
-            const stat = actor.stats?.[key] || {};
-            defaults.abilityBonus = stat.mod || 0;
-        } else if (type === 'item') {
-            let item = actor.items?.find((i: any) => i.id === key || i._id === key);
-
-            // Fallback: Look in systemData (Compendium) for spells using centralized resolver
-            if (!item) {
-                const name = resolveName(key, 'spells');
-                if (name && name !== key) {
-                    // We found something! It's a "virtual" spell not on the actor
-                    item = { 
-                        name,
-                        uuid: key,
-                        type: 'Spell',
-                        system: { description: '' } 
-                    };
-                }
-            }
-
-            if (item) {
-                const itemRef = item.id || item._id;
-                const isVirtual = !actor.items?.some((i: any) => i.id === itemRef || i._id === itemRef);
-                if (isVirtual) {
-                    defaults.itemData = item;
-                }
-
-                if (item.type === 'Spell') {
-                    dialogType = 'spell';
-                    title = `Cast Spell: ${item.name}`;
-                    
-                    const getAbilityForClass = (classes: string[] | string) => {
-                        const classArray = Array.isArray(classes) ? classes : [classes];
-                        const classNames = classArray.map(c => c?.toLowerCase() || "");
-
-                        const possibleAbilities: string[] = [];
-                        if (classNames.some(c => c.includes('wizard'))) possibleAbilities.push('int');
-                        if (classNames.some(c => c.includes('priest') || c.includes('druid') || c.includes('seer'))) possibleAbilities.push('wis');
-                        if (classNames.some(c => c.includes('bard') || c.includes('warlock') || c.includes('witch'))) possibleAbilities.push('cha');
-
-                        if (possibleAbilities.length === 0) return null;
-
-                        const actorAbility = actor.computed?.spellcastingAbility?.toLowerCase();
-                        if (actorAbility && possibleAbilities.includes(actorAbility)) return actorAbility;
-
-                        return possibleAbilities[0];
-                    };
-
-                    const spellClass = item.system?.class || item.class;
-                    const classAbility = spellClass ? getAbilityForClass(spellClass) : null;
-                    const statKey = item.system?.ability || classAbility || actor.computed?.spellcastingAbility || 'int';
-
-                    const stat = actor.stats?.[statKey.toLowerCase()] || {};
-                    defaults.abilityBonus = stat.mod || 0;
-
-                    const spellBonus = calculateSpellBonus(actor, item);
-                    defaults.talentBonus = spellBonus.bonus;
-
-                    defaults.showItemBonus = false;
-                } else {
-                    dialogType = 'attack';
-                    title = `Roll Attack with ${item.name}`;
-                    const attack = prepareWeaponAttack(actor, item, options);
-                    defaults.abilityBonus = attack.abilityBonus;
-                    defaults.itemBonus = attack.itemBonus;
-                    defaults.talentBonus = attack.talentBonus;
-                    defaults.attackType = attack.attackType;
-                    defaults.handedness = attack.handedness;
-                }
-            }
-        }
-
-        setRollDialog({
-            open: true,
-            title,
-            type: dialogType,
-            defaults,
-            callback: (rollOptions) => {
-                const finalOptions = { ...rollOptions };
-                if (defaults.itemData) finalOptions.itemData = defaults.itemData;
-                if (defaults.handedness) finalOptions.handedness = defaults.handedness;
-                if (defaults.attackType) finalOptions.attackType = defaults.attackType;
-                performRoll(type, key, finalOptions);
-                closeRollDialog();
-            }
-        });
-    }, [actor, resolveName, performRoll, closeRollDialog]);
-
-    // Filter optimistically deleted items to ensure immediate frontend reactivity
-    // independent of network latency or stale responses
-    const computedActor = React.useMemo(() => {
-        if (!actor) return null;
-        if (optimisticDeletedIds.size === 0) return actor;
-        
-        return {
-            ...actor,
-            items: (actor.items || []).filter((i: any) => !optimisticDeletedIds.has(i.id) && !optimisticDeletedIds.has(i._id))
+    const updateActor = useCallback(async (path: string, value: any, options: { immediate?: boolean } = {}) => {
+        const owner = actorIdRef.current;
+        setDrafts(prev => ({ actorId: owner, values: { ...(prev.actorId === owner ? prev.values : {}), [path]: value } }));
+        if (timers.current[path]) { clearTimeout(timers.current[path]); delete timers.current[path]; }
+        const write = async () => {
+            if (actorIdRef.current !== owner) return false;
+            const result = await track('Update', () => onUpdate(path, value));
+            if (!result.ok) clearDraft(path);
+            return result.ok;
         };
-    }, [actor, optimisticDeletedIds]);
+        if (options.immediate) return write();
+        return new Promise<boolean>(resolve => {
+            timers.current[path] = setTimeout(() => { delete timers.current[path]; write().then(resolve); }, 800);
+        });
+    }, [onUpdate, track, clearDraft]);
 
-    const value = {
+    const updateItem = useCallback(async (itemId: string, patch: Record<string, unknown>, deletedEffectRefs: string[] = []) =>
+        (await track('Item update', () => onUpdateItem(itemId, patch, deletedEffectRefs))).ok, [onUpdateItem, track]);
+
+    const deleteItem = useCallback(async (itemId: string) => {
+        setOptimisticDeletedIds(prev => new Set(prev).add(itemId));
+        const result = await track('Delete', () => onDeleteItem(itemId));
+        if (!result.ok) setOptimisticDeletedIds(prev => { const next = new Set(prev); next.delete(itemId); return next; });
+        return result.ok;
+    }, [onDeleteItem, track]);
+
+    const createItem = useCallback(async (itemData: any) => (await track('Create', () => onCreateItem(itemData))).ok, [onCreateItem, track]);
+    const toggleEffect = useCallback(async (ref: string, enabled: boolean) => (await track('Effect toggle', () => onToggleEffect(ref, enabled))).ok, [onToggleEffect, track]);
+    const deleteEffect = useCallback(async (ref: string) => (await track('Effect delete', () => onDeleteEffect(ref))).ok, [onDeleteEffect, track]);
+    const createEffect = useCallback(async (payload: any) => (await track('Effect create', () => onCreateEffect(payload))).ok, [onCreateEffect, track]);
+    const updateEffect = useCallback(async (ref: string, patch: any) => (await track('Effect update', () => onUpdateEffect(ref, patch))).ok, [onUpdateEffect, track]);
+    const refreshActor = useCallback(async () => { await track('Refresh', onRefresh); }, [onRefresh, track]);
+    const performRoll = useCallback(async (type: string, key: string, options?: any) => { await onRoll(type, key, options); }, [onRoll]);
+
+    const { triggerLevelUp, showLevelUpModal, levelUpData, closeLevelUp } = useShadowdarkLevelUp(initialActor, addNotification as any);
+
+    const getDraftValue = useCallback((path: string, fallback: any) =>
+        drafts.actorId === actorId && drafts.values[path] !== undefined ? drafts.values[path] : fallback, [drafts, actorId]);
+
+    const closeRollDialog = useCallback(() => setRollDialog(prev => ({ ...prev, open: false, callback: null })), []);
+    const isActionBusy = useCallback((id: string) => busyActions.has(id), [busyActions]);
+
+    // The item's own write goes first and stops the sequence on failure; native
+    // side effects on other items follow, and a partial result is reported.
+    const runItemControl = useCallback(async (control: ItemControl) => {
+        const [own, ...others] = control.writes;
+        const key = `control:${own?.itemId}:${control.id}`;
+        if (!own || busyActions.has(key)) return false;
+        setBusyActions(prev => new Set(prev).add(key));
+        try {
+            if (!(await updateItem(own.itemId, own.patch))) return false;
+            let failed = 0;
+            for (const write of others) if (!(await updateItem(write.itemId, write.patch))) failed++;
+            if (failed && mounted.current) addNotification(`${control.label}: done, but ${failed} related item update(s) failed.`, 'error');
+            return failed === 0;
+        } finally {
+            if (mounted.current) setBusyActions(prev => { const next = new Set(prev); next.delete(key); return next; });
+        }
+    }, [busyActions, updateItem, addNotification]);
+
+    const runAction = useCallback(async (action: PreparedAction, body: Record<string, unknown>, onSettled?: (result: ActionResponse | null) => void) => {
+        if (busyActions.has(action.id) || !onAction) { onSettled?.(null); return; }
+        const owner = actorIdRef.current;
+        setBusyActions(prev => new Set(prev).add(action.id));
+        const result = await track(action.label, () => onAction({ requestId: requestId(), kind: action.kind, itemId: action.itemId,
+            spellIndex: action.spell?.index ?? undefined, ...body }));
+        if (mounted.current) setBusyActions(prev => { const next = new Set(prev); next.delete(action.id); return next; });
+        if (!result.ok || actorIdRef.current !== owner) { onSettled?.(null); return; }
+        const response = result.value;
+        const failed = (response.consequences ?? []).filter(entry => entry.status === 'failed');
+        if (failed.length || response.pending?.length) {
+            addNotification(`${action.label}: rolled, but not every result was saved (${[...failed.map(entry => `${entry.description} ${entry.error ?? ''}`), ...(response.pending ?? [])].join('; ')}).`, 'error');
+        }
+        onSettled?.(response);
+    }, [busyActions, onAction, track, addNotification]);
+
+    /** RollDialog values are overrides only where the user changed a default. */
+    const changedOverrides = (defaults: any, options: any) => {
+        const overrides: Record<string, unknown> = {};
+        for (const key of ['abilityBonus', 'itemBonus', 'talentBonus'] as const) {
+            if (options?.[key] !== undefined && Number(options[key]) !== Number(defaults?.[key] ?? 0)) overrides[key] = Number(options[key]);
+        }
+        if (options?.advantageMode && options.advantageMode !== defaults?.advantageMode) overrides.advantageMode = options.advantageMode;
+        if (options?.manualValue !== undefined && options.manualValue !== null) overrides.manualValue = Number(options.manualValue);
+        return overrides;
+    };
+
+    const startAction = useCallback((action: PreparedAction, options: { focus?: boolean; onSettled?: (result: ActionResponse | null) => void } = {}) => {
+        if (!action.available) {
+            addNotification(action.reason ?? `${action.label} is unavailable.`, 'error');
+            options.onSettled?.(null);
+            return;
+        }
+        if (busyActions.has(action.id)) return;
+        if (action.kind === 'potion' || (action.kind === 'ability' && action.dc === null)) {
+            setPendingConfirmation({
+                title: action.label,
+                message: action.consequences.map(entry => entry.description).join(' ') || `${action.label}?`,
+                onConfirm: () => { setPendingConfirmation(null); runAction(action, {}, options.onSettled); },
+            });
+            return;
+        }
+        const defaults = {
+            abilityBonus: action.abilityBonus, itemBonus: action.itemBonus, talentBonus: action.talentBonus,
+            showItemBonus: action.kind === 'attack',
+            advantageMode: action.advantage > 0 ? 'advantage' : action.advantage < 0 ? 'disadvantage' : 'normal',
+        };
+        const dialogType = action.kind === 'spell' ? 'spell' : action.kind === 'check' || action.kind === 'ability' ? 'ability' : 'attack';
+        setRollDialog({
+            open: true, title: action.label, type: dialogType, defaults,
+            callback: (rollOptions: any) => {
+                const overrides = changedOverrides(defaults, rollOptions);
+                closeRollDialog();
+                if (action.kind === 'attack' || action.kind === 'check') {
+                    const type = action.kind === 'check' ? 'ability' : 'item';
+                    const key = action.kind === 'check' ? String(action.request.stat) : String(action.itemId);
+                    performRoll(type, key, { ...overrides, attackType: action.request.attackType, handedness: action.request.handedness })
+                        .then(() => options.onSettled?.({ success: true }));
+                    return;
+                }
+                runAction(action, { overrides, focus: options.focus === true }, options.onSettled);
+            },
+        });
+    }, [busyActions, addNotification, closeRollDialog, performRoll, runAction]);
+
+    const triggerRollDialog = useCallback((type: string, key: string, options: any = {}) => {
+        const actions: PreparedAction[] = initialActor?.derived?.actions ?? [];
+        const action = type === 'ability'
+            ? actions.find(entry => entry.kind === 'check' && entry.request.stat === key)
+            : actions.find(entry => entry.itemId === key && (!options.attackType || entry.attack?.type === options.attackType));
+        if (!action) {
+            addNotification('That action is not available from the prepared character data.', 'error');
+            return;
+        }
+        startAction(action);
+    }, [initialActor, startAction, addNotification]);
+
+    const computedActor = useMemo(() => {
+        if (!initialActor || optimisticDeletedIds.size === 0) return initialActor;
+        const keep = (id: unknown) => !optimisticDeletedIds.has(String(id));
+        const derived = initialActor.derived ? {
+            ...initialActor.derived,
+            items: (initialActor.derived.items ?? []).filter((view: any) => keep(view.id)),
+            actions: (initialActor.derived.actions ?? []).filter((action: any) => !action.itemId || keep(action.itemId)),
+            attacks: {
+                melee: (initialActor.derived.attacks?.melee ?? []).filter((row: any) => keep(row.id)),
+                ranged: (initialActor.derived.attacks?.ranged ?? []).filter((row: any) => keep(row.id)),
+            },
+        } : initialActor.derived;
+        return { ...initialActor, items: (initialActor.items || []).filter((item: any) => keep(item.id ?? item._id)), derived, computed: derived };
+    }, [initialActor, optimisticDeletedIds]);
+
+    const value: ShadowdarkActorState = {
         actor: computedActor,
-        isSaving,
-        updateActor,
-        updateItem,
-        deleteItem,
-        createItem,
-        performRoll,
-        getDraftValue,
-        toggleEffect,
-        deleteEffect,
-        createEffect,
-        updateEffect,
-        addPredefinedEffect,
-        refreshActor,
-        // Level-Up shared state
-        triggerLevelUp,
-        showLevelUpModal,
-        levelUpData,
-        closeLevelUp,
-        rollDialog,
-        triggerRollDialog,
-        closeRollDialog
+        isSaving: pending > 0,
+        pending,
+        updateActor, updateItem, deleteItem, createItem, performRoll,
+        getDraftValue, toggleEffect, deleteEffect, createEffect, updateEffect, refreshActor,
+        triggerLevelUp, showLevelUpModal, levelUpData, closeLevelUp,
+        rollDialog, startAction, triggerRollDialog, closeRollDialog, isActionBusy, runItemControl,
+        pendingConfirmation, cancelConfirmation: () => setPendingConfirmation(null),
+        card, openCard: setCard, closeCard: () => setCard(null),
     };
 
     return (
@@ -416,6 +354,14 @@ export function useShadowdarkActor() {
     }
     return context;
 }
+
+/** Prepared actions for an owned item (shared by both layouts and cards). */
+export function actionsForItem(actor: any, itemId: string): PreparedAction[] {
+    return (actor?.derived?.actions ?? []).filter((action: PreparedAction) => action.itemId === itemId);
+}
+
+export type { PreparedAction, ActionRequest };
+export { noopAsync };
 
 // Utility to get deep nested values by string path (e.g. "system.attributes.hp.value")
 function getDeepValue(obj: any, path: string) {

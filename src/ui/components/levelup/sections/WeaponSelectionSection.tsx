@@ -1,5 +1,5 @@
 import { Swords } from 'lucide-react';
-import { MASTERY_WEAPONS } from '../../../../logic/talent-choices';
+import { useChoiceCatalog } from '../../../hooks/useChoiceCatalog';
 
 interface WeaponSelectionSectionProps {
     required: number;
@@ -7,14 +7,16 @@ interface WeaponSelectionSectionProps {
     onSelectionChange: (selected: string[]) => void;
 }
 
-const WEAPONS = MASTERY_WEAPONS;
 
 export const WeaponSelectionSection: React.FC<WeaponSelectionSectionProps> = ({
     required,
     selected,
     onSelectionChange
 }) => {
+    const catalog = useChoiceCatalog();
     if (required <= 0) return null;
+    // Native options from declared packs; selections are stored by option name.
+    const WEAPONS: string[] | null = catalog ? (catalog.weapon ?? []).map(option => option.name) : null;
 
     const toggleWeapon = (weapon: string) => {
         if (selected.includes(weapon)) {
@@ -44,7 +46,9 @@ export const WeaponSelectionSection: React.FC<WeaponSelectionSectionProps> = ({
             </p>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {WEAPONS.map(weapon => {
+                {WEAPONS === null && <p role="status" className="col-span-full italic">Loading options…</p>}
+                {WEAPONS?.length === 0 && <p role="alert" className="col-span-full text-red-800">No weapon options are available from declared Shadowdark data.</p>}
+                {(WEAPONS ?? []).map(weapon => {
                     const isSelected = selected.includes(weapon);
                     const isDisabled = !isSelected && selected.length >= required;
 

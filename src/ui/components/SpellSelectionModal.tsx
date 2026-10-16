@@ -1,7 +1,8 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { X, Search, Check, ChevronDown, ChevronUp } from 'lucide-react';
-import { resolveImage, formatDescription, getSafeDescription } from '../sheet-utils';
+import { presentDescription } from '../../logic/description';
+import { canonicalUuid } from '../../logic/identity';
 import { useSDK } from '@sheet-delver/sdk/react';
 import { logger } from '@sheet-delver/sdk';
 import { useShadowdarkUI } from '../context/ShadowdarkUIContext';
@@ -22,7 +23,9 @@ interface SpellSelectionModalProps {
     onSave: (selected: SpellOption[]) => void;
     title: string;
     tier?: number;
-    classKey?: string;
+    /** Exact Class UUID whose spell list is offered. */
+    classUuid?: string;
+    /** Owned spells: source UUID (for matching) and whether they are innate. */
     knownSpells: SpellOption[];
     maxSelections?: number;
     isSaving?: boolean;
@@ -35,7 +38,7 @@ export default function SpellSelectionModal({
     onSave,
     title,
     tier,
-    classKey,
+    classUuid,
     knownSpells,
     maxSelections,
     isSaving = false,
@@ -53,53 +56,20 @@ export default function SpellSelectionModal({
     const [hasInitialized, setHasInitialized] = useState(false);
     const [initialKnownUuids, setInitialKnownUuids] = useState<Set<string>>(new Set());
 
-    const freeSpellUuids = useMemo(() => {
-        return new Set<string>(actor?.computed?.freeSpellUuids || []);
-    }, [actor?.computed?.freeSpellUuids]);
-
+    // Spells whose system.class contains this exact class UUID (fetch-pack rows keep
+    // canonical references); no class-name substring or terminal-ID matching.
     const availableSpells = useMemo(() => {
         const fullSpells = collections?.spells || systemData?.spells || [];
-        if (!tier || !classKey) return [];
-        
-        const filterLower = classKey.toLowerCase();
-        const classList = collections?.classes || systemData?.classes || [];
-
-        return fullSpells.filter((s: any) => {
-            const spellTier = Number(s.tier !== undefined ? s.tier : s.system?.tier);
-            if (spellTier !== tier) return false;
-
-            const classData = s.class || s.system?.class || [];
-            const classArray = Array.isArray(classData) ? classData : [classData];
-
-            const resolvedClasses = classArray.map(c => {
-                if (typeof c !== 'string') return '';
-                const lowerC = c.toLowerCase();
-                if (!c.includes('.') && !c.includes('Compendium')) return lowerC;
-
-                const match = classList.find((cls: any) =>
-                    cls.uuid === c || cls._id === c || cls.id === c || c.endsWith(cls._id || cls.id)
-                );
-                return match ? match.name.toLowerCase() : lowerC;
-            });
-
-            return resolvedClasses.some(c => c.includes(filterLower));
-        }).map((s: any) => {
-            const uuid = s.uuid || s._id;
-            const isInnate = !!s.isInnate || 
-                freeSpellUuids.has(uuid) || 
-                (typeof uuid === 'string' && Array.from(freeSpellUuids).some(id => uuid.endsWith(id)));
-
-            return {
-                name: s.name,
-                uuid: uuid,
-                tier: tier,
-                img: s.img,
-                description: s.description || s.system?.description?.value || s.system?.description,
-                system: s.system,
-                isInnate: isInnate
-            };
-        });
-    }, [systemData, collections, tier, classKey, freeSpellUuids]);
+        const target = canonicalUuid(classUuid);
+        if (!tier || !target) return [];
+        const innate = new Set(knownSpells.filter(spell => (spell as any).isInnate).map(spell => spell.uuid));
+        return fullSpells.filter((s: any) => Number(s.system?.tier ?? s.tier) === tier
+            && (Array.isArray(s.system?.class) ? s.system.class : []).some((value: unknown) => canonicalUuid(value) === target))
+            .map((s: any) => ({
+                name: s.name, uuid: canonicalUuid(s.uuid) ?? s.uuid, tier, img: s.img,
+                description: s.system?.description, system: s.system, isInnate: innate.has(canonicalUuid(s.uuid) ?? ''),
+            }));
+    }, [systemData, collections, tier, classUuid, knownSpells]);
 
     const toggleExpand = (spell: SpellOption) => {
         if (isSaving) return;
@@ -116,12 +86,10 @@ export default function SpellSelectionModal({
     useEffect(() => {
         if (isOpen && !hasInitialized) {
             const initialSet = new Set<string>();
-            // Use names to match as UUIDs might differ between compendiums and actors
-            const knownNames = new Set(knownSpells.map(s => s.name));
-            availableSpells.forEach(s => {
-                if (knownNames.has(s.name)) {
-                    initialSet.add(s.uuid);
-                }
+            // Owned spells match by their recorded source identity only.
+            const knownSources = new Set(knownSpells.map(s => s.uuid).filter(Boolean));
+            availableSpells.forEach((s: any) => {
+                if (knownSources.has(s.uuid)) initialSet.add(s.uuid);
             });
             setSelectedUuids(initialSet);
             setInitialKnownUuids(new Set(initialSet));
@@ -161,13 +129,10 @@ export default function SpellSelectionModal({
     const innateUuids = useMemo(() => {
         const set = new Set<string>();
         availableSpells.forEach(s => {
-            const isInnate = (s as any).isInnate || 
-                (s as any).computed?.isInnate || 
-                Array.from(freeSpellUuids).some(id => s.uuid === id || (typeof s.uuid === 'string' && s.uuid.endsWith(id)));
-            if (isInnate) set.add(s.uuid);
+            if ((s as any).isInnate) set.add(s.uuid);
         });
         return set;
-    }, [availableSpells, freeSpellUuids]);
+    }, [availableSpells]);
 
     const selectableCount = useMemo(() => {
         let count = 0;
@@ -256,9 +221,7 @@ export default function SpellSelectionModal({
                             const description = spell.description || fetched?.description;
                             const isLoading = loadingUuids.has(spell.uuid);
 
-                            const isInnate = (spell as any).isInnate || 
-                                (spell as any).computed?.isInnate || 
-                                Array.from(freeSpellUuids).some(id => spell.uuid === id || (typeof spell.uuid === 'string' && spell.uuid.endsWith(id)));
+                            const isInnate = innateUuids.has(spell.uuid);
                             const isPreExisting = initialKnownUuids.has(spell.uuid);
 
                             // Only lock innate spells; pre-existing known spells can be swapped
@@ -338,7 +301,7 @@ export default function SpellSelectionModal({
 
                                                 <div className="text-sm font-serif leading-relaxed text-neutral-800 prose prose-sm max-w-none">
                                                     {description ? (
-                                                        <div dangerouslySetInnerHTML={{ __html: formatDescription(description) }} />
+                                                        <div dangerouslySetInnerHTML={{ __html: presentDescription(description) }} />
                                                     ) : (
                                                         <span className="italic text-neutral-400">No description available.</span>
                                                     )}

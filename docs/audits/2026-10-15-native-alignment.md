@@ -1,10 +1,12 @@
 # Shadowdark native alignment audit — October 15, 2026
 
-Status: **Review complete for the static/offline scope; corrections proposed, not implemented.**
+Status: **Review complete; module corrections implemented with offline evidence
+(see [implementation dispositions](#implementation-dispositions)); native/operator
+acceptance pending.**
 Implementation plan: [Shadowdark ADR-0001](../adr/0001-native-alignment-and-resource-cards.md).
 This is the module-owned technical evidence record. Its findings are independent
-of the completed ADR-0063 closeout. No application code, versions or Foundry data
-changed during this review.
+of the completed ADR-0063 closeout. The review itself changed no application code,
+versions or Foundry data; the later implementation is recorded at the end.
 
 The selected implementation scope is module-only. Core-owned findings remain
 external dependencies, as defined in the ADR's ownership section. Module
@@ -524,3 +526,270 @@ Primary native project: [foundryvtt-shadowdark](https://github.com/Muttley/found
 Local snapshots establish the inspected versions; a moving upstream branch is
 not a substitute for these fingerprints. Native browser/operator comparison is
 still pending and must be recorded separately from these source-derived oracles.
+
+## Implementation dispositions
+
+Recorded on module branch `fix/adr-0001-native-alignment` (from `e95fc47`, module
+0.9.4, changes uncommitted for review) against Core 0.18.1 at `ff65695` (the
+review inspected `8c43170`; the SDK surface used by this module is unchanged
+since `v0.18.0`, the CI pin). Native authority throughout: tag `release-4.0.6`,
+commit `9677d16b3903b3b640f00d4efd48249142ac8334`; the five fingerprints above were
+rechecked and match.
+
+"Fixed (offline)" means a failing case on the unchanged code now passes against
+a source-derived oracle. It is **not** native/operator acceptance, which remains
+pending for every finding. Evidence: **NA** `src/tests/native-alignment.test.ts`,
+**BD** `src/tests/boundaries.test.ts`, **BR** the isolated browser run below.
+Paths are relative to `src/` unless noted.
+
+| ID | Disposition | Changed paths | Native authority | Failing → passing evidence | Remaining limitation |
+| --- | --- | --- | --- | --- | --- |
+| SD01-01 | Fixed (offline) | `logic/effects.ts`, `logic/foundry.ts`, `logic/formula.ts`, `logic/roll-keys.ts`, `logic/actor-preparation.ts`, `logic/weapon-rules.ts` | `ActiveEffectSD.mjs`, `_ActorBaseSD._getActiveEffectKeys`, `dice.resolveFormula`; Foundry 14 `BaseActiveEffect.migrateData`, `applyActiveEffects` phases | NA A01-01 (6 surfaces `-1 d8` → `+0 d8+1`), SD01-01 class ADD and HP formula; BD suppression/transfer/situational/phase/priority/selector cases | Duration expiry and custom (hook) change types are reported, not applied. |
+| SD01-02 | Fixed (offline) | `logic/talent-choices.ts`, `logic/talent-handlers.ts`, `server/api/effects.ts`, `ui/components/AddEffectsModal.tsx`, `ui/components/CustomBoonModal.tsx`, `data/native-predefined-effects.ts` | `config.mjs` PREDEFINED_EFFECTS; Foundry 14 change types/modes | NA v14 REPLACEME replaced and unresolved placeholder blocks; BD owner refs, lossless edit, no-op save, legacy mode labels | Two native predefined entries are unusable as shipped and are refused with reasons. |
+| SD01-03 | Fixed (offline) | `logic/actor-preparation.ts`, `info.json` combat paths | `PlayerSD` attributeModel/migrateData, `NpcSD` | NA NPC DEX +3, Player score 0 → -4, 24 → +4, HP formula | — |
+| SD01-04 | Fixed (offline) | `logic/actor-preparation.ts` | `PlayerSD.prepareDerivedData`, `ArmorSD` | NA shield AC 15, base 15 + DEX AC 18, order independence 16, slots 10 + max(0, STR − 10) | Native free-carry/gem bag aggregation is matched for fixtures only. |
+| SD01-05 | Module consumers fixed; **Core rewrite external** | `logic/identity.ts`, `logic/prepared-view.ts`, `logic/normalization.ts`, `ui/DetailsTab.tsx`, `ui/pages/ActorPage.tsx` | — (identity contract) | NA canonical mastery source survives `hostActorProjection` (a replica of Core's rewrite) | See external dependencies: raw reference strings in the Actor detail response are still replaced by names. |
+| SD01-06 | Fixed (offline) | `server/api/document.ts`, `server/api/effects.ts`, `server/api/spells.ts`, `server/api/level-up.ts`, `server/api/actions.ts`, `server/api/bestiary.ts`, `server/ShadowdarkAdapter.ts` | Core caller runtime policy (ADR-0038) | NA denied world read now 404; BD caller projection, privileged-then-denied, denied Actor effects | Uses Core's projection; journal/whisper behavior is Core-owned. |
+| SD01-07 | Fixed (offline) | `server/Registry.ts`, `logic/identity.ts`, `ui/context/ShadowdarkUIContext.tsx` | Declared packs in `info.json` | NA cross-pack terminal ID no longer substituted; BD stale-load guard, alias only within declared pack, same-name ambiguity | The table-pattern map remains a module convenience over exact table UUIDs. |
+| SD01-08 | Fixed (offline) for implemented actions | `logic/actions.ts`, `server/api/actions.ts`, `server/ShadowdarkAdapter.ts`, `ui/SpellsTab.tsx`, `ui/components/ResourceDetailModal.tsx` | `PlayerSD.castSpell/useAbility/usePotion`, `NpcSD.castSpell`, `_getSpellcastingAbility` | BD SD01-08 and C4 (spell loss, scroll, wand break, limited uses, potion, replay); NA attack modes (Melee/Thrown and Versatile grips labelled distinctly, shield blocks the two-handed grip, server refuses absent modes): 6 red on the pre-fix logic → green; sheets omit unavailable modes while the card explains them (red without the filter) | Luck spend, rest/recovery, ammunition and damage auto-roll are not implemented; each is explicit. |
+| SD01-09 | Fixed (offline) | `server/api/spells.ts`, `server/api/level-up.ts`, `server/api/level-up-engine.ts`, `server/importer.ts`, `server/api/import.ts`, `ui/components/ShadowdarkImportForm.tsx`, `ui/tools/Generator.tsx`, `utils/TableService.ts`, `utils/Sanitizer.ts` | Native class spell lists, item types | BD learn rejects non-Spell, level-up ignores client class objects, import needs confirmation | Extra-spell tier is not limited (no native rule found). |
+| SD01-10 | Fixed (offline) | `logic/prepared-view.ts`, `logic/rules.ts`, `ui/*Tab.tsx`, `ui/ShadowdarkPaperSheet.tsx`, `ui/sheet-utils.ts` | — | NA paper/advanced render the prepared rows | `computed` remains an alias of `derived`, not a second computation. |
+| SD01-11 | Fixed (offline) | `logic/prepared-view.ts`, `logic/effects.ts`, `ui/EffectsTab.tsx`, `ui/InventoryComponents.tsx` | Foundry `allApplicableEffects` | NA `_id`-only item id and Actor-only effect; BD same id on Actor and Item listed once each | — |
+| SD01-12 | Fixed (offline) | `ui/context/ShadowdarkActorContext.tsx`, `ui/pages/ActorPage.tsx`, `ui/InventoryTab.tsx` | — | BR debounced edits, Actor switch cancels pending write, failed delete rollback | Reconnect/world switch with a live host is untested. |
+| SD01-13 | Fixed (offline) | `logic/description.ts`, `logic/resource-cards.ts`, UI HTML sinks | SDK `processHtmlContent` | BD cards omit alternate identification; description sanitized without rewriting source | — |
+| SD01-14 | Fixed (offline) | `ui/ShadowdarkPaperSheet.tsx`, `ui/components/LuckControl.tsx`, `ui/components/ResourceDetailModal.tsx` | — | BR 8 attack rows, spell → card → Cast, keyboard; item cards keep equip/stash/light/quantity (`ui/components/ItemStateControls.tsx`, `logic/inventory-controls.ts`; red: BR "card keeps Unequip" on the pre-fix card) | Luck shows both native fields because the Pulp setting is unreadable. |
+| SD01-15 | Partially verified | `ui/ShadowdarkSheet.tsx`, `ui/components/ModuleDialog.tsx`, tabs/modals | — | BR all tabs at 360/390/768/1280, short height, 200% zoom | Core HUD/tray/safe-area overlap not rendered offline (Core-owned). |
+| SD01-16 | Fixed (offline) | `info.json` (`shadowdark.monsters`), `server/api/bestiary.ts`, `server/api/collections.ts`, `ui/tools/Bestiary.tsx`, `module/ui.tsx` | Native `monsters` pack metadata | BD GM-only compendium list, NPC card fields; BR bestiary | Compendium monsters are GM-only (no pack ownership in the SDK). |
+| SD01-17 | Fixed (offline) | `tests/native-alignment.test.ts`, `tests/boundaries.test.ts`, `tests/fixtures/native-406.ts`, updated `tests/weapon-rules.test.ts`, `tests/fixtures/weapon-cases.ts`, `tests/prepared-actor.test.ts`, `tests/presentation.test.ts`, `.github/workflows/ci-shadowdark.yaml` | Native pack source oracle | NA 9/30 on unchanged code → 30/30 | Fixture totals are not native parity. |
+
+### External dependencies and blocked cases
+
+- **SD01-05 (Core).** `ActorService` replaces every string that *starts with*
+  `Compendium.` and matches a declared pack index entry with that entry's name,
+  recursively over the Actor detail response. Module views avoid it by carrying
+  structured references. Still affected in the client: `system.class`,
+  `ancestry`, `background`, `deity`, `patron`, `languages[]`; item
+  `system.properties[]`; spell `system.class[]`; scroll `system.spellUuid`; wand
+  `system.spells[].uuid`; `flags.core.sourceId` and `_stats.compendiumSource`.
+  Embedded `@UUID[...]` enrichers in descriptions are not affected. Consequence:
+  sheet editors send diff patches and never echo those fields; server actions
+  re-read source through the caller. Client-side identity comparison of these raw
+  fields (part of A01-06) is blocked. Proposed Core fix: stop rewriting source
+  fields or add a separate label map, after a consumer inventory.
+- **System settings (SDK contract).** `shadowdark.usePulpMode` and
+  `shadowdark.autoConsumeAmmunition` cannot be read by modules; see the research
+  note below. Until then the module uses the native defaults through one seam
+  (`logic/world-settings.ts`): luck shows the standard token only (Pulp off), and
+  ammunition is never consumed (stated on the attack).
+- **Compendium ownership (SDK contract).** Pack permission configuration is not
+  exposed, so compendium monsters are offered to GMs only.
+- **Core layout (C8).** HUD, floating tray and safe-area insets were not
+  rendered; overlap checks need a host render.
+
+### Effect conformance audit (October 16, 2026)
+
+Trigger: a user saw a character with CON 9 and an "Ability Score Improvement
+(Con) +2" stay at 9, and some casters with no casting class.
+
+**Native data.** The pinned 4.0.6 packs use 59 distinct effect keys on effects
+their parents actually list. Every one has a known consumer:
+
+| Use | Keys |
+| --- | --- |
+| Actor data | 15 |
+| Roll-key selectors | 37 |
+| Choice templates (`REPLACEME`) | 5 |
+| Native no-ops | 2 |
+
+- The two native no-ops: `system.roll.dex.advantage` (Stone Skin Advantage on
+  Hide) has no native reader, and `system.attributes.ac.all` (Dire Wolf) is
+  excluded for armor items.
+- The 14 pre-4.0 effects (`system.bonuses.*`, `wis.base`) in the packs are
+  orphaned files that their parent items do not list, so Foundry never loads
+  them.
+- The module's roll-key bases equal native's 18 `_getActiveEffectKeys` bases
+  exactly.
+- A representative native effect for each family gave native-expected results in
+  both serialized shapes: abilities, AC (armor/mastery/unarmored/value), HP,
+  slots, attack/damage/critical/die upgrade/extra dice, advantage, stat, spell,
+  initiative, spellcasting fields and `system.bonus.*` formula data.
+
+**Root cause of the reports.** SheetDelver 0.9.4 and earlier kept a hand-written
+effect table (`src/data/talent-effects.ts` `SYSTEM_PREDEFINED_EFFECTS`) using
+pre-4.0 keys: `system.abilities.<stat>.bonus`, `.base`, and `system.bonuses.*`,
+including `system.bonuses.spellcastingClasses`.
+
+- Native's migration (`Update_251001_1`) renames these keys once, at world
+  upgrade. Effects written later keep them.
+- Native 4.0.6 rejects `system.bonuses.*` and writes `.bonus` to an unused field.
+  So those characters lose the bonus in Foundry too: CON stays 9, and the caster
+  class is never granted.
+- SheetDelver silently wrote `.bonus` keys to an unused field, with no
+  diagnostic.
+
+**Changes.**
+
+- `logic/legacy-effect-keys.ts` ports native's migration table. Preparation
+  reports each pre-4.0 change on the effect itself (Effects tab), naming its
+  native 4.0 equivalent, and does not apply it.
+- The legacy table was removed. The Registry and `custom-maps` now serve the
+  generated native predefined effects; the `actor-enricher` import was dead.
+- Effect-granted languages are shown as granted (`identity.grantedLanguages`)
+  without being written back.
+- Level-up HP rolls apply `system.roll.hp.advantage` (native LevelUpSD and
+  `applyAdvantage`, giving `2dNkh`).
+- Two importer talent mappings pointed at documents that do not exist in 4.0.6
+  ("+1 Ranged Damage", "HP Advantage"). They were removed, so those bonuses now
+  show as unresolved.
+
+**Guardrail.** `src/tests/effect-conformance.test.ts` (83 cases, in CI) and
+`logic/effect-key-coverage.ts`:
+
+- Every snapshot key (`tests/fixtures/native-406-effect-keys.json`) must have a
+  consumer.
+- With the native reference present, the snapshot, roll-key bases, predefined
+  effects and importer mappings are re-derived from native source and compared.
+- Representative effects run against hand-derived native oracles.
+- Keys the module writes must be native 4.0 keys.
+
+Red: a copy with the fixes reverted fails 11 of 81 cases (pre-4.0 reporting,
+granted languages, HP advantage). Green: 83/83.
+
+**Open decision.** Existing characters with pre-4.0 keys still show the
+unmodified value; this matches native Foundry, which ignores those keys too. The
+user wants these migrated automatically, without player involvement. A pure
+planner (`logic/effect-key-migration.ts`) and a caller-bound route
+(`server/api/migrations.ts`, with `ui/hooks/useDataMigrations.ts`) are
+prototyped but not wired into any page. The platform-level approach is written
+up in the [Core/SDK proposal](2026-10-16-core-sdk-world-data-proposal.md).
+
+### Research note: world settings are not readable by modules (open)
+
+Recorded October 16, 2026 for later research; no Core change was made or proposed
+as part of this module work. Verified against Core `ff65695` and native 4.0.6.
+
+**What the module needs.** Native `src/settings.mjs` registers both settings with
+`scope: "world"`: `shadowdark.usePulpMode` (default `false`; Pulp luck uses
+`luck.remaining` instead of the `luck.available` token) and
+`shadowdark.autoConsumeAmmunition` (default `true`). Other systems have similar
+world-level rule switches, so the gap is not Shadowdark-specific.
+
+**What Core has today.**
+
+- `src/server/core/documents/primary/settings/SettingStore.ts` mirrors Foundry
+  Setting documents (bootstrap plus `modifyDocument` updates). Its ownership is
+  GM-only, no route exposes it, and a privileged `getValueByKey` is used
+  internally.
+- That store was wired in Core ADR-0028 Phase 7 (settings slice, July 5, 2026)
+  for one internal need: combat progression reading
+  `core.combatTrackerConfig.skipDefeated`.
+- Module document services list Setting among types intentionally absent
+  (`src/server/shared/utils/moduleDocumentServices.ts`).
+- The only SDK settings API is `useModuleSettings`: per-browser localStorage for a
+  module's own options, not Foundry world data.
+
+**Why it is probably GM-only (inference, not a recorded decision).** The store was
+added for an internal consumer, so the safest default was chosen. Setting rows hold
+every package's world configuration, and Core has no classification of which keys
+are safe to share; other modules may keep URLs or tokens there. To verify: whether
+Foundry v14 delivers world-scoped settings to every connected client (if it does,
+player-visible world settings are not a Foundry-level secret, though an allowlist
+would still be prudent).
+
+**Details any fix must handle.**
+
+- Foundry stores only changed values, so an untouched setting has no Setting row.
+  Core cannot see system registrations, so the reader needs the declared default.
+- Client-scoped settings live in each browser's storage, not the world, and remain
+  out of reach.
+- Values must follow live changes and reset on world switch.
+
+**Generic fix sketch (for research; nothing here is specific to Shadowdark).**
+
+- Modules declare readable world settings in `info.json`, each with key, type and
+  default.
+- Core allows only keys in the module's own system namespace (`<systemId>.*`),
+  plus at most a curated `core.*` list.
+- A read-only `req.runtime.settings.get(key)` on the server and a
+  `useWorldSetting(key)` hook on the client return the stored value or the
+  declared default, with live updates from the existing Setting events.
+- This would be an additive module-api minor contract.
+- Tests: undeclared or foreign keys are denied, defaults apply, updates propagate,
+  and a world switch resets values.
+
+**Rejected stopgaps.**
+
+- A per-browser module setting: not the world's truth, and each user would have
+  to set it.
+- Inferring the mode from Actor data.
+- Private Core imports or a direct Foundry transport.
+
+**Proposal.** See the [Core/SDK world data proposal](2026-10-16-core-sdk-world-data-proposal.md)
+(contract A).
+
+**Module seam.** `src/logic/world-settings.ts` returns `{ value, source:
+'native-default' }`. Its consumers are `ui/components/LuckControl.tsx` (Pulp count
+selector versus standard token) and the ammunition diagnostic in
+`logic/actions.ts`. A future contract would replace this one function.
+
+### Field and action coverage inventory
+
+| Native source (4.0.6) | Preparation owner | Consumers | Status | Diagnostic when unavailable | Test |
+| --- | --- | --- | --- | --- | --- |
+| Effects: `system.changes` / legacy `changes`, type/mode, phase, priority, disabled, transfer, situational, suppression | `logic/effects.ts` | preparation, roll keys, Effects tab, editor | Supported; duration expiry and custom types not applied | Effect diagnostics list | NA, BD |
+| Player abilities `base`/`value`, bounded mod | `actor-preparation.ts` | sheets, actions, combat suggestions | Supported | — | NA |
+| NPC explicit `mod`, AC | `actor-preparation.ts` | NPC sheet, cards | Supported | — | NA |
+| HP `base`/`max`/`value`, level, XP | `actor-preparation.ts` | sheets | Supported | Formula failure diagnostic | NA |
+| AC: armor base/attribute/modifier, best + bonus armor, `system.attributes.ac.*` effects | `actor-preparation.ts` | sheets, combat | Supported | — | NA |
+| Gear slots: 10 + effects + STR bonus, per-item usage, free carry, stashed | `actor-preparation.ts` | Inventory, paper | Supported | — | NA |
+| Roll keys `system.roll.*` (stat/melee/ranged/attack/spell/initiative, `.bonus`/`.damage`/`.advantage`) | `roll-keys.ts` | actions, dialog defaults, server | Supported; situational shown, not selectable | Unresolved value diagnostic | NA, BD |
+| Weapon damage 1h/2h, properties, thrown, NPC Attack | `weapon-rules.ts`, `actions.ts` | sheets, cards, server | Supported | "Damage unavailable" + field | weapon suite, NA |
+| Spellcasting classes, spell ability, tier, lost | `actor-preparation.ts`, `actions.ts` | Spells tab, paper, cards, server | Supported | Unavailable reason | BD |
+| Scroll / wand (per spell) / NPC spell | `actions.ts` | Spells tab, cards, server | Supported with consequences | Unavailable reason | BD |
+| Class Ability uses, lose on failure | `actions.ts` | Talents and Abilities tabs, cards, server | Supported | — | BD |
+| Potion use | `actions.ts` | item card (from Inventory), server | Supported (confirmation, no roll) | — | BD |
+| Luck `available` / `remaining`, `usePulpMode` setting | sheet editing only | paper, Details | Edit only; setting unreadable | Tooltip explains | BR |
+| `autoConsumeAmmunition` setting | — | attacks | Not supported | Attack diagnostic | BD |
+| Rest / recovery, damage auto-roll | — | — | Not supported | Not offered | — |
+| Light source active | Inventory toggle | Inventory | State only; no scene light/timer (DW-04) | Tooltip | — |
+| Identification | `resource-cards.ts` | cards, inventory | Current identified presentation only | "Unidentified" label | BD |
+| Predefined effects, mastery choices | `data/native-predefined-effects.ts`, `talent-choices.ts` | editor, level-up, generator, importer | Supported; 2 native entries refused | Reason text | BD |
+| Monsters pack, world NPCs | `server/api/bestiary.ts` | Bestiary tool | Read-only; compendium GM-only | Visible notice | BD, BR |
+
+### Isolated browser evidence (BR)
+
+A local, ignored harness rendered the actual module components (both layouts,
+cards, editors, bestiary) in headless Chrome with the network blocked, Core's
+module Tailwind build and stubbed SDK services; it is a development tool, not a
+dependency. 38 checks passed: at 360×740, 390×844, 768×1024, 1280×800 and
+1280×500, paper shows all 8 attack rows with `+0 d8+1` and no horizontal
+overflow; paper spell → card is a named modal with contained focus, Escape and
+focus return; Cast opens the host roll dialog above an inert card, cancel restores
+it and one action request is sent with a request ID; linked `@UUID` opens a
+document card with Back; every advanced tab (including the overflow menu) has
+no overflow and no unnamed control; a thrown weapon's card shows distinct
+**Melee attack** / **Thrown attack** actions and measures 384×384 at tablet and
+desktop sizes (full width on phones); weapon cards offer Unequip and Stash
+(Stash sends the native `{ stashed: true, equipped: false }` write) and a lit
+Torch card offers Put out and quantity but no Equip. Also: per-spell wand rows with lost reasons,
+multi-change effect editing with no-op save, debounced HP edits and pending-write
+cancellation on Actor switch, failed delete rollback with an error, NPC sheet,
+bestiary disambiguation and keyboard-opened NPC card at 360/1280, and 200% zoom
+of 1280×800 (640×400 CSS viewport) for both layouts. Fixes found by the run:
+narrow-screen inventory column headers overflowed (now hidden below `sm`), and
+coin, HP and XP inputs lacked accessible names. A user report then showed the
+resource dialog passed `inert=""`, which React 19 treats as false; it now passes
+a boolean, and the run asserts the attribute, unfocusable card controls under
+the roll dialog and an empty React console-error log. Not covered: the real Core HUD,
+tray and safe areas; observer/GM role variants; very large lists.
+
+### Verification commands run
+
+All eight module suites pass (`weapon-rules`, `prepared-actor`, `actor-enricher`,
+`presentation`, `roll-feedback`, `importer-mapping`, `native-alignment` 44/44, `effect-conformance` 83/83,
+`boundaries` 42/42). Explicit module TypeScript check: clean. `npm run module:check
+-- shadowdark`: passed. Packaging into an isolated data directory: 9 entries
+(`LICENSE`, `README.md`, `info.json`, compiled `dist/` entries and scoped CSS),
+no tests or local files. The boundaries suite's native pack oracle reads
+`temp/shadowdark/data/packs` from the Core checkout and reports itself as
+skipped when that reference is absent (as in CI).

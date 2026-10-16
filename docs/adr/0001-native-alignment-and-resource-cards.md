@@ -1,6 +1,6 @@
 # Shadowdark ADR-0001: Native Alignment and Resource Cards
 
-**Status:** Proposed — module-only native alignment and resource cards
+**Status:** Proposed — implementation in progress (offline evidence recorded; native/operator acceptance pending)
 **Date:** October 15, 2026
 **Related Core decisions:** ADR-0021, ADR-0027, ADR-0038, ADR-0049, ADR-0057, ADR-0063
 
@@ -17,8 +17,8 @@ use top-level `changes` and numeric `mode` instead.
 The user requested a complete module review against the supplied native source,
 alignment with Foundry-provided data/rules/actions, removal of competing client
 derivations, a review of paper and tabbed sheets, and a plan for resource cards.
-This pass documents the review and corrective steps. It changes no application
-code, dependency, manifest, version, source document or remote repository state.
+The review pass documented the findings and corrective steps without code
+changes; the implementation that followed is recorded in the checkpoints below.
 ADR-0063 remains Completed on its recorded evidence; these are successor findings.
 
 The inspected baseline is Core 0.18.1 at `8c43170`, Shadowdark module 0.9.4 at
@@ -198,231 +198,303 @@ explicitly outside this implementation plan.
 
 ## Implementation sequence and checkpoints
 
-All boxes are pending. For every checkpoint, record changed paths, the source
-oracle, red-before/green-after evidence, remaining limitations and the next
-dependency in the module audit. A restatement of a finding is not its resolution.
+Implementation is in progress on module branch `fix/adr-0001-native-alignment`
+(created from `e95fc47`, module 0.9.4; changes uncommitted for review). A checked
+box means the module work is implemented with **offline** evidence: red-before on
+the unchanged code, green-after with an independent source-derived oracle. It is
+not native/operator acceptance; that column stays pending below. Per-finding
+paths, authority, evidence and limitations are in the module audit's
+[implementation dispositions](../audits/2026-10-15-native-alignment.md#implementation-dispositions).
+
+Evidence shorthand: **NA** `src/tests/native-alignment.test.ts` (44 cases; the
+first 30 were 9/30 on unchanged code; the 6 attack-mode cases failed on the
+pre-fix logic; 4 inventory-control rule cases and 1 hidden-mode case added
+(red without the sheet filter); 3 luck cases; 44/44 after), **BD**
+`src/tests/boundaries.test.ts` (42 cases; cannot load on unchanged code because
+the routes and helpers it covers did not exist), **BR** the isolated browser run
+(38 interaction checks) described in the audit.
 
 ### C0 — Pin scope, sources and failing boundary cases
 
-- [ ] Inventory released native 4.0.6 actor/item schemas, effect forms, roll
+- [x] Inventory released native 4.0.6 actor/item schemas, effect forms, roll
   selectors, relevant settings, templates/tables and action consequences. Label
   historical 4.1.0 development comparisons separately; their additions do not add
   implementation or acceptance obligations to this correction.
-- [ ] Record full native/module/Core versions and reference hashes. Keep sanitized
+  — Audit [coverage inventory](../audits/2026-10-15-native-alignment.md#field-and-action-coverage-inventory);
+  All 39 native predefined effects are generated from `src/config.mjs` into
+  `src/data/native-predefined-effects.ts`; two are flagged unusable with native reasons.
+- [x] Record full native/module/Core versions and reference hashes. Keep sanitized
   raw-source fixtures distinct from native prepared/result oracles and
   module-prepared expected output. Do not relabel synthetic Prim-like data as a
   captured Prim Actor. A native capture requires an approved local instance or
   user-provided data; no default production socket.
-- [ ] Add focused red regressions for SD01-01/02/03/04/06/07/11; reproduce issue23
+  — Fingerprints rechecked; `src/tests/fixtures/native-406.ts` labels its Actor
+  "Prim-like" synthetic source and replicates Core's projection separately.
+- [x] Add focused red regressions for SD01-01/02/03/04/06/07/11; reproduce issue23
   through the actual adapter and HTTP projection, not just a helper. Add both
-  v13/legacy and v14 shapes where compatibility is claimed.
-- [ ] Produce a field/action coverage inventory: native source, preparation owner,
+  v13/legacy and v14 shapes where compatibility is claimed. — NA (21 red).
+- [x] Produce a field/action coverage inventory: native source, preparation owner,
   consumer, supported status, diagnostic and test. Include settings such as Pulp
   mode; if the runtime cannot provide needed settings, define a narrowly scoped
   generic contract change for review instead of private transports or defaults.
+  — Pulp mode and `autoConsumeAmmunition` are unavailable to modules; the audit
+  proposes a read-only allowlisted system-settings contract (external, not built).
 
-**Gate:** failing cases are independently justified, source versions are pinned,
-and there is no claim of native acceptance without a native oracle/capture.
+**Gate:** met offline. No native capture exists; no native acceptance is claimed.
 
 ### C1 — Repair access and serialized-effect boundaries
 
-- [ ] Route world/embedded lookups through caller runtime; restrict shared pack
+- [x] Route world/embedded lookups through caller runtime; restrict shared pack
   lookup to declared exact UUIDs. Test denied users and restricted journal/chat
   projections, including after a privileged read. Inventory every caller of the
   singleton resolver, including spell learn/table/card paths.
-- [ ] Add canonical lossless effect reading/serialization with original metadata,
+  — `server/api/document.ts`, `effects.ts`, `spells.ts`, `level-up.ts`, `actions.ts`,
+  `bestiary.ts` use `req.runtime`; the shared resolver serves declared compendium
+  UUIDs only. NA/BD SD01-06 (denied read, privileged-then-denied, embedded reads).
+  Journal/chat projections are Core's and are reached only through `req.runtime`.
+- [x] Add canonical lossless effect reading/serialization with original metadata,
   owner identity, phase/priority and numeric/string mode mapping. Resolve mixed
-  shape precedence, unknown types and zero values explicitly.
-- [ ] Implement native suppression/transfer/situational selection rules in the
+  shape precedence, unknown types and zero values explicitly. — `logic/effects.ts`,
+  `logic/foundry.ts`; NA A01-02 mixed payload, BD SD01-02 serializer cases.
+- [x] Implement native suppression/transfer/situational selection rules in the
   relevant preparation/action stages. Preserve unsupported changes for editing
-  and diagnostic display; do not silently discard them.
-- [ ] Prove registry cache reset/rebuild across epoch/pack changes, no ambiguous
+  and diagnostic display; do not silently discard them. — BD SD01-01 cases.
+  Duration-based expiry is not modeled (no world time); see audit limitations.
+  Effect conformance (Oct 16): every native 4.0.6 pack key mapped to a consumer;
+  pre-4.0 keys from SheetDelver 0.9.4 reported with native's migration
+  replacement instead of being silently dropped; the hand-written legacy table
+  was removed. `effect-conformance.test.ts` guards drift (audit section
+  "Effect conformance audit").
+- [x] Prove registry cache reset/rebuild across epoch/pack changes, no ambiguous
   cross-pack terminal-ID match and no caller world data in shared collections.
+  — `server/Registry.ts`; BD SD01-07, NA SD01-07.
 
-**Gate:** issue23 shape is visible to the rule layer; denying caller reads are
-honored; effect and lookup data round-trip without loss. Access gate precedes C7.
+**Gate:** met offline.
 
 ### C2 — Preserve identity and define the single prepared contract
 
-- [ ] Inventory this module's consumers of Core Actor detail UUID substitution.
+- [x] Inventory this module's consumers of Core Actor detail UUID substitution.
   Preserve canonical references and explicit labels in module-owned paths using
   the existing public SDK. Record the Core recursive rewrite as an external
   dependency; do not edit Core or other modules to remove it in this work.
-- [ ] Define typed module view and canonical references for Actor, embedded Item,
+  — Structured `DocumentRef` values in `derived` survive projection (NA SD01-05).
+  Raw source reference fields remain rewritten by Core; affected cases are listed
+  in the audit. **External dependency, not fixed.**
+- [x] Define typed module view and canonical references for Actor, embedded Item,
   effect owner and compendium resource; normalize `_id`/`id` access once.
-- [ ] Split raw fields, prepared results and caller projection. Include preparation
+  — `logic/prepared-view.ts`, `logic/identity.ts`; NA SD01-11.
+- [x] Split raw fields, prepared results and caller projection. Include preparation
   completeness/provenance; remove mutations that replace canonical source
   references with names. Keep Core's prepared lifecycle/revision guarantees.
-- [ ] Define one reference/description handling path using existing SDK sanitation
+  — `logic/normalization.ts` no longer mutates source; NA "source data is not mutated".
+- [x] Define one reference/description handling path using existing SDK sanitation
   and permission APIs. Cache only data appropriate to its scope and epoch.
+  — `logic/description.ts` (SDK `processHtmlContent`); UI caches are world-scoped.
 
-**Gate:** module-controlled HTTP/SDK paths preserve exact identities and source
-bytes; both layouts and server resolve the same item despite duplicate/changed
-names. Mark cases still affected by Core rewriting as externally blocked, not
-passed. No Core changes belong in this module-only implementation.
+**Gate:** met for module-controlled paths. Cases depending on raw source reference
+strings in the Actor detail response are **externally blocked** by SD01-05.
 
 ### C3 — Align effective statistics, inventory and weapon preparation
 
-- [ ] Implement Player/NPC-specific ability rules, bounded Player modifiers,
+- [x] Implement Player/NPC-specific ability rules, bounded Player modifiers,
   effective HP, initiative and manifest suggested stat paths. Preserve explicit
-  NPC AC/modifiers and saved GM overrides.
-- [ ] Replace armor name/AC-threshold guesses with native base/attribute/modifier,
-  best-armor/bonus-armor and effect-selector rules. Prove order independence.
-- [ ] Align slots, quantities, free carry, coins/gems, stashed/equipped categories
+  NPC AC/modifiers and saved GM overrides. — `logic/actor-preparation.ts`,
+  `info.json` combat paths `derived.abilities.<key>.value`; NA SD01-03.
+- [x] Replace armor name/AC-threshold guesses with native base/attribute/modifier,
+  best-armor/bonus-armor and effect-selector rules. Prove order independence. — NA SD01-04.
+- [x] Align slots, quantities, free carry, coins/gems, stashed/equipped categories
   and effect-granted capacity against native aggregation and settings.
-- [ ] Extend shared weapon preparation through C1 effects: property/base/name/this/
+  — Native slot formula and per-item usage; NA "slots start at 10".
+- [x] Extend shared weapon preparation through C1 effects: property/base/name/this/
   all selectors, melee/ranged/thrown/handedness, numeric and supported dice/string
   damage, upgrades/extra dice, and native roll configuration. Preserve missing
-  damage diagnostics and base-versus-Actor labeling.
-- [ ] Expose all results through C2; a later sheet/card must not reconstruct them.
+  damage diagnostics and base-versus-Actor labeling. — `logic/roll-keys.ts`
+  (port of `_getActiveEffectKeys`), `logic/weapon-rules.ts`; NA A01-01, weapon suite.
+- [x] Expose all results through C2; a later sheet/card must not reconstruct them.
 
-**Gate:** source-backed expectations agree across prepared Actor, combat fields,
-paper/advanced/inventory/detail views, dialog defaults and server roll inputs.
+**Gate:** met offline: prepared Actor, caller projection, both layouts, dialog
+defaults and server roll agree on `+0 d8+1` (NA A01-01, BR).
 
 ### C4 — Make actions explicit and native-backed
 
-- [ ] Build one typed preparer for checks, attacks, spells and Class Abilities,
+- [x] Build one typed preparer for checks, attacks, spells and Class Abilities,
   including ability selection, bonuses, signed advantage, applicable situational
-  choices, thresholds/critical configuration and diagnostics.
-- [ ] Resolve spells and magic resources by full source and triggering item
+  choices, thresholds/critical configuration and diagnostics. — `logic/actions.ts`.
+- [x] Resolve spells and magic resources by full source and triggering item
   identity. Handle multiple wand spells, NPC casting fields, lost/broken state,
   class/item eligibility and exact native ability metadata. Remove class-name,
-  name-only virtual spell and arbitrary item-data fallbacks.
-- [ ] Use existing Core roll/chat/dice contracts for execution. Revalidate source,
+  name-only virtual spell and arbitrary item-data fallbacks. — BD SD01-08.
+  Each weapon attack mode is its own labelled action: the weapon's type, an added
+  Thrown attack (`PlayerSD.getAttacks`) and both grips of a Versatile weapon
+  (`WeaponSD.getDamageFormula`; stored grip first). A two-handed grip is
+  unavailable while a shield is equipped, and the server refuses modes the weapon
+  lacks. Sheets (paper, Abilities, inventory details) omit unavailable modes;
+  the card keeps them disabled with the reason. — NA SD01-08 attack-mode cases (user report: two identical "Dagger
+  Attack" buttons).
+- [x] Use existing Core roll/chat/dice contracts for execution. Revalidate source,
   ownership and action eligibility on the server. Model explicit manual modifiers
   without trusting supplied content to establish identity or permission.
+  — `server/api/actions.ts` via `req.runtime.rolls`; BD C4 owner/unavailable cases.
 - [ ] Implement and verify supported native post-result consequences: spell loss,
   scroll consumption, wand loss/breakage, limited uses, ability loss, potion use,
-  standard/Pulp luck and bounded rest/recovery. Inventory each rule's setting and
-  source. If existing SDK lacks the necessary result/write boundary, document
-  the precise generic gap for approval; do not add private transports or silently
-  declare the workflow complete.
-- [ ] Design cancellation, duplicate-submit protection, write failure and retry
+  standard/Pulp luck and bounded rest/recovery. **Partial:** spell loss, scroll
+  consumption, wand loss/breakage, limited uses, ability loss and potion use are
+  implemented (BD C4). Luck is edited, not automated; the Pulp setting is unreadable, so luck uses the native default (standard token) via one seam (`logic/world-settings.ts`, audit research note);
+  rest/recovery and ammunition consumption are not implemented and say so.
+- [x] Design cancellation, duplicate-submit protection, write failure and retry
   reconciliation. Do not reroll or double-consume on a network retry, or promise
-  multi-document atomicity without platform support.
+  multi-document atomicity without platform support. — Request-ID replay (process
+  local, 10 minutes), sequential reported consequences; BD C4, BR cast/cancel.
 
-**Gate:** identical inputs give identical default action/result semantics from
-paper, advanced and card entry points. Unsupported actions are explicit; a
-generic d20 is not a fallback. Native browser/scene hooks remain out of scope.
+**Gate:** met for implemented actions; remaining consequences are explicit gaps.
 
 ### C5 — Correct generation, advancement, imports and editors
 
-- [ ] Feed mastery and other choices from declared native definitions/templates;
+- [x] Feed mastery and other choices from declared native definitions/templates;
   retain fixed/rolled grant independence and exact counts. Support v14 placeholders
   and reject unresolved choices before any write in every creation path.
-- [ ] Reconcile client/server/table/talent maps into one source-backed rules path.
+  — `logic/talent-choices.ts`, `server/api/level-up-engine.ts`; NA/BD SD01-02.
+- [x] Reconcile client/server/table/talent maps into one source-backed rules path.
   Validate class/spell/source type, grant eligibility, language/stat choices and
   limits on the server. Preserve full allowed source fields/effects on copying.
-- [ ] Replace silent importer loss/guesses with a preview of unresolved references
+  — BD SD01-09 learn/level-up. The table pattern map remains a documented convenience.
+- [x] Replace silent importer loss/guesses with a preview of unresolved references
   and explicit supported conversion rules. Keep user-entered custom items distinct
   from resolved native items. Never infer damage from a familiar weapon name.
-- [ ] Make effect/boon editing multi-change and lossless with correct mode labels,
+  — `server/importer.ts`, `ShadowdarkImportForm.tsx`; BD SD01-09 import.
+- [x] Make effect/boon editing multi-change and lossless with correct mode labels,
   stable owner-qualified identity, disabled/suppressed visibility and no-op
   round-trip preservation. Use shared confirmation/error UI, not native alerts.
+  — `AddEffectsModal.tsx`, `CustomBoonModal.tsx`, `server/api/effects.ts`; BD SD01-02, BR.
 
-**Gate:** raw templates are unchanged; invalid/cancelled operations write nothing;
-creation and editing preserve both formats and all unrelated metadata. Existing
-Actor repair/migration is not authorized (DW-11 remains deferred).
+**Gate:** met offline. No existing Actor repair (DW-11 deferred).
 
 ### C6 — Consolidate sheets and mutation state
 
-- [ ] Remove competing React rule derivations and redundant level-up ownership.
+- [x] Remove competing React rule derivations and redundant level-up ownership.
   Both layouts consume C2/C3/C4; authoritative false/zero are respected.
-- [ ] Scope drafts, dialogs, item selection and caches to Actor/epoch/revision.
+- [x] Scope drafts, dialogs, item selection and caches to Actor/epoch/revision.
   Cancel stale debounce timers, sequence requests, reconcile optimistic changes,
   expose failures and use per-operation pending state.
-- [ ] Fix ID-only write paths and effect-list duplication/omission. Handle deleted
-  or permission-revoked resources while a modal is open.
-- [ ] Give spell management, treasure sales and other multi-write flows explicit
+  — `context/ShadowdarkActorContext.tsx`, `pages/ActorPage.tsx`; BR rapid edits/Actor switch.
+- [x] Fix ID-only write paths and effect-list duplication/omission. Handle deleted
+  or permission-revoked resources while a modal is open. — NA/BD SD01-11; cards show
+  an unavailable state when their item disappears.
+- [x] Give spell management, treasure sales and other multi-write flows explicit
   completion/partial-failure behavior. A caught error must not look like success.
-- [ ] Remove paper's silent five-attack cutoff; expose complete features, free carry
-  and capability-based sections. Test tab disappearance/overflow and return state.
+  — BR failed delete rollback; sale credits only removed items and reports failures.
+- [x] Remove paper's silent five-attack cutoff; expose complete features, free carry
+  and capability-based sections. Test tab disappearance/overflow and return state. — BR.
 
-**Gate:** tests exercise rapid edits, actor switches, reconnect, denied/failed writes,
-deletion and out-of-order responses; sheet values and actions stay synchronized.
+**Gate:** met offline for rapid edits, Actor switch, failed writes and stale
+responses. Reconnect and live permission revocation need a running host (pending).
 
 ### C7 — Implement resource details and module bestiary
 
-- [ ] Define authorized card view models and one modal/controller. Reuse full owned
+- [x] Define authorized card view models and one modal/controller. Reuse full owned
   instance data and shared safe descriptions; no second projector in the component.
-- [ ] Add paper spell → card → Cast → SDK RollDialog; use the same route from
-  advanced sheets. Support item/magic/feature cards with appropriate actions.
-- [ ] Declare exact native Actor pack(s) needed for a module bestiary after checking
+  — `logic/resource-cards.ts`, `components/ResourceDetailModal.tsx`, `ModuleDialog.tsx`.
+- [x] Add paper spell → card → Cast → SDK RollDialog; use the same route from
+  advanced sheets. Support item/magic/feature cards with appropriate actions. — BR.
+  Cards use a compact fixed size (24rem × 24rem on tablet/desktop) that grows to
+  34rem wide and up to 88dvh tall for longer content; phones use full width.
+  Owned physical item cards keep the inventory controls the old item modal had
+  (equip/unequip, stash/retrieve, light/put out, quantity), now from one shared
+  rule helper (`logic/inventory-controls.ts`, native `PlayerSheetSD` handlers
+  including the shield and single-lit-source side effects) used by both the card
+  and the inventory row. The unused `ItemModal` was removed. A user report
+  found the regression; BR "card keeps Unequip" fails on the pre-fix card.
+- [x] Declare exact native Actor pack(s) needed for a module bestiary after checking
   their metadata and permission policy. Extend module indexing to Actor/NPC data;
   do not request all packs or derive monsters from item/name guesses.
-- [ ] Complete module browsing/preview and NPC card fields from C3, including
+  — `info.json` declares `shadowdark.monsters` (native pack metadata: Actor, NPC).
+- [x] Complete module browsing/preview and NPC card fields from C3, including
   attack counts, special text, movement and features. World NPC reads stay
   caller-bound. Provide a working module entry point, not just an unused component.
-- [ ] Keep Core card SDK, encounter insertion, monster spawning and sharing out of
+  — Dashboard tool `bestiary`; BD SD01-16, BR. Compendium monsters are GM-only
+  because Core does not expose pack ownership to modules.
+- [x] Keep Core card SDK, encounter insertion, monster spawning and sharing out of
   this slice. Record the proven module view as evidence for deferred DW-13.
 
-**Gate:** all requested card kinds work through real module data paths; spell
-casting delegates to C4, hidden fields stay excluded, long/missing content and
-permission changes are handled. No fabricated rules or static demonstration-only cards.
+**Gate:** met offline with fixture data; native content acceptance pending.
 
 ### C8 — Verify both layouts, tabs and modal interaction
 
-- [ ] Cover paper and advanced Abilities, Inventory, Spells, Details, Notes and
-  Effects at 360/390/768/1280px widths, including short viewport height and zoom.
+- [x] Cover paper and advanced Abilities, Inventory, Spells, Details, Notes and
+  Effects at 360/390/768/1280px widths, including short viewport height and zoom. — BR.
 - [ ] Check empty and large lists, >5 attacks, long names/descriptions, multi-spell
   wands, NPCs, observers/owners/GMs, standard/Pulp luck and unsupported states.
-- [ ] Verify keyboard access, named buttons/dialogs, focus containment/return,
+  **Partial:** >5 attacks, long names, multi-spell wands, NPCs, luck fields and
+  unavailable states are covered; observer/GM role variants and very large lists
+  were not rendered.
+- [x] Verify keyboard access, named buttons/dialogs, focus containment/return,
   Escape, scroll reachability, touch targets, theme contrast and non-color state.
+  — BR (contrast judged from screenshots, not measured).
 - [ ] Check Core HUD/floating-tray overlap, sticky headers, tab overflow and modal
-  stacking/safe areas in isolated rendering. Record demonstrated Core layout
-  defects as external dependencies; do not edit Core or add fixed system-specific
-  offsets to conceal them.
+  stacking/safe areas in isolated rendering. **Partial:** tab overflow and modal
+  stacking under a host-roll-dialog stand-in pass; the real Core HUD, tray and
+  safe-area insets were not rendered offline (Core-owned; pending).
 
-**Gate:** retain screenshots/interaction results for the actual revised components;
-existing marketing screenshots and server-render counts alone do not satisfy this.
+**Gate:** screenshots and interaction results exist for the revised components;
+host-chrome checks remain pending.
 
 ### C9 — Validate parity and obtain explicit acceptance evidence
 
-- [ ] Run tracked module regressions (including new cases), explicit module typing,
+- [x] Run tracked module regressions (including new cases), explicit module typing,
   module checking and isolated packaging against the supported released Core
   toolchain. Root TypeScript alone excludes module code. Core tooling may be
   used read-only; keep test/package artifacts isolated and do not modify Core.
-- [ ] Exercise raw source → adapter → prepared store → caller HTTP/SDK projection
+  — All eight suites pass; explicit module `tsc` clean; `module:check` passed;
+  packaging into an isolated data directory produced a 9-entry archive. Core
+  0.18.1 tooling was used; its SDK surface is unchanged from the pinned `v0.18.0`.
+- [x] Exercise raw source → adapter → prepared store → caller HTTP/SDK projection
   → both layouts/card → dialog → server execution; include errors and action
   consequences. Compare to independent native source-derived or captured oracles.
-- [ ] Run isolated browser checks with network blocked except local test fixtures;
-  no application/backend dependency on Playwright or a running Foundry browser.
+  — NA A01-01 chain and the native pack oracle in BD (Weapon Mastery + Longsword
+  from native 4.0.6 pack source, migrated to the Foundry 14 shape).
+- [x] Run isolated browser checks with network blocked except local test fixtures;
+  no application/backend dependency on Playwright or a running Foundry browser. — BR.
 - [ ] Perform the native/operator matrix below only with approved local/test-world
   access. Record versions, expected/actual, actor/resource, evidence and status.
   If unavailable, leave it pending; offline success is not native acceptance.
+  **Pending:** no approved Foundry access in this task.
 
-**Gate:** every SD01 finding maps to passing evidence, an explicit limitation or
-a user-accepted deferral. No blanket closeout from a total test count.
+**Gate:** not met — native/operator acceptance pending.
 
 ### C10 — Reconcile documentation and release readiness
 
-- [ ] Update module development/compatibility/action documentation and terse
+- [x] Update module development/compatibility/action documentation and terse
   changelog notes. Document any future Core/SDK requirement in the module audit;
   do not edit Core architecture/SDK/module-authoring documents in this work.
-- [ ] Reconcile the coverage matrix and module audit dispositions, keeping unknowns
+- [x] Reconcile the coverage matrix and module audit dispositions, keeping unknowns
   distinct from fixes. Keep the implementation handoff and evidence in the module;
   report any proposed root tracker/ADR reconciliation to the user without editing
   Core-owned documents or local root trackers.
 - [ ] Close/archive only after agreed acceptance or an explicit user closeout on
   stated limitations. Do not reopen ADR-0063 or promote unrelated deferred work.
+  **Open:** not closed.
 - [ ] Produce a module release-readiness summary with the supported native/Core
   baseline, verification evidence and remaining external dependencies. Repository
   release authorization and versioning rules are maintained in AGENTS.md.
+  **Pending** native acceptance and release authorization.
 
 ## Required regression and acceptance matrix
 
+"Offline" records module evidence; "Native" stays pending until an approved
+Foundry 14 / native 4.0.6 comparison is performed.
+
 | ID | Scenario | Acceptance evidence / current status |
 | --- | --- | --- |
-| A01-01 | Prim-like L1 mastery, native 4.0.6 on Foundry14; Actor and Item effects | All surfaces `+0 d8+1`; effect disable/enable changes once; raw/native comparison. **Pending.** |
-| A01-02 | Effect schema/type/phase/priority, selector/property/this/situational, formula/dice/string values | Correct native behavior or explicit unsupported state; legacy compatibility, no double application/loss. **Pending.** |
-| A01-03 | Player/NPC scores/modifiers, HP, armor/shields/custom attributes, slots and combat | Shared authoritative results, source unchanged and GM overrides respected. **Pending.** |
-| A01-04 | Spell, NPC spell, multi-spell wand, scroll, Class Ability, potion, luck/recovery | Correct eligibility/defaults and result consequences; cancel/retry/failure safe. **Pending.** |
-| A01-05 | Generator/import/level-up and effect/boon edit | Full native source/effects retained, exact choices, no unresolved placeholder or guessed data. **Pending.** |
-| A01-06 | Duplicate names/IDs, renamed content, missing packs and reconnect/world switch | Canonical identity, readiness, invalidation and visible unavailable state. **Pending.** |
-| A01-07 | Denied/limited/observer/owner/GM world/embedded/compendium/card reads | Existing Core visibility, Secret/whisper and identification boundaries maintained; no cache bypass. **Pending.** |
-| A01-08 | Paper, every advanced tab and all card kinds; phone/tablet/desktop/keyboard | Complete accessible content/actions, no trapped controls or HUD/modal collisions. **Pending.** |
-| A01-09 | Rapid edits, Actor switch, stale responses, deletion/permission change, failed partial write | Correct reconciliation with current Actor; no stale/double action or false success. **Pending.** |
-| A01-10 | Released 4.0.6 compatibility across claimed Foundry builds/serialized shapes | Prove each claimed combination; development-only 4.1 notes create no support claim or acceptance blocker. **Pending.** |
+| A01-01 | Prim-like L1 mastery, native 4.0.6 on Foundry14; Actor and Item effects | All surfaces `+0 d8+1`; effect disable/enable changes once; raw/native comparison. **Offline: passes** (NA, BD native pack oracle, BR). **Native: pending.** |
+| A01-02 | Effect schema/type/phase/priority, selector/property/this/situational, formula/dice/string values | Correct native behavior or explicit unsupported state; legacy compatibility, no double application/loss. **Offline: passes** (NA, BD); situational choices are listed but not selectable in the roll UI. **Native: pending.** |
+| A01-03 | Player/NPC scores/modifiers, HP, armor/shields/custom attributes, slots and combat | Shared authoritative results, source unchanged and GM overrides respected. **Offline: passes** (NA). **Native: pending.** |
+| A01-04 | Spell, NPC spell, multi-spell wand, scroll, Class Ability, potion, luck/recovery | Correct eligibility/defaults and result consequences; cancel/retry/failure safe. **Offline: partial** (BD C4, BR); luck automation, rest/recovery and ammunition are explicit gaps. **Native: pending.** |
+| A01-05 | Generator/import/level-up and effect/boon edit | Full native source/effects retained, exact choices, no unresolved placeholder or guessed data. **Offline: passes** (BD SD01-02/09). **Native: pending.** |
+| A01-06 | Duplicate names/IDs, renamed content, missing packs and reconnect/world switch | Canonical identity, readiness, invalidation and visible unavailable state. **Offline: partial** (NA/BD SD01-07/05). **Externally blocked** for raw source reference fields rewritten by Core (SD01-05); reconnect not exercised. |
+| A01-07 | Denied/limited/observer/owner/GM world/embedded/compendium/card reads | Existing Core visibility, Secret/whisper and identification boundaries maintained; no cache bypass. **Offline: passes** for module routes (BD SD01-06/13/16). **Native: pending.** |
+| A01-08 | Paper, every advanced tab and all card kinds; phone/tablet/desktop/keyboard | Complete accessible content/actions, no trapped controls or HUD/modal collisions. **Offline: partial** (BR); real Core HUD/tray/safe areas pending. |
+| A01-09 | Rapid edits, Actor switch, stale responses, deletion/permission change, failed partial write | Correct reconciliation with current Actor; no stale/double action or false success. **Offline: partial** (BR, BD C4); live permission change pending. |
+| A01-10 | Released 4.0.6 compatibility across claimed Foundry builds/serialized shapes | Prove each claimed combination; development-only 4.1 notes create no support claim or acceptance blocker. **Offline:** legacy and Foundry 14 serialized shapes covered. **Native: pending.** |
 
 ## Scope boundaries and decisions to settle at C0
 

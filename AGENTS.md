@@ -90,6 +90,15 @@ Its released-system baseline and future-version exclusions are explicit there;
 local source checkout details belong in the handoff. Existing legacy effect
 fixtures do not establish v14 serialized-effect parity.
 
+Effect definitions come from native data only: compendium documents (copied
+with their effects) and `src/data/native-predefined-effects.ts`, generated from
+the pinned `config.mjs`. Never hand-write effect keys or tables. Pre-4.0 keys are
+reported with native's own migration replacement (`logic/legacy-effect-keys.ts`),
+not applied. `effect-conformance.test.ts` must keep every native pack key mapped
+to a consumer (`logic/effect-key-coverage.ts`); when the supported native release
+changes, regenerate the key snapshot and predefined effects and rerun it with
+the native reference present.
+
 Resource details must consume the shared prepared view/action path. Future Core
 card SDK/encounter features and historical Actor repair are separately scoped.
 Core-owned findings in the audit remain external dependencies; never hide them
@@ -107,6 +116,9 @@ npx tsx data/local/modules/shadowdark/src/tests/actor-enricher.test.ts
 npx tsx data/local/modules/shadowdark/src/tests/presentation.test.ts
 npx tsx data/local/modules/shadowdark/src/tests/roll-feedback.test.ts
 npx tsx data/local/modules/shadowdark/src/tests/importer-mapping.test.ts
+npx tsx data/local/modules/shadowdark/src/tests/native-alignment.test.ts
+npx tsx data/local/modules/shadowdark/src/tests/boundaries.test.ts
+npx tsx data/local/modules/shadowdark/src/tests/effect-conformance.test.ts
 npm run module:check -- shadowdark
 ```
 

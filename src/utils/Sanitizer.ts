@@ -23,19 +23,20 @@ export function sanitizeItem(item: any): any {
 }
 
 /**
- * Helper to construct a standardized Shadowdark Effect object.
+ * New ActiveEffect data in the legacy `changes` shape, which Foundry 13 stores and
+ * Foundry 14 migrates losslessly to `system.changes`. Foundry assigns the id.
  */
 export function createEffect(name: string, icon: string, changes: any[], options: any = {}): any {
     return {
-        _id: options._id || Math.random().toString(36).substring(2, 15),
+        ...(options._id ? { _id: options._id } : {}),
         name: name,
-        icon: icon || "icons/svg/aura.svg",
-        img: icon || "icons/svg/aura.svg", // Compatibility
+        img: icon || "icons/svg/aura.svg",
         changes: changes.map(c => ({
             key: c.key,
             mode: c.mode ?? 2, // ADD
             value: String(c.value),
-            priority: c.priority ?? 0
+            // null means the change type's default priority, as in native pack data.
+            priority: c.priority ?? null
         })),
         disabled: !!options.disabled,
         duration: options.duration || { startTime: null, seconds: null, combat: null, rounds: null, turns: null, startRound: null, startTurn: null },

@@ -1,23 +1,31 @@
 import { logger } from '@sheet-delver/sdk';
 import type { CompendiumPackReader, ReadonlyDocumentStore } from '@sheet-delver/sdk/server';
 import { isRareLanguage } from '../logic/rules';
-import { SYSTEM_PREDEFINED_EFFECTS, BOON_TYPE_MAP, EFFECT_TRANSLATIONS_MAP } from '../data/talent-effects';
+import { BOON_TYPE_MAP, EFFECT_TRANSLATIONS_MAP } from '../data/talent-effects';
+import { NATIVE_PREDEFINED_EFFECTS } from '../data/native-predefined-effects';
+import { canonicalUuid, declaredPack, formatUuid, parseUuid } from '../logic/identity';
+import { isClassSpellcaster } from '../logic/rules';
+import { choiceCatalog, type ChoiceCatalog } from '../logic/talent-choices';
 
 /**
- * ShadowdarkRegistry — system-wide data, sourced entirely from the SDK runtime.
+ * ShadowdarkRegistry — a derived, in-process projection over this module's
+ * declared compendium packs (`runtime.compendium`). It is not a document store:
  *
- * It no longer maintains its own persistent cache or reaches into `PersistentCache` / `fs` /
- * `info.json`. Pack data comes from `runtime.compendium` (the module's declared packs, whose
- * rows the platform identity-stamps with `pack`/`uuid`), and UUID hydration from
- * `runtime.documents.fetchByUuid`. The categorized collections + nameIndex it builds are an
- * in-process *derived projection* over that platform data (TTL-memoized) — not a parallel
- * store. The adapter wires the sources via {@link attach} in `initialize(runtime)`.
+ * - Lookups are by exact canonical UUID. A request for another pack, a terminal
+ *   ID or a name never returns a different document (SD01-07).
+ * - Only declared compendium identities are served. World and embedded UUIDs are
+ *   caller-specific and must be read through the request runtime (SD01-06); they
+ *   are never fetched with the system-level reader or kept in shared collections.
+ * - `attach` (a new runtime/world) resets every collection and in-flight load, and
+ *   a load started for an earlier generation cannot publish into the new one.
  */
 export class ShadowdarkRegistry {
     private systemData: any = null;
     private _collections: Record<string, any[]> = {};
     private nameIndex: Record<string, string> = {};
+    private byUuid = new Map<string, any>();
     private lastFetch = 0;
+    private generation = 0;
 
     private aggregationPromise: Promise<any> | null = null;
     private pendingFetches = new Map<string, Promise<any>>();
@@ -36,10 +44,12 @@ export class ShadowdarkRegistry {
         'language': 'languages',
         'spell': 'spells',
         'talent': 'talents',
+        'class ability': 'class-abilities',
         'rolltable': 'tables',
-        'item': 'gear',
+        'basic': 'gear',
         'weapon': 'gear',
-        'armor': 'gear'
+        'armor': 'gear',
+        'npc': 'monsters',
     };
 
     private static readonly COLLECTIONS = [
@@ -47,10 +57,23 @@ export class ShadowdarkRegistry {
         'magic-items', 'conditions', 'spell-effects', 'properties'
     ];
 
-    /** Wire the runtime-backed data sources (called by the adapter on initialize). */
+    /** Wire the runtime-backed data sources; discards everything from a prior runtime. */
     public attach(compendium: CompendiumPackReader, documents: ReadonlyDocumentStore): void {
+        this.generation++;
         this._compendium = compendium;
         this._documents = documents;
+        this.reset();
+    }
+
+    /** Drop the derived projection so the next read rebuilds it from current packs. */
+    public reset(): void {
+        this.systemData = null;
+        this._collections = {};
+        this.nameIndex = {};
+        this.byUuid = new Map();
+        this.lastFetch = 0;
+        this.aggregationPromise = null;
+        this.pendingFetches = new Map();
     }
 
     /** The lean system index for the adapter's synchronous SystemAdapter methods. */
@@ -58,9 +81,13 @@ export class ShadowdarkRegistry {
         return this.systemData;
     }
 
-    /**
-     * Gets the lean aggregated system data (titles + nameIndex + rule data), reloading if stale.
-     */
+    /** Synchronous exact lookup in the hydrated declared-pack projection. */
+    public getCachedDocument(uuid: string): any | null {
+        const canonical = canonicalUuid(uuid);
+        const doc = canonical ? this.byUuid.get(canonical) : null;
+        return doc ? JSON.parse(JSON.stringify(doc)) : null;
+    }
+
     public async getSystemData(): Promise<any> {
         if (!this.isFresh()) {
             await this.aggregate();
@@ -69,7 +96,7 @@ export class ShadowdarkRegistry {
         return {
             titles: this.systemData?.titles || {},
             nameIndex: this.nameIndex || {},
-            PREDEFINED_EFFECTS: { ...SYSTEM_PREDEFINED_EFFECTS },
+            PREDEFINED_EFFECTS: { ...NATIVE_PREDEFINED_EFFECTS },
             BOON_TYPES: { ...BOON_TYPE_MAP },
             EFFECT_TRANSLATIONS: { ...EFFECT_TRANSLATIONS_MAP },
             _debug: {
@@ -83,8 +110,7 @@ export class ShadowdarkRegistry {
         if (!this.isFresh()) await this.aggregate();
         const collection = (this._collections as any)[id] || [];
 
-        // Force full data for character builder critical categories
-        // This ensures the Generator gets "unaltered" data without diet summaries.
+        // Character-builder categories keep complete source documents.
         const forceFull = [
             'ancestries', 'backgrounds', 'classes',
             'deities', 'patrons', 'talents', 'languages'
@@ -98,7 +124,7 @@ export class ShadowdarkRegistry {
                 rarity: d.rarity,
                 type: d.type,
                 tier: d.system?.tier,
-                // Rule Shard Statistics
+                level: d.system?.level?.value,
                 system: {
                     cost: d.system?.cost,
                     slots: d.system?.slots,
@@ -108,7 +134,12 @@ export class ShadowdarkRegistry {
                     talentClass: d.system?.talentClass,
                     talentLevel: d.system?.talentLevel,
                     requirement: d.system?.requirement,
-                    class: d.system?.class
+                    class: d.system?.class,
+                    baseWeapon: d.system?.baseWeapon,
+                    baseArmor: d.system?.baseArmor,
+                    magicItem: d.system?.magicItem,
+                    level: d.system?.level,
+                    alignment: d.system?.alignment,
                 }
             }))));
         }
@@ -120,8 +151,9 @@ export class ShadowdarkRegistry {
         if (this.aggregationPromise) {
             return this.aggregationPromise;
         }
+        const generation = this.generation;
 
-        this.aggregationPromise = (async () => {
+        const promise = (async () => {
             try {
                 logger.info('[ShadowdarkRegistry] Starting compendium-driven aggregation...');
 
@@ -132,36 +164,38 @@ export class ShadowdarkRegistry {
                 }
 
                 // Declared packs only; rows arrive identity-stamped with `pack`/`uuid`.
-                const [items, tables] = await Promise.all([
+                const [items, tables, actors] = await Promise.all([
                     this._compendium.findAll('Item'),
                     this._compendium.findAll('RollTable'),
+                    this._compendium.findAll('Actor'),
                 ]);
+                if (generation !== this.generation) return this.systemData;
 
                 const aggregated = this.createSkeleton();
-                const encounteredUuids = new Set<string>();
-                const localNameIndex = new Map<string, string>();
+                const byUuid = new Map<string, any>();
+                const nameIndex: Record<string, string> = {};
 
-                // Group rows by their source pack so the same categorization logic that used
-                // to iterate manifest pack shards can run per pack.
-                const byPack = new Map<string, any[]>();
-                for (const doc of [...items, ...tables]) {
-                    const packId = typeof doc.pack === 'string' ? doc.pack : 'shadowdark.unknown';
-                    if (!byPack.has(packId)) byPack.set(packId, []);
-                    byPack.get(packId)!.push(doc);
-                }
-
-                let loadedCount = 0;
-                for (const [packId, docs] of byPack) {
-                    loadedCount++;
-                    this._processShardDocuments(packId, docs, aggregated, localNameIndex, encounteredUuids);
+                for (const original of [...items, ...tables, ...actors]) {
+                    const doc: any = { ...original };
+                    const packId = typeof doc.pack === 'string' ? doc.pack : null;
+                    const pack = packId ? declaredPack(packId) : null;
+                    if (!pack) continue;
+                    const id = doc._id || doc.id;
+                    const canonical = canonicalUuid(doc.uuid) ?? (id ? `Compendium.${pack.id}.${pack.type}.${id}` : null);
+                    const ref = canonical ? parseUuid(canonical) : null;
+                    // A row must belong to the pack it was read from.
+                    if (!ref || ref.kind !== 'compendium' || ref.pack !== pack.id || ref.id !== id) continue;
+                    if (byUuid.has(canonical!)) continue;
+                    doc.uuid = canonical;
+                    doc.pack = pack.id;
+                    byUuid.set(canonical!, doc);
+                    if (typeof doc.name === 'string') nameIndex[canonical!] = doc.name;
+                    this._categorize(pack.id, doc, aggregated);
                 }
 
                 this._collections = aggregated;
-                this.nameIndex = encounteredUuids.size > 0 ? Array.from(encounteredUuids).reduce((acc: Record<string, string>, uuid: string) => {
-                    const name = localNameIndex.get(uuid);
-                    if (name) acc[uuid] = name;
-                    return acc;
-                }, {}) : {};
+                this.byUuid = byUuid;
+                this.nameIndex = nameIndex;
 
                 this.systemData = {
                     ...this.createSkeleton(),
@@ -172,227 +206,145 @@ export class ShadowdarkRegistry {
 
                 this.lastFetch = Date.now();
 
-                logger.info(`[ShadowdarkRegistry] Aggregation complete. ${loadedCount} packs processed. Index size: ${Object.keys(this.nameIndex).length}`);
+                logger.info(`[ShadowdarkRegistry] Aggregation complete. Index size: ${Object.keys(this.nameIndex).length}`);
 
                 return this.systemData;
             } catch (err) {
                 logger.error('[ShadowdarkRegistry] Aggregation failed:', err);
                 throw err;
             } finally {
-                this.aggregationPromise = null;
+                if (generation === this.generation) this.aggregationPromise = null;
             }
         })();
-
-        return this.aggregationPromise;
+        this.aggregationPromise = promise;
+        return promise;
     }
 
     /**
-     * Resolves a document by its UUID, hydrating it from the platform if it's not in the
-     * aggregated projection.
+     * Resolves an exact declared compendium document. Supported inputs are a
+     * canonical `Compendium.<pack>.<Type>.<id>` UUID or the explicit legacy alias
+     * `Compendium.<pack>.<id>` for a declared pack. Anything else returns null.
      */
     public async getDocument(uuid: string): Promise<any | null> {
-        if (!uuid) return null;
+        const ref = parseUuid(uuid);
+        if (!ref || ref.kind !== 'compendium') return null;
+        const pack = declaredPack(ref.pack);
+        if (!pack || pack.type !== ref.documentType) return null;
+        const canonical = formatUuid(ref);
 
-        // 1. Check local aggregated projection
         if (!this.isFresh()) await this.aggregate();
-        const collections = this._collections;
+        const found = this.byUuid.get(canonical);
+        if (found && (found.system || found.results || found.type === 'RollTable')) return JSON.parse(JSON.stringify(found));
 
-        let found = null;
-        const extractedId = uuid.includes('.') ? uuid.split('.').pop() : uuid;
-
-        for (const key of ShadowdarkRegistry.COLLECTIONS) {
-            found = collections[key]?.find((d: any) => {
-                const idMatch = d._id === extractedId || d.id === extractedId || d._id === uuid || d.id === uuid;
-                if (d.uuid === uuid || idMatch) return true;
-
-                // Flexible UUID matching (handle missing .Item. or .RollTable. segment)
-                if (uuid.startsWith('Compendium.') && d.uuid?.startsWith('Compendium.')) {
-                    const parts1 = uuid.split('.');
-                    const parts2 = d.uuid.split('.');
-                    if (parts1[1] === parts2[1] && (parts1[2] === parts2[2] || parts1.length === parts2.length)) {
-                        const id1 = parts1[parts1.length - 1];
-                        const id2 = parts2[parts2.length - 1];
-                        return id1 === id2;
-                    }
-                }
-                return false;
-            });
-            if (found && (found.system || found.type === 'RollTable' || found.results)) {
-                return JSON.parse(JSON.stringify(found));
+        // Index-only declared packs can be hydrated per document through the
+        // platform reader; the result must match the exact requested identity.
+        if (!this._documents) return null;
+        if (this.pendingFetches.has(canonical)) return this.pendingFetches.get(canonical);
+        const generation = this.generation;
+        const fetchPromise = (async () => {
+            try {
+                const fullDoc: any = await this._documents!.fetchByUuid(canonical);
+                if (!fullDoc || generation !== this.generation) return null;
+                if ((fullDoc._id ?? fullDoc.id) !== ref.id) return null;
+                const doc = { ...fullDoc, uuid: canonical, pack: pack.id };
+                this.byUuid.set(canonical, doc);
+                if (typeof doc.name === 'string') this.nameIndex[canonical] = doc.name;
+                return JSON.parse(JSON.stringify(doc));
+            } catch (e) {
+                logger.warn(`[ShadowdarkRegistry] Hydration failed for ${canonical}:`, e);
+                return null;
+            } finally {
+                this.pendingFetches.delete(canonical);
             }
-        }
-
-        if (!found) {
-            logger.debug(`[ShadowdarkRegistry] ${uuid} not found in projection. Index has ${Object.keys(this.nameIndex).length} items.`);
-        }
-
-        // 2. Hydrate from the platform document surface (compendium-backed, no live fetch).
-        if (this._documents) {
-            if (this.pendingFetches.has(uuid)) return this.pendingFetches.get(uuid);
-
-            const fetchPromise = (async () => {
-                try {
-                    logger.debug(`[ShadowdarkRegistry] Hydrating ${uuid} via runtime.documents...`);
-                    const fullDoc = await this._documents!.fetchByUuid(uuid);
-                    if (fullDoc) {
-                        return this.inventoryDocument(uuid, fullDoc);
-                    }
-                    return null;
-                } catch (e) {
-                    logger.warn(`[ShadowdarkRegistry] Hydration failed for ${uuid}:`, e);
-                    return null;
-                } finally {
-                    this.pendingFetches.delete(uuid);
-                }
-            })();
-
-            this.pendingFetches.set(uuid, fetchPromise);
-            return fetchPromise;
-        }
-
-        return null;
+        })();
+        this.pendingFetches.set(canonical, fetchPromise);
+        return fetchPromise;
     }
 
     /**
-     * Rolls on a table and ensures results are hydrated.
+     * Rolls a declared RollTable and hydrates exact result documents. A missing
+     * table or result document is reported, not substituted by name.
      */
-    public async draw(uuidOrName: string, rollOverride?: number): Promise<any | null> {
-        let table = await this.getDocument(uuidOrName);
-
-        if (!table && !uuidOrName.includes('.')) {
-            table = await this.findByName(uuidOrName, 'RollTable');
-        }
-
-        if (!table || (!table.results && !table.results?.length)) {
-            logger.warn(`[ShadowdarkRegistry] Draw failed: Table '${uuidOrName}' not found or empty.`);
+    public async draw(uuid: string, rollOverride?: number): Promise<any | null> {
+        const table = await this.getDocument(uuid);
+        if (!table || !Array.isArray(table.results) || !table.results.length) {
+            logger.warn(`[ShadowdarkRegistry] Draw failed: table '${uuid}' is not a declared, populated RollTable.`);
             return null;
         }
 
-        const formula = table.system?.formula || table.formula || "1d20";
+        const formula = table.system?.formula || table.formula;
         let roll = rollOverride;
-
+        const match = typeof formula === 'string' ? formula.match(/^(\d+)d(\d+)$/i) : null;
         if (roll === undefined) {
-            const match = formula.match(/^(\d+)d(\d+)$/i);
-            if (match) {
-                const count = parseInt(match[1]);
-                const die = parseInt(match[2]);
-                roll = 0;
-                for (let i = 0; i < count; i++) roll += Math.floor(Math.random() * die) + 1;
-            } else {
-                roll = Math.floor(Math.random() * 20) + 1;
+            if (!match) {
+                logger.warn(`[ShadowdarkRegistry] Draw failed: table formula '${formula}' is not supported.`);
+                return null;
             }
+            const count = parseInt(match[1]);
+            const die = parseInt(match[2]);
+            roll = 0;
+            for (let i = 0; i < count; i++) roll += Math.floor(Math.random() * die) + 1;
         }
 
         const matched = table.results.filter((r: any) => {
-            const range = r.range || [1, 1];
-            return roll! >= range[0] && roll! <= range[1];
+            const range = Array.isArray(r.range) ? r.range : null;
+            return range && roll! >= range[0] && roll! <= range[1];
         });
 
         const items: any[] = [];
+        const unresolved: string[] = [];
         for (const res of matched) {
-            const targetUuid = res.documentUuid || (res.documentCollection && res.documentId ? `Compendium.${res.documentCollection}.Item.${res.documentId}` : null);
-
-            if (targetUuid) {
-                const item = await this.getDocument(targetUuid);
-                if (item) items.push(item);
-            }
+            const targetUuid = canonicalUuid(res.documentUuid)
+                ?? (res.documentCollection && res.documentId ? canonicalUuid(`Compendium.${res.documentCollection}.Item.${res.documentId}`) : null);
+            if (!targetUuid) continue;
+            const item = await this.getDocument(targetUuid);
+            if (item) items.push(item); else unresolved.push(targetUuid);
         }
 
-        return {
-            id: table._id || table.id,
-            roll,
-            total: roll,
-            formula,
-            results: matched,
-            items: items,
-            table
-        };
+        return { id: table._id || table.id, uuid: table.uuid, roll, total: roll, formula, results: matched, items, unresolved, table };
     }
 
     /**
-     * Finds a document in the projection by name and type.
+     * Spells whose `system.class` references the exact class document. Class
+     * identity is the declared class UUID, not a name substring.
      */
-    public async findByName(name: string, type?: string): Promise<any | null> {
+    public async getSpellsForClass(classUuid: string): Promise<any[]> {
         if (!this.isFresh()) await this.aggregate();
-        const normalized = name.toLowerCase();
-
-        for (const key of ShadowdarkRegistry.COLLECTIONS) {
-            const found = this._collections[key]?.find((doc: any) => {
-                const matchesName = (doc.name || "").toLowerCase() === normalized;
-                if (!matchesName) return false;
-                if (!type) return true;
-
-                const docType = (doc.type || "").toLowerCase();
-                const targetType = type.toLowerCase();
-
-                if (targetType === 'rolltable' && (doc.results || key === 'tables')) return true;
-
-                return docType === targetType;
-            });
-            if (found) return JSON.parse(JSON.stringify(found));
-        }
-        return null;
+        const canonical = canonicalUuid(classUuid);
+        if (!canonical) return [];
+        return JSON.parse(JSON.stringify((this._collections.spells ?? []).filter((spell: any) =>
+            (Array.isArray(spell.system?.class) ? spell.system.class : []).some((value: unknown) => canonicalUuid(value) === canonical))));
     }
 
     /**
-     * Filters discovered spells by class source.
+     * Import-format conversion: the one declared document of an allowed native type
+     * whose name equals `name` (case-insensitive). Several distinct documents with
+     * that name are ambiguous and return `{ ambiguous }` instead of a guess.
      */
-    public async getSpellsBySource(className: string): Promise<any[]> {
+    public async findUniqueByName(name: string, types: string[]): Promise<{ doc: any | null; ambiguous: string[] }> {
         if (!this.isFresh()) await this.aggregate();
-        if (!this._collections?.spells) return [];
+        const wanted = String(name ?? '').trim().toLowerCase();
+        if (!wanted) return { doc: null, ambiguous: [] };
+        const matches = [...this.byUuid.values()].filter(doc => types.includes(doc.type) && String(doc.name ?? '').trim().toLowerCase() === wanted);
+        if (matches.length === 1) return { doc: JSON.parse(JSON.stringify(matches[0])), ambiguous: [] };
+        return { doc: null, ambiguous: matches.map(doc => doc.uuid) };
+    }
 
-        const normalizedClass = className.toLowerCase();
-        return JSON.parse(JSON.stringify(this._collections.spells.filter((spell: any) => {
-            const spellClasses = spell.system?.class || [];
-            const list = Array.isArray(spellClasses) ? spellClasses : [spellClasses];
-            return list.some((c: string) => {
-                const identifier = String(c).toLowerCase();
+    /** Native choice options (base weapons/armor, spells) from declared packs. */
+    public async getChoiceCatalog(): Promise<ChoiceCatalog> {
+        if (!this.isFresh()) await this.aggregate();
+        return choiceCatalog([...(this._collections.gear ?? []), ...(this._collections['magic-items'] ?? []), ...(this._collections.spells ?? [])]);
+    }
 
-                if (identifier.includes(normalizedClass)) return true;
-
-                const resolvedName = (this.nameIndex[c] || "").toLowerCase();
-                if (resolvedName && resolvedName.includes(normalizedClass)) return true;
-
-                return false;
-            });
-        })));
+    /** Declared casting classes (native ClassSD.isCastingClass). */
+    public async getCastingClasses(): Promise<any[]> {
+        if (!this.isFresh()) await this.aggregate();
+        return JSON.parse(JSON.stringify((this._collections.classes ?? []).filter(isClassSpellcaster)));
     }
 
     public async getIndex(): Promise<Record<string, string>> {
         if (!this.isFresh()) await this.aggregate();
         return this.nameIndex;
-    }
-
-    /**
-     * Updates/Inserts a hydrated document into the aggregated projection.
-     */
-    private inventoryDocument(uuid: string, doc: any): any {
-        const enriched = { ...doc, uuid, isShallow: false };
-        let updated = false;
-
-        for (const key of ShadowdarkRegistry.COLLECTIONS) {
-            if (!this._collections[key]) continue;
-            const idx = this._collections[key].findIndex((d: any) => d.uuid === uuid || d._id === uuid || d.id === uuid);
-            if (idx !== -1) {
-                this._collections[key][idx] = enriched;
-                updated = true;
-            }
-        }
-
-        if (!updated) {
-            const target = ShadowdarkRegistry.TYPE_TO_COLLECTION[doc.type?.toLowerCase()] || 'gear';
-            if (!this._collections[target]) this._collections[target] = [];
-            this._collections[target].push(enriched);
-        }
-
-        if (doc.uuid && doc.name) {
-            this.nameIndex[doc.uuid] = doc.name;
-            if (this.systemData) {
-                this.systemData.nameIndex = { ...this.nameIndex };
-            }
-        }
-
-        return JSON.parse(JSON.stringify(enriched));
     }
 
     private isFresh(): boolean {
@@ -402,7 +354,7 @@ export class ShadowdarkRegistry {
 
     private _getRuleData() {
         return {
-            PREDEFINED_EFFECTS: { ...SYSTEM_PREDEFINED_EFFECTS },
+            PREDEFINED_EFFECTS: { ...NATIVE_PREDEFINED_EFFECTS },
             BOON_TYPES: { ...BOON_TYPE_MAP },
             EFFECT_TRANSLATIONS: { ...EFFECT_TRANSLATIONS_MAP },
             DEBUG_SYNC_MS: Date.now()
@@ -421,69 +373,26 @@ export class ShadowdarkRegistry {
         return skeleton;
     }
 
-    private _processShardDocuments(packId: string, docs: any[], results: any, nameIndex: Map<string, string>, encounteredUuids: Set<string>) {
+    /** Category from native document type; pack names only split mixed packs. */
+    private _categorize(packId: string, doc: any, results: any) {
         const lowerPack = packId.toLowerCase();
-        docs.forEach(originalDoc => {
-            const doc = { ...originalDoc };
-            const id = doc._id || doc.id;
+        const type = String(doc.type || '').toLowerCase();
+        let category: string | null = null;
 
-            if (!doc.uuid) {
-                const isTable = doc.type === 'RollTable' || (doc.results && !doc.type) || lowerPack.includes('rollable-tables');
-                const docType = isTable ? 'RollTable' : 'Item';
-                doc.uuid = `Compendium.${packId}.${docType}.${id}`;
-            }
-            doc.pack = packId;
+        if (lowerPack.endsWith('.magic-items') && ['weapon', 'armor', 'basic', 'potion', 'scroll', 'wand'].includes(type)) category = 'magic-items';
+        else if (lowerPack.endsWith('.conditions')) category = 'conditions';
+        else if (lowerPack.endsWith('.spell-effects')) category = 'spell-effects';
+        else if (lowerPack.endsWith('.properties')) category = 'properties';
+        else if (lowerPack.endsWith('.rollable-tables') || type === 'rolltable' || (doc.results && !doc.type)) category = 'tables';
+        else category = ShadowdarkRegistry.TYPE_TO_COLLECTION[type] ?? null;
 
-            if (encounteredUuids.has(doc.uuid)) return;
-            encounteredUuids.add(doc.uuid);
-            if (typeof doc.uuid === 'string' && typeof doc.name === 'string') {
-                nameIndex.set(doc.uuid, doc.name);
-            }
-
-            const type = (doc.type || "").toLowerCase();
-            let category: string | null = null;
-
-            category = ShadowdarkRegistry.TYPE_TO_COLLECTION[type] || null;
-
-            if (!category) {
-                if (lowerPack.includes('ancestries')) category = 'ancestries';
-                else if (lowerPack.includes('backgrounds')) category = 'backgrounds';
-                else if (lowerPack.includes('classes')) category = 'classes';
-                else if (lowerPack.includes('spells')) category = 'spells';
-                else if (lowerPack.includes('talents') || lowerPack.includes('class-abilities')) category = 'talents';
-                else if (lowerPack.includes('languages')) category = 'languages';
-                else if (lowerPack.includes('magic-items')) category = 'magic-items';
-                else if (lowerPack.includes('gear')) category = 'gear';
-                else if (lowerPack.includes('conditions')) category = 'conditions';
-                else if (lowerPack.includes('spell-effects')) category = 'spell-effects';
-                else if (lowerPack.includes('properties')) category = 'properties';
-                else if (lowerPack.includes('rollable-tables')) category = 'tables';
-            }
-
-            if (!category && lowerPack.includes('patrons-and-deities')) {
-                const name = (doc.name || "").toLowerCase();
-                if (name.includes('patron')) category = 'patrons';
-                else category = 'deities';
-            }
-
-            if (category && results[category]) {
-                if (category === 'languages') {
-                    doc.rarity = isRareLanguage(doc.name) ? 'rare' : 'common';
-                } else if (category === 'classes' && doc.system?.titles) {
-                    results.titles[doc.name] = doc.system.titles;
-                }
-                results[category].push(doc);
-            } else if (!category) {
-                if (['item', 'weapon', 'armor'].includes(type)) {
-                    results.gear.push(doc);
-                }
-            }
-
-            if (type === 'rolltable' || (doc.results && !category)) {
-                if (!results.tables.includes(doc)) {
-                    results.tables.push(doc);
-                }
-            }
-        });
+        if (!category && ['potion', 'scroll', 'wand', 'gem'].includes(type)) category = 'gear';
+        if (!category) return;
+        if (category === 'languages') {
+            doc.rarity = isRareLanguage(doc.name) ? 'rare' : 'common';
+        } else if (category === 'classes' && doc.system?.titles) {
+            results.titles[doc.name] = doc.system.titles;
+        }
+        (results[category] ??= []).push(doc);
     }
 }

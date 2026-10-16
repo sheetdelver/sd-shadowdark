@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { X, Search, ChevronDown, ChevronRight, Shield, Backpack, Swords, Sparkles, Sprout, Briefcase, Plus, Flame, Sun, Target } from 'lucide-react';
 import { useSDK } from '@sheet-delver/sdk/react';
 import { useShadowdarkUI } from '../context/ShadowdarkUIContext';
+import { presentDescription } from '../../logic/description';
 
 interface GearSelectionModalProps {
     isOpen: boolean;
@@ -280,7 +281,7 @@ export default function GearSelectionModal({ isOpen, onClose, onCreate }: GearSe
                                                                 {/* Description */}
                                                                 <div
                                                                     className="text-sm lg:text-xs text-neutral-600 leading-relaxed break-words"
-                                                                    dangerouslySetInnerHTML={{ __html: item.system?.description || '' }}
+                                                                    dangerouslySetInnerHTML={{ __html: presentDescription(item.system?.description) }}
                                                                 />
                                                             </div>
                                                         </div>

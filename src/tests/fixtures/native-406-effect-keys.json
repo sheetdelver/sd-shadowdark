@@ -1,0 +1,479 @@
+{
+ "release": "release-4.0.6",
+ "commit": "9677d16b3903b3b640f00d4efd48249142ac8334",
+ "generatedFrom": "data/packs/*.db ActiveEffect documents listed by their parent (orphaned effect files excluded)",
+ "keys": [
+  {
+   "key": "system.abilities.cha.value",
+   "mode": 5,
+   "value": "3",
+   "parentType": "Effect",
+   "source": "conditions.db/Permanent Ability (Cha)",
+   "count": 8
+  },
+  {
+   "key": "system.abilities.con.value",
+   "mode": 2,
+   "value": "-1",
+   "parentType": "Effect",
+   "source": "conditions.db/Condition: Disease (1)",
+   "count": 18
+  },
+  {
+   "key": "system.abilities.dex.value",
+   "mode": 5,
+   "value": "3",
+   "parentType": "Effect",
+   "source": "conditions.db/Permanent Ability (Dex)",
+   "count": 10
+  },
+  {
+   "key": "system.abilities.int.value",
+   "mode": 5,
+   "value": "1",
+   "parentType": "Effect",
+   "source": "conditions.db/Condition: Bug Brain",
+   "count": 9
+  },
+  {
+   "key": "system.abilities.str.value",
+   "mode": 5,
+   "value": "3",
+   "parentType": "Effect",
+   "source": "conditions.db/Permanent Ability (Str)",
+   "count": 12
+  },
+  {
+   "key": "system.abilities.wis.value",
+   "mode": 2,
+   "value": "-1",
+   "parentType": "Effect",
+   "source": "conditions.db/Condition: Drained (1)",
+   "count": 13
+  },
+  {
+   "key": "system.attributes.ac.REPLACEME",
+   "mode": 2,
+   "value": "1",
+   "parentType": "Talent",
+   "source": "talents.db/Armor Mastery",
+   "count": 1
+  },
+  {
+   "key": "system.attributes.ac.all",
+   "mode": 5,
+   "value": "12",
+   "parentType": "Effect",
+   "source": "spell-effects.db/Dire Wolf",
+   "count": 3
+  },
+  {
+   "key": "system.attributes.ac.unarmored",
+   "mode": 2,
+   "value": "2+floor(@level.value/2)",
+   "parentType": "Talent",
+   "source": "talents.db/Stone Skin Talent",
+   "count": 1
+  },
+  {
+   "key": "system.attributes.ac.value",
+   "mode": 2,
+   "value": "1",
+   "parentType": "Armor",
+   "source": "magic-items.db/AC Bonus",
+   "count": 14
+  },
+  {
+   "key": "system.attributes.hp.max",
+   "mode": 2,
+   "value": "2",
+   "parentType": "Talent",
+   "source": "quickstart-pregens.db/Extra HP Max",
+   "count": 6
+  },
+  {
+   "key": "system.bonus.backstabdice",
+   "mode": 2,
+   "value": "1",
+   "parentType": "Talent",
+   "source": "quickstart-pregens.db/Additional Backstab Die",
+   "count": 2
+  },
+  {
+   "key": "system.bonus.destineddie",
+   "mode": 2,
+   "value": "2",
+   "parentType": "Talent",
+   "source": "talents.db/Destine Die Upgrade",
+   "count": 2
+  },
+  {
+   "key": "system.languages",
+   "mode": 2,
+   "value": "Compendium.shadowdark.languages.Item.b5yBrLaRIl7ZEWKu",
+   "parentType": "Armor",
+   "source": "magic-items.db/Speak & Understand Diabolic",
+   "count": 2
+  },
+  {
+   "key": "system.roll.attack.bonus.all",
+   "mode": 2,
+   "value": "1",
+   "parentType": "Effect",
+   "source": "spell-effects.db/Holy Weapon",
+   "count": 3
+  },
+  {
+   "key": "system.roll.attack.bonus.this",
+   "mode": 2,
+   "value": "1",
+   "parentType": "Weapon",
+   "source": "magic-items.db/Attack Roll Bonus",
+   "count": 24
+  },
+  {
+   "key": "system.roll.attack.critical-failure.all",
+   "mode": 5,
+   "value": "3",
+   "parentType": "Basic",
+   "source": "magic-items.db/Critical Failure Threshold",
+   "count": 1
+  },
+  {
+   "key": "system.roll.attack.critical-multiplier.this",
+   "mode": 5,
+   "value": "4",
+   "parentType": "Weapon",
+   "source": "magic-items.db/Critical Multiplier",
+   "count": 1
+  },
+  {
+   "key": "system.roll.attack.critical-success.all",
+   "mode": 5,
+   "value": "18",
+   "parentType": "Basic",
+   "source": "magic-items.db/Critical Success Threshold",
+   "count": 1
+  },
+  {
+   "key": "system.roll.attack.damage.all",
+   "mode": 1,
+   "value": "2",
+   "parentType": "Effect",
+   "source": "spell-effects.db/Envenomed",
+   "count": 4
+  },
+  {
+   "key": "system.roll.attack.damage.this",
+   "mode": 2,
+   "value": "2",
+   "parentType": "Weapon",
+   "source": "magic-items.db/Attack Damage Bonus",
+   "count": 27
+  },
+  {
+   "key": "system.roll.attack.extra-damage-die.all",
+   "mode": 2,
+   "value": "1+@bonus.backstabdice+floor(@level.value/2)",
+   "parentType": "Talent",
+   "source": "quickstart-pregens.db/Backstab",
+   "count": 3
+  },
+  {
+   "key": "system.roll.attack.upgrade-damage-die.REPLACEME",
+   "mode": 2,
+   "value": "5",
+   "parentType": "Talent",
+   "source": "talents.db/Increased Weapon Damage Die",
+   "count": 1
+  },
+  {
+   "key": "system.roll.dex.advantage",
+   "mode": 2,
+   "value": "1",
+   "parentType": "Talent",
+   "source": "talents.db/Stone Skin Advantage on Hide",
+   "count": 1
+  },
+  {
+   "key": "system.roll.hp.advantage",
+   "mode": 2,
+   "value": "1",
+   "parentType": "Talent",
+   "source": "quickstart-pregens.db/HP Roll Advantage",
+   "count": 3
+  },
+  {
+   "key": "system.roll.initiative.advantage",
+   "mode": 2,
+   "value": "1",
+   "parentType": "Talent",
+   "source": "quickstart-pregens.db/Initiative Advantage",
+   "count": 2
+  },
+  {
+   "key": "system.roll.melee.advantage.all",
+   "mode": 2,
+   "value": "-1",
+   "parentType": "Armor",
+   "source": "magic-items.db/Disadvantage on Attacks & Spellcasting vs Demons",
+   "count": 2
+  },
+  {
+   "key": "system.roll.melee.advantage.this",
+   "mode": 2,
+   "value": "1",
+   "parentType": "Weapon",
+   "source": "magic-items.db/Advantage on attacks vs Undead",
+   "count": 1
+  },
+  {
+   "key": "system.roll.melee.bonus.REPLACEME",
+   "mode": 2,
+   "value": "1+floor(@level.value/2)",
+   "parentType": "Talent",
+   "source": "talents.db/Weapon Mastery",
+   "count": 1
+  },
+  {
+   "key": "system.roll.melee.bonus.all",
+   "mode": 2,
+   "value": "1",
+   "parentType": "Talent",
+   "source": "quickstart-pregens.db/Mighty",
+   "count": 7
+  },
+  {
+   "key": "system.roll.melee.bonus.bastard-sword",
+   "mode": 2,
+   "value": "1+floor(@level.value/2)",
+   "parentType": "Talent",
+   "source": "quickstart-pregens.db/Weapon Mastery",
+   "count": 1
+  },
+  {
+   "key": "system.roll.melee.bonus.greataxe",
+   "mode": 2,
+   "value": "1+floor(@level.value/2)",
+   "parentType": "Talent",
+   "source": "quickstart-pregens.db/Weapon Mastery",
+   "count": 1
+  },
+  {
+   "key": "system.roll.melee.damage.REPLACEME",
+   "mode": 2,
+   "value": "1+floor(@level.value/2)",
+   "parentType": "Talent",
+   "source": "talents.db/Weapon Mastery",
+   "count": 1
+  },
+  {
+   "key": "system.roll.melee.damage.all",
+   "mode": 2,
+   "value": "1",
+   "parentType": "Armor",
+   "source": "magic-items.db/Melee Damage Bonus",
+   "count": 7
+  },
+  {
+   "key": "system.roll.melee.damage.bastard-sword",
+   "mode": 2,
+   "value": "1+floor(@level.value/2)",
+   "parentType": "Talent",
+   "source": "quickstart-pregens.db/Weapon Mastery",
+   "count": 1
+  },
+  {
+   "key": "system.roll.melee.damage.greataxe",
+   "mode": 2,
+   "value": "1+floor(@level.value/2)",
+   "parentType": "Talent",
+   "source": "quickstart-pregens.db/Weapon Mastery",
+   "count": 1
+  },
+  {
+   "key": "system.roll.ranged.advantage.all",
+   "mode": 2,
+   "value": "-1",
+   "parentType": "Armor",
+   "source": "magic-items.db/Disadvantage on Attacks & Spellcasting vs Demons",
+   "count": 2
+  },
+  {
+   "key": "system.roll.ranged.advantage.this",
+   "mode": 2,
+   "value": "1",
+   "parentType": "Weapon",
+   "source": "magic-items.db/Advantage vs Unnatural Creatures & Outsiders",
+   "count": 1
+  },
+  {
+   "key": "system.roll.ranged.bonus.all",
+   "mode": 2,
+   "value": "1",
+   "parentType": "Talent",
+   "source": "quickstart-pregens.db/Ranged Attack Roll Bonus",
+   "count": 7
+  },
+  {
+   "key": "system.roll.ranged.damage.all",
+   "mode": 2,
+   "value": "1",
+   "parentType": "Armor",
+   "source": "magic-items.db/Ranged Damage Bonus",
+   "count": 4
+  },
+  {
+   "key": "system.roll.spell.advantage.REPLACEME",
+   "mode": 2,
+   "value": "1",
+   "parentType": "Talent",
+   "source": "talents.db/Spellcasting Advantage on Spell",
+   "count": 1
+  },
+  {
+   "key": "system.roll.spell.advantage.all",
+   "mode": 2,
+   "value": "-1",
+   "parentType": "Armor",
+   "source": "magic-items.db/Disadvantage on Attacks & Spellcasting vs Demons",
+   "count": 4
+  },
+  {
+   "key": "system.roll.spell.advantage.disintegrate",
+   "mode": 2,
+   "value": "1",
+   "parentType": "Armor",
+   "source": "magic-items.db/Spellcasting Advantage on Spell",
+   "count": 1
+  },
+  {
+   "key": "system.roll.spell.advantage.magic-missile",
+   "mode": 2,
+   "value": "1",
+   "parentType": "Talent",
+   "source": "quickstart-pregens.db/Spellcasting Advantage on Spell",
+   "count": 3
+  },
+  {
+   "key": "system.roll.spell.advantage.power-word-kill",
+   "mode": 2,
+   "value": "1",
+   "parentType": "Armor",
+   "source": "magic-items.db/Spellcasting Advantage on Spell",
+   "count": 1
+  },
+  {
+   "key": "system.roll.spell.advantage.shapechanger",
+   "mode": 2,
+   "value": "1",
+   "parentType": "Armor",
+   "source": "magic-items.db/Spellcasting Advantage on Spell",
+   "count": 1
+  },
+  {
+   "key": "system.roll.spell.bonus.all",
+   "mode": 2,
+   "value": "1",
+   "parentType": "Talent",
+   "source": "quickstart-pregens.db/Spellcasting Check Bonus",
+   "count": 8
+  },
+  {
+   "key": "system.roll.spell.bonus.control-water",
+   "mode": 2,
+   "value": "4",
+   "parentType": "Weapon",
+   "source": "magic-items.db/Bonus to Control Water",
+   "count": 1
+  },
+  {
+   "key": "system.roll.spell.bonus.detect-thoughts",
+   "mode": 2,
+   "value": "4",
+   "parentType": "Armor",
+   "source": "magic-items.db/Spellcasting Check Bonus",
+   "count": 1
+  },
+  {
+   "key": "system.roll.spell.damage.all",
+   "mode": 2,
+   "value": "d@bonus.destineddie",
+   "parentType": "Talent",
+   "source": "talents.db/Destined (Dmg)",
+   "count": 1
+  },
+  {
+   "key": "system.roll.stat.advantage.all",
+   "mode": 2,
+   "value": "1",
+   "parentType": "Talent",
+   "source": "quickstart-pregens.db/Thievery",
+   "count": 3
+  },
+  {
+   "key": "system.roll.stat.advantage.con",
+   "mode": 2,
+   "value": "1",
+   "parentType": "Armor",
+   "source": "magic-items.db/Advantage vs Poison",
+   "count": 1
+  },
+  {
+   "key": "system.roll.stat.advantage.dex",
+   "mode": 2,
+   "value": "1",
+   "parentType": "Talent",
+   "source": "talents.db/Advantage Against Opposing Force",
+   "count": 1
+  },
+  {
+   "key": "system.roll.stat.advantage.str",
+   "mode": 2,
+   "value": "1",
+   "parentType": "Talent",
+   "source": "quickstart-pregens.db/Advantage Against Opposing Force",
+   "count": 3
+  },
+  {
+   "key": "system.roll.stat.bonus.all",
+   "mode": 2,
+   "value": "d@bonus.destineddie",
+   "parentType": "Talent",
+   "source": "talents.db/Destined",
+   "count": 1
+  },
+  {
+   "key": "system.slots",
+   "mode": 2,
+   "value": "10",
+   "parentType": "Basic",
+   "source": "magic-items.db/Additional Gear Slots",
+   "count": 4
+  },
+  {
+   "key": "system.spellcasting.allowAllItems",
+   "mode": 2,
+   "value": "true",
+   "parentType": "Talent",
+   "source": "talents.db/Allow Magic Items",
+   "count": 2
+  },
+  {
+   "key": "system.spellcasting.classes",
+   "mode": 2,
+   "value": "priest",
+   "parentType": "Talent",
+   "source": "quickstart-pregens.db/Spell Class",
+   "count": 9
+  },
+  {
+   "key": "system.spellcasting.itemAbility",
+   "mode": 2,
+   "value": "cha",
+   "parentType": "Talent",
+   "source": "talents.db/Allow Magic Items",
+   "count": 1
+  }
+ ]
+}

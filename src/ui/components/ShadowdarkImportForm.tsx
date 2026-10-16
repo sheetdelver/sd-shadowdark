@@ -24,6 +24,8 @@ export default function ShadowdarkImportForm({ onCancel, onImportSuccess }: Shad
     const [warnings, setWarnings] = useState<string[]>([]);
     const [importedId, setImportedId] = useState<string | null>(null);
     const [charSummary, setCharSummary] = useState<any>(null);
+    // Unresolved references returned before any write; the user decides.
+    const [review, setReview] = useState<{ parsed: any; unresolved: Array<{ category: string; name: string; reason: string; candidates?: string[] }> } | null>(null);
 
     const handleCancel = async () => {
         if (importedId) {
@@ -37,7 +39,7 @@ export default function ShadowdarkImportForm({ onCancel, onImportSuccess }: Shad
         onCancel();
     };
 
-    const handleImport = async () => {
+    const handleImport = async (confirmation?: { allowCustomGear: boolean }) => {
         if (!jsonInput.trim()) return;
 
         setLoading(true);
@@ -67,10 +69,17 @@ export default function ShadowdarkImportForm({ onCancel, onImportSuccess }: Shad
             const res = await fetchWithAuth('/api/modules/shadowdark/import', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(parsed)
+                body: JSON.stringify(confirmation ? { character: parsed, confirm: true, allowCustomGear: confirmation.allowCustomGear } : parsed)
             });
 
             const data = await res.json();
+            if (data.needsConfirmation) {
+                // Nothing was written; show what could not be resolved.
+                setReview({ parsed, unresolved: data.unresolved ?? [] });
+                setWarnings(data.warnings ?? []);
+                return;
+            }
+            setReview(null);
             logger.debug('[Import Page] API Response:', data);
 
             if (data.debug && Array.isArray(data.debug)) {
@@ -81,6 +90,9 @@ export default function ShadowdarkImportForm({ onCancel, onImportSuccess }: Shad
                 throw new Error(data.error || 'Import failed');
             }
 
+            if (data.unresolved?.length) {
+                setRawErrors(data.unresolved.map((entry: any) => ({ type: entry.category, name: entry.name, error: entry.reason })));
+            }
             if (data.errors && data.errors.length > 0) {
                 // Filter and store objects. If string, wrap it.
                 const objs = data.errors.map((e: any) =>
@@ -95,7 +107,7 @@ export default function ShadowdarkImportForm({ onCancel, onImportSuccess }: Shad
 
             if (data.success && data.id) {
                 // If there are no HARD errors (warnings are ok), auto-proceed.
-                if (!data.errors || data.errors.length === 0) {
+                if ((!data.errors || data.errors.length === 0) && !data.unresolved?.length) {
                     onImportSuccess(data.id);
                     return;
                 }
@@ -144,6 +156,23 @@ export default function ShadowdarkImportForm({ onCancel, onImportSuccess }: Shad
             <div className="flex-1 px-4 max-w-5xl mx-auto w-full pt-6 mb-20 space-y-8">
                 <section className="bg-white p-6 border-2 border-black shadow-sm">
                     <h2 className="text-black font-black font-serif text-xl border-b-2 border-black mb-4 pb-1">Shadowdarklings.net Importer</h2>
+
+                    {review && !importedId && (
+                        <div className="border-2 border-amber-600 bg-amber-50 p-4 mb-6" role="region" aria-label="Unresolved references">
+                            <h3 className="font-serif font-bold text-lg mb-2">Review before importing</h3>
+                            <p className="text-sm mb-3">Nothing has been created yet. These entries have no exact Shadowdark document. Gear and treasure lines can be created as clearly labelled custom items from the export's own values; other entries are skipped.</p>
+                            <ul className="text-sm space-y-1 max-h-56 overflow-y-auto">
+                                {review.unresolved.map((entry, index) => (
+                                    <li key={index}><strong>{entry.name}</strong> <span className="text-neutral-700">({entry.category})</span> — {entry.reason}{entry.candidates?.length ? ` Candidates: ${entry.candidates.join(', ')}` : ''}</li>
+                                ))}
+                            </ul>
+                            <div className="flex flex-wrap gap-2 mt-4">
+                                <button type="button" disabled={loading} onClick={() => handleImport({ allowCustomGear: true })} className="min-h-11 px-4 bg-black text-white font-bold uppercase text-xs disabled:opacity-50">Import with custom gear</button>
+                                <button type="button" disabled={loading} onClick={() => handleImport({ allowCustomGear: false })} className="min-h-11 px-4 border-2 border-black bg-white font-bold uppercase text-xs disabled:opacity-50">Import and skip unresolved</button>
+                                <button type="button" onClick={() => setReview(null)} className="min-h-11 px-4 border-2 border-neutral-500 font-bold uppercase text-xs">Edit JSON</button>
+                            </div>
+                        </div>
+                    )}
 
                     {/* View: Input */}
                     {!importedId && (
@@ -279,8 +308,8 @@ export default function ShadowdarkImportForm({ onCancel, onImportSuccess }: Shad
                     ) : (
                         <button
                             type="button"
-                            onClick={handleImport}
-                            disabled={loading || !jsonInput}
+                            onClick={() => handleImport()}
+                            disabled={loading || !jsonInput || !!review}
                             className="flex-1 bg-amber-600 hover:bg-amber-500 text-white font-bold py-4 rounded shadow-lg uppercase tracking-widest text-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105"
                         >
                             {loading ? 'Reading Scroll...' : 'Import Character'}

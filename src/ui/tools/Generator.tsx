@@ -8,6 +8,8 @@ import { useSDK, useSDKComponents } from '@sheet-delver/sdk/react';
 import { useShadowdarkUI, ShadowdarkUIProvider } from '../context/ShadowdarkUIContext';
 import { enrichItem, resolveSubItems, EnrichmentContext } from '../../logic/actor-enricher';
 import { assertResolvedTalentChoices } from '../../logic/talent-choices';
+import { ownedCopy } from '../../logic/identity';
+import { presentDescription } from '../../logic/description';
 
 export default function Generator() {
     return (
@@ -814,22 +816,19 @@ function GeneratorContent() {
                     patron: effectivePatronUuid || "",    // Link to Compendium UUID (Correct for Shadowdark)
                     alignment: formData.alignment,
                     deity: formData.deity,
-                    details: {
-                        title: formData.title || ""
-                    },
                     languages: languageUuids, // Populate with selected language UUIDs
                     level: {
                         value: formData.level0 ? 0 : 1,
-                        xp: 0,
-                        next: formData.level0 ? 0 : 10
+                        xp: 0
                     },
+                    // PlayerSD attributeModel stores only `value`; title is derived from the class.
                     abilities: {
-                        str: { value: formData.stats.STR.value, base: formData.stats.STR.value, bonus: 0 },
-                        dex: { value: formData.stats.DEX.value, base: formData.stats.DEX.value, bonus: 0 },
-                        con: { value: formData.stats.CON.value, base: formData.stats.CON.value, bonus: 0 },
-                        int: { value: formData.stats.INT.value, base: formData.stats.INT.value, bonus: 0 },
-                        wis: { value: formData.stats.WIS.value, base: formData.stats.WIS.value, bonus: 0 },
-                        cha: { value: formData.stats.CHA.value, base: formData.stats.CHA.value, bonus: 0 }
+                        str: { value: formData.stats.STR.value },
+                        dex: { value: formData.stats.DEX.value },
+                        con: { value: formData.stats.CON.value },
+                        int: { value: formData.stats.INT.value },
+                        wis: { value: formData.stats.WIS.value },
+                        cha: { value: formData.stats.CHA.value }
                     },
                     attributes: {
                         hp: { value: extraData.hpRoll ?? formData.hp, max: extraData.hpRoll ?? formData.hp }
@@ -841,7 +840,8 @@ function GeneratorContent() {
                     },
                     notes: formData.description
                 },
-                items: items
+                // Owned copies record their exact compendium source.
+                items: items.map(item => ownedCopy(item))
             };
 
             // 3. Send to API
@@ -1221,7 +1221,7 @@ function GeneratorContent() {
                         {classDetails?.system?.description && !formData.level0 && (
                             <div
                                 className="mb-2 italic leading-tight"
-                                dangerouslySetInnerHTML={{ __html: classDetails.system.description.value || classDetails.system.description }}
+                                dangerouslySetInnerHTML={{ __html: presentDescription(classDetails.system.description) }}
                             />
                         )}
 
@@ -1231,8 +1231,7 @@ function GeneratorContent() {
                                 <div className="leading-tight mb-2">
                                     {(() => {
                                         const rawDesc = ancestryDetails.system?.description?.value || ancestryDetails.system?.description || "";
-                                        const cleanDesc = rawDesc.replace(/<[^>]+>/g, ' ');
-                                        return <span dangerouslySetInnerHTML={{ __html: cleanDesc }} />;
+                                        return <span>{String(rawDesc).replace(/<[^>]+>/g, ' ')}</span>;
                                     })()}
                                 </div>
 
@@ -1315,7 +1314,7 @@ function GeneratorContent() {
                                                                     <div className={`font-serif font-black text-sm uppercase tracking-widest ${isSelected ? 'text-black' : 'text-neutral-600'}`}>{t.name}</div>
                                                                     {isSelected && <span className="text-indigo-600 font-bold">✓</span>}
                                                                 </div>
-                                                                <div className="text-xs text-neutral-500 mt-2 font-medium" dangerouslySetInnerHTML={{ __html: t.description }}></div>
+                                                                <div className="text-xs text-neutral-500 mt-2 font-medium" dangerouslySetInnerHTML={{ __html: presentDescription(t.description) }}></div>
                                                             </div>
                                                         );
                                                     })}
@@ -1567,7 +1566,7 @@ function GeneratorContent() {
                                             Edit/Change
                                         </button>
                                         <div className="italic text-neutral-600 text-[11px] mt-1 leading-tight ml-4 border-l-2 border-neutral-200 pl-2">
-                                            <span dangerouslySetInnerHTML={{ __html: (patronDetails.system?.description?.value || patronDetails.system?.description || "").replace(/<[^>]+>/g, ' ') }}></span>
+                                            <span>{String(patronDetails.system?.description?.value || patronDetails.system?.description || '').replace(/<[^>]+>/g, ' ')}</span>
                                         </div>
                                     </span>
                                 ) : (

@@ -5,7 +5,8 @@ import { resolveBaggage, resolveGear } from './gear-resolver';
 import { ROLL_TABLE_FILTER } from '../../data/roll-table-patterns';
 import { TableService } from '../../utils/TableService';
 import { sanitizeItems } from '../../utils/Sanitizer';
-import { applyMasteryChoice, assertResolvedTalentChoices, masteryKind } from '../../logic/talent-choices';
+import { applyMasteryChoice, assertResolvedTalentChoices, masteryKind, type ChoiceCatalog } from '../../logic/talent-choices';
+import { canonicalUuid, sourceRef, formatUuid, ownedCopy } from '../../logic/identity';
 
 interface RollResultProcessorOptions {
     result: any;
@@ -185,7 +186,8 @@ export async function validateState(state: LevelUpState, requirements: any, acto
 /**
  * Assembles all items for finalization.
  */
-export async function assembleFinalItems(state: LevelUpState, targetLevel: number, classObj: any, ancestry?: any, background?: any, patron?: any, client?: any, actor?: any) {
+export async function assembleFinalItems(state: LevelUpState, targetLevel: number, classObj: any, ancestry?: any, background?: any, patron?: any, client?: any, actor?: any, catalogOverride?: ChoiceCatalog) {
+    const catalog = catalogOverride ?? await shadowdarkAdapter.getChoiceCatalog();
     const items: any[] = [];
     // A template UUID identifies a source, not a grant. Each roll is independent;
     // repeated references within one fixed class/ancestry grant are aliases.
@@ -197,9 +199,10 @@ export async function assembleFinalItems(state: LevelUpState, targetLevel: numbe
     };
     const baggageNames = new Set<string>();
 
+    // Existing Actor items are matched by recorded source identity, never by name.
     const existingItems = actor?.items || [];
-    const existingNames = new Set(existingItems.map((i: any) => (i.name || "").trim().toLowerCase()));
-    const existingUuids = new Set(existingItems.map((i: any) => i.uuid || i._id).filter(Boolean));
+    const existingUuids = new Set(existingItems.map((i: any) => sourceRef(i)).filter(Boolean).map((ref: any) => formatUuid(ref)));
+    const isExisting = (uuid: unknown) => { const canonical = canonicalUuid(uuid); return !!canonical && existingUuids.has(canonical); };
 
     // 1. Process Talents and Boons
     const allRolled = [...state.rolledTalents, ...state.rolledBoons];
@@ -243,7 +246,7 @@ export async function assembleFinalItems(state: LevelUpState, targetLevel: numbe
         if (handler.resolveItems && !['weapon-mastery', 'armor-mastery'].includes(handler.action ?? '')) {
             const extra = await handler.resolveItems(state, targetLevel, async (uuid: string) => {
                 return shadowdarkAdapter.resolveDocument(uuid);
-            });
+            }, catalog);
             extra.forEach((item, index) => append(item, 'other', `${handler.id}:${index}`));
         }
     }
@@ -266,7 +269,7 @@ export async function assembleFinalItems(state: LevelUpState, targetLevel: numbe
                 const name = (item.name || "").trim().toLowerCase();
                 
                 // Deduplicate against existing actor items to prevent 0 -> 1 duplicates
-                if ((uuid && existingUuids.has(uuid)) || existingNames.has(name)) {
+                if (isExisting(uuid)) {
                     logger.debug(`[LevelUpEngine] Skipping baggage item already on actor: ${item.name}`);
                     continue;
                 }
@@ -278,9 +281,7 @@ export async function assembleFinalItems(state: LevelUpState, targetLevel: numbe
 
         if (classObj) {
             // Include the Class item itself IF not already present
-            const classUuid = classObj.uuid;
-            const className = (classObj.name || "").trim().toLowerCase();
-            if (!(classUuid && existingUuids.has(classUuid)) && !existingNames.has(className)) {
+            if (!isExisting(classObj.uuid)) {
                  const cleanClass = JSON.parse(JSON.stringify(classObj));
                  delete cleanClass._id;
                  if (classObj.uuid) cleanClass.uuid = classObj.uuid;
@@ -292,9 +293,7 @@ export async function assembleFinalItems(state: LevelUpState, targetLevel: numbe
         }
         if (ancestry) {
             // Include the Ancestry item itself IF not already present
-            const ancestryUuid = ancestry.uuid;
-            const ancestryName = (ancestry.name || "").trim().toLowerCase();
-            if (!(ancestryUuid && existingUuids.has(ancestryUuid)) && !existingNames.has(ancestryName)) {
+            if (!isExisting(ancestry.uuid)) {
                 const cleanAncestry = JSON.parse(JSON.stringify(ancestry));
                 delete cleanAncestry._id;
                 if (ancestry.uuid) cleanAncestry.uuid = ancestry.uuid;
@@ -421,8 +420,9 @@ export async function assembleFinalItems(state: LevelUpState, targetLevel: numbe
         if (!kind) return item;
         const selection = kind === 'weapon' ? state.weaponMasterySelection : state.armorMasterySelection;
         const selected = selection?.selected?.[selectionsUsed[kind]++];
-        return applyMasteryChoice(item, selected, kind);
+        return applyMasteryChoice(item, selected, kind, catalog);
     });
     assertResolvedTalentChoices(finalized);
-    return sanitizeItems(finalized);
+    // Created Items record their exact compendium source (Foundry fromCompendium).
+    return sanitizeItems(finalized).map(item => ownedCopy(item));
 }

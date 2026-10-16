@@ -17,6 +17,7 @@ import { LoadingOverlay } from './levelup/sections/LoadingOverlay';
 import { LevelUpFooter } from './levelup/sections/LevelUpFooter';
 import { ExtraSpellSelectionSection } from './levelup/sections/ExtraSpellSelectionSection';
 import { useSDK } from '@sheet-delver/sdk/react';
+import { presentDescription } from '../../logic/description';
 
 export const LevelUpModal = (props: LevelUpProps) => {
     const { state, actions } = useLevelUp(props);
@@ -35,7 +36,7 @@ export const LevelUpModal = (props: LevelUpProps) => {
                 <h4 className="font-serif font-black text-xl uppercase tracking-wider text-black leading-none">{state.activeClassObj.name}</h4>
                 <div
                     className="text-[10px] text-neutral-500 font-bold uppercase tracking-widest mt-1 italic"
-                    dangerouslySetInnerHTML={{ __html: state.activeClassObj.system?.description || "Class Archetype" }}
+                    dangerouslySetInnerHTML={{ __html: presentDescription(state.activeClassObj.system?.description) || 'Class Archetype' }}
                 />
             </div>
         </div>

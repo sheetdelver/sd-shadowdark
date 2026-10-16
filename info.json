@@ -20,12 +20,13 @@
             { "key": "hp", "label": "HP", "path": "system.attributes.hp", "kind": "resource", "showInRoster": true },
             { "key": "ac", "label": "AC", "path": "derived.ac", "kind": "number", "showInRoster": true },
             { "key": "level", "label": "Level", "path": "system.level.value", "kind": "number" },
-            { "key": "str", "label": "STR", "path": "system.abilities.str.base", "kind": "number", "actorTypes": ["Player"] },
-            { "key": "dex", "label": "DEX", "path": "system.abilities.dex.base", "kind": "number", "actorTypes": ["Player"] },
-            { "key": "con", "label": "CON", "path": "system.abilities.con.base", "kind": "number", "actorTypes": ["Player"] },
-            { "key": "int", "label": "INT", "path": "system.abilities.int.base", "kind": "number", "actorTypes": ["Player"] },
-            { "key": "wis", "label": "WIS", "path": "system.abilities.wis.base", "kind": "number", "actorTypes": ["Player"] },
-            { "key": "cha", "label": "CHA", "path": "system.abilities.cha.base", "kind": "number", "actorTypes": ["Player"] }
+            { "key": "str", "label": "STR", "path": "derived.abilities.str.value", "kind": "number", "actorTypes": ["Player"] },
+            { "key": "dex", "label": "DEX", "path": "derived.abilities.dex.value", "kind": "number", "actorTypes": ["Player"] },
+            { "key": "con", "label": "CON", "path": "derived.abilities.con.value", "kind": "number", "actorTypes": ["Player"] },
+            { "key": "int", "label": "INT", "path": "derived.abilities.int.value", "kind": "number", "actorTypes": ["Player"] },
+            { "key": "wis", "label": "WIS", "path": "derived.abilities.wis.value", "kind": "number", "actorTypes": ["Player"] },
+            { "key": "cha", "label": "CHA", "path": "derived.abilities.cha.value", "kind": "number", "actorTypes": ["Player"] },
+            { "key": "notes", "label": "Notes", "path": "system.notes", "kind": "textarea", "contentFormat": "html", "layout": { "columnSpan": 3, "rowSpan": 3, "textRows": 12 } }
         ]
     },
     "compendiumPacks": {
@@ -68,6 +69,11 @@
             {
                 "id": "shadowdark.magic-items",
                 "type": "Item",
+                "hydrate": true
+            },
+            {
+                "id": "shadowdark.monsters",
+                "type": "Actor",
                 "hydrate": true
             },
             {

@@ -1,6 +1,27 @@
 # Releases
 
-Historical entries are reconstructed from [published releases](https://github.com/sheetdelver/sd-shadowdark/releases), their tags, and merged changes. Version numbers follow the published tags; unreleased branch work is excluded.
+Historical entries are reconstructed from [published releases](https://github.com/sheetdelver/sd-shadowdark/releases), their tags, and merged changes. Version numbers follow the published tags; the Unreleased section collects notes for the next authorized release.
+
+## Unreleased
+- Read Foundry 14 effects
+- Native ability, AC, slots
+- Caller-bound document reads
+- Exact compendium identities
+- Lossless multi-change effect editing
+- Native spell and item actions
+- Shared resource detail cards
+- Read-only module bestiary
+- Complete paper attack list
+- Labelled weapon attack modes
+- Compact resource cards
+- Inventory controls on item cards
+- Hidden unavailable attack modes
+- Standard luck token by default
+- Reported pre-4.0 effect keys
+- Effect-granted languages shown
+- HP roll advantage on level-up
+- Native effect conformance tests
+- Safer edits and rollback
 
 ## 0.9.4
 - Corrected weapon preparation
