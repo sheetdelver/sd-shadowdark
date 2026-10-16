@@ -554,3 +554,63 @@ milestone once independently verified; cards depend on those corrected data
 contracts. Splitting delivery does not silently close the remaining checkpoints.
 The proposed result is one source-backed rules/action path with two sheet layouts
 and reusable resource details, accompanied by explicit capability limits.
+
+
+## Addendum: independent Core-aware review (October 16, 2026)
+
+The checkpoint `33ed227` was independently reviewed against Core `ff65695` and
+native 4.0.6. The preceding user-review addendum was already present and is
+preserved. Nine tracked suites, explicit module typing and 38 isolated browser
+checks pass again; native/operator A01-01–10 remain pending. These results do
+not establish full Core HTTP/runtime integration or release readiness.
+
+The [independent review](../audits/2026-10-15-native-alignment.md#independent-review-addendum--october-16-2026)
+records corrective evidence and M1–M5 gates. It qualifies earlier checked boxes
+and "Fixed (offline)" dispositions as follows:
+
+| Review ID | Correction required | Affected checkpoints |
+| --- | --- | --- |
+| RV-01 | Generic document route returns a synthetic monster to a non-GM while bestiary denies it; unify caller policy across all resource routes. | C1/C7; SD01-06/16 |
+| RV-02 | Registered migration route uses invalid slash keys and one-based paging against Core's zero-based list; a permissive-marker probe skips an eligible Actor and marks completion. Direct planner/route coverage is absent. | C5/C9; migration follow-up R9 |
+| RV-03 | Cached action replay returns before owner recheck; same request ID with changed item returns old success. Add world/request identity and partial-result reconciliation. | C4/C6; SD01-08/12 |
+| RV-04 | Spell card loses Class despite correct structured label already in the prepared view. Use the canonical prepared card facts. | C2/C7; SD01-05/10 |
+| RV-05 | Native-default Pulp value is not a verified world value; reflect unavailable settings and adopt the eventual authoritative context. | C0/C3/C4/C6 |
+| RV-06 | Core same-world recovery retains the adapter; registry attach tests do not prove dependency refresh before prepared rebuild. | C1/C2/C6/C9 |
+| RV-07 | Simulated runtimes/HTTP projection and stub host dialogs are offline evidence; correct planner-test and stale handoff claims. | C9/C10 |
+
+R9 means a **proposed** Core-owned migration mechanism, not completed automatic
+repair or authorization to mutate historical Actors. Core already has write
+transport, settings, Scene/ActorDelta data and native pack-permission policies;
+the module needs bounded capabilities and lifecycle support, not direct privileged
+access. The secondary SDK proposal now contains a Core-review correction addendum.
+Core ADR-0064 is the follow-up design for that work. Module ADR-0001 remains open
+until corrections and acceptance are reconciled; the new Core proposal is not
+an excuse to defer independent module fixes.
+
+### Core dependency refinement — admin-owned migration upgrades
+
+The October 16 follow-up selects Core ADR-0064's **admin upgrade** dry-run/apply
+workflow for migration execution. Release metadata and a separate pure planner
+belong to the module; Core owns the reviewed world-specific job, maintenance,
+transport, restart recovery and activation. New repairs must not run from module
+pages, ordinary bootstrap or writable initialization. Bootstrap may resume an
+already authorized admin job. World-setting snapshots still refresh live.
+
+This supersedes automatic-bootstrap/owner-fallback suggestions in the secondary
+proposal, whose [ownership revision](../audits/2026-10-16-core-sdk-world-data-proposal.md#admin-upgrade-ownership-revision--october-16-2026)
+records the Core audit. RV-02 remains unfixed; eventual contract adoption removes
+the caller migration route/hook and tests the planner/serializer directly. Existing
+module corrections and native acceptance remain open; this is documentation only.
+
+The subsequent catalog refinement moves migration maps/paths out of info.json:
+use a module-owned migration.json and native-version directories with definitions
+and check/plan/verify hooks. Required fresh-source checks block world readiness
+when a Foundry backup restore reintroduces legacy data, regardless of Core's
+completed journal. Core provides admin reasons/repair, a backup limitation warning
+and resumable execution; native lockout and world backup/undo are outside scope.
+No implementation or acceptance disposition changes in this documentation pass.
+
+The confirmed Core service-account policy is now full Gamemaster for all world
+connections, with role-failure blocking/admin remediation planned under Core
+ADR-0064 G0a. It is not a new restriction on ordinary Assistant players and is
+not implemented by this module documentation pass.

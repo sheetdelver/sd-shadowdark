@@ -1,8 +1,10 @@
 # Shadowdark native alignment audit — October 15, 2026
 
-Status: **Review complete; module corrections implemented with offline evidence
-(see [implementation dispositions](#implementation-dispositions)); native/operator
-acceptance pending.**
+Status: **Implementation independently reviewed October 16; substantial offline
+coverage passes, but confirmed corrections remain open.** The
+[independent review addendum](#independent-review-addendum--october-16-2026)
+supersedes broad "Fixed (offline)" labels where noted. Native/operator acceptance
+remains pending.
 Implementation plan: [Shadowdark ADR-0001](../adr/0001-native-alignment-and-resource-cards.md).
 This is the module-owned technical evidence record. Its findings are independent
 of the completed ADR-0063 closeout. The review itself changed no application code,
@@ -557,7 +559,7 @@ Paths are relative to `src/` unless noted.
 | SD01-11 | Fixed (offline) | `logic/prepared-view.ts`, `logic/effects.ts`, `ui/EffectsTab.tsx`, `ui/InventoryComponents.tsx` | Foundry `allApplicableEffects` | NA `_id`-only item id and Actor-only effect; BD same id on Actor and Item listed once each | — |
 | SD01-12 | Fixed (offline) | `ui/context/ShadowdarkActorContext.tsx`, `ui/pages/ActorPage.tsx`, `ui/InventoryTab.tsx` | — | BR debounced edits, Actor switch cancels pending write, failed delete rollback | Reconnect/world switch with a live host is untested. |
 | SD01-13 | Fixed (offline) | `logic/description.ts`, `logic/resource-cards.ts`, UI HTML sinks | SDK `processHtmlContent` | BD cards omit alternate identification; description sanitized without rewriting source | — |
-| SD01-14 | Fixed (offline) | `ui/ShadowdarkPaperSheet.tsx`, `ui/components/LuckControl.tsx`, `ui/components/ResourceDetailModal.tsx` | — | BR 8 attack rows, spell → card → Cast, keyboard; item cards keep equip/stash/light/quantity (`ui/components/ItemStateControls.tsx`, `logic/inventory-controls.ts`; red: BR "card keeps Unequip" on the pre-fix card) | Luck shows both native fields because the Pulp setting is unreadable. |
+| SD01-14 | Fixed (offline) | `ui/ShadowdarkPaperSheet.tsx`, `ui/components/LuckControl.tsx`, `ui/components/ResourceDetailModal.tsx` | — | BR 8 attack rows, spell → card → Cast, keyboard; item cards keep equip/stash/light/quantity (`ui/components/ItemStateControls.tsx`, `logic/inventory-controls.ts`; red: BR "card keeps Unequip" on the pre-fix card) | Current UI shows only the assumed standard token; actual world mode is unavailable (RV-05). |
 | SD01-15 | Partially verified | `ui/ShadowdarkSheet.tsx`, `ui/components/ModuleDialog.tsx`, tabs/modals | — | BR all tabs at 360/390/768/1280, short height, 200% zoom | Core HUD/tray/safe-area overlap not rendered offline (Core-owned). |
 | SD01-16 | Fixed (offline) | `info.json` (`shadowdark.monsters`), `server/api/bestiary.ts`, `server/api/collections.ts`, `ui/tools/Bestiary.tsx`, `module/ui.tsx` | Native `monsters` pack metadata | BD GM-only compendium list, NPC card fields; BR bestiary | Compendium monsters are GM-only (no pack ownership in the SDK). |
 | SD01-17 | Fixed (offline) | `tests/native-alignment.test.ts`, `tests/boundaries.test.ts`, `tests/fixtures/native-406.ts`, updated `tests/weapon-rules.test.ts`, `tests/fixtures/weapon-cases.ts`, `tests/prepared-actor.test.ts`, `tests/presentation.test.ts`, `.github/workflows/ci-shadowdark.yaml` | Native pack source oracle | NA 9/30 on unchanged code → 30/30 | Fixture totals are not native parity. |
@@ -785,7 +787,7 @@ tray and safe areas; observer/GM role variants; very large lists.
 
 ### Verification commands run
 
-All eight module suites pass (`weapon-rules`, `prepared-actor`, `actor-enricher`,
+All nine module suites pass (`weapon-rules`, `prepared-actor`, `actor-enricher`,
 `presentation`, `roll-feedback`, `importer-mapping`, `native-alignment` 44/44, `effect-conformance` 83/83,
 `boundaries` 42/42). Explicit module TypeScript check: clean. `npm run module:check
 -- shadowdark`: passed. Packaging into an isolated data directory: 9 entries
@@ -793,3 +795,239 @@ All eight module suites pass (`weapon-rules`, `prepared-actor`, `actor-enricher`
 no tests or local files. The boundaries suite's native pack oracle reads
 `temp/shadowdark/data/packs` from the Core checkout and reports itself as
 skipped when that reference is absent (as in CI).
+
+
+## Independent review addendum — October 16, 2026
+
+### Scope, baseline and independently repeated evidence
+
+Review requested after checkpoint `33ed227` on `fix/adr-0001-native-alignment`,
+module 0.9.4. Core is `ff65695` / 0.18.1. An uncommitted user-review addendum
+already existed in ADR-0001; it was preserved. This review changes documentation
+only. No source fixes, world writes, native acceptance, release or Git mutation
+were performed. Earlier "uncommitted implementation" statements describe the
+pre-checkpoint report, not the current code baseline.
+
+Native reference remains clean at `release-4.0.6`,
+`9677d16b3903b3b640f00d4efd48249142ac8334`. Local Foundry 14.367 client settings
+source was inspected; this is not a connected-world observation.
+
+Independently repeated on the checkpoint source:
+
+- All **nine** tracked suites pass: weapon-rules, prepared-actor, actor-enricher,
+  presentation, roll-feedback, importer-mapping, native-alignment **44/44**,
+  boundaries **42/42**, effect-conformance **83/83**. Native-reference drift
+  checks ran with the reference present. The earlier "eight" count was a typo.
+- Explicit module TypeScript check passes, with module `src/` and `module/`
+  included, `noEmit` and no incremental output. A root-only check excludes modules.
+- The existing isolated browser harness passes **38** checks. Network was blocked;
+  no Core/Foundry service was started. Actual module components are rendered, but
+  host dialogs, SDK services and Actor HTTP projection are stubs/simulations.
+- Visual inspection of the paper phone sheet confirms the Prim-like Longsword
+  `+0 d8+1` row. Inspection of the short-height spell card exposed RV-04 despite
+  all 38 checks passing. Existing assertions do not cover every displayed fact.
+- Four additional synthetic probes establish RV-01–04 below. The migration
+  pagination probe uses Core's actual in-memory document list implementation.
+  No real private document or live permission boundary was probed.
+
+Scratch evidence: `/tmp/sd-review-20261016/` holds named suite logs, `typecheck.log`,
+`browser.log`, `browser/report.txt`, screenshots and `probes.ts`, `pagination.ts`,
+`card.ts` with their logs. These are optional local artifacts; the reproducible
+inputs and outcomes below are the durable evidence. Packaging, released-host CI
+and native/operator tests were **not** repeated in this review; their previous
+reported results remain historical evidence, not new verification.
+
+### Validated implementation and corrected dispositions
+
+| Area | Independently supported result | Remaining gate |
+| --- | --- | --- |
+| C0/C1 effects; SD01-01/02/11 | Nested v14/legacy effect reading, source-preserving metadata/owner references, mastery counts and representative typed changes pass tracked cases. | Unsupported phase/custom/duration behavior remains explicit; migrations have separate defects (RV-02). |
+| C2/C3 shared rules; SD01-03/04/10 | Player/NPC distinctions, HP/AC/slots, authoritative weapon dice and shared action rows pass representative fixtures. | Not complete native parity; card facts still bypass prepared labels (RV-04). |
+| C1 access; SD01-06/07 | Caller-bound world/embedded reads and exact identity tests pass. | Reopen external compendium route coverage: RV-01. Registry attach guards do not establish same-world recovery freshness: RV-06. |
+| C4/C5 actions and creation; SD01-08/09 | Supported spell/scroll/wand/ability/potion consequences, validation and cancellation cases pass. | Replay authorization/reconciliation remains defective (RV-03); settings and explicitly unsupported actions remain open. |
+| C6/C7 sheets/cards/bestiary; SD01-12/13/14/16 | Shared views, inventory controls, HTML/identification selection and usable spell/item/NPC card flows exist. | Broad fixed labels are qualified by RV-01/03/04/05; basic module browser passes do not establish host permission/lifecycle parity. |
+| C8/C9; SD01-15/17 | Nine suites, explicit typing and 38 isolated interactions repeated. | Real Core HTTP/projection/dialog/chrome, permission revocation/recovery and A01-01–10 native acceptance remain pending. |
+| C10 | Module documentation and handoff exist and are updated. | ADR stays open; no blanket closeout or release-ready claim. |
+
+### RV-01 — Generic document access bypasses the monster restriction (P1, module)
+
+`src/server/api/bestiary.ts` and `collections.ts` require GM for compendium
+monsters, but `document.ts` delegates to
+`ShadowdarkAdapter.resolveDocumentFor`, whose compendium branch calls the shared
+registry without a caller check. The generic index also needs the same policy
+inventory; hydration does not establish caller permission.
+
+Synthetic probe: a non-GM request for
+`Compendium.shadowdark.monsters.Actor.fixture-monster`, with a fake registry
+returning a synthetic NPC, receives **200** through `document/[uuid]` and **403**
+through `bestiary/[uuid]`. Only the resolver was stubbed; both route handlers and
+the adapter dispatch path were real. This establishes inconsistent route policy,
+not a claim that live restricted content was accessed.
+
+**Correction:** centralize caller-aware serving of every compendium document,
+collection, index and linked card. Until Core provides generalized native pack
+access, enforce the existing conservative monster policy consistently. Once the
+Core capability exists, use it across all routes rather than keeping a parallel
+GM-only policy. Do not fix only the visible bestiary button. Add direct generic
+UUID/index tests, privileged-read-then-denied tests and post-change invalidation.
+SD01-06/16 are partial until this gate passes.
+
+### RV-02 — Registered migration prototype violates current SDK contracts (P1, module)
+
+`src/server/index.ts` registers `migrations/effect-keys`. The UI hook is unused,
+but **the server endpoint is reachable through module routing**; it is not inert
+code merely because no page invokes it.
+
+Confirmed failures in `src/server/api/migrations.ts`:
+
+1. `markerKey` produces `migrations/shadowdark-4.0-effect-keys/<worldId>`.
+   Core `createModuleRuntime.validateDataStoreKey` rejects `/`. Calling the real
+   handler with its GET marker lookup and Core's real validator returns **400**,
+   `DataStore key must be a flat logical name`. The GM POST marker lookup fails
+   before scanning as well.
+2. `listAll` starts `page=1`. Core `moduleDocumentServices.applyQuery` uses zero-based
+   pages (`slice(page * pageSize, ...)`). With one synthetic eligible Actor in the
+   real in-memory ActorStore and a deliberately permissive fake marker store to
+   isolate this second defect, page 0 returns one Actor; the route processes **0**,
+   writes **0**, and records completion. Worlds of 100 or fewer records are skipped;
+   larger collections lose their first 100 records of each type.
+3. Scope derives from caller-supplied `worldId`; DataStore has no trusted world
+   namespace. GET lacks an explicit GM gate (normally masked by the invalid key).
+   The route has no lease/concurrency fencing and marks runs with unresolved keys
+   complete when writes did not fail. These are static findings, not live probes.
+4. `effect-conformance.test.ts` covers the native replacement table and writer
+   keys but does **not import/call `planEffectMigration`** or the migration route.
+   The secondary proposal/handoff statement that the planner is covered by that
+   suite overstates the evidence. Add planner/serializer round-trip, idempotency,
+   unknown metadata, multi-replacement, unresolved and route enumeration tests.
+
+**Correction:** retire/unregister the interim route when adopting the Core runner,
+or correct and explicitly test all of its existing contracts before retaining it.
+Do not wire the hook as a shortcut. Core infrastructure is a genuine missing
+capability, but these defects are module bugs, not permissions limitations.
+
+### RV-03 — Action replay bypasses current authorization and request identity (P1, module)
+
+`src/server/api/actions.ts` stores process-global results under
+`userId:actorId:requestId`; `remember` returns a cached promise before `execute`
+re-reads owner access. The key lacks world/epoch and request-body identity, and is
+not cleared by adapter teardown. Failed promises are all evicted despite the
+comment saying only pre-roll failures may retry.
+
+Synthetic potion probe: first request returns **200**, with one owner read and
+one consumption write. After the same runtime denies ownership, replay returns
+**200**, still only one read. Changing `itemId` while reusing the request ID also
+returns **200** with no new read. Thus a reused request can disclose stale results
+or claim success for a different action. Cross-world collision and retry after a
+post-roll/chat error are additional static risks; they were not exercised live.
+
+**Correction:** verify current subject/world/resource access on every response,
+including replay; bind cache entries to lifecycle and canonical request identity;
+reject a different request body under an existing key. Separate pre-roll failure,
+roll-completed, writes-partial and reconciled result states. Do not reroll because
+chat/transport failed after evaluation. Re-read/reconcile partial writes without
+double consumption. Core's proposed context identity helps lifecycle scoping but
+permission rechecks and payload validation can be fixed in the module now.
+C4/C6/SD01-08/12 remain partial.
+
+### RV-04 — Spell cards discard an available prepared class label (P2, module)
+
+The reviewed screenshot `browser/card-spell-1280x500.png` says **Unavailable
+class** for the Wizard fixture. `resource-cards.ts#spellFacts` reparses
+`item.system.class` after Core replaced its UUID strings with names, even though
+`prepareShadowdarkView` already preserved `derived.items[].spellClasses` as
+structured references with labels.
+
+Synthetic probe using the existing `hostActorProjection` simulator: card Class
+is **Wizard** before projection and **Unavailable class** afterward; the same
+projected prepared item still holds `spellClasses[0].label = "Wizard"` and the
+exact structured compendium reference. This confirms a module consumer defect
+in addition to the real Core UUID rewrite.
+
+**Correction:** build owned-card class facts from the prepared item view; keep
+preview-document preparation in its appropriate shared projection path. Add
+assertions for every requested card fact through the host projection, including
+multiple classes and unavailable source. No name-to-UUID guessing is needed.
+SD01-05/10 and C2/C7 are not fully fixed by the current structured-reference work.
+
+### RV-05 — Native defaults are presented as current world mode (P1 dependency; module presentation correction)
+
+`world-settings.ts` always returns the registered defaults. `LuckControl` takes
+only `.value`, ignoring `source`, and offers edits to `luck.available` while the
+actual world may be in Pulp mode. The displayed checkbox has no explanation of
+that missing authority. A proven schema default is valid only for an absent
+setting in a ready world snapshot, not for an unreadable world.
+
+**Correction:** adopt Core's declared setting snapshot and distinguish stored,
+proven-default and unavailable results. Until available, visibly label/disable
+affected mode-specific controls rather than presenting standard mode as verified.
+Keep ammunition unsupported until both setting and consequence behavior are
+implemented; exposing the setting alone does not implement consumption. The
+secondary proposal's statement that one function replacement completes adoption
+is too narrow: UI, preparation, actions, context revisions and tests all need it.
+
+### RV-06 — Attach reset is not same-world recovery invalidation (P1 integration gap)
+
+`Registry.attach` clears cached rows and guards old attachment loads. However,
+Core `WorldBootstrapper.runRecovery` refreshes pack rows and rebuilds prepared
+Actors without `adapter.initialize`; the existing registry stays attached and
+retains its projection/TTL. Synchronous `getCachedSystemData/getCachedDocument`
+do not refresh it. A later collection read may refresh only the registry, leaving
+already-prepared Actors on different reference data.
+
+This is a source-verified lifecycle gap, not a freshly executed live reconnect
+failure. Add a Core-owned pack/context revision notification and a module refresh
+barrier before prepared rebuild. Test same-world recovery, dependency-only change,
+stale work and disposal; do not claim `attach` tests cover these paths. Module
+review of its `reset` generation fencing is also needed if reset becomes public
+refresh behavior. C1/C2/C6 remain partial for this case.
+
+### RV-07 — Evidence and handoff claims need narrower wording (documentation)
+
+The suites use fake request runtimes and a replica of ActorService UUID rewriting;
+the browser harness uses stub host dialogs and SDK. Neither runs the full real
+Core source → prepared Store → HTTP → UI → action pipeline. Preserve their useful
+coverage, but describe it as simulation. All A01 native cases remain pending.
+Migration planner coverage was overstated (RV-02); "eight" suites was corrected
+above; the prior handoff mixed committed/uncommitted and pushed/not-rechecked
+statements. The current handoff must report known local state and user-reported
+remote state separately. No new native acceptance, publication or release claim
+is made by this review.
+
+### Corrective checkpoints after review
+
+- [ ] M1: close RV-01 across every module route; RV-03 replay reauthorization,
+      request identity and partial-result tests. Existing green suites must remain green.
+- [ ] M2: fix RV-04 using prepared card facts; make unavailable setting behavior
+      explicit (RV-05). Assert semantic labels, not only geometry/click success.
+- [ ] M3: remove or correctly quarantine/test the registered migration prototype;
+      add direct pure planner/serializer coverage (RV-02) before Core adoption.
+- [ ] M4: adopt separately implemented Core context/settings, permissions and
+      migration contracts; prove RV-06 refresh semantics with real host integration.
+- [ ] M5: run actual host-boundary and approved native/operator acceptance;
+      reconcile SD01/C/A01 dispositions without converting pending work into passed.
+
+Core follow-up is proposed as **Core ADR-0064, Module World Context and Data
+Migrations**. That proposal extends existing stores/transport; it does not remove
+module-local correction obligations above. This review does not implement either
+repository's corrections or authorize migrations against any world.
+
+### Migration ownership follow-up — October 16, 2026
+
+Core ADR-0064 now proposes migration through the **admin release upgrade job**,
+with a required running-world preview and a durable maintenance/restart boundary.
+This replaces standing automatic-bootstrap repair proposals. The module supplies
+versioned pure plans, receives no privileged write runtime, and retires its caller
+migration route/hook upon adoption. Ordinary startup assesses compatibility or
+resumes an approved Core job only. M3's immediate quarantine/removal and direct
+planner tests remain necessary; M4 adopts the final packaged planner/metadata
+contract after Core implements it. See the [secondary report's ownership revision](2026-10-16-core-sdk-world-data-proposal.md#admin-upgrade-ownership-revision--october-16-2026).
+No RV finding or native acceptance has been closed by this design change.
+
+Catalog refinement: M4 adopts a separate migration.json with version-directory
+definitions and check/plan/verify hooks, not migration fields in info.json. Add
+restored-data fixtures proving required checks detect old source despite completed
+journal markers and block host world readiness until admin maintenance. Current
+Core proposal excludes native lockout and world backup/undo implementation; admin
+acknowledges the limitation and is advised to back up using Foundry. M3 planner/
+serializer regressions and all RV findings remain pending.

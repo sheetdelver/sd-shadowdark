@@ -182,3 +182,38 @@ Repository workflow and verification commands live in [AGENTS.md](../AGENTS.md).
 The shared contracts are described in Core's
 [module authoring guide](https://github.com/sheetdelver/sheetdelver/blob/v0.18.0/docs/MODULE_AUTHORING.md)
 and [release process](https://github.com/sheetdelver/sheetdelver/blob/v0.18.0/docs/RELEASING.md).
+
+## Independent review limitations (October 16, 2026)
+
+The [independent review addendum](audits/2026-10-15-native-alignment.md#independent-review-addendum--october-16-2026)
+qualifies the supported behavior described above. Nine suites and 38 isolated
+module browser checks pass, but the generic document route does not enforce
+the bestiary's monster restriction (RV-01), action replay does not reauthorize
+cached results (RV-03), and spell cards can ignore available prepared class
+labels (RV-04). These are remaining module corrections.
+
+The migration prototype is registered as a route even though its UI hook is
+unwired. Its datastore keys and pagination do not match Core contracts, and
+direct planner/route coverage is missing (RV-02). It is not ready for automatic
+execution. The source-backed native default seam does not establish current
+world settings (RV-05). Registry attachment reset does not cover Core's retained
+adapter on same-world recovery (RV-06).
+
+Core ADR-0064 proposes bounded settings/context and permission contracts. Its
+migration design is now an admin-owned release upgrade job: the module provides a
+separate migration.json catalog/version-directory definitions with pure
+check/plan/verify hooks, while Core previews, authorizes, gates access,
+executes and verifies changes across restart. No module maintenance-write runtime
+or owner repair fallback is selected. Ordinary bootstrap may resume an approved
+job but cannot start new repairs. It must check fresh data even when its ledger
+says complete, blocking world readiness after an incompatible external restore.
+Native-user lockout and world backup/undo are excluded; admin receives a backup
+limitation warning. World-setting context continues to refresh live.
+Nothing in this module currently implements those proposed APIs.
+Native/operator acceptance and real host-boundary checks remain pending; the
+module's ADR stays open.
+
+Core ADR-0064 G0a also requires a full-Gamemaster **service account** for every
+world connection, with lower-role/demotion blocking and admin correction/retry.
+This enforcement is pending in Core, and does not change human Assistant/player
+module permissions. No module-side role promotion or privileged fallback is allowed.
