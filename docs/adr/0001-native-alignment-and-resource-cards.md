@@ -478,6 +478,26 @@ host-chrome checks remain pending.
   release authorization and versioning rules are maintained in AGENTS.md.
   **Pending** native acceptance and release authorization.
 
+## Addendum: user review follow-ups (October 15–16, 2026)
+
+After the first implementation pass, the user reviewed the branch in a local
+host and reported the issues below. Each was handled within this ADR's scope
+unless noted. "NA", "BR" and "EC" refer to the native-alignment suite, the
+isolated browser run and `effect-conformance.test.ts`. The work was
+checkpointed in commit `33ed227`; native/operator acceptance remains pending.
+
+| # | Report | Finding | Change | Evidence | Status |
+| --- | --- | --- | --- | --- | --- |
+| R1 | User-added Notes combat-tracking row broke the build | `"layout": { 3, 3, 12 }` is invalid JSON | `info.json` layout uses `columnSpan`/`rowSpan`/`textRows` (Core `ModuleCombatStatLayout`); `prepared-actor` test checks only numeric rows as Player stats | Core `parseCombatStatAttributes` accepts the row; `module:check` | Fixed |
+| R2 | Console error on Attack: `inert=""` | React 19 treats `""` as false, so the card stayed interactive under the roll dialog | `ModuleDialog` passes a boolean `inert` | BR asserts `inert`, unfocusable card controls and no React console errors | Fixed |
+| R3 | Weapon card showed two identical "Dagger Attack" actions | Attack modes (melee/thrown, Versatile grips) shared one label | `weaponAttackModes` (native `getAttacks` + `getDamageFormula`): labelled modes on every surface; both Versatile grips; two-handed blocked by an equipped shield; server refuses absent modes | NA 6 cases (red on pre-fix logic); BR distinct Melee/Thrown buttons | Fixed (C4/C7) |
+| R4 | Cards far too large | Card used a 48rem dialog | `ModuleDialog` `card` size: 24rem × 24rem on tablet/desktop, grows to 34rem wide and 88dvh tall; phones full width | BR measures 384×384 | Fixed (C7/C8) |
+| R5 | Item cards lost equip/stash/light | Regression: moving to the shared card dropped the old item modal's inventory controls | `logic/inventory-controls.ts` (native `PlayerSheetSD` equip/stash/light, shield and single-lit-source side effects) used by the card and inventory row; `ItemModal` removed; name-based light and "Consume Ration" not restored (not native) | NA 4 rule cases; BR red "card keeps Unequip" on the pre-fix card, then green | Fixed (C6/C7) |
+| R6 | Blocked two-handed attack broke the paper layout | Unavailable modes were listed as greyed "Damage unavailable" rows | Sheets (paper, Abilities, inventory details) omit unavailable modes; the card keeps them disabled with the reason; paper row width hardened | NA hidden-mode case (red without the filter) | Fixed (C6/C8) |
+| R7 | Luck showed "Token" and "Pulp" fields | `shadowdark.usePulpMode` is unreadable by modules | `logic/world-settings.ts` seam (native defaults, labelled); standard luck is an unlabelled, centred tick box; the Pulp count selector appears only when the setting is on | NA 3 luck cases | Partial: Core/SDK contract A in the proposal |
+| R8 | CON 9 with an "+2 CON" improvement stays 9; casters without a casting class | SheetDelver ≤ 0.9.4 wrote pre-4.0 keys (`.bonus`, `system.bonuses.*`) that native 4.0.6 also ignores; the module dropped them silently | Hand-written legacy table removed; pre-4.0 keys reported on their effect with native's `Update_251001_1` replacement; effect-granted languages shown; level-up HP rolls apply `system.roll.hp.advantage`; two non-existent importer mappings removed; conformance guard and AGENTS rule added | EC 83 cases (red 70/81 with fixes reverted); all 59 native pack keys mapped | Fixed (reporting); existing data needs migration (R9) |
+| R9 | Migrate old data automatically, without player action | SDK writes are request-bound; there is no load-time write hook, no per-world ledger, and tokens and packs are unreachable | Pure planner `logic/effect-key-migration.ts`; caller-bound route and hooks prototyped but not wired; [Core/SDK proposal](../audits/2026-10-16-core-sdk-world-data-proposal.md) (world settings and Core-run module migrations) | Planner covered by EC; route untested against a host | External dependency: user is implementing the Core changes |
+
 ## Required regression and acceptance matrix
 
 "Offline" records module evidence; "Native" stays pending until an approved
