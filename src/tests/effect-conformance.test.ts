@@ -11,6 +11,9 @@ import { hitPointRollFormula } from '../logic/actions';
 import { modeToType } from '../logic/foundry';
 import { TALENT_HANDLERS } from '../logic/talent-handlers';
 import { TALENT_EFFECTS_MAP } from '../data/talent-effects';
+import { actorEffectsInScope, planEffectMigration } from '../logic/effect-key-migration';
+import { serializeChanges } from '../logic/effects';
+import { apiRoutes } from '../server/index';
 
 /**
  * Effect conformance against native Shadowdark 4.0.6 (release-4.0.6,
@@ -26,6 +29,8 @@ import { TALENT_EFFECTS_MAP } from '../data/talent-effects';
  *    native PlayerSD/_ActorBaseSD/LevelUpSD code, not module output).
  * 4. Keys the module itself writes are native 4.0 keys; pre-4.0 keys are
  *    reported with native's own migration replacement and never applied.
+ * 5. The migration planner and effect serializer, called directly: renames,
+ *    multi-change replacements, unknown fields, idempotency and unresolved keys.
  */
 type Result = { id: string; name: string; ok: boolean; detail?: string };
 const results: Result[] = [];
@@ -217,6 +222,64 @@ check('EC-4', 'native migration table covers every pre-4.0 key SheetDelver 0.9.4
         'system.bonuses.armorMastery', 'system.bonuses.gearSlots', 'system.bonuses.backstabDie', 'system.bonuses.critical.multiplier',
         'system.bonuses.meleeAttackBonus', 'system.bonuses.rangedDamageBonus', 'system.bonuses.unarmoredAcBonus', 'system.bonuses.stoneSkinTalent'];
     assert.deepEqual(written.filter(key => !nativeKeyMigration({ key, value: 'x' })), []);
+});
+
+// 5. The migration planner and serializer, called directly (review RV-02). Expected
+// replacements come from native Update_251001_1.updateEffects (see section 4).
+const applyPlan = (effect: any, changes: any[]) => {
+    const written = serializeChanges(effect, changes);
+    return 'changes' in written ? { ...effect, changes: written.changes } : { ...effect, system: { ...effect.system, changes: written['system.changes'] } };
+};
+const spells = new Set(['magic-missile']);
+check('EC-5', 'legacy shape: a renamed key keeps its mode, value, position and unknown fields', () => {
+    const effect = { _id: 'e', name: 'Stat Improvement', flags: { core: { note: 'keep' } }, changes: [
+        { key: 'system.abilities.con.bonus', mode: 2, value: '2', priority: null, custom: 'kept' },
+        { key: 'system.attributes.hp.max', mode: 2, value: '1' },
+    ] };
+    const plan = planEffectMigration(effect, 'Talent', spells);
+    assert.deepEqual(plan.migrated, [{ from: 'system.abilities.con.bonus', to: ['system.abilities.con.value'] }]);
+    assert.deepEqual(plan.unresolved, []);
+    const migrated = applyPlan(effect, plan.changes!);
+    assert.deepEqual(migrated.changes, [
+        { key: 'system.abilities.con.value', mode: 2, value: '2', priority: null, custom: 'kept' },
+        { key: 'system.attributes.hp.max', mode: 2, value: '1' },
+    ]);
+    assert.equal(migrated.flags.core.note, 'keep'); assert.equal(migrated.system, undefined);
+});
+check('EC-5', 'Foundry 14 shape: one change can become several, in order, keeping phase', () => {
+    const effect = { _id: 'e', name: 'Weapon Mastery', system: { changes: [
+        { key: 'system.bonuses.weaponMastery', type: 'add', value: 'longsword', phase: 'initial', priority: null },
+        { key: 'system.roll.ranged.bonus.all', type: 'add', value: 1, phase: 'final', priority: 30 },
+    ] } };
+    const plan = planEffectMigration(effect, 'Talent', spells);
+    const changes = applyPlan(effect, plan.changes!).system.changes;
+    assert.deepEqual(changes.map((change: any) => [change.key, change.type, change.value, change.phase]), [
+        ['system.roll.melee.bonus.longsword', 'add', '1+floor(@level.value/2)', 'initial'],
+        ['system.roll.melee.damage.longsword', 'add', '1+floor(@level.value/2)', 'initial'],
+        ['system.roll.ranged.bonus.all', 'add', 1, 'final'],
+    ]);
+    assert.equal(changes[2].priority, 30);
+});
+check('EC-5', 'planning a migrated effect again changes nothing (idempotent)', () => {
+    const effect = { _id: 'e', changes: [{ key: 'system.bonuses.gearSlots', mode: 2, value: '2' }, { key: 'system.bonuses.advantage', mode: 2, value: 'Magic Missile' }] };
+    const once = applyPlan(effect, planEffectMigration(effect, 'Talent', spells).changes!);
+    assert.deepEqual(once.changes.map((change: any) => change.key), ['system.slots', 'system.roll.spell.advantage.magic-missile']);
+    assert.deepEqual(planEffectMigration(once, 'Talent', spells), { changes: null, migrated: [], unresolved: [] });
+});
+check('EC-5', 'unresolvable keys stay unchanged and are reported', () => {
+    const effect = { _id: 'e', changes: [{ key: 'system.bonuses.advantage', mode: 2, value: 'Not A Spell' }, { key: 'system.bonuses.somethingElse', mode: 2, value: '1' }] };
+    const plan = planEffectMigration(effect, 'Talent', spells);
+    assert.equal(plan.changes, null, 'nothing to write');
+    assert.deepEqual(plan.unresolved.map(entry => entry.key), ['system.bonuses.advantage', 'system.bonuses.somethingElse']);
+});
+check('EC-5', 'weapon-owned keys scope to .this; Actor-level effects migrate for Players only', () => {
+    const effect = { _id: 'e', changes: [{ key: 'system.bonuses.meleeAttackBonus', mode: 2, value: '1' }] };
+    assert.equal(planEffectMigration(effect, 'Weapon', spells).changes![0].key, 'system.roll.melee.bonus.this');
+    assert.equal(planEffectMigration(effect, 'Talent', spells).changes![0].key, 'system.roll.melee.bonus.all');
+    assert.equal(actorEffectsInScope({ type: 'Player' }), true); assert.equal(actorEffectsInScope({ type: 'NPC' }), false);
+});
+check('EC-5', 'no caller migration route is registered (retired until Core runs migrations)', () => {
+    assert.equal(Object.keys(apiRoutes).some(route => route.startsWith('migrations')), false);
 });
 
 const failed = results.filter(result => !result.ok);

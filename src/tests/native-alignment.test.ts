@@ -310,11 +310,51 @@ async function luck() {
         assert.doesNotMatch(html, />\s*Token\s*</, 'no visible label');
         assert.doesNotMatch(html, /Pulp|luck tokens/i);
     });
-    await check('C8', 'Pulp luck replaces the token with an unlabelled count selector', () => {
+    // User decision (October 16): no label in either mode; Pulp off shows only the
+    // tick box; Pulp on shows only a number input, with spinner buttons where there is space.
+    await check('C8', 'Pulp luck replaces the token with an unlabelled number input and spinner', () => {
         const html = render(() => createElement(LuckControl, { pulpMode: true }), actor);
-        assert.doesNotMatch(html, /type="checkbox"|Token|Pulp/);
-        assert.match(html, /aria-label="3 luck tokens"/);
-        assert.match(html, /aria-label="Spend a luck token"/);
+        assert.doesNotMatch(html, /type="checkbox"|Token|Pulp|<label/);
+        assert.match(html, /<input[^>]*type="number"[^>]*value="3"|<input[^>]*value="3"[^>]*type="number"/);
+        assert.match(html, /aria-label="Spend a luck token"/); assert.match(html, /aria-label="Gain a luck token"/);
+    });
+    await check('C8', 'compact Pulp luck (paper sheet) is the number input only', () => {
+        const html = render(() => createElement(LuckControl, { pulpMode: true, compact: true }), actor);
+        assert.match(html, /type="number"/);
+        assert.doesNotMatch(html, /<button|type="checkbox"|Token|Pulp|<label/);
+    });
+}
+
+async function spellCardFacts() {
+    // RV-04: Core replaces every Compendium.* string in the Actor detail projection
+    // with a name (SD01-05), so the owned spell card must read its classes from the
+    // prepared view's structured spellClasses, not reparse item.system.class.
+    const WIZARD = 'Compendium.shadowdark.classes.Item.035nuVkU9q2wtMPs';
+    const PRIEST = 'Compendium.shadowdark.classes.Item.zGNtMhlCzqRDKpZp';
+    const MISSING = 'Compendium.shadowdark.classes.Item.notInThisWorld0';
+    const labels: Record<string, string> = { [WIZARD]: 'Wizard', [PRIEST]: 'Priest' };
+    const lookups = { label: (ref: any) => labels[`Compendium.${ref.pack}.${ref.documentType}.${ref.id}`] ?? null };
+    const caster = (classes: string[]) => ({ ...primLike(), items: [{ _id: 'spell', name: 'Light', type: 'Spell',
+        system: { tier: 1, class: classes, range: 'close', duration: { type: 'focus' } }, effects: [] }] });
+    const projectedCard = (classes: string[]) => {
+        const actor: any = caster(classes);
+        const projected: any = hostActorProjection({ ...actor, derived: prepareShadowdarkView(actor, lookups) }, { ...labels, [MISSING]: 'Missing' });
+        return buildOwnedItemCard(projected.derived, projected.items[0], lookups)!;
+    };
+    const classFact = (card: any) => card.facts.find((fact: any) => fact.label === 'Class')?.value;
+
+    await check('RV-04', 'owned spell card keeps the class label after host projection', () => {
+        const actor: any = caster([WIZARD]);
+        assert.equal(classFact(buildOwnedItemCard(prepareShadowdarkView(actor, lookups), actor.items[0], lookups)), 'Wizard', 'before projection');
+        assert.equal(classFact(projectedCard([WIZARD])), 'Wizard', 'after projection');
+    });
+    await check('RV-04', 'several classes keep their order; an unavailable class source stays explicit', () => {
+        assert.equal(classFact(projectedCard([WIZARD, PRIEST])), 'Wizard, Priest');
+        assert.equal(classFact(projectedCard([WIZARD, MISSING])), 'Wizard, Unavailable class');
+    });
+    await check('RV-04', 'every requested spell card fact survives host projection', () => {
+        assert.deepEqual(projectedCard([WIZARD]).facts.map((fact: any) => `${fact.label}: ${fact.value}`),
+            ['Tier: 1', 'DC: 11', 'Class: Wizard', 'Range: Close', 'Duration: Focus']);
     });
 }
 
@@ -326,6 +366,7 @@ export async function run(options: { report?: boolean } = {}) {
     await attackModes();
     await inventoryControls();
     await luck();
+    await spellCardFacts();
     const failed = results.filter(result => !result.ok);
     if (options.report || failed.length) {
         for (const result of results) console.log(`${result.ok ? 'PASS' : 'FAIL'} ${result.id} ${result.name}${result.detail ? ` — ${result.detail}` : ''}`);

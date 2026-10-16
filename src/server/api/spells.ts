@@ -2,6 +2,7 @@ import { json, error, type ModuleServerRequest } from '@sheet-delver/sdk/server'
 import { getErrorMessage, isSdkError, logger } from '@sheet-delver/sdk';
 import { shadowdarkAdapter } from '../../server/ShadowdarkAdapter';
 import { canonicalUuid, ownedCopy } from '../../logic/identity';
+import { callerOf } from '../access';
 
 /**
  * POST /api/modules/shadowdark/actors/[id]/spells/learn
@@ -18,7 +19,7 @@ export async function handleLearnSpell(actorId: string, req: ModuleServerRequest
         const actor = await req.runtime.documents.get('Actor', actorId, { minOwnership: 'owner' });
         if (!actor) return error('not_found', 'Actor not found or not owned');
 
-        const spellData = await shadowdarkAdapter.resolveDocumentFor(canonical, req.runtime);
+        const spellData = await shadowdarkAdapter.resolveDocumentFor(canonical, callerOf(req));
         if (!spellData) return error('not_found', `Spell not available: ${canonical}`);
         if (spellData.type !== 'Spell') return error('validation', `${spellData.name} is a ${spellData.type}, not a Spell`);
 

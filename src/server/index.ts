@@ -6,7 +6,6 @@ import { handleGetDocument } from './api/document';
 import { handleEffects } from './api/effects';
 import { handleActorAction } from './api/actions';
 import { handleBestiaryCard, handleBestiaryList } from './api/bestiary';
-import { handleEffectKeyMigration } from './api/migrations';
 import { getErrorMessage, isSdkError } from '@sheet-delver/sdk';
 import { handleGetCollection } from './api/collections';
 import { handleIndex } from './api/index';
@@ -69,7 +68,6 @@ export const apiRoutes = {
     'actors/[id]/actions': async (req: ModuleServerRequest, { params }: ModuleServerParams) => {
         return handleActorAction(await actorIdFrom(params), req);
     },
-    'migrations/effect-keys': handleEffectKeyMigration,
     'bestiary': handleBestiaryList,
     'bestiary/[uuid]': handleBestiaryCard,
     'actors/[id]/notes': async (req: ModuleServerRequest, { params }: ModuleServerParams) => {

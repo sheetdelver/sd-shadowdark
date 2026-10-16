@@ -494,7 +494,7 @@ checkpointed in commit `33ed227`; native/operator acceptance remains pending.
 | R4 | Cards far too large | Card used a 48rem dialog | `ModuleDialog` `card` size: 24rem × 24rem on tablet/desktop, grows to 34rem wide and 88dvh tall; phones full width | BR measures 384×384 | Fixed (C7/C8) |
 | R5 | Item cards lost equip/stash/light | Regression: moving to the shared card dropped the old item modal's inventory controls | `logic/inventory-controls.ts` (native `PlayerSheetSD` equip/stash/light, shield and single-lit-source side effects) used by the card and inventory row; `ItemModal` removed; name-based light and "Consume Ration" not restored (not native) | NA 4 rule cases; BR red "card keeps Unequip" on the pre-fix card, then green | Fixed (C6/C7) |
 | R6 | Blocked two-handed attack broke the paper layout | Unavailable modes were listed as greyed "Damage unavailable" rows | Sheets (paper, Abilities, inventory details) omit unavailable modes; the card keeps them disabled with the reason; paper row width hardened | NA hidden-mode case (red without the filter) | Fixed (C6/C8) |
-| R7 | Luck showed "Token" and "Pulp" fields | `shadowdark.usePulpMode` is unreadable by modules | `logic/world-settings.ts` seam (native defaults, labelled); standard luck is an unlabelled, centred tick box; the Pulp count selector appears only when the setting is on | NA 3 luck cases | Partial: Core/SDK contract A in the proposal |
+| R7 | Luck showed "Token" and "Pulp" fields | `shadowdark.usePulpMode` is unreadable by modules | `logic/world-settings.ts` seam (native defaults, marked `native-default` in code); no visible label in either mode; Pulp off shows only the tick box; Pulp on shows only a number input, with −/+ spinner buttons where there is space (not in the paper sheet's compact box) | NA 4 luck cases | Partial: Core/SDK contract A in the proposal |
 | R8 | CON 9 with an "+2 CON" improvement stays 9; casters without a casting class | SheetDelver ≤ 0.9.4 wrote pre-4.0 keys (`.bonus`, `system.bonuses.*`) that native 4.0.6 also ignores; the module dropped them silently | Hand-written legacy table removed; pre-4.0 keys reported on their effect with native's `Update_251001_1` replacement; effect-granted languages shown; level-up HP rolls apply `system.roll.hp.advantage`; two non-existent importer mappings removed; conformance guard and AGENTS rule added | EC 83 cases (red 70/81 with fixes reverted); all 59 native pack keys mapped | Fixed (reporting); existing data needs migration (R9) |
 | R9 | Migrate old data automatically, without player action | SDK writes are request-bound; there is no load-time write hook, no per-world ledger, and tokens and packs are unreachable | Pure planner `logic/effect-key-migration.ts`; caller-bound route and hooks prototyped but not wired; [Core/SDK proposal](../audits/2026-10-16-core-sdk-world-data-proposal.md) (world settings and Core-run module migrations) | Planner covered by EC; route untested against a host | External dependency: user is implementing the Core changes |
 
@@ -574,7 +574,7 @@ and "Fixed (offline)" dispositions as follows:
 | RV-02 | Registered migration route uses invalid slash keys and one-based paging against Core's zero-based list; a permissive-marker probe skips an eligible Actor and marks completion. Direct planner/route coverage is absent. | C5/C9; migration follow-up R9 |
 | RV-03 | Cached action replay returns before owner recheck; same request ID with changed item returns old success. Add world/request identity and partial-result reconciliation. | C4/C6; SD01-08/12 |
 | RV-04 | Spell card loses Class despite correct structured label already in the prepared view. Use the canonical prepared card facts. | C2/C7; SD01-05/10 |
-| RV-05 | Native-default Pulp value is not a verified world value; reflect unavailable settings and adopt the eventual authoritative context. | C0/C3/C4/C6 |
+| RV-05 | Native-default Pulp value is not a verified world value; reflect unavailable settings and adopt the eventual authoritative context. *(Presentation superseded by the user's luck decision, see the correction pass; adoption remains.)* | C0/C3/C4/C6 |
 | RV-06 | Core same-world recovery retains the adapter; registry attach tests do not prove dependency refresh before prepared rebuild. | C1/C2/C6/C9 |
 | RV-07 | Simulated runtimes/HTTP projection and stub host dialogs are offline evidence; correct planner-test and stale handoff claims. | C9/C10 |
 
@@ -614,3 +614,23 @@ The confirmed Core service-account policy is now full Gamemaster for all world
 connections, with role-failure blocking/admin remediation planned under Core
 ADR-0064 G0a. It is not a new restriction on ordinary Assistant players and is
 not implemented by this module documentation pass.
+
+### Module correction pass (October 16, 2026)
+
+The user selected the review findings that need no Core/SDK change. Details and
+red/green evidence are in the audit's
+[module correction pass](../audits/2026-10-15-native-alignment.md#module-correction-pass--october-16-2026).
+Gates M1, M2 and M3 are met offline. For M2's RV-05 part the user decided the
+luck presentation (below); reading the actual setting is M4.
+
+| Review ID | Module change | Status |
+| --- | --- | --- |
+| RV-01 | One compendium caller policy (`server/access.ts`) on every route: document, collections, name index, bestiary, spells, actions, level-up. Monster pack GM-only until Core exposes caller pack capabilities. | Fixed (offline) |
+| RV-02 | Caller migration route, UI hook and `pendingMigrations` removed; pure planner kept, with direct planner/serializer cases. Effects are not migrated by any caller; R9 now waits on the Core ADR-0064 runner. | Module part fixed |
+| RV-03 | Action request id bound to runtime, user, Actor and body; replays recheck owner access; post-result chat failures become warnings; partial results reconcile without rerolling. | Fixed (offline) |
+| RV-04 | Spell card Class from the prepared view's `spellClasses` labels. | Fixed (offline) |
+| RV-05 | User decision replaces the review's interim labelling: no visible label in either mode; Pulp off shows only the tick box; Pulp on shows only a number input, with −/+ spinner buttons where there is space (not in the paper sheet's compact box). The unverified setting stays in code (`source: 'native-default'`) and docs, not the UI. Pulp input implemented and tested. Reading the real setting waits on Core. | Presentation done; adoption open (Core) |
+| RV-06 | Unchanged: needs Core context revisions. | Open (Core) |
+
+This pass changes no versions or compatibility pins and closes no A01 case.
+ADR-0001 remains open.

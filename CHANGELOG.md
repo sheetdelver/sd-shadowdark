@@ -22,6 +22,8 @@ Historical entries are reconstructed from [published releases](https://github.co
 - HP roll advantage on level-up
 - Native effect conformance tests
 - Safer edits and rollback
+- GM-only monsters on every route
+- Verified action request replays
 
 ## 0.9.4
 - Corrected weapon preparation

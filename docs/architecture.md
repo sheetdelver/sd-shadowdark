@@ -69,6 +69,16 @@ Actor pack). `attach` resets it and a load from an older runtime cannot publish.
 World and embedded documents are always read through `req.runtime`, so Core's
 caller projection applies; the shared resolver serves declared compendium UUIDs only.
 
+Compendium content reaches callers under one policy, `server/access.ts`. Core
+does not expose native pack permissions to modules, so the monster pack is
+GM-only on every route that can return it: `document/[uuid]` and every other
+caller-bound resolution (`resolveDocumentFor`), `fetch-pack/monsters`, the
+`index` name index (monster names are left out for players) and bestiary cards.
+System-level reads (`resolveDocument`, `getCollection` without a GM caller) never
+serve that pack. The policy is checked on each request, so a GM's earlier read
+is not served to a player. When Core provides caller pack capabilities, they
+replace this policy on all routes together.
+
 Effect keys follow native 4.0.6. `logic/effect-key-coverage.ts` maps every key
 in the pinned native packs to its consumer (actor data, roll-key selector, choice
 template, native no-op, or out of scope such as scene light). Pre-4.0 keys
@@ -102,16 +112,30 @@ the caller, requires owner access, refuses unavailable actions before rolling,
 rolls through `req.runtime.rolls` and then applies native consequences: lost
 spell on failure (not on focus checks), scroll consumed, wand spell lost and
 wand broken on a critical failure, limited uses and loss on failure, potion
-consumed after confirmation. A repeated `requestId` from the same user and
-Actor returns the first result for ten minutes (process-local). Consequence
-writes are sequential, not atomic; each outcome is reported.
+consumed after confirmation. Consequence writes are sequential, not atomic;
+each outcome is reported and the response `state` is `complete` or `partial`.
+
+A `requestId` is bound to the adapter runtime (world/epoch), the user, the
+Actor and the request body, for ten minutes (process-local). Repeating it with
+the same body re-checks owner access, then returns the first result with
+`replayed: true` without rolling or consuming again; reusing it with a different
+body is a 409 conflict. A failure before a result exists (refusal, unavailable
+action, failed roll call) can be retried. Once a roll is evaluated it is final:
+a chat failure after that is returned in `warnings`, and a replay of a
+`partial` result re-reads the Actor and applies only the consequences it does
+not already show. The sheets send a new id per action, so this replay path
+serves client retries of the same request.
 
 World settings: modules cannot read Foundry world settings, so
-`logic/world-settings.ts` returns the native registered defaults (labelled
-`native-default`). Luck therefore uses standard mode (the `luck.available`
-token); the Pulp count selector (`luck.remaining`, no "Pulp" label) appears only
-when `usePulpMode` is on, which is not reachable until Core exposes it. See the
-audit's world-settings research note.
+`logic/world-settings.ts` returns the native registered defaults, marked
+`source: 'native-default'` in code. Luck therefore uses standard mode.
+
+Luck presentation (user decision, October 16): no visible label in either mode,
+and the unverified setting is not shown in the UI. Pulp off shows only the
+centred tick box (`luck.available`). Pulp on shows only a number input
+(`luck.remaining`), with −/+ spinner buttons where there is space; the paper
+sheet's compact box shows the input alone. Pulp on is not reachable until Core
+exposes `usePulpMode`. See the audit's world-settings research note.
 
 Not implemented, stated in the UI: luck spending, rest and recovery, ammunition
 consumption (`autoConsumeAmmunition` unreadable), damage auto-roll, duration
@@ -147,7 +171,9 @@ every attack. Selecting a spell, item or feature opens one module dialog
 desktop the card is 24rem × 24rem and grows to 34rem wide and 88dvh tall for
 longer content; phones use the full width. Cast and Use
 delegate to the shared action and open the SDK RollDialog above it, and Drink
-asks for confirmation. Owned physical items also show inventory controls on
+asks for confirmation. An owned spell card's Class comes from the prepared view's `spellClasses`
+labels, because Core's Actor detail response replaces `system.class` UUIDs with
+names. Owned physical items also show inventory controls on
 their card (Equip/Unequip for Weapon and Armor, Stash/Retrieve, Light/Put out
 for native light sources, quantity). `logic/inventory-controls.ts` follows the
 native sheet handlers: equipping clears stashed and stashing clears equipped;
@@ -160,7 +186,7 @@ the current identified presentation only, never the alternate identification
 fields. Descriptions go through `logic/description.ts` and the SDK sanitizer.
 
 The Bestiary dashboard tool lists world NPCs visible to the caller and, for GMs,
-the declared monster pack (Core does not expose pack ownership to modules).
+the declared monster pack (the `server/access.ts` policy above).
 It is read-only: no spawn, encounter or sharing action.
 
 ## Known alignment limits
@@ -186,18 +212,20 @@ and [release process](https://github.com/sheetdelver/sheetdelver/blob/v0.18.0/do
 ## Independent review limitations (October 16, 2026)
 
 The [independent review addendum](audits/2026-10-15-native-alignment.md#independent-review-addendum--october-16-2026)
-qualifies the supported behavior described above. Nine suites and 38 isolated
-module browser checks pass, but the generic document route does not enforce
-the bestiary's monster restriction (RV-01), action replay does not reauthorize
-cached results (RV-03), and spell cards can ignore available prepared class
-labels (RV-04). These are remaining module corrections.
+qualifies the supported behavior described above. The module-only corrections
+are in place and covered offline (see the audit's
+[module correction pass](audits/2026-10-15-native-alignment.md#module-correction-pass--october-16-2026)):
+one compendium caller policy on every route (RV-01), request identity and
+reconciliation for action replays (RV-03) and spell card classes from prepared
+labels (RV-04). The migration prototype route and hook were removed; the pure
+planner `logic/effect-key-migration.ts` remains, with direct planner and
+serializer tests, for Core's eventual runner (RV-02). No caller can migrate
+data today; existing Actors keep their stored keys, which are reported.
 
-The migration prototype is registered as a route even though its UI hook is
-unwired. Its datastore keys and pagination do not match Core contracts, and
-direct planner/route coverage is missing (RV-02). It is not ready for automatic
-execution. The source-backed native default seam does not establish current
-world settings (RV-05). Registry attachment reset does not cover Core's retained
-adapter on same-world recovery (RV-06).
+Still open: the native-default settings seam does not read the current world
+setting (RV-05; the luck presentation itself is the user's decision above, not a
+pending correction), and registry attachment reset does not cover Core's
+retained adapter on same-world recovery (RV-06). Both need the Core contracts below.
 
 Core ADR-0064 proposes bounded settings/context and permission contracts. Its
 migration design is now an admin-owned release upgrade job: the module provides a

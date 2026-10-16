@@ -2,11 +2,13 @@ import { json, error, type ModuleServerRequest, type ModuleServerParams } from '
 import { shadowdarkAdapter } from '../../server/ShadowdarkAdapter';
 import { getErrorMessage, isSdkError, logger } from '@sheet-delver/sdk';
 import { parseUuid } from '../../logic/identity';
+import { callerOf } from '../access';
 
 /**
  * GET document/<uuid>. Declared compendium documents come from the shared pack
- * projection; world and embedded documents are read through `req.runtime`, so
- * Core's caller visibility and projections apply (no system-level world reads).
+ * projection under the caller's pack policy (server/access.ts); world and
+ * embedded documents are read through `req.runtime`, so Core's caller visibility
+ * and projections apply (no system-level world reads).
  */
 export async function handleGetDocument(req: ModuleServerRequest, { params }: ModuleServerParams) {
     try {
@@ -20,7 +22,7 @@ export async function handleGetDocument(req: ModuleServerRequest, { params }: Mo
             return error('validation', `Unsupported document reference: ${uuid}`);
         }
 
-        const document = await shadowdarkAdapter.resolveDocumentFor(uuid, req.runtime);
+        const document = await shadowdarkAdapter.resolveDocumentFor(uuid, callerOf(req));
 
         if (!document) {
             return error('not_found', `Document not found or not visible: ${uuid}`);

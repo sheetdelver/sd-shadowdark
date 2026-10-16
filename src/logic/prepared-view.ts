@@ -1,4 +1,3 @@
-import { nativeKeyMigration } from './legacy-effect-keys';
 import { prepareActorCore, ABILITY_KEYS, type AbilityKey, type PreparationLookups, type PreparedActorCore, type PreparedItemBasics } from './actor-preparation';
 import { listActions, weaponBase, bonusLabel, type PreparedAction } from './actions';
 import type { CanonicalEffect } from './effects';
@@ -214,10 +213,6 @@ export function prepareShadowdarkView(source: any, lookups: ViewLookups = {}) {
             spellcasting: core.spellcasting,
         } : null,
         diagnostics: [...new Set(core.diagnostics)],
-        // Stored pre-4.0 effect keys the module migrates automatically (see server/api/migrations.ts).
-        pendingMigrations: { effectKeys: core.effects.reduce((count, effect) => count
-            + (effect.owner.kind === 'actor' && core.kind !== 'Player' ? 0
-                : effect.changes.filter(change => nativeKeyMigration(change, effect.owner.kind === 'item' ? effect.owner.itemType : undefined)).length), 0) },
     };
 }
 

@@ -196,7 +196,12 @@ remain in the [active audit review addendum](2026-10-15-native-alignment.md#inde
    the combat manager's pack policy automatically.
 
 No code, contract version, release metadata, native setting or world document was
-changed by this review. Automatic migration is the desired future workflow, not
+changed by this review.
+
+Module follow-up (October 16): the interim route and UI hook named above were
+removed and the planner gained direct tests (audit
+[module correction pass](2026-10-15-native-alignment.md#module-correction-pass--october-16-2026)).
+The planner remains for the Core-run upgrade job. Automatic migration is the desired future workflow, not
 an operation performed or authorized against the current world in this pass.
 
 ## Admin upgrade ownership revision — October 16, 2026

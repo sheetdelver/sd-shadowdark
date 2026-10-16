@@ -26,6 +26,10 @@ export interface ActionResponse {
     outcome?: { total: number; natural: number | null; success: boolean | null; criticalSuccess: boolean; criticalFailure: boolean } | null;
     consequences?: Array<{ description: string; status: 'applied' | 'failed'; error?: string }>;
     pending?: string[];
+    /** `partial` when a consequence was not saved; a retry with the same request id applies only the rest. */
+    state?: 'complete' | 'partial';
+    /** Problems after the result was final (e.g. chat posting); the roll is not repeated. */
+    warnings?: string[];
     error?: string;
 }
 
@@ -249,6 +253,7 @@ export function ShadowdarkActorProvider({
         if (failed.length || response.pending?.length) {
             addNotification(`${action.label}: rolled, but not every result was saved (${[...failed.map(entry => `${entry.description} ${entry.error ?? ''}`), ...(response.pending ?? [])].join('; ')}).`, 'error');
         }
+        if (response.warnings?.length) addNotification(`${action.label}: ${response.warnings.join(' ')}`, 'warning');
         onSettled?.(response);
     }, [busyActions, onAction, track, addNotification]);
 

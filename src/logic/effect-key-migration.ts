@@ -6,7 +6,11 @@ import { nativeKeyMigration, isRejectedBonusesKey } from './legacy-effect-keys';
  * Plans native Shadowdark 4.0.6 `Update_251001_1.updateEffects` for one stored
  * effect: every pre-4.0 change becomes its native 4.0 replacement, in place,
  * keeping the effect's own serialized shape and every unrelated change. Pure;
- * the server route writes the result through the caller's runtime.
+ * nothing applies it yet. The caller-bound route that did was retired (review
+ * RV-02); Core ADR-0064's admin upgrade job is the intended runner.
+ *
+ * `priority` is left undefined so `serializeChanges` keeps each original entry's
+ * stored priority (or its absence) exactly.
  *
  * Deliberate differences from native, both recorded in the audit:
  * - `system.bonuses.advantage` with a spell value also matches the slugified
@@ -16,9 +20,6 @@ import { nativeKeyMigration, isRejectedBonusesKey } from './legacy-effect-keys';
  * - `system.bonuses.*` keys native has no case for are left unchanged and
  *   reported (native logs "No migration path").
  */
-export const EFFECT_KEY_MIGRATION_ID = 'shadowdark-4.0-effect-keys';
-export const EFFECT_KEY_MIGRATION_VERSION = 1;
-
 export interface EffectMigrationPlan {
     /** Full replacement change list for `serializeChanges`, or null when nothing changes. */
     changes: EditableChange[] | null;
@@ -33,7 +34,7 @@ export function planEffectMigration(effect: any, parentType: string | undefined,
     const output: EditableChange[] = [];
     let touched = false;
     for (const change of changes) {
-        const keep: EditableChange = { index: change.index, key: change.key, type: change.type, value: change.value, phase: change.phase, priority: change.storedPriority };
+        const keep: EditableChange = { index: change.index, key: change.key, type: change.type, value: change.value, phase: change.phase };
         let migration = nativeKeyMigration({ key: change.key, mode: change.mode, value: change.value }, parentType);
         if (change.key === 'system.bonuses.advantage' && migration?.note) {
             const raw = String(change.value ?? '');
@@ -57,7 +58,7 @@ export function planEffectMigration(effect: any, parentType: string | undefined,
             ...(position === 0 ? { index: change.index } : {}),
             key: entry.key,
             type: entry.mode === undefined || entry.mode === null || entry.mode === change.mode ? change.type : modeToType(entry.mode),
-            value: entry.value, phase: change.phase, priority: change.storedPriority,
+            value: entry.value, phase: change.phase,
         }));
     }
     return { changes: touched ? output : null, migrated, unresolved };

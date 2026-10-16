@@ -5,8 +5,9 @@ import type {
     FoundryActor,
     PreparedActorData,
 } from '@sheet-delver/sdk';
-import type { ModuleRequestRuntime, ModuleRuntime } from '@sheet-delver/sdk/server';
+import type { ModuleRuntime } from '@sheet-delver/sdk/server';
 import { ShadowdarkRegistry } from './Registry';
+import { canReadCollection, canReadPack, compendiumDenied, isRestrictedFor, visibleNameIndex, type Caller } from './access';
 import { ShadowdarkNormalizer, lookupsFromSystemData } from '../logic/normalization';
 import { getInitiativeFormula, isClassSpellcaster } from '../logic/rules';
 import { prepareActorCore } from '../logic/actor-preparation';
@@ -33,6 +34,8 @@ export class ShadowdarkAdapter extends BaseSystemAdapter {
     systemId = 'shadowdark';
     private static instance: ShadowdarkAdapter;
     private readonly _registry = new ShadowdarkRegistry();
+    /** Incremented per platform runtime (world/epoch); request-scoped caches key on it. */
+    runtimeGeneration = 0;
 
     constructor() {
         super();
@@ -60,6 +63,7 @@ export class ShadowdarkAdapter extends BaseSystemAdapter {
 
     async initialize(runtime: ModuleRuntime): Promise<void> {
         await super.initialize(runtime);
+        this.runtimeGeneration++;
         // A new runtime (world/epoch) starts from an empty projection.
         this._registry.attach(runtime.compendium, runtime.documents);
         logger.info('[ShadowdarkAdapter] Service layer unified via runtime-backed Registry.');
@@ -112,8 +116,16 @@ export class ShadowdarkAdapter extends BaseSystemAdapter {
         return this._registry.getSystemData();
     }
 
-    async getCollection(id: string, options: { summary?: boolean } = {}): Promise<any[]> {
-        return this._registry.getCollection(id, options);
+    /** System data as served to a caller: restricted packs are left out of the name index. */
+    async getSystemDataFor(caller: Pick<Caller, 'isGM'>): Promise<any> {
+        const data = await this._registry.getSystemData();
+        return { ...data, nameIndex: visibleNameIndex(data?.nameIndex ?? {}, caller) };
+    }
+
+    /** A declared collection; restricted collections (monsters) need a GM `caller`. */
+    async getCollection(id: string, options: { summary?: boolean; caller?: Pick<Caller, 'isGM'> } = {}): Promise<any[]> {
+        if (!canReadCollection(options.caller, id)) return [];
+        return this._registry.getCollection(id, { summary: options.summary });
     }
 
     async drawTable(uuid: string, rollOverride?: number): Promise<any> {
@@ -140,31 +152,41 @@ export class ShadowdarkAdapter extends BaseSystemAdapter {
         return ShadowdarkNormalizer.normalizeActorData(actor, this._registry.getCachedSystemData(), this.lookups());
     }
 
-    /** Exact declared compendium document (system-level read of shared pack data only). */
+    /**
+     * Exact declared compendium document (system-level read of shared pack data
+     * only). Restricted packs are never served here; they need a caller
+     * ({@link resolveDocumentFor}).
+     */
     async resolveDocument(uuid: string): Promise<any> {
+        if (isRestrictedFor(null, uuid)) return null;
         return this._registry.getDocument(uuid);
     }
 
     /**
-     * Caller-bound resolution: declared compendium documents from the registry;
-     * world and embedded documents only through the caller's request runtime,
-     * which applies Core's visibility projection. Unsupported identities are null.
+     * Caller-bound resolution: declared compendium documents from the registry,
+     * subject to the caller's pack access (restricted content throws
+     * `permission_denied`); world and embedded documents only through the
+     * caller's request runtime, which applies Core's visibility projection.
+     * Unsupported identities are null.
      */
-    async resolveDocumentFor(uuid: string, runtime: Pick<ModuleRequestRuntime, 'documents'>): Promise<any | null> {
+    async resolveDocumentFor(uuid: string, caller: Caller): Promise<any | null> {
         const ref = parseUuid(uuid);
         if (!ref) return null;
-        if (ref.kind === 'compendium') return this.resolveDocument(formatUuid(ref));
+        if (ref.kind === 'compendium') {
+            if (!canReadPack(caller, ref.pack)) throw compendiumDenied();
+            return this._registry.getDocument(formatUuid(ref));
+        }
         if (ref.kind === 'world') {
-            return runtime.documents.get(ref.documentType, ref.id);
+            return caller.runtime.documents.get(ref.documentType, ref.id);
         }
         if (ref.parentType !== 'Actor' || !['Item', 'ActiveEffect'].includes(ref.documentType)) return null;
-        const parent: any = await runtime.documents.get('Actor', ref.parentId);
+        const parent: any = await caller.runtime.documents.get('Actor', ref.parentId);
         const children = ref.documentType === 'Item' ? parent?.items : parent?.effects;
         const child = Array.isArray(children) ? children.find((entry: any) => documentId(entry) === ref.id) : null;
         return child ? { ...child, uuid: formatUuid(ref) } : null;
     }
 
-    async getLevelUpData(actor: any, classUuidOverride?: string, patronUuidOverride?: string, runtime?: Pick<ModuleRequestRuntime, 'documents'>) {
+    async getLevelUpData(actor: any, classUuidOverride?: string, patronUuidOverride?: string, caller?: Caller) {
         const currentLevel = actor?.system?.level?.value || 0;
         const targetLevel = currentLevel + 1;
         const currentXP = actor?.system?.level?.xp || 0;
@@ -172,7 +194,7 @@ export class ShadowdarkAdapter extends BaseSystemAdapter {
         const patronUuid = patronUuidOverride || actor?.system?.patron;
         const prepared = prepareActorCore(actor, this.lookups());
         const conMod = prepared.abilities.con.mod;
-        const resolve = (uuid: string) => runtime ? this.resolveDocumentFor(uuid, runtime) : this.resolveDocument(uuid);
+        const resolve = (uuid: string) => caller ? this.resolveDocumentFor(uuid, caller) : this.resolveDocument(uuid);
 
         const classDoc = classUuid ? await resolve(classUuid) : null;
         const patronDoc = patronUuid ? await resolve(patronUuid) : null;

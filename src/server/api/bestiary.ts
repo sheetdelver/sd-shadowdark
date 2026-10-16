@@ -4,11 +4,13 @@ import { shadowdarkAdapter } from '../ShadowdarkAdapter';
 import { prepareShadowdarkView } from '../../logic/prepared-view';
 import { buildNpcCard } from '../../logic/resource-cards';
 import { documentId, formatUuid, parseUuid } from '../../logic/identity';
+import { callerOf } from '../access';
 
 /**
  * Module bestiary: read-only NPC browsing and cards.
  *
- * - Declared monster packs (`shadowdark.monsters`) are offered to GMs only. Core
+ * - Declared monster packs (`shadowdark.monsters`) are offered to GMs only, by the
+ *   module-wide caller policy in server/access.ts that every route applies. Core
  *   does not expose a world's compendium ownership configuration, and GMs often
  *   restrict monster packs, so players are not shown compendium monsters.
  * - World NPC Actors are listed and read through `req.runtime`, so Core's
@@ -17,8 +19,6 @@ import { documentId, formatUuid, parseUuid } from '../../logic/identity';
  * Cards come from the same preparation as sheets. There is no spawn, encounter
  * or sharing action.
  */
-const isGM = (req: ModuleServerRequest) => req.userSession?.isGM === true || req.getAccessContext?.().isGM === true;
-
 function summary(doc: any, uuid: string, source: 'compendium' | 'world') {
     const system = doc?.system ?? {};
     return {
@@ -31,9 +31,10 @@ function summary(doc: any, uuid: string, source: 'compendium' | 'world') {
 export async function handleBestiaryList(req: ModuleServerRequest) {
     try {
         const entries: any[] = [];
-        const gm = isGM(req);
+        const caller = callerOf(req);
+        const gm = caller.isGM;
         if (gm) {
-            const monsters = await shadowdarkAdapter.getCollection('monsters');
+            const monsters = await shadowdarkAdapter.getCollection('monsters', { caller });
             for (const doc of monsters) if (doc?.type === 'NPC' && parseUuid(doc.uuid)) entries.push(summary(doc, doc.uuid, 'compendium'));
         }
         try {
@@ -57,8 +58,7 @@ export async function handleBestiaryCard(req: ModuleServerRequest, { params }: M
         if (!ref) return error('validation', 'An exact NPC reference is required');
         let doc: any = null;
         if (ref.kind === 'compendium') {
-            if (!isGM(req)) return error('permission_denied', 'Compendium monsters are available to GMs.');
-            doc = await shadowdarkAdapter.resolveDocument(formatUuid(ref));
+            doc = await shadowdarkAdapter.resolveDocumentFor(formatUuid(ref), callerOf(req));
         } else if (ref.kind === 'world' && ref.documentType === 'Actor') {
             doc = await req.runtime.documents.get('Actor', ref.id);
         }

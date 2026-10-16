@@ -74,9 +74,15 @@ function cardActions(actions: PreparedAction[]): CardAction[] {
     }));
 }
 
-function spellFacts(spell: any, lookups: ViewLookups, action?: PreparedAction): CardFact[] {
+/**
+ * Spell facts. `classLabels` are the prepared view's `spellClasses` labels for an
+ * owned spell: the Actor detail projection replaces `system.class` UUIDs with
+ * names (SD01-05), so owned cards must not reparse it (RV-04). Documents that
+ * are not projected (compendium/world previews) resolve their own references.
+ */
+function spellFacts(spell: any, lookups: ViewLookups, action?: PreparedAction, classLabels?: Array<string | null>): CardFact[] {
     const system = spell?.system ?? {};
-    const classes = (Array.isArray(system.class) ? system.class : []).map((value: unknown) => {
+    const classes = classLabels ?? (Array.isArray(system.class) ? system.class : []).map((value: unknown) => {
         const ref = parseUuid(value);
         return ref ? lookups.label?.(ref) ?? null : null;
     });
@@ -114,7 +120,7 @@ export function buildOwnedItemCard(view: ShadowdarkView, item: any, lookups: Vie
     if (item.type === 'Spell') {
         kind = 'spell';
         const spellAction = actions.find(action => action.kind === 'spell');
-        facts.push(...spellFacts(item, lookups, spellAction));
+        facts.push(...spellFacts(item, lookups, spellAction, (itemView.spellClasses ?? []).map(entry => entry.label)));
         subtitle = 'Spell';
     } else if (['Talent', 'Boon', 'Class Ability', 'NPC Feature'].includes(item.type)) {
         kind = 'feature';
@@ -224,7 +230,8 @@ export function buildNpcCard(view: ShadowdarkView, source: any, ref: DocumentRef
     const features = items.filter(item => item?.type === 'NPC Feature').map(item => ({ title: item.name, description: item.system?.description ?? '', itemId: item._id ?? item.id }));
     const spells = view.actions.filter(action => action.kind === 'spell').map(action => {
         const item = items.find(entry => (entry._id ?? entry.id) === action.itemId);
-        return { title: item?.name ?? action.label, itemId: action.itemId ?? undefined, facts: spellFacts(item, {}, action), description: item?.system?.description };
+        const classLabels = (view.items.find(entry => entry.id === action.itemId)?.spellClasses ?? []).map(entry => entry.label);
+        return { title: item?.name ?? action.label, itemId: action.itemId ?? undefined, facts: spellFacts(item, {}, action, classLabels), description: item?.system?.description };
     });
     const sections: CardSection[] = [];
     if (attacks.length) sections.push({ title: 'Attacks', entries: attacks });

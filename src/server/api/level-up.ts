@@ -1,10 +1,11 @@
 import { json, error, type ModuleServerRequest } from '@sheet-delver/sdk/server';
-import { getErrorMessage, logger } from '@sheet-delver/sdk';
+import { getErrorMessage, isSdkError, logger } from '@sheet-delver/sdk';
 import { shadowdarkAdapter } from '../../server/ShadowdarkAdapter';
 import { assembleFinalItems } from './level-up-engine';
 import * as levelUpEngine from './level-up-engine';
 import { TALENT_HANDLERS } from '../../logic/talent-handlers';
 import { canonicalUuid } from '../../logic/identity';
+import { callerOf } from '../access';
 import { hitPointRollFormula } from '../../logic/actions';
 import { prepareActorCore } from '../../logic/actor-preparation';
 
@@ -17,7 +18,7 @@ async function verifyGrants(body: any, classObj: any, req: ModuleServerRequest) 
     const resolveGrant = async (entry: any, allowed: string[]) => {
         const uuid = canonicalUuid(entry?.documentUuid ?? entry?.uuid);
         if (uuid) {
-            const doc = await shadowdarkAdapter.resolveDocumentFor(uuid, req.runtime);
+            const doc = await shadowdarkAdapter.resolveDocumentFor(uuid, callerOf(req));
             if (!doc) throw new Error(`${entry?.name || uuid} is not available.`);
             if (doc.type === 'RollTable') return { name: doc.name, type: 'Talent', uuid, system: { ...(entry?.system ?? {}) }, effects: [] };
             if (!allowed.includes(doc.type)) throw new Error(`${doc.name} is a ${doc.type}, not ${allowed.join('/')}.`);
@@ -36,7 +37,7 @@ async function verifyGrants(body: any, classObj: any, req: ModuleServerRequest) 
     const resolveSpell = async (entry: any, requireClass: boolean) => {
         const uuid = canonicalUuid(entry?.uuid);
         if (!uuid) throw new Error(`${entry?.name || 'A selected spell'} has no source reference.`);
-        const doc = await shadowdarkAdapter.resolveDocumentFor(uuid, req.runtime);
+        const doc = await shadowdarkAdapter.resolveDocumentFor(uuid, callerOf(req));
         if (!doc || doc.type !== 'Spell') throw new Error(`${entry?.name || uuid} is not an available Spell.`);
         if (requireClass && classUuid && !(doc.system?.class ?? []).some((value: unknown) => canonicalUuid(value) === classUuid)) {
             throw new Error(`${doc.name} is not on the ${classObj.name} spell list.`);
@@ -75,11 +76,12 @@ export async function handleGetLevelUpData(actorId: string | undefined, req: Mod
             actor = await req.runtime.documents.get('Actor', actorId);
         }
 
-        const data = await shadowdarkAdapter.getLevelUpData(actor, classId || undefined, patronId || undefined, req.runtime);
+        const data = await shadowdarkAdapter.getLevelUpData(actor, classId || undefined, patronId || undefined, callerOf(req));
 
         return json({ success: true, data });
 
     } catch (e: unknown) {
+        if (isSdkError(e)) return error(e.code, e.message);
         logger.error('[API] Level-Up Data Error:', e);
         return error('internal', getErrorMessage(e) || 'Failed to fetch level-up data');
     }
@@ -112,7 +114,7 @@ export async function handleRollHP(actorId: string | undefined, req: ModuleServe
         // Fallback: Use classId override if provided (e.g. for Level 1 creation)
         if (hitDie === '1d4' && classId) {
             try {
-                const classDoc = await shadowdarkAdapter.resolveDocumentFor(classId, req.runtime);
+                const classDoc = await shadowdarkAdapter.resolveDocumentFor(classId, callerOf(req));
                 if (classDoc?.system?.hitPoints) {
                     hitDie = classDoc.system.hitPoints;
                 }
@@ -163,6 +165,7 @@ export async function handleRollHP(actorId: string | undefined, req: ModuleServe
         });
 
     } catch (e: unknown) {
+        if (isSdkError(e)) return error(e.code, e.message);
         logger.error('[API] Roll HP Error:', e);
         return error('internal', getErrorMessage(e) || 'Failed to roll HP');
     }
@@ -196,6 +199,7 @@ export async function handleRollGold(actorId: string | undefined, req: ModuleSer
 
         return json({ success: true, roll: { total: requirePositiveRollTotal(result.total, 'Starting gold roll') } });
     } catch (e: unknown) {
+        if (isSdkError(e)) return error(e.code, e.message);
         logger.error("Gold Roll Failed", e);
         return error('internal', getErrorMessage(e));
     }
@@ -325,6 +329,7 @@ export async function handleRollTalent(actorId: string | undefined, req: ModuleS
         });
 
     } catch (e: unknown) {
+        if (isSdkError(e)) return error(e.code, e.message);
         logger.error('[API] Roll Talent Error:', e);
         return error('internal', getErrorMessage(e) || 'Failed to roll talent');
     }
@@ -359,7 +364,7 @@ export async function handleFinalizeLevelUp(actorId: string, req: ModuleServerRe
         // caller; client-supplied document bodies never establish identity.
         const resolveTyped = async (uuid: unknown, type: string) => {
             if (uuid === undefined || uuid === null || uuid === '') return null;
-            const doc = await shadowdarkAdapter.resolveDocumentFor(String(uuid), req.runtime);
+            const doc = await shadowdarkAdapter.resolveDocumentFor(String(uuid), callerOf(req));
             if (!doc || doc.type !== type) throw new Error(`${type} ${String(uuid)} is not available.`);
             return { ...doc, uuid: canonicalUuid(uuid) ?? doc.uuid };
         };
@@ -447,6 +452,7 @@ export async function handleFinalizeLevelUp(actorId: string, req: ModuleServerRe
         });
 
     } catch (e: unknown) {
+        if (isSdkError(e)) return error(e.code, e.message);
         logger.error('[API] Finalize Level-Up Error:', e);
         return error('internal', getErrorMessage(e) || 'Failed to finalize level-up');
     }

@@ -6,6 +6,8 @@ import { handleActorAction } from '../server/api/actions';
 import { handleGetDocument } from '../server/api/document';
 import { handleLearnSpell } from '../server/api/spells';
 import { handleBestiaryCard, handleBestiaryList } from '../server/api/bestiary';
+import { handleGetCollection } from '../server/api/collections';
+import { handleIndex } from '../server/api/index';
 import { handleFinalizeLevelUp } from '../server/api/level-up';
 import { ShadowdarkRegistry } from '../server/Registry';
 import { shadowdarkAdapter } from '../server/ShadowdarkAdapter';
@@ -396,12 +398,13 @@ async function registryAndRoutes() {
         } finally { shadowdarkAdapter.resolveDocumentFor = resolveFor; }
     });
     await check('SD01-16', 'bestiary hides compendium monsters from players and serves GMs', async () => {
-        const collection = shadowdarkAdapter.getCollection;
-        const resolve = shadowdarkAdapter.resolveDocument;
+        const registry = (shadowdarkAdapter as any)._registry;
+        const collection = registry.getCollection;
+        const resolve = registry.getDocument;
         const goblin = { _id: 'g1', uuid: 'Compendium.shadowdark.monsters.Actor.g1', name: 'Goblin', type: 'NPC', items: [],
             system: { abilities: { dex: { mod: 1 } }, attributes: { ac: { value: 11 }, hp: { value: 5, max: 5 } }, level: { value: 1 }, move: 'near', darkAdapted: true } };
-        shadowdarkAdapter.getCollection = async (id: string) => id === 'monsters' ? [goblin] : [];
-        shadowdarkAdapter.resolveDocument = async (uuid: string) => uuid === goblin.uuid ? structuredClone(goblin) : null;
+        registry.getCollection = async (id: string) => id === 'monsters' ? [goblin] : [];
+        registry.getDocument = async (uuid: string) => uuid === goblin.uuid ? structuredClone(goblin) : null;
         try {
             const runtime = { documents: { list: async () => ({ rows: [], total: 0 }), get: async () => null } };
             const player = { runtime, userSession: { isGM: false } } as any;
@@ -413,8 +416,139 @@ async function registryAndRoutes() {
             assert.equal(card.facts.find((fact: any) => fact.label === 'AC').value, '11');
             assert.equal(card.facts.find((fact: any) => fact.label === 'Senses').value, 'Dark-adapted');
             assert.equal(card.actions.length, 0, 'no spawn, encounter or share action');
-        } finally { shadowdarkAdapter.getCollection = collection; shadowdarkAdapter.resolveDocument = resolve; }
+        } finally { registry.getCollection = collection; registry.getDocument = resolve; }
     });
+}
+
+/**
+ * Independent review corrections (audit "Independent review addendum"): RV-01
+ * one caller policy for compendium monsters on every route; RV-03 action replay
+ * rechecks the caller and binds the request identity to its body.
+ */
+async function reviewCorrections() {
+    const registry = (shadowdarkAdapter as any)._registry;
+    const monsterUuid = 'Compendium.shadowdark.monsters.Actor.fixture-monster';
+    const spellUuid = 'Compendium.shadowdark.spells.Item.fixture-spell';
+    const monster = { _id: 'fixture-monster', uuid: monsterUuid, name: 'Synthetic Ogre', type: 'NPC', items: [],
+        system: { abilities: {}, attributes: { ac: { value: 9 }, hp: { value: 30, max: 30 } }, level: { value: 6 } } };
+    const docs: Record<string, any> = { [monsterUuid]: monster, [spellUuid]: { _id: 'fixture-spell', uuid: spellUuid, name: 'Synthetic Light', type: 'Spell', system: {} } };
+    const saved = { getDocument: registry.getDocument, getSystemData: registry.getSystemData, getCollection: registry.getCollection };
+    registry.getDocument = async (uuid: string) => docs[uuid] ? structuredClone(docs[uuid]) : null;
+    registry.getSystemData = async () => ({ nameIndex: { [monsterUuid]: monster.name, [spellUuid]: 'Synthetic Light' }, titles: {} });
+    registry.getCollection = async (id: string) => id === 'monsters' ? [structuredClone(monster)] : [];
+    const runtime = { documents: { list: async () => ({ rows: [], total: 0 }), get: async () => null,
+        fetchByUuid: async () => { throw new Error('caller reads must not use fetchByUuid'); } } };
+    const caller = (isGM: boolean): any => ({ runtime, url: 'http://localhost/x', userSession: { userId: isGM ? 'gm' : 'p1', isGM }, getAccessContext: () => ({ isGM }) });
+    try {
+        await check('RV-01', 'generic document route denies a compendium monster to a player and serves a GM', async () => {
+            const player = await statusOf(await handleGetDocument(caller(false), params(['document', monsterUuid])));
+            assert.equal(player.status, 403);
+            assert.doesNotMatch(JSON.stringify(player.body), /Synthetic Ogre/);
+            assert.equal((await statusOf(await handleGetDocument(caller(true), params(['document', monsterUuid])))).body.name, 'Synthetic Ogre');
+            assert.equal((await statusOf(await handleGetDocument(caller(false), params(['document', spellUuid])))).body.name, 'Synthetic Light');
+        });
+        await check('RV-01', 'a GM read of a monster is not served to a later player request', async () => {
+            assert.equal((await statusOf(await handleGetDocument(caller(true), params(['document', monsterUuid])))).status, 200);
+            assert.equal((await statusOf(await handleGetDocument(caller(false), params(['document', monsterUuid])))).status, 403);
+            assert.equal((await statusOf(await handleBestiaryCard(caller(false), params(['bestiary', monsterUuid])))).status, 403);
+        });
+        await check('RV-01', 'system index omits monster names for players and keeps them for GMs', async () => {
+            const player = (await statusOf(await handleIndex(caller(false)))).body;
+            assert.equal(player.nameIndex[monsterUuid], undefined); assert.equal(player.nameIndex[spellUuid], 'Synthetic Light');
+            assert.equal((await statusOf(await handleIndex(caller(true)))).body.nameIndex[monsterUuid], 'Synthetic Ogre');
+        });
+        await check('RV-01', 'monster collection and system-level reads require a GM caller', async () => {
+            assert.equal((await statusOf(await handleGetCollection(caller(false), 'monsters'))).status, 403);
+            assert.equal((await statusOf(await handleGetCollection(caller(true), 'monsters'))).body.length, 1);
+            assert.deepEqual(await shadowdarkAdapter.getCollection('monsters'), [], 'no caller, no monsters');
+            assert.equal(await shadowdarkAdapter.resolveDocument(monsterUuid), null, 'system-level reads never serve the monster pack');
+        });
+        await check('RV-01', 'every caller-bound document path applies the same policy (spell learning)', async () => {
+            const { runtime: owned, writes } = fakeRuntime({ _id: 'a1', type: 'Player', system: {}, items: [] });
+            const learn = await statusOf(await handleLearnSpell('a1', { ...caller(false), runtime: owned, json: async () => ({ spellUuid: monsterUuid }) } as any));
+            assert.equal(learn.status, 403); assert.equal(writes.length, 0);
+            assert.doesNotMatch(JSON.stringify(learn.body), /Synthetic Ogre/);
+        });
+    } finally {
+        Object.assign(registry, saved);
+    }
+
+    const lookupsFn = shadowdarkAdapter.lookups;
+    shadowdarkAdapter.lookups = () => lookups as any;
+    try {
+        const potionActor = () => ({ _id: 'a1', name: 'Drinker', type: 'Player', system: { abilities: {} }, effects: [],
+            items: [{ _id: 'potion', name: 'Healing Potion', type: 'Potion', system: {}, effects: [] },
+                { _id: 'potion2', name: 'Other Potion', type: 'Potion', system: {}, effects: [] }] });
+        await check('RV-03', 'a replay rechecks current ownership and discloses nothing after revocation', async () => {
+            let owner = true;
+            const { runtime, writes } = fakeRuntime(potionActor());
+            const get = runtime.documents.get;
+            let reads = 0;
+            runtime.documents.get = async (type: string, id: string, opts?: any) => { reads++; return opts?.minOwnership === 'owner' && !owner ? null : get(type, id, opts); };
+            const body = { requestId: 'rv03-revoke-01', kind: 'potion', itemId: 'potion' };
+            assert.equal((await statusOf(await handleActorAction('a1', request(runtime, body) as any))).status, 200);
+            owner = false;
+            const replay = await statusOf(await handleActorAction('a1', request(runtime, body) as any));
+            assert.equal(replay.status, 403); assert.equal(reads, 2, 'the replay re-read the Actor');
+            assert.doesNotMatch(JSON.stringify(replay.body), /Healing Potion/);
+            assert.equal(writes.filter(write => write[0] === 'item.delete').length, 1);
+        });
+        await check('RV-03', 'reusing a request id with a different action is refused', async () => {
+            const { runtime, writes } = fakeRuntime(potionActor());
+            await handleActorAction('a1', request(runtime, { requestId: 'rv03-body-0001', kind: 'potion', itemId: 'potion' }) as any);
+            const reused = await statusOf(await handleActorAction('a1', request(runtime, { requestId: 'rv03-body-0001', kind: 'potion', itemId: 'potion2' }) as any));
+            assert.equal(reused.status, 409);
+            assert.deepEqual(writes.filter(write => write[0] === 'item.delete').map(write => write[2]), ['potion']);
+        });
+        await check('RV-03', 'an identical replay returns the first result without rolling or writing', async () => {
+            const { runtime, writes, rolls } = fakeRuntime(wizardActor(), { rolls: [3, 3] });
+            const body = { requestId: 'rv03-same-0001', kind: 'spell', itemId: 'mm' };
+            const first = await statusOf(await handleActorAction('w1', request(runtime, body) as any));
+            const again = await statusOf(await handleActorAction('w1', request(runtime, body) as any));
+            assert.equal(again.status, 200); assert.equal(again.body.replayed, true);
+            assert.deepEqual(again.body.roll, first.body.roll); assert.equal(rolls(), 1);
+            assert.equal(writes.filter(write => write[0] === 'item.update').length, 1);
+        });
+        await check('RV-03', 'a chat failure after the result does not reroll or skip consequences', async () => {
+            const { runtime, writes, rolls } = fakeRuntime(wizardActor());
+            runtime.chat.send = async () => { throw new Error('chat transport down'); };
+            const body = { requestId: 'rv03-chat-0001', kind: 'spell', itemId: 'mm', overrides: { manualValue: 2 } };
+            const first = await statusOf(await handleActorAction('w1', request(runtime, body) as any));
+            assert.equal(first.status, 200); assert.equal(first.body.outcome.success, false);
+            assert.ok(first.body.warnings.some((warning: string) => /chat transport down/.test(warning)));
+            assert.deepEqual(writes.filter(write => write[0] === 'item.update').map(write => write[3]), [{ 'system.lost': true }]);
+            assert.equal((await statusOf(await handleActorAction('w1', request(runtime, body) as any))).body.replayed, true);
+            assert.equal(rolls(), 0); assert.equal(writes.filter(write => write[0] === 'item.update').length, 1);
+        });
+        await check('RV-03', 'a replay of a partial result applies only the outstanding writes, without rerolling', async () => {
+            const { runtime, writes, rolls } = fakeRuntime(wizardActor(), { rolls: [2, 20] });
+            let refuse = true;
+            const update = runtime.documents.items.update;
+            runtime.documents.items.update = async (parent: any, id: string, data: any) => {
+                if (refuse && 'system.lost' in data) throw new Error('write refused');
+                return update(parent, id, data);
+            };
+            const body = { requestId: 'rv03-part-0001', kind: 'ability', itemId: 'turn' };
+            const first = await statusOf(await handleActorAction('w1', request(runtime, body) as any));
+            assert.equal(first.body.state, 'partial');
+            assert.deepEqual(first.body.consequences.map((entry: any) => entry.status), ['applied', 'failed']);
+            refuse = false;
+            const again = await statusOf(await handleActorAction('w1', request(runtime, body) as any));
+            assert.equal(again.body.state, 'complete'); assert.equal(rolls(), 1);
+            assert.deepEqual(writes.filter(write => write[0] === 'item.update').map(write => write[3]), [{ 'system.uses.available': 0 }, { 'system.lost': true }],
+                'the use is consumed once; only the lost write is retried');
+        });
+        await check('RV-03', 'a new adapter runtime does not replay results from the previous one', async () => {
+            const { runtime, writes } = fakeRuntime(potionActor());
+            await handleActorAction('a1', request(runtime, { requestId: 'rv03-life-0001', kind: 'potion', itemId: 'potion' }) as any);
+            (shadowdarkAdapter as any).runtimeGeneration++;
+            const fresh = await statusOf(await handleActorAction('a1', request(runtime, { requestId: 'rv03-life-0001', kind: 'potion', itemId: 'potion2' }) as any));
+            assert.equal(fresh.status, 200); assert.equal(fresh.body.replayed, undefined);
+            assert.deepEqual(writes.filter(write => write[0] === 'item.delete').map(write => write[2]), ['potion', 'potion2']);
+        });
+    } finally {
+        shadowdarkAdapter.lookups = lookupsFn;
+    }
 }
 
 async function importerAndCards() {
@@ -511,6 +645,7 @@ export async function run(options: { report?: boolean } = {}) {
     await actions();
     await preparation();
     await registryAndRoutes();
+    await reviewCorrections();
     await importerAndCards();
     await nativePackOracle();
     const failed = results.filter(result => !result.ok);

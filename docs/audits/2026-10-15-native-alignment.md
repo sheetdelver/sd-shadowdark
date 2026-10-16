@@ -664,6 +664,8 @@ planner (`logic/effect-key-migration.ts`) and a caller-bound route
 (`server/api/migrations.ts`, with `ui/hooks/useDataMigrations.ts`) are
 prototyped but not wired into any page. The platform-level approach is written
 up in the [Core/SDK proposal](2026-10-16-core-sdk-world-data-proposal.md).
+(Later: the route and hook were removed in the
+[module correction pass](#module-correction-pass--october-16-2026); the planner remains.)
 
 ### Research note: world settings are not readable by modules (open)
 
@@ -730,8 +732,8 @@ would still be prudent).
 (contract A).
 
 **Module seam.** `src/logic/world-settings.ts` returns `{ value, source:
-'native-default' }`. Its consumers are `ui/components/LuckControl.tsx` (Pulp count
-selector versus standard token) and the ammunition diagnostic in
+'native-default' }`. Its consumers are `ui/components/LuckControl.tsx` (Pulp number
+input versus standard tick box, neither labelled) and the ammunition diagnostic in
 `logic/actions.ts`. A future contract would replace this one function.
 
 ### Field and action coverage inventory
@@ -750,7 +752,7 @@ selector versus standard token) and the ammunition diagnostic in
 | Scroll / wand (per spell) / NPC spell | `actions.ts` | Spells tab, cards, server | Supported with consequences | Unavailable reason | BD |
 | Class Ability uses, lose on failure | `actions.ts` | Talents and Abilities tabs, cards, server | Supported | — | BD |
 | Potion use | `actions.ts` | item card (from Inventory), server | Supported (confirmation, no roll) | — | BD |
-| Luck `available` / `remaining`, `usePulpMode` setting | sheet editing only | paper, Details | Edit only; setting unreadable | Tooltip explains | BR |
+| Luck `available` / `remaining`, `usePulpMode` setting | sheet editing only | paper, Abilities | Edit only; setting unreadable | None in the UI by user decision (no label); recorded in code and docs | NA |
 | `autoConsumeAmmunition` setting | — | attacks | Not supported | Attack diagnostic | BD |
 | Rest / recovery, damage auto-roll | — | — | Not supported | Not offered | — |
 | Light source active | Inventory toggle | Inventory | State only; no scene light/timer (DW-04) | Tooltip | — |
@@ -961,6 +963,8 @@ setting in a ready world snapshot, not for an unreadable world.
 **Correction:** adopt Core's declared setting snapshot and distinguish stored,
 proven-default and unavailable results. Until available, visibly label/disable
 affected mode-specific controls rather than presenting standard mode as verified.
+*(Superseded October 16 by user decision: no visible label in either mode; Pulp off shows only the tick box; Pulp on shows only a number input, with −/+ spinner buttons where there is space (not in the paper sheet's compact box). The interim labelling
+is not applied; see the module correction pass.)*
 Keep ammunition unsupported until both setting and consequence behavior are
 implemented; exposing the setting alone does not implement consumption. The
 secondary proposal's statement that one function replacement completes adoption
@@ -996,12 +1000,15 @@ is made by this review.
 
 ### Corrective checkpoints after review
 
-- [ ] M1: close RV-01 across every module route; RV-03 replay reauthorization,
+- [x] M1: close RV-01 across every module route; RV-03 replay reauthorization,
       request identity and partial-result tests. Existing green suites must remain green.
-- [ ] M2: fix RV-04 using prepared card facts; make unavailable setting behavior
+      *(Offline, [module correction pass](#module-correction-pass--october-16-2026).)*
+- [x] M2: fix RV-04 using prepared card facts; make unavailable setting behavior
       explicit (RV-05). Assert semantic labels, not only geometry/click success.
-- [ ] M3: remove or correctly quarantine/test the registered migration prototype;
+      *(RV-04 done offline; RV-05 presentation decided by the user, see the correction pass.)*
+- [x] M3: remove or correctly quarantine/test the registered migration prototype;
       add direct pure planner/serializer coverage (RV-02) before Core adoption.
+      *(Route and hook removed; planner/serializer cases EC-5.)*
 - [ ] M4: adopt separately implemented Core context/settings, permissions and
       migration contracts; prove RV-06 refresh semantics with real host integration.
 - [ ] M5: run actual host-boundary and approved native/operator acceptance;
@@ -1031,3 +1038,30 @@ journal markers and block host world readiness until admin maintenance. Current
 Core proposal excludes native lockout and world backup/undo implementation; admin
 acknowledges the limitation and is advised to back up using Foundry. M3 planner/
 serializer regressions and all RV findings remain pending.
+
+## Module correction pass — October 16, 2026
+
+The user selected the module-only review corrections (no Core/SDK change) on
+`fix/adr-0001-native-alignment`, after docs commit `d7e01ba`. Each new case was
+first run against the unchanged source and failed (14 of 14 in boundaries and
+native-alignment; the EC-5 route case and a planner case in effect-conformance),
+then passed after the change. Offline evidence only; no Core, Foundry, world or
+native acceptance run.
+
+| Finding | Change | Evidence | Status |
+| --- | --- | --- | --- |
+| RV-01 | `server/access.ts` holds one caller policy (monster pack GM-only until Core exposes pack capabilities). `resolveDocumentFor` takes the caller and refuses restricted packs with `permission_denied`; system-level `resolveDocument`/`getCollection` never serve them; the `index` name index omits monster names for players; bestiary, collections, document, spells, actions and level-up routes all use it. Level-up routes now return SDK error codes instead of 500. | Boundaries RV-01 × 5: player 403 / GM 200 through `document/[uuid]` using the review's synthetic UUID; GM-then-player sequence; index filtering; collection and system-level reads; spell learning with a monster UUID returns 403 without the name (before, it read the monster through the unrestricted resolver). SD01-16 bestiary case now runs the real policy. | Fixed (offline) |
+| RV-02 | Route `migrations/effect-keys`, `server/api/migrations.ts`, `ui/hooks/useDataMigrations.ts` and `derived.pendingMigrations` removed. Planner kept; it no longer writes `priority: null` onto untouched changes that had no priority (found by the new direct case). Marker constants removed. | EC-5 × 6: legacy and Foundry 14 shapes, multi-change replacement order and phase, unknown fields, idempotency, unresolved keys, `.this` scope, no `migrations*` route registered. | Fixed (module part); runner awaits Core ADR-0064 |
+| RV-03 | Replay key includes the adapter runtime generation (incremented on each `initialize`), user, Actor and request id; the body fingerprint must match (else 409). Every replay re-reads the Actor with owner access first. A result exists once the roll is evaluated: later chat failures become `warnings`; a `partial` replay applies only consequences the re-read Actor does not show. Failures before a result remain retryable. The sheet shows warnings. | Boundaries RV-03 × 6: revoked owner → 403 with no disclosure (the review's potion probe); changed `itemId` → 409; identical replay `replayed: true` with one roll; manual-roll chat failure keeps the result and the `lost` write; partial ability result consumes the use once and retries only `lost`; a new runtime does not replay. | Fixed (offline) |
+| RV-04 | Owned and NPC spell cards take Class from the prepared item view's `spellClasses` labels; previews of unprojected documents still resolve their own references. | Native-alignment RV-04 × 3 through `hostActorProjection`: Wizard after projection; two classes in order; unavailable class stays explicit; full fact list. Browser `card-spell-1280x500` shows Class Wizard. | Fixed (offline) |
+| RV-05 | User decision replaces the review's interim labelling/disabling: no visible label in either mode; Pulp off shows only the tick box; Pulp on shows only a number input, with −/+ spinner buttons where there is space (not in the paper sheet's compact box). `LuckControl` Pulp mode is now a number input (was a −/count/+ stepper everywhere). The unverified setting stays in code (`source: 'native-default'`) and documentation. | Native-alignment C8 luck cases: tick box only, no label; Pulp input plus spinner; compact input only (red before the input change). | Presentation done; reading the setting awaits Core (M4) |
+| RV-06 | Not changed; needs Core's context revision notification. | — | Open (Core) |
+| RV-07 | Documentation: this section states offline scope; the ADR and architecture describe the corrections without claiming host integration. | — | Ongoing |
+
+Verification after the change: weapon-rules, prepared-actor, actor-enricher,
+presentation, roll-feedback and importer-mapping exit 0; native-alignment
+**47/47**, boundaries **53/53**, effect-conformance **89/89** (native reference
+present; 48/48 after the luck input change). Explicit module TypeScript check and `module:check` pass. The isolated
+browser harness passes **38** checks with stubbed host services. Still pending:
+real Core HTTP/runtime integration, native/operator A01-01–10, reading the
+actual Pulp setting (RV-05), RV-06 and Core ADR-0064 adoption (M4/M5).

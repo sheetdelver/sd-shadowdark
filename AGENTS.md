@@ -99,6 +99,12 @@ to a consumer (`logic/effect-key-coverage.ts`); when the supported native releas
 changes, regenerate the key snapshot and predefined effects and rerun it with
 the native reference present.
 
+Compendium content reaches callers only through the `server/access.ts` policy
+(`resolveDocumentFor` with the caller, caller-filtered index and collections);
+do not add a route that reads restricted packs another way. Action routes keep
+request identity bound to runtime, user, Actor and body, and recheck access on
+replay.
+
 Resource details must consume the shared prepared view/action path. Future Core
 card SDK/encounter features and historical Actor repair are separately scoped.
 Core-owned findings in the audit remain external dependencies; never hide them
