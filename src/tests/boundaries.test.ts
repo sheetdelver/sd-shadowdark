@@ -31,7 +31,7 @@ type Result = { id: string; name: string; ok: boolean; detail?: string };
 const results: Result[] = [];
 async function check(id: string, name: string, fn: () => unknown | Promise<unknown>) {
     try { await fn(); results.push({ id, name, ok: true }); }
-    catch (error) { results.push({ id, name, ok: false, detail: (error as Error).message.split('\n')[0] }); }
+    catch (error) { results.push({ id, name, ok: false, detail: (error as Error).message.split('\n').slice(0, 6).join(' ') }); }
 }
 
 function fakeRuntime(actor: any, options: { owner?: boolean; rolls?: number[]; failWrites?: string[] } = {}) {
@@ -70,6 +70,8 @@ function fakeRuntime(actor: any, options: { owner?: boolean; rolls?: number[]; f
     };
     return { runtime, writes, rolls: () => rollCount };
 }
+/** Core's request-runtime pack capability (module-api 1.5), driven by a test policy. */
+const packAccess = (allowed: (pack: string) => boolean) => ({ canReadPack: allowed, packs: () => [] });
 const request = (runtime: any, body: unknown, extra: any = {}) => ({ runtime, json: async () => body, userSession: { userId: 'u1', isGM: false }, ...extra });
 const params = (route: string[]) => ({ params: Promise.resolve({ systemId: 'shadowdark', route }) });
 const statusOf = async (response: any) => ({ status: response.status ?? 200, body: await response.json() });
@@ -340,7 +342,7 @@ async function registryAndRoutes() {
             { _id: 'g1', name: 'Goblin', type: 'NPC', pack: 'shadowdark.monsters', system: {} },
             { _id: 'g2', name: 'Goblin', type: 'NPC', pack: 'shadowdark.monsters', system: {} },
         ] : [] } as any, { fetchByUuid: async () => null } as any);
-        const { doc, ambiguous } = await registry.findUniqueByName('goblin', ['NPC']);
+        const { doc, ambiguous } = await registry.findUniqueByName('goblin', ['NPC'], () => true);
         assert.equal(doc, null); assert.equal(ambiguous.length, 2);
     });
     await check('SD01-06', 'world and embedded document reads use the caller projection', async () => {
@@ -365,7 +367,8 @@ async function registryAndRoutes() {
         const denied = await statusOf(await handleGetDocument(caller(false), params(['document', 'Item.s'])));
         assert.equal(denied.status, 404);
         assert.doesNotMatch(JSON.stringify(denied.body), /GM secret/);
-        assert.equal(await shadowdarkAdapter.resolveDocument('Item.s'), null, 'the shared resolver never serves world documents');
+        assert.equal(await shadowdarkAdapter.resolveDocumentFor('Item.s', { runtime: caller(false).runtime, isGM: false }), null,
+            'a world document comes only from the caller runtime');
     });
     await check('SD01-09', 'learning rejects a non-Spell source and copies the full Spell with its source', async () => {
         const actor = { _id: 'a1', items: [] };
@@ -397,18 +400,19 @@ async function registryAndRoutes() {
             assert.equal(writes.length, 0);
         } finally { shadowdarkAdapter.resolveDocumentFor = resolveFor; }
     });
-    await check('SD01-16', 'bestiary hides compendium monsters from players and serves GMs', async () => {
+    await check('SD01-16', 'bestiary offers compendium monsters only with the caller pack capability', async () => {
         const registry = (shadowdarkAdapter as any)._registry;
         const collection = registry.getCollection;
         const resolve = registry.getDocument;
         const goblin = { _id: 'g1', uuid: 'Compendium.shadowdark.monsters.Actor.g1', name: 'Goblin', type: 'NPC', items: [],
             system: { abilities: { dex: { mod: 1 } }, attributes: { ac: { value: 11 }, hp: { value: 5, max: 5 } }, level: { value: 1 }, move: 'near', darkAdapted: true } };
-        registry.getCollection = async (id: string) => id === 'monsters' ? [goblin] : [];
+        registry.getCollection = async (id: string, options: any = {}) => id === 'monsters' ? [goblin].filter(doc => !options.readable || options.readable('shadowdark.monsters')) : [];
         registry.getDocument = async (uuid: string) => uuid === goblin.uuid ? structuredClone(goblin) : null;
         try {
-            const runtime = { documents: { list: async () => ({ rows: [], total: 0 }), get: async () => null } };
-            const player = { runtime, userSession: { isGM: false } } as any;
-            const gm = { runtime, userSession: { isGM: true } } as any;
+            const documents = { list: async () => ({ rows: [], total: 0 }), get: async () => null };
+            // Core's effective capability: this world restricts the monster pack from players.
+            const player = { runtime: { documents, access: packAccess(pack => pack !== 'shadowdark.monsters') }, userSession: { isGM: false } } as any;
+            const gm = { runtime: { documents, access: packAccess(() => true) }, userSession: { isGM: true } } as any;
             assert.equal((await statusOf(await handleBestiaryList(player))).body.entries.length, 0);
             assert.equal((await statusOf(await handleBestiaryCard(player, params(['bestiary', goblin.uuid])))).status, 403);
             assert.equal((await statusOf(await handleBestiaryList(gm))).body.entries.length, 1);
@@ -432,13 +436,21 @@ async function reviewCorrections() {
     const monster = { _id: 'fixture-monster', uuid: monsterUuid, name: 'Synthetic Ogre', type: 'NPC', items: [],
         system: { abilities: {}, attributes: { ac: { value: 9 }, hp: { value: 30, max: 30 } }, level: { value: 6 } } };
     const docs: Record<string, any> = { [monsterUuid]: monster, [spellUuid]: { _id: 'fixture-spell', uuid: spellUuid, name: 'Synthetic Light', type: 'Spell', system: {} } };
-    const saved = { getDocument: registry.getDocument, getSystemData: registry.getSystemData, getCollection: registry.getCollection };
+    const saved = { getDocument: registry.getDocument, getSystemData: registry.getSystemData, getCollection: registry.getCollection,
+        collectionSize: registry.collectionSize };
+    registry.collectionSize = async (id: string) => id === 'monsters' ? 1 : 0;
     registry.getDocument = async (uuid: string) => docs[uuid] ? structuredClone(docs[uuid]) : null;
     registry.getSystemData = async () => ({ nameIndex: { [monsterUuid]: monster.name, [spellUuid]: 'Synthetic Light' }, titles: {} });
-    registry.getCollection = async (id: string) => id === 'monsters' ? [structuredClone(monster)] : [];
-    const runtime = { documents: { list: async () => ({ rows: [], total: 0 }), get: async () => null,
-        fetchByUuid: async () => { throw new Error('caller reads must not use fetchByUuid'); } } };
-    const caller = (isGM: boolean): any => ({ runtime, url: 'http://localhost/x', userSession: { userId: isGM ? 'gm' : 'p1', isGM }, getAccessContext: () => ({ isGM }) });
+    registry.getCollection = async (id: string, options: any = {}) => id === 'monsters'
+        ? [structuredClone(monster)].filter(doc => !options.readable || options.readable('shadowdark.monsters')) : [];
+    const documents = { list: async () => ({ rows: [], total: 0 }), get: async () => null,
+        fetchByUuid: async () => { throw new Error('caller reads must not use fetchByUuid'); } };
+    // Unfiltered pack rows: the module must apply the caller capability itself.
+    const compendium = { findAll: async (type: string) => type === 'Actor' ? [{ ...structuredClone(monster), pack: 'shadowdark.monsters' }]
+        : type === 'Item' ? [{ ...docs[spellUuid], pack: 'shadowdark.spells' }] : [] };
+    // The world restricts the monster pack from this player; GMs read every pack.
+    const caller = (isGM: boolean): any => ({ runtime: { documents, compendium, access: packAccess(pack => isGM || pack !== 'shadowdark.monsters') },
+        url: 'http://localhost/x', userSession: { userId: isGM ? 'gm' : 'p1', isGM }, getAccessContext: () => ({ isGM }) });
     try {
         await check('RV-01', 'generic document route denies a compendium monster to a player and serves a GM', async () => {
             const player = await statusOf(await handleGetDocument(caller(false), params(['document', monsterUuid])));
@@ -457,11 +469,12 @@ async function reviewCorrections() {
             assert.equal(player.nameIndex[monsterUuid], undefined); assert.equal(player.nameIndex[spellUuid], 'Synthetic Light');
             assert.equal((await statusOf(await handleIndex(caller(true)))).body.nameIndex[monsterUuid], 'Synthetic Ogre');
         });
-        await check('RV-01', 'monster collection and system-level reads require a GM caller', async () => {
+        await check('RV-01', 'monster collection follows the capability; a runtime without capabilities reads no pack', async () => {
             assert.equal((await statusOf(await handleGetCollection(caller(false), 'monsters'))).status, 403);
             assert.equal((await statusOf(await handleGetCollection(caller(true), 'monsters'))).body.length, 1);
-            assert.deepEqual(await shadowdarkAdapter.getCollection('monsters'), [], 'no caller, no monsters');
-            assert.equal(await shadowdarkAdapter.resolveDocument(monsterUuid), null, 'system-level reads never serve the monster pack');
+            const noAccess: any = { runtime: { documents }, url: 'http://localhost/x', userSession: { userId: 'gm', isGM: true } };
+            assert.equal((await statusOf(await handleGetDocument(noAccess, params(['document', spellUuid])))).status, 403,
+                'no capability is not an allow-all fallback, even for a GM session');
         });
         await check('RV-01', 'every caller-bound document path applies the same policy (spell learning)', async () => {
             const { runtime: owned, writes } = fakeRuntime({ _id: 'a1', type: 'Player', system: {}, items: [] });
@@ -554,15 +567,13 @@ async function reviewCorrections() {
 async function importerAndCards() {
     await check('SD01-09', 'import with unresolved references writes nothing until confirmed', async () => {
         const unique = shadowdarkAdapter.findUniqueByName;
-        const resolve = shadowdarkAdapter.resolveDocument;
+        const resolve = shadowdarkAdapter.resolveReadable;
         const catalog = shadowdarkAdapter.getChoiceCatalog;
-        const system = shadowdarkAdapter.getSystemData;
         shadowdarkAdapter.findUniqueByName = async (name: string) => name === 'Arrows'
             ? { doc: { name: 'Arrows', type: 'Basic', uuid: 'Compendium.shadowdark.gear.Item.arrows', system: { quantity: 20, isAmmunition: true } }, ambiguous: [] }
             : { doc: null, ambiguous: [] };
-        shadowdarkAdapter.resolveDocument = async () => null;
+        shadowdarkAdapter.resolveReadable = async () => null;
         shadowdarkAdapter.getChoiceCatalog = async () => ({});
-        shadowdarkAdapter.getSystemData = async () => ({});
         try {
             const json = { name: 'Imported', rolledStats: { STR: 9, DEX: 10, CON: 10, INT: 10, WIS: 10, CHA: 10 }, maxHitPoints: 6, level: 1,
                 gear: [{ name: 'Arrows', type: 'basic', quantity: 1 }, { name: 'Mystery Box', type: 'sundry', quantity: 2, slots: 1 }] };
@@ -580,8 +591,8 @@ async function importerAndCards() {
             assert.equal(items.find(item => item.name === 'Arrows').system.quantity, 1, 'ammo quantity is not inferred from the name');
             assert.match(items.find(item => item.name === 'Mystery Box').system.description, /Custom item/);
         } finally {
-            shadowdarkAdapter.findUniqueByName = unique; shadowdarkAdapter.resolveDocument = resolve;
-            shadowdarkAdapter.getChoiceCatalog = catalog; shadowdarkAdapter.getSystemData = system;
+            shadowdarkAdapter.findUniqueByName = unique; shadowdarkAdapter.resolveReadable = resolve;
+            shadowdarkAdapter.getChoiceCatalog = catalog;
         }
     });
     await check('SD01-13', 'cards never project the alternate identification fields', () => {

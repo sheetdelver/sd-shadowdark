@@ -2,7 +2,8 @@ import { logger } from '@sheet-delver/sdk';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { X, Search, ChevronDown, ChevronRight, Shield, Backpack, Swords, Sparkles, Sprout, Briefcase, Plus, Flame, Sun, Target } from 'lucide-react';
 import { useSDK } from '@sheet-delver/sdk/react';
-import { useShadowdarkUI } from '../context/ShadowdarkUIContext';
+import { useShadowdarkUI, useShadowdarkCollections } from '../context/ShadowdarkUIContext';
+import { CollectionStatus } from './CollectionStatus';
 import { presentDescription } from '../../logic/description';
 
 interface GearSelectionModalProps {
@@ -25,10 +26,11 @@ const FOLDER_IDS: Record<string, GearCategory> = {
 
 export default function GearSelectionModal({ isOpen, onClose, onCreate }: GearSelectionModalProps) {
     const { resolveImageUrl } = useSDK();
-    const { collections, fetchPack, resolveName } = useShadowdarkUI();
+    const { resolveName } = useShadowdarkUI();
+    const data = useShadowdarkCollections(['gear', 'magic-items', 'properties'], isOpen);
+    const { collections } = data;
     const [searchTerm, setSearchTerm] = useState('');
     const [expandedCategories, setExpandedCategories] = useState<Set<GearCategory>>(new Set(['Basic Gear']));
-    const [loading, setLoading] = useState(false);
     const dialogRef = useRef<HTMLDialogElement>(null);
 
     useEffect(() => {
@@ -62,24 +64,6 @@ export default function GearSelectionModal({ isOpen, onClose, onCreate }: GearSe
             return typeMatch;
         });
     }, [collections]);
-
-    useEffect(() => {
-        if (isOpen) {
-            const loadNeeded = async () => {
-                setLoading(true);
-                try {
-                    await Promise.all([
-                        fetchPack('gear'),
-                        fetchPack('magic-items'),
-                        fetchPack('properties')
-                    ]);
-                } finally {
-                    setLoading(false);
-                }
-            };
-            loadNeeded();
-        }
-    }, [isOpen, fetchPack]);
 
     const toggleCategory = (category: GearCategory) => {
         const newSet = new Set(expandedCategories);
@@ -150,6 +134,7 @@ export default function GearSelectionModal({ isOpen, onClose, onCreate }: GearSe
     };
 
     const handleAdd = async (item: any) => {
+        if (!data.ready) return;
         // Clone item data to create a new instance
         const newItemData = {
             name: item.name,
@@ -200,11 +185,9 @@ export default function GearSelectionModal({ isOpen, onClose, onCreate }: GearSe
 
                 {/* Content */}
                 <div className="min-h-0 flex-1 overflow-y-auto p-2 sm:p-4 space-y-4">
-                    {loading ? (
-                        <div className="flex justify-center items-center h-full">
-                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-black"></div>
-                        </div>
-                    ) : (
+                    <CollectionStatus state={data} label="Loading gear…" />
+                    {data.ready && items.length === 0 && <p>No gear is available in the readable collections.</p>}
+                    {data.ready && (
                         (Object.keys(categorizedItems) as GearCategory[]).map(category => {
                             const itemsInCategory = categorizedItems[category];
                             if (itemsInCategory.length === 0) return null;

@@ -2,6 +2,7 @@ import type { ActorSheetData } from '@sheet-delver/sdk';
 import { prepareShadowdarkView, type ViewLookups } from './prepared-view';
 import { getLanguageLimits } from './rules';
 import { canonicalUuid, documentId, formatUuid } from './identity';
+import { UNAVAILABLE_RULE_INPUTS, type RuleInputs } from './world-settings';
 
 /**
  * Exact label for a reference: the declared-pack name index entry for the
@@ -52,8 +53,9 @@ function classTitle(actor: any, view: ReturnType<typeof prepareShadowdarkView>, 
  * rule result lives in the single prepared view (`derived`, aliased `computed`).
  */
 export class ShadowdarkNormalizer {
-    static normalizeActorData(actor: any, cachedSystemData: any, lookups: ViewLookups = lookupsFromSystemData(cachedSystemData), collections?: any): ActorSheetData {
-        const view = prepareShadowdarkView(actor, lookups);
+    static normalizeActorData(actor: any, cachedSystemData: any, lookups: ViewLookups = lookupsFromSystemData(cachedSystemData), collections?: any,
+        rules: RuleInputs = UNAVAILABLE_RULE_INPUTS): ActorSheetData {
+        const view = prepareShadowdarkView(actor, lookups, rules);
         const s = actor.system || {};
         const items = (actor.items || []).map((item: any) => ({ ...item, id: documentId(item) }));
         const label = (entry: { label: string | null; value: string | null }) => entry.label ?? entry.value ?? '';

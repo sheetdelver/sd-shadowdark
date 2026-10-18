@@ -5,7 +5,8 @@ import { presentDescription } from '../../logic/description';
 import { canonicalUuid } from '../../logic/identity';
 import { useSDK } from '@sheet-delver/sdk/react';
 import { logger } from '@sheet-delver/sdk';
-import { useShadowdarkUI } from '../context/ShadowdarkUIContext';
+import { useShadowdarkCollections } from '../context/ShadowdarkUIContext';
+import { CollectionStatus } from './CollectionStatus';
 
 interface SpellOption {
     name: string;
@@ -45,7 +46,8 @@ export default function SpellSelectionModal({
     actor
 }: SpellSelectionModalProps) {
     const { resolveImageUrl } = useSDK();
-    const { systemData, collections } = useShadowdarkUI();
+    const data = useShadowdarkCollections(['spells'], isOpen);
+    const { collections } = data;
     const [search, setSearch] = useState('');
     const [selectedUuids, setSelectedUuids] = useState<Set<string>>(new Set());
     const [expandedUuids, setExpandedUuids] = useState<Set<string>>(new Set());
@@ -59,7 +61,7 @@ export default function SpellSelectionModal({
     // Spells whose system.class contains this exact class UUID (fetch-pack rows keep
     // canonical references); no class-name substring or terminal-ID matching.
     const availableSpells = useMemo(() => {
-        const fullSpells = collections?.spells || systemData?.spells || [];
+        const fullSpells = data.ready ? collections.spells : [];
         const target = canonicalUuid(classUuid);
         if (!tier || !target) return [];
         const innate = new Set(knownSpells.filter(spell => (spell as any).isInnate).map(spell => spell.uuid));
@@ -69,7 +71,7 @@ export default function SpellSelectionModal({
                 name: s.name, uuid: canonicalUuid(s.uuid) ?? s.uuid, tier, img: s.img,
                 description: s.system?.description, system: s.system, isInnate: innate.has(canonicalUuid(s.uuid) ?? ''),
             }));
-    }, [systemData, collections, tier, classUuid, knownSpells]);
+    }, [data.ready, collections, tier, classUuid, knownSpells]);
 
     const toggleExpand = (spell: SpellOption) => {
         if (isSaving) return;
@@ -84,7 +86,7 @@ export default function SpellSelectionModal({
 
     // Initialize selection from known spells ONLY when the modal opens
     useEffect(() => {
-        if (isOpen && !hasInitialized) {
+        if (isOpen && data.ready && !hasInitialized) {
             const initialSet = new Set<string>();
             // Owned spells match by their recorded source identity only.
             const knownSources = new Set(knownSpells.map(s => s.uuid).filter(Boolean));
@@ -98,7 +100,7 @@ export default function SpellSelectionModal({
             setHasInitialized(false);
             setSearch('');
         }
-    }, [isOpen, knownSpells, availableSpells, hasInitialized]);
+    }, [isOpen, knownSpells, availableSpells, hasInitialized, data.ready]);
 
     const filteredSpells = useMemo(() => {
         let result = availableSpells;
@@ -145,6 +147,7 @@ export default function SpellSelectionModal({
     const isMaxReached = maxSelections ? selectableCount >= maxSelections : false;
 
     const handleSave = () => {
+        if (!data.ready || isSaving) return;
         const selected = availableSpells.filter(s => selectedUuids.has(s.uuid));
         onSave(selected);
         // We do NOT call onClose() here anymore; SpellsTab.tsx will call it after the async save completes.
@@ -214,6 +217,7 @@ export default function SpellSelectionModal({
 
                     {/* Spell List */}
                     <div className="flex-1 overflow-y-auto space-y-0 pr-2 custom-scrollbar border-t-2 border-black">
+                        <CollectionStatus state={data} label="Loading spells…" />
                         {filteredSpells.map((spell, idx) => {
                             const isSelected = selectedUuids.has(spell.uuid);
                             const isExpanded = expandedUuids.has(spell.uuid);
@@ -313,7 +317,7 @@ export default function SpellSelectionModal({
                             );
                         })}
 
-                        {filteredSpells.length === 0 && (
+                        {data.ready && filteredSpells.length === 0 && (
                             <div className="text-center py-20 text-neutral-400 italic border-2 border-dashed border-neutral-200 rounded-lg">
                                 No spells found matching your filter.
                             </div>
@@ -332,7 +336,7 @@ export default function SpellSelectionModal({
                     </button>
                     <button
                         onClick={handleSave}
-                        disabled={isSaving}
+                        disabled={isSaving || !data.ready}
                         className="px-10 py-3 bg-black text-white border-2 border-black font-serif font-bold text-lg shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                     >
                         {isSaving ? (

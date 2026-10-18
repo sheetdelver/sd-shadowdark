@@ -1,42 +1,53 @@
 import { json, error, type ModuleServerRequest, type ModuleRequestRuntime } from '@sheet-delver/sdk/server';
 import { shadowdarkAdapter } from '../../server/ShadowdarkAdapter';
 import { getErrorMessage, logger } from '@sheet-delver/sdk';
+import { callerOf, type Caller } from '../access';
+
+/** A collection limited to the caller's readable packs; an unreadable one offers nothing. */
+async function collection(id: string, caller: Caller): Promise<any[]> {
+    try {
+        return await shadowdarkAdapter.getCollection(id, { summary: true, caller });
+    } catch (e: any) {
+        if (e?.code === 'permission_denied') return [];
+        throw e;
+    }
+}
 
 // --- Logic Helpers ---
 
-async function getRandomAncestry() {
-    const options = await shadowdarkAdapter.getCollection('ancestries', { summary: true });
+async function getRandomAncestry(caller: Caller) {
+    const options = await collection('ancestries', caller);
     if (!options.length) return null;
     const selection = options[Math.floor(Math.random() * options.length)];
-    return await shadowdarkAdapter.resolveDocument(selection.uuid);
+    return await shadowdarkAdapter.resolveReadable(selection.uuid, caller);
 }
 
-async function getRandomClass() {
-    const options = (await shadowdarkAdapter.getCollection('classes', { summary: true })).filter((c: any) => c.name !== "Level 0");
+async function getRandomClass(caller: Caller) {
+    const options = (await collection('classes', caller)).filter((c: any) => c.name !== "Level 0");
     if (!options.length) return null;
     const selection = options[Math.floor(Math.random() * options.length)];
-    return await shadowdarkAdapter.resolveDocument(selection.uuid);
+    return await shadowdarkAdapter.resolveReadable(selection.uuid, caller);
 }
 
-async function getRandomBackground() {
-    const options = await shadowdarkAdapter.getCollection('backgrounds', { summary: true });
+async function getRandomBackground(caller: Caller) {
+    const options = await collection('backgrounds', caller);
     if (!options.length) return null;
     const selection = options[Math.floor(Math.random() * options.length)];
-    return await shadowdarkAdapter.resolveDocument(selection.uuid);
+    return await shadowdarkAdapter.resolveReadable(selection.uuid, caller);
 }
 
-async function getRandomDeity() {
-    const options = await shadowdarkAdapter.getCollection('deities', { summary: true });
+async function getRandomDeity(caller: Caller) {
+    const options = await collection('deities', caller);
     if (!options.length) return null;
     const selection = options[Math.floor(Math.random() * options.length)];
-    return await shadowdarkAdapter.resolveDocument(selection.uuid);
+    return await shadowdarkAdapter.resolveReadable(selection.uuid, caller);
 }
 
-async function getRandomPatron() {
-    const options = await shadowdarkAdapter.getCollection('patrons', { summary: true });
+async function getRandomPatron(caller: Caller) {
+    const options = await collection('patrons', caller);
     if (!options.length) return null;
     const selection = options[Math.floor(Math.random() * options.length)];
-    return await shadowdarkAdapter.resolveDocument(selection.uuid);
+    return await shadowdarkAdapter.resolveReadable(selection.uuid, caller);
 }
 
 function getRandomAlignment() {
@@ -54,13 +65,13 @@ function getRandomStats() {
     return stats;
 }
 
-async function getRandomName(ancestryUuid?: string) {
+async function getRandomName(caller: Caller, ancestryUuid?: string) {
     if (!ancestryUuid) return "Unnamed";
 
     try {
-        const ancestry = await shadowdarkAdapter.resolveDocument(ancestryUuid);
+        const ancestry = await shadowdarkAdapter.resolveReadable(ancestryUuid, caller);
         if (ancestry?.system?.nameTable) {
-            const table = await shadowdarkAdapter.resolveDocument(ancestry.system.nameTable);
+            const table = await shadowdarkAdapter.resolveReadable(ancestry.system.nameTable, caller);
             if (table && table.results) {
                 const results = table.results;
                 const max = Math.max(...results.map((r: any) => (r.range?.[1] || 0)));
@@ -201,9 +212,9 @@ function getRandomTalents(ancestryDoc: any, classDoc?: any) {
     return results;
 }
 
-async function getRandomLanguages(ancestryDoc: any, classDoc: any, intMod: number) {
+async function getRandomLanguages(caller: Caller, ancestryDoc: any, classDoc: any, intMod: number) {
     const known = new Set<string>();
-    const languagesIndex = await shadowdarkAdapter.getCollection('languages', { summary: true });
+    const languagesIndex = await collection('languages', caller);
 
     // 1. Fixed Languages
     const commonLang = languagesIndex.find((l: any) => l.name.trim().toLowerCase() === 'common');
@@ -306,7 +317,7 @@ async function getRandomLanguages(ancestryDoc: any, classDoc: any, intMod: numbe
 export async function handleRandomizeName(req: ModuleServerRequest) {
     try {
         const body = await req.json<any>().catch(() => ({}));
-        const name = await getRandomName(body.ancestryUuid);
+        const name = await getRandomName(callerOf(req), body.ancestryUuid);
         return json({ name });
     } catch (e: unknown) { return error('internal', getErrorMessage(e)); }
 }
@@ -324,15 +335,16 @@ export async function handleRandomizeStats(_req: ModuleServerRequest) {
 export async function handleRandomizeCharacter(req: ModuleServerRequest) {
     try {
         const runtime: ModuleRequestRuntime = req.runtime;
+        const caller = callerOf(req);
 
         const body = await req.json<any>().catch(() => ({}));
         const isLevel0 = body.level0 === true;
 
         // Parallel fetch for basic randoms
         const [ancestry, bg, deity, alignment, stats, gear] = await Promise.all([
-            getRandomAncestry(),
-            getRandomBackground(),
-            getRandomDeity(),
+            getRandomAncestry(caller),
+            getRandomBackground(caller),
+            getRandomDeity(caller),
             Promise.resolve(getRandomAlignment()),
             Promise.resolve(getRandomStats()),
             getRandomGear(runtime, isLevel0)
@@ -342,21 +354,21 @@ export async function handleRandomizeCharacter(req: ModuleServerRequest) {
         let cls = null;
         let patron = null;
         if (!isLevel0) {
-            cls = await getRandomClass();
+            cls = await getRandomClass(caller);
             if (cls && cls.name.toLowerCase().includes('warlock')) {
-                patron = await getRandomPatron();
+                patron = await getRandomPatron(caller);
             }
         }
 
         // Name (needs ancestry)
-        const name = ancestry ? await getRandomName(ancestry.uuid) : "Unnamed";
+        const name = ancestry ? await getRandomName(caller, ancestry.uuid) : "Unnamed";
 
         // Talents (needs ancestry + class)
         const talents = getRandomTalents(ancestry, cls);
 
         // Languages (needs ancestry + class + int mod)
         const intMod = stats.INT?.mod || 0;
-        const languages = await getRandomLanguages(ancestry, cls, intMod);
+        const languages = await getRandomLanguages(caller, ancestry, cls, intMod);
 
         const result = {
             name,

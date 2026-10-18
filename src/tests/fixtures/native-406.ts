@@ -77,6 +77,27 @@ export const hostIndex: Record<string, string> = {
 };
 
 /**
+ * Test replica of Core 0.19.0 `ActorService` Actor responses (Core ADR-0064 G7):
+ * canonical source strings are kept and `referenceLabels` maps each declared
+ * compendium UUID the caller may read to its name. A boundary simulator, not
+ * Core code.
+ */
+export function coreActorResponse<T extends object>(prepared: T, index: Record<string, string> = hostIndex,
+    canReadPack: (pack: string) => boolean = () => true): T & { referenceLabels: Record<string, string> } {
+    const referenceLabels: Record<string, string> = {};
+    const collect = (value: unknown): void => {
+        if (typeof value === 'string') {
+            const pack = value.startsWith('Compendium.') ? value.split('.').slice(1, 3).join('.') : null;
+            if (pack && index[value] && canReadPack(pack)) referenceLabels[value] = index[value];
+        } else if (Array.isArray(value)) value.forEach(collect);
+        else if (value && typeof value === 'object') Object.values(value).forEach(collect);
+    };
+    const response = JSON.parse(JSON.stringify(prepared));
+    collect(response);
+    return { ...response, referenceLabels };
+}
+
+/**
  * Test replica of Core 0.18.1 `ActorService.getActorById/resolveUUIDs`
  * (src/server/services/actors/ActorService.ts): every string beginning with
  * `Compendium.` whose pack index contains the document becomes that document's
@@ -97,6 +118,31 @@ export const preparationContext = Object.freeze({
     worldEpoch: 1, sourceRevision: 1, systemId: 'shadowdark', systemVersion: '4.0.6',
     moduleId: 'shadowdark', moduleVersion: '0.9.4',
 });
+
+/**
+ * A Core world snapshot (module-api 1.5 `ModuleWorldSnapshot`) as Core resolves
+ * this module's two declared settings: `world` for a stored row, or
+ * `registered-default` with the declared native default (usePulpMode false,
+ * autoConsumeAmmunition true) when the world has none.
+ */
+export function worldSnapshot(revision: number, stored: { usePulpMode?: unknown; autoConsumeAmmunition?: unknown } = {},
+    unavailable: Partial<Record<'usePulpMode' | 'autoConsumeAmmunition', string>> = {}) {
+    const result = (name: 'usePulpMode' | 'autoConsumeAmmunition', fallback: boolean) => unavailable[name]
+        ? { status: 'unavailable', reason: unavailable[name] }
+        : name in stored ? { status: 'world', value: stored[name] } : { status: 'registered-default', value: fallback };
+    return {
+        identity: { instanceId: 'fixture', worldId: 'fixture-world', systemId: 'shadowdark', systemVersion: '4.0.6', foundryGeneration: 14,
+            foundryBuild: '367', runtimeEpoch: 1, contextRevision: revision },
+        settings: {
+            'shadowdark.usePulpMode': result('usePulpMode', false),
+            'shadowdark.autoConsumeAmmunition': result('autoConsumeAmmunition', true),
+        },
+    };
+}
+
+/** Preparation context carrying a world snapshot, as Core supplies it (ADR-0064). */
+export const contextWith = (world: ReturnType<typeof worldSnapshot>) =>
+    Object.freeze({ ...preparationContext, world, contextRevision: world.identity.contextRevision }) as any;
 
 /**
  * Attack-mode extracts (native 4.0.6 data/packs): gear.db/dagger__C3mc5OlKPSJNMrng.json,

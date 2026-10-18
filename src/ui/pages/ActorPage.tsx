@@ -90,6 +90,9 @@ export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProp
                 fetchActor(actorId, true);
             }
         });
+        // World rules changed (a setting or declared pack): Core re-prepares Actors;
+        // reload so luck mode, actions and the context revision are current.
+        const offContext = events.on('world:contextChanged', () => fetchActor(actorId, true));
 
         const timeout = setTimeout(() => {
             if (loadingRef.current) {
@@ -99,6 +102,7 @@ export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProp
 
         return () => {
             off();
+            offContext();
             clearTimeout(timeout);
         };
     }, [actorId, fetchActor, addNotification, events]);
@@ -133,10 +137,15 @@ export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProp
             { fetchWithAuth, addNotification: addToast }, actor, type, key, options,
             localStorage.getItem('sheetdelver_roll_mode') || 'publicroll',
         );
+        // A refused stale roll (world rules changed) needs the re-prepared Actor.
+        if (currentActorId.current) fetchActor(currentActorId.current, true);
     };
 
     const id = actor?.id || actor?._id;
     const moduleBase = `/api/modules/shadowdark/actors/${id}`;
+    /** The world-context revision this Actor was prepared under; Core refuses the write if rules changed since. */
+    const contextHeaders = (): Record<string, string> => typeof actor?.worldContextRevision === 'number'
+        ? { 'X-SheetDelver-Context-Revision': String(actor.worldContextRevision) } : {};
 
     const handleUpdate = (path: string, value: any) => refreshAfter(() =>
         request(`/api/actors/${id}/update`, { method: 'POST', body: JSON.stringify({ [path]: value }) }));
@@ -168,8 +177,11 @@ export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProp
     const handleUpdateEffect = (ref: string, patch: any) => refreshAfter(() =>
         request(`${moduleBase}/effects/update`, { method: 'POST', body: JSON.stringify({ ref, patch }) }));
     const handleAction = (body: any) => refreshAfter(() => request(`${moduleBase}/actions`, {
-        method: 'POST',
+        method: 'POST', headers: contextHeaders(),
         body: JSON.stringify({ ...body, rollMode: body.rollMode ?? (localStorage.getItem('sheetdelver_roll_mode') || 'publicroll') }),
+    }));
+    const handleLuck = (mode: 'pulp' | 'standard', value: number | boolean) => refreshAfter(() => request(`${moduleBase}/luck`, {
+        method: 'POST', headers: contextHeaders(), body: JSON.stringify({ mode, value }),
     }));
 
     if (loading) return <LoadingModal message="Loading Codex..." />;
@@ -201,6 +213,7 @@ export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProp
                             onUpdateItem={handleUpdateItem}
                             onRoll={handleRoll}
                             onAction={handleAction}
+                            onLuck={handleLuck}
                             onToggleEffect={handleToggleEffect}
                             onDeleteEffect={handleDeleteEffect}
                             onCreateEffect={handleCreateEffect}

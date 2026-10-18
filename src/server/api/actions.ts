@@ -7,7 +7,7 @@ import {
     type ActionRequest, type ConsequenceWrite, type RollOverrides,
 } from '../../logic/actions';
 import { documentId, formatUuid, parseUuid } from '../../logic/identity';
-import { callerOf } from '../access';
+import { callerOf, contextConflict, requestRevision, requestRules } from '../access';
 
 /**
  * POST actors/[id]/actions — executes a spell cast, Class Ability or potion with
@@ -25,6 +25,13 @@ import { callerOf } from '../access';
  * evaluated it is never rolled again: a chat failure after that is reported as
  * a warning, and a replay of a `partial` result re-reads the Actor and applies
  * only the consequences not yet reflected there.
+ *
+ * World context (G8-C): the client sends the Actor's prepared context revision
+ * as `X-SheetDelver-Context-Revision`; Core's module router refuses a stale one
+ * (409 `world-context-changed`) before this handler runs, and the request
+ * runtime fails closed if the context changes during the request. A replay is
+ * keyed without the revision, so after a context change the same request id
+ * returns the recorded result and never rolls again.
  *
  * Multi-document consequences are sequential, not atomic; each write's outcome
  * is reported.
@@ -137,6 +144,7 @@ export async function handleActorAction(actorId: string, req: ModuleServerReques
     const generation = shadowdarkAdapter.runtimeGeneration;
     const key = `${generation}:${userId}:${actorId}:${body.requestId}`;
     const print = fingerprint(body);
+    const revision = requestRevision(req.runtime);
     try {
         const now = Date.now();
         prune(now, generation);
@@ -157,6 +165,8 @@ export async function handleActorAction(actorId: string, req: ModuleServerReques
     } catch (e) {
         if (e instanceof ActionError) return error(e.code, e.message);
         if (isSdkError(e)) return error(e.code, e.message);
+        const conflict = contextConflict(req.runtime, revision);
+        if (conflict) return conflict;
         logger.error('[ShadowdarkActions] Action failed:', e);
         return error('internal', getErrorMessage(e));
     }
@@ -181,7 +191,8 @@ async function execute(actorId: string, body: ActionBody, req: ModuleServerReque
         if (doc?.type === 'Spell') resolvedSpells.set(formatUuid(ref), doc);
     }
     const lookups = { ...baseLookups, spellDocument: (ref: any) => resolvedSpells.get(formatUuid(ref)) ?? baseLookups.spellDocument?.(ref) ?? null };
-    const core = prepareActorCore(actor, lookups);
+    // Rule inputs from the request's world context; Core pins its revision for this request.
+    const core = prepareActorCore(actor, lookups, requestRules(req.runtime));
     const request: ActionRequest = { kind: body.kind!, itemId: body.itemId, spellIndex: body.spellIndex, selected: body.selected };
     const action = prepareRequestedAction(core, actor, lookups, request);
     if (!action) throw new ActionError('not_found', 'That action is not available for this item.');

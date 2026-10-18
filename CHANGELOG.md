@@ -3,6 +3,10 @@
 Historical entries are reconstructed from [published releases](https://github.com/sheetdelver/sd-shadowdark/releases), their tags, and merged changes. Version numbers follow the published tags; the Unreleased section collects notes for the next authorized release.
 
 ## Unreleased
+- Core 0.19.2 adoption checkpoints
+- Required world-pack migration completeness
+- Open pickers refresh after context changes
+- Collection failures with retry and mode readiness
 - Read Foundry 14 effects
 - Native ability, AC, slots
 - Caller-bound document reads
@@ -22,8 +26,17 @@ Historical entries are reconstructed from [published releases](https://github.co
 - HP roll advantage on level-up
 - Native effect conformance tests
 - Safer edits and rollback
-- GM-only monsters on every route
+- Pack access from Core capabilities
 - Verified action request replays
+- World Pulp Mode and ammunition settings
+- Context-fenced luck, actions, rolls
+- Refresh on world rule changes
+- Caller-safe system data
+- Effect-key world migration
+- World-pack effect migration
+- Reliable system data refresh
+- Context conflicts answer 409
+- Requires Core 0.19.1
 
 ## 0.9.4
 - Corrected weapon preparation

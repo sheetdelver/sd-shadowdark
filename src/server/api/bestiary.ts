@@ -4,15 +4,14 @@ import { shadowdarkAdapter } from '../ShadowdarkAdapter';
 import { prepareShadowdarkView } from '../../logic/prepared-view';
 import { buildNpcCard } from '../../logic/resource-cards';
 import { documentId, formatUuid, parseUuid } from '../../logic/identity';
-import { callerOf } from '../access';
+import { callerOf, canReadPack, requestRules } from '../access';
 
 /**
  * Module bestiary: read-only NPC browsing and cards.
  *
- * - Declared monster packs (`shadowdark.monsters`) are offered to GMs only, by the
- *   module-wide caller policy in server/access.ts that every route applies. Core
- *   does not expose a world's compendium ownership configuration, and GMs often
- *   restrict monster packs, so players are not shown compendium monsters.
+ * - The declared monster pack (`shadowdark.monsters`) is offered when the caller's
+ *   effective native pack capability allows it (server/access.ts), the same
+ *   policy every route applies. GMs often restrict monster packs; Core decides.
  * - World NPC Actors are listed and read through `req.runtime`, so Core's
  *   visibility projection decides what each caller may see.
  *
@@ -32,8 +31,8 @@ export async function handleBestiaryList(req: ModuleServerRequest) {
     try {
         const entries: any[] = [];
         const caller = callerOf(req);
-        const gm = caller.isGM;
-        if (gm) {
+        const compendiumAvailable = canReadPack(caller, 'shadowdark.monsters');
+        if (compendiumAvailable) {
             const monsters = await shadowdarkAdapter.getCollection('monsters', { caller });
             for (const doc of monsters) if (doc?.type === 'NPC' && parseUuid(doc.uuid)) entries.push(summary(doc, doc.uuid, 'compendium'));
         }
@@ -44,8 +43,9 @@ export async function handleBestiaryList(req: ModuleServerRequest) {
             logger.warn('[ShadowdarkBestiary] World NPCs unavailable:', e);
         }
         entries.sort((a, b) => a.level - b.level || String(a.name).localeCompare(String(b.name)));
-        return json({ success: true, compendiumAvailable: gm, entries });
+        return json({ success: true, compendiumAvailable, entries });
     } catch (e) {
+        if (isSdkError(e)) return error(e.code, e.message);
         logger.error('[ShadowdarkBestiary] List failed:', e);
         return error('internal', getErrorMessage(e));
     }
@@ -63,7 +63,7 @@ export async function handleBestiaryCard(req: ModuleServerRequest, { params }: M
             doc = await req.runtime.documents.get('Actor', ref.id);
         }
         if (!doc || doc.type !== 'NPC') return error('not_found', 'NPC not found or not visible');
-        const view = prepareShadowdarkView(doc, shadowdarkAdapter.lookups());
+        const view = prepareShadowdarkView(doc, shadowdarkAdapter.lookups(), requestRules(req.runtime));
         return json({ success: true, card: buildNpcCard(view, doc, ref) });
     } catch (e) {
         if (isSdkError(e)) return error(e.code, e.message);

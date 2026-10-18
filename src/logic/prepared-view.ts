@@ -1,5 +1,6 @@
 import { prepareActorCore, ABILITY_KEYS, type AbilityKey, type PreparationLookups, type PreparedActorCore, type PreparedItemBasics } from './actor-preparation';
 import { listActions, weaponBase, bonusLabel, type PreparedAction } from './actions';
+import { UNAVAILABLE_RULE_INPUTS, hasLuckToken, luckMode, type RuleInputs } from './world-settings';
 import type { CanonicalEffect } from './effects';
 import { documentId, formatUuid, parseUuid, type DocumentRef } from './identity';
 import { slugify } from './foundry';
@@ -88,8 +89,8 @@ function attackRow(item: any, action: PreparedAction) {
     };
 }
 
-export function prepareShadowdarkView(source: any, lookups: ViewLookups = {}) {
-    const core: PreparedActorCore = prepareActorCore(source, lookups);
+export function prepareShadowdarkView(source: any, lookups: ViewLookups = {}, rules: RuleInputs = UNAVAILABLE_RULE_INPUTS) {
+    const core: PreparedActorCore = prepareActorCore(source, lookups, rules);
     const items: any[] = Array.isArray(source?.items) ? source.items : [];
     const actions = listActions(core, source, lookups);
     const byItem = new Map<string, PreparedAction[]>();
@@ -207,7 +208,14 @@ export function prepareShadowdarkView(source: any, lookups: ViewLookups = {}) {
             stashed: physical.filter(view => view.stashed).map(view => view.id),
         },
         effects,
-        luck: { available: system.luck?.available === true, remaining: Number(system.luck?.remaining ?? 0) },
+        // Native PlayerSD luck: the Pulp world setting selects `remaining` over `available`.
+        // `mode` is null when the setting is unavailable; no mode is guessed.
+        luck: {
+            mode: luckMode(rules), available: system.luck?.available === true, remaining: Number(system.luck?.remaining ?? 0),
+            hasLuckToken: hasLuckToken(rules, system.luck),
+            unavailableReason: rules.usePulpMode.status === 'unavailable' ? rules.usePulpMode.reason : null,
+        },
+        ruleInputs: rules,
         npc: core.kind === 'NPC' ? {
             move: String(system.move ?? 'near'), moveNote: String(system.moveNote ?? ''), darkAdapted: system.darkAdapted === true,
             spellcasting: core.spellcasting,

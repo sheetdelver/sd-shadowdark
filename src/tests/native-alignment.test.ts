@@ -13,8 +13,8 @@ import { ShadowdarkActorProvider } from '../ui/context/ShadowdarkActorContext';
 import AbilitiesTab from '../ui/AbilitiesTab';
 import ShadowdarkPaperSheet from '../ui/ShadowdarkPaperSheet';
 import {
-    armsman, bastardSword, dagger, greatsword, lantern, torch, hostActorProjection, legacyMastery, longsword, MASTERY_UUID, preparationContext, primLike,
-    PROPERTY_NAMES, shield, v14Mastery,
+    armsman, bastardSword, contextWith, coreActorResponse, dagger, greatsword, lantern, torch, hostActorProjection, legacyMastery, longsword, MASTERY_UUID, preparationContext, primLike,
+    PROPERTY_NAMES, shield, v14Mastery, worldSnapshot,
 } from './fixtures/native-406';
 import { prepareShadowdarkView } from '../logic/prepared-view';
 import { buildOwnedItemCard } from '../logic/resource-cards';
@@ -22,7 +22,6 @@ import { prepareActorCore } from '../logic/actor-preparation';
 import { prepareRequestedAction } from '../logic/actions';
 import { itemControls } from '../logic/inventory-controls';
 import { LuckControl } from '../ui/components/LuckControl';
-import { worldSetting } from '../logic/world-settings';
 
 /**
  * ADR-0001 native-alignment regressions. Expected values are derived by hand from
@@ -296,14 +295,29 @@ async function inventoryControls() {
 }
 
 async function luck() {
-    // settings.mjs: usePulpMode is world-scoped, default false. PlayerSD luck:
-    // standard mode uses luck.available, Pulp mode uses luck.remaining.
+    // settings.mjs (4.0.0–4.0.6): usePulpMode is a world Boolean, default false.
+    // PlayerSD luck: standard mode uses luck.available, Pulp mode luck.remaining.
+    // The mode comes from Core's world context through preparation (G8-A).
     const actor = { ...primLike(), system: { ...primLike().system, luck: { available: true, remaining: 3 } } };
-    await check('C8', 'Pulp mode falls back to the native default (off) and says so', () => {
-        assert.deepEqual(worldSetting('usePulpMode'), { value: false, source: 'native-default' });
+    const at = (world: ReturnType<typeof worldSnapshot> | null) =>
+        adapter.prepareActorData(structuredClone(actor) as any, world ? contextWith(world) : preparationContext) as any;
+    await check('G8-A', 'Pulp mode is the stored world value, the registered default, or unavailable', () => {
+        const stored = at(worldSnapshot(4, { usePulpMode: true })).derived;
+        assert.equal(stored.luck.mode, 'pulp'); assert.equal(stored.luck.hasLuckToken, true);
+        assert.deepEqual(stored.ruleInputs.usePulpMode, { status: 'world', value: true });
+        const defaulted = at(worldSnapshot(5)).derived;
+        assert.equal(defaulted.luck.mode, 'standard');
+        assert.deepEqual(defaulted.ruleInputs.usePulpMode, { status: 'registered-default', value: false });
+        const storedFalse = at(worldSnapshot(6, { usePulpMode: false })).derived;
+        assert.deepEqual(storedFalse.ruleInputs.usePulpMode, { status: 'world', value: false }, 'a stored false is kept as false');
+        for (const prepared of [at(null), at(worldSnapshot(7, {}, { usePulpMode: 'unsupported-version' })), at(worldSnapshot(8, { usePulpMode: 'yes' }))]) {
+            assert.equal(prepared.derived.luck.mode, null, 'no mode is guessed');
+            assert.equal(prepared.derived.luck.hasLuckToken, null);
+            assert.ok(prepared.derived.luck.unavailableReason);
+        }
     });
     await check('C8', 'standard luck is a centred, unlabelled tick box', () => {
-        const html = render(() => createElement(LuckControl, {}), actor);
+        const html = render(() => createElement(LuckControl, {}), at(worldSnapshot(5)));
         assert.match(html, /type="checkbox"[^>]*checked/);
         assert.match(html, /aria-label="Luck token"/, 'named for assistive technology only');
         assert.match(html, /justify-center/);
@@ -313,15 +327,33 @@ async function luck() {
     // User decision (October 16): no label in either mode; Pulp off shows only the
     // tick box; Pulp on shows only a number input, with spinner buttons where there is space.
     await check('C8', 'Pulp luck replaces the token with an unlabelled number input and spinner', () => {
-        const html = render(() => createElement(LuckControl, { pulpMode: true }), actor);
+        const html = render(() => createElement(LuckControl, {}), at(worldSnapshot(4, { usePulpMode: true })));
         assert.doesNotMatch(html, /type="checkbox"|Token|Pulp|<label/);
         assert.match(html, /<input[^>]*type="number"[^>]*value="3"|<input[^>]*value="3"[^>]*type="number"/);
         assert.match(html, /aria-label="Spend a luck token"/); assert.match(html, /aria-label="Gain a luck token"/);
     });
     await check('C8', 'compact Pulp luck (paper sheet) is the number input only', () => {
-        const html = render(() => createElement(LuckControl, { pulpMode: true, compact: true }), actor);
+        const html = render(() => createElement(LuckControl, { compact: true }), at(worldSnapshot(4, { usePulpMode: true })));
         assert.match(html, /type="number"/);
         assert.doesNotMatch(html, /<button|type="checkbox"|Token|Pulp|<label/);
+    });
+    await check('G8-A', 'an unavailable setting shows an inert, explained placeholder instead of a guessed control', () => {
+        const html = render(() => createElement(LuckControl, {}), at(worldSnapshot(7, {}, { usePulpMode: 'not-ready' })));
+        assert.doesNotMatch(html, /<input|<button/);
+        assert.match(html, /data-luck-unavailable/); assert.match(html, /aria-label="Luck is unavailable: [^"]*not-ready/);
+    });
+    await check('G8-A', 'a live false → true → false Pulp change reaches both sheets through re-preparation', () => {
+        const views = [worldSnapshot(10, { usePulpMode: false }), worldSnapshot(11, { usePulpMode: true }), worldSnapshot(12, { usePulpMode: false })].map(at);
+        const tab = views.map(view => render(AbilitiesTab, view));
+        const paper = views.map(view => render(ShadowdarkPaperSheet, view));
+        for (const [index, pulp] of [false, true, false].entries()) {
+            for (const html of [tab[index], paper[index]]) {
+                assert.equal(/type="checkbox"[^>]*aria-label="Luck token"|aria-label="Luck token"[^>]*type="checkbox"/.test(html), !pulp);
+                assert.equal(/aria-label="Luck tokens"/.test(html), pulp);
+                assert.match(html, /Luck/, 'the Luck heading stays');
+            }
+        }
+        assert.deepEqual(views.map(view => view.derived.ruleInputs.contextRevision), [10, 11, 12], 'each view carries its context revision');
     });
 }
 
@@ -355,6 +387,22 @@ async function spellCardFacts() {
     await check('RV-04', 'every requested spell card fact survives host projection', () => {
         assert.deepEqual(projectedCard([WIZARD]).facts.map((fact: any) => `${fact.label}: ${fact.value}`),
             ['Tier: 1', 'DC: 11', 'Class: Wizard', 'Range: Close', 'Duration: Focus']);
+    });
+    // G8-D: Core 0.19.0 keeps canonical UUIDs in Actor responses (labels are a
+    // separate, caller-filtered map). The prepared labels still present names.
+    await check('G8-D', 'Core 0.19.0 responses keep UUIDs; cards and both sheets show labels, never raw UUIDs', () => {
+        const actor: any = { ...caster([WIZARD]), system: { ...primLike().system, class: WIZARD } };
+        const response: any = coreActorResponse({ ...actor, derived: prepareShadowdarkView(actor, lookups) }, labels);
+        assert.equal(response.system.class, WIZARD, 'source reference preserved');
+        assert.equal(response.referenceLabels[WIZARD], 'Wizard');
+        assert.equal(classFact(buildOwnedItemCard(response.derived, response.items[0], lookups)!), 'Wizard');
+        const prepared: any = coreActorResponse(prepare(actor), labels);
+        for (const component of [AbilitiesTab, ShadowdarkPaperSheet]) {
+            const text = render(component, prepared).replace(/<[^>]+>/g, ' ');
+            assert.doesNotMatch(text, /Compendium\.shadowdark\./, 'no raw UUID text on the sheet');
+        }
+        const hidden = coreActorResponse({ ...actor, derived: prepareShadowdarkView(actor, lookups) }, labels, pack => pack !== 'shadowdark.classes');
+        assert.deepEqual(hidden.referenceLabels, {}, 'Core withholds labels for packs the caller cannot read');
     });
 }
 

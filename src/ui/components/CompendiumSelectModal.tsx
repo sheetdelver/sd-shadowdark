@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { X, Search, Check, Loader2 } from 'lucide-react';
+import { CollectionStatus } from './CollectionStatus';
 
 interface Option {
     name: string;
@@ -17,9 +18,10 @@ interface CompendiumSelectModalProps {
     currentValue?: string | string[];
     multiSelect?: boolean;
     isLoading?: boolean;
+    dataState?: { loading: boolean; error: string | null; retry: () => void };
 }
 
-export default function CompendiumSelectModal({ isOpen, onClose, onSelect, title, options, currentValue, multiSelect, isLoading }: CompendiumSelectModalProps) {
+export default function CompendiumSelectModal({ isOpen, onClose, onSelect, title, options, currentValue, multiSelect, isLoading, dataState }: CompendiumSelectModalProps) {
     const [search, setSearch] = useState('');
 
     const filteredOptions = useMemo(() => {
@@ -65,7 +67,8 @@ export default function CompendiumSelectModal({ isOpen, onClose, onSelect, title
 
                 {/* List */}
                 <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-                    {isLoading ? (
+                    {dataState && <CollectionStatus state={dataState} label={`Loading ${title}…`} />}
+                    {dataState?.error || dataState?.loading ? null : isLoading ? (
                         <div className="flex flex-col items-center justify-center py-20 text-neutral-400 gap-4">
                             <Loader2 className="w-10 h-10 animate-spin text-black" />
                             <p className="font-bold uppercase tracking-widest text-xs italic">Fetching {title}...</p>

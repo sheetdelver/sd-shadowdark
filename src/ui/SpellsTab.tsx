@@ -2,11 +2,12 @@
 
 import React from 'react';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Loader2, Sparkles } from 'lucide-react';
 import { useSDK } from '@sheet-delver/sdk/react';
 import SpellSelectionModal from './components/SpellSelectionModal';
-import { useShadowdarkUI } from './context/ShadowdarkUIContext';
+import { useShadowdarkCollections } from './context/ShadowdarkUIContext';
+import { CollectionStatus } from './components/CollectionStatus';
 import { useShadowdarkActor } from './context/ShadowdarkActorContext';
 import { bonusLabel, type PreparedAction } from '../logic/actions';
 import { RANGE_LABELS, spellDuration } from '../logic/resource-cards';
@@ -23,7 +24,8 @@ import { slugify } from '../logic/foundry';
 interface SpellSource { classUuid: string; name: string; slug: string; spellsknown: any | null }
 
 export default function SpellsTab() {
-    const { systemData, collections, fetchPack } = useShadowdarkUI();
+    const data = useShadowdarkCollections(['classes']);
+    const { collections } = data;
     const { resolveImageUrl, addNotification, fetchWithAuth } = useSDK();
     const { actor, updateItem, deleteItem, startAction, openCard, isActionBusy, refreshActor } = useShadowdarkActor();
     const [manage, setManage] = useState<{ source: SpellSource; tier: number } | null>(null);
@@ -32,10 +34,6 @@ export default function SpellsTab() {
     const actions: PreparedAction[] = derived.actions ?? [];
     const views: any[] = derived.items ?? [];
     const itemById = (id: string) => (actor.items ?? []).find((item: any) => String(item.id ?? item._id) === id);
-
-    useEffect(() => {
-        if (!collections?.classes) fetchPack('classes');
-    }, [collections?.classes, fetchPack]);
 
     const sources: SpellSource[] = useMemo(() => {
         const classes: string[] = derived.spellcasting?.classes ?? [];
@@ -64,7 +62,7 @@ export default function SpellsTab() {
 
     /** Sequential learn/remove with an explicit result; nothing is reported as done unless it was. */
     const saveSelection = async (selected: any[]) => {
-        if (!manage) return;
+        if (!manage || !data.ready || !sources.some(source => source.classUuid === manage.source.classUuid)) return;
         setSaving(true);
         const owned = knownFor(manage.source, manage.tier).filter(view => !view.innate && view.source);
         const ownedSources = new Map(owned.map(view => [formatUuid(view.source), view]));
@@ -144,8 +142,8 @@ export default function SpellsTab() {
 
             <section className="space-y-3" aria-label="Manage spells">
                 <h3 className="bg-black text-white p-2 font-serif font-bold text-xl uppercase tracking-wider shadow-md">Manage Spells</h3>
-                {!collections?.classes && <p role="status" className="italic flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> Loading classes…</p>}
-                {collections?.classes && sources.length === 0 && (
+                <CollectionStatus state={data} label="Loading classes…" />
+                {data.ready && sources.length === 0 && (
                     <p className="text-sm">No spellcasting class from the character's native spellcasting classes ({(derived.spellcasting?.classes ?? []).join(', ') || 'none'}) is available in declared Shadowdark data.</p>
                 )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -157,7 +155,7 @@ export default function SpellsTab() {
                                     const limit = limitFor(source, tier);
                                     const known = knownFor(source, tier).filter(view => !view.innate).length;
                                     return (
-                                        <button type="button" key={tier} onClick={async () => { if (!collections?.spells) await fetchPack('spells'); setManage({ source, tier }); }}
+                                        <button type="button" key={tier} onClick={() => setManage({ source, tier })}
                                             className="min-h-11 px-4 py-2 bg-white border-2 border-black font-serif font-bold text-sm hover:bg-black hover:text-white flex flex-col items-center min-w-[100px]">
                                             <span>TIER {tier}</span>
                                             <span className="text-[10px] font-sans">{known} / {limit ?? '—'}</span>
@@ -183,7 +181,7 @@ export default function SpellsTab() {
                     onSave={saveSelection}
                     onClose={() => setManage(null)}
                     maxSelections={limitFor(manage.source, manage.tier)}
-                    isSaving={saving}
+                    isSaving={saving || !data.ready || !sources.some(source => source.classUuid === manage.source.classUuid)}
                     actor={actor}
                 />
             )}

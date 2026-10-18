@@ -246,7 +246,9 @@ check('EC-5', 'legacy shape: a renamed key keeps its mode, value, position and u
     ]);
     assert.equal(migrated.flags.core.note, 'keep'); assert.equal(migrated.system, undefined);
 });
-check('EC-5', 'Foundry 14 shape: one change can become several, in order, keeping phase', () => {
+// Update_251001_1 rewrites the Weapon Mastery change in place and pushes its damage
+// change onto the end of effect.changes, after every existing change.
+check('EC-5', 'Foundry 14 shape: one change can become several, in native order, keeping phase', () => {
     const effect = { _id: 'e', name: 'Weapon Mastery', system: { changes: [
         { key: 'system.bonuses.weaponMastery', type: 'add', value: 'longsword', phase: 'initial', priority: null },
         { key: 'system.roll.ranged.bonus.all', type: 'add', value: 1, phase: 'final', priority: 30 },
@@ -255,10 +257,11 @@ check('EC-5', 'Foundry 14 shape: one change can become several, in order, keepin
     const changes = applyPlan(effect, plan.changes!).system.changes;
     assert.deepEqual(changes.map((change: any) => [change.key, change.type, change.value, change.phase]), [
         ['system.roll.melee.bonus.longsword', 'add', '1+floor(@level.value/2)', 'initial'],
-        ['system.roll.melee.damage.longsword', 'add', '1+floor(@level.value/2)', 'initial'],
         ['system.roll.ranged.bonus.all', 'add', 1, 'final'],
+        ['system.roll.melee.damage.longsword', 'add', '1+floor(@level.value/2)', 'initial'],
     ]);
-    assert.equal(changes[2].priority, 30);
+    assert.equal(changes[1].priority, 30, 'an unrelated change keeps its stored priority');
+    assert.equal(changes[2].priority, null, 'the appended change takes the type default');
 });
 check('EC-5', 'planning a migrated effect again changes nothing (idempotent)', () => {
     const effect = { _id: 'e', changes: [{ key: 'system.bonuses.gearSlots', mode: 2, value: '2' }, { key: 'system.bonuses.advantage', mode: 2, value: 'Magic Missile' }] };

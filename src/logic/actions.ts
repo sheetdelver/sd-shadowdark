@@ -228,9 +228,16 @@ export function prepareWeaponAction(core: PreparedActorCore, item: any, request:
         ? damageConfig(core, rollData, type, base.damage, keyItem, action, config)
         : { formula: null, base: null, label: 'Damage', warnings: base.warnings };
     if (!basics.equipped) action.diagnostics.push('Native attack lists include equipped weapons only.');
+    // ItemSD.usesAmmunition: the world setting, an owned Player Weapon and an ammoClass.
+    // Reading the setting does not implement consumption; SheetDelver states it.
     if (item?.system?.ammoClass) {
-        action.consequences.push({ when: 'before-roll', description:
-            'Native automatic ammunition use depends on the world setting autoConsumeAmmunition, which SheetDelver cannot read; ammunition is not consumed.' });
+        const setting = core.rules.autoConsumeAmmunition;
+        if (setting.value === true) {
+            action.consequences.push({ when: 'before-roll', description:
+                `Native Shadowdark uses one ${item.system.ammoClass} ammunition per attack in this world and refuses the attack without any. SheetDelver does not consume ammunition; adjust the quantity yourself.` });
+        } else if (setting.value === null) {
+            action.diagnostics.push(`Whether this attack uses ammunition is unknown: ${setting.reason}`);
+        }
     }
     return action;
 }

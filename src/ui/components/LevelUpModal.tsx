@@ -18,6 +18,7 @@ import { LevelUpFooter } from './levelup/sections/LevelUpFooter';
 import { ExtraSpellSelectionSection } from './levelup/sections/ExtraSpellSelectionSection';
 import { useSDK } from '@sheet-delver/sdk/react';
 import { presentDescription } from '../../logic/description';
+import { CollectionStatus } from './CollectionStatus';
 
 export const LevelUpModal = (props: LevelUpProps) => {
     const { state, actions } = useLevelUp(props);
@@ -140,6 +141,9 @@ export const LevelUpModal = (props: LevelUpProps) => {
                                     />
 
                                     {state.extraSpellSelection && state.extraSpellSelection.active && (
+                                        <>
+                                        <CollectionStatus state={state.extraSpellData} label="Loading bonus spell collections…" />
+                                        {state.extraSpellData.ready && (
                                         <ExtraSpellSelectionSection
                                             active={state.extraSpellSelection.active}
                                             maxTier={state.extraSpellSelection.maxTier}
@@ -152,6 +156,8 @@ export const LevelUpModal = (props: LevelUpProps) => {
                                                 actions.setExtraSpellSelection({ ...state.extraSpellSelection, selected });
                                             }}
                                         />
+                                        )}
+                                        </>
                                     )}
 
 

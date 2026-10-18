@@ -5,9 +5,11 @@ import { nativeKeyMigration, isRejectedBonusesKey } from './legacy-effect-keys';
 /**
  * Plans native Shadowdark 4.0.6 `Update_251001_1.updateEffects` for one stored
  * effect: every pre-4.0 change becomes its native 4.0 replacement, in place,
- * keeping the effect's own serialized shape and every unrelated change. Pure;
- * nothing applies it yet. The caller-bound route that did was retired (review
- * RV-02); Core ADR-0064's admin upgrade job is the intended runner.
+ * keeping the effect's own serialized shape and every unrelated change; an extra
+ * replacement change (Weapon Mastery's damage change) is appended at the end, as
+ * native pushes it. Pure. It runs only inside the packaged migration hooks
+ * (`migrations/4.0.6`), which Core's admin-approved maintenance job executes;
+ * no module route, initialization or rendering applies it (review RV-02, G8-B).
  *
  * `priority` is left undefined so `serializeChanges` keeps each original entry's
  * stored priority (or its absence) exactly.
@@ -32,6 +34,8 @@ export function planEffectMigration(effect: any, parentType: string | undefined,
     const migrated: EffectMigrationPlan['migrated'] = [];
     const unresolved: EffectMigrationPlan['unresolved'] = [];
     const output: EditableChange[] = [];
+    // Native pushes extra replacement changes (Weapon Mastery's damage change) onto the end.
+    const appended: EditableChange[] = [];
     let touched = false;
     for (const change of changes) {
         const keep: EditableChange = { index: change.index, key: change.key, type: change.type, value: change.value, phase: change.phase };
@@ -53,7 +57,7 @@ export function planEffectMigration(effect: any, parentType: string | undefined,
         }
         touched = true;
         migrated.push({ from: change.key, to: migration.changes.map(entry => entry.key) });
-        migration.changes.forEach((entry, position) => output.push({
+        migration.changes.forEach((entry, position) => (position === 0 ? output : appended).push({
             // The first replacement keeps the original entry (and its unknown fields).
             ...(position === 0 ? { index: change.index } : {}),
             key: entry.key,
@@ -61,7 +65,7 @@ export function planEffectMigration(effect: any, parentType: string | undefined,
             value: entry.value, phase: change.phase,
         }));
     }
-    return { changes: touched ? output : null, migrated, unresolved };
+    return { changes: touched ? [...output, ...appended] : null, migrated, unresolved };
 }
 
 /** Native `updateActor` migrates Actor-level effects of Players only; owned items always. */

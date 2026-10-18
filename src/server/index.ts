@@ -5,6 +5,7 @@ import { handleLearnSpell, handleGetSpellsBySource } from './api/spells';
 import { handleGetDocument } from './api/document';
 import { handleEffects } from './api/effects';
 import { handleActorAction } from './api/actions';
+import { handleLuck } from './api/luck';
 import { handleBestiaryCard, handleBestiaryList } from './api/bestiary';
 import { getErrorMessage, isSdkError } from '@sheet-delver/sdk';
 import { handleGetCollection } from './api/collections';
@@ -67,6 +68,9 @@ export const apiRoutes = {
     },
     'actors/[id]/actions': async (req: ModuleServerRequest, { params }: ModuleServerParams) => {
         return handleActorAction(await actorIdFrom(params), req);
+    },
+    'actors/[id]/luck': async (req: ModuleServerRequest, { params }: ModuleServerParams) => {
+        return handleLuck(await actorIdFrom(params), req);
     },
     'bestiary': handleBestiaryList,
     'bestiary/[uuid]': handleBestiaryCard,

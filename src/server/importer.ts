@@ -8,6 +8,7 @@ import { sanitizeItem, createEffect } from '../utils/Sanitizer';
 import { enrichItem, resolveSubItems, EnrichmentContext } from '../logic/actor-enricher';
 import { assertResolvedTalentChoices } from '../logic/talent-choices';
 import { canonicalUuid, ownedCopy } from '../logic/identity';
+import { callerFromRuntime } from './access';
 import { collectEffects } from '../logic/effects';
 import { resolveFormula } from '../logic/formula';
 
@@ -81,7 +82,7 @@ export class ShadowdarkImporter {
         try {
             if (!json || typeof json !== 'object' || !json.rolledStats) throw new Error('This is not a Shadowdarklings character export.');
             log(`Resolving import for ${json.name}`);
-            await shadowdarkAdapter.getSystemData();
+            const caller = callerFromRuntime(runtime);
 
             const gear: any[] = [];
             const customGear: any[] = [];
@@ -96,12 +97,12 @@ export class ShadowdarkImporter {
                 const key = table[name] !== undefined ? name : Object.keys(table).find(entry => entry.toLowerCase() === name.toLowerCase());
                 if (key) {
                     const uuid = canonicalUuid(table[key]);
-                    const doc = uuid ? await shadowdarkAdapter.resolveDocument(uuid) : null;
+                    const doc = uuid ? await shadowdarkAdapter.resolveReadable(uuid, caller) : null;
                     if (doc) return { ...sanitizeItem(doc), uuid };
-                    if (required) unresolved.push({ category, name, reason: `Mapped document ${table[key]} is not available from declared packs.` });
+                    if (required) unresolved.push({ category, name, reason: `Mapped document ${table[key]} is not available from declared packs you can read.` });
                     return null;
                 }
-                const { doc, ambiguous } = await shadowdarkAdapter.findUniqueByName(name, TYPE_FOR_CATEGORY[category] ?? []);
+                const { doc, ambiguous } = await shadowdarkAdapter.findUniqueByName(name, TYPE_FOR_CATEGORY[category] ?? [], caller);
                 if (doc) return sanitizeItem(doc);
                 if (required) {
                     unresolved.push(ambiguous.length
@@ -117,15 +118,15 @@ export class ShadowdarkImporter {
                 const key = keys.find(candidate => candidate && table[candidate]);
                 if (key) {
                     const uuid = canonicalUuid(table[key]);
-                    const doc = uuid ? await shadowdarkAdapter.resolveDocument(uuid) : null;
+                    const doc = uuid ? await shadowdarkAdapter.resolveReadable(uuid, caller) : null;
                     if (doc) return { ...sanitizeItem(doc), uuid };
-                    unresolved.push({ category: 'talent', name: bonus.name, reason: `Mapped document ${table[key]} is not available from declared packs.` });
+                    unresolved.push({ category: 'talent', name: bonus.name, reason: `Mapped document ${table[key]} is not available from declared packs you can read.` });
                     return null;
                 }
                 const named = TALENT_EFFECTS_MAP[bonus.bonusName] ?? TALENT_EFFECTS_MAP[bonus.name];
                 if (named) {
                     const uuid = canonicalUuid(named);
-                    const doc = uuid ? await shadowdarkAdapter.resolveDocument(uuid) : null;
+                    const doc = uuid ? await shadowdarkAdapter.resolveReadable(uuid, caller) : null;
                     if (doc) return { ...sanitizeItem(doc), uuid };
                 }
                 return findItem(bonus.bonusName || bonus.name, 'talent');
@@ -139,10 +140,10 @@ export class ShadowdarkImporter {
                 bonuses: json.bonuses || [],
                 mapping: this.mapping,
                 discoveredItems: [],
-                resolveDoc: (uuid: string) => shadowdarkAdapter.resolveDocument(uuid),
-                choices: await shadowdarkAdapter.getChoiceCatalog(),
+                resolveDoc: (uuid: string) => shadowdarkAdapter.resolveReadable(uuid, caller),
+                choices: await shadowdarkAdapter.getChoiceCatalog(caller),
             };
-            const resolveDoc = (uuid: string) => shadowdarkAdapter.resolveDocument(uuid);
+            const resolveDoc = (uuid: string) => shadowdarkAdapter.resolveReadable(uuid, caller);
 
             const stats = json.rolledStats ?? {};
             const actorData: any = {

@@ -1,5 +1,6 @@
 import { Swords } from 'lucide-react';
 import { useChoiceCatalog } from '../../../hooks/useChoiceCatalog';
+import { CollectionStatus } from '../../CollectionStatus';
 
 interface WeaponSelectionSectionProps {
     required: number;
@@ -13,7 +14,8 @@ export const WeaponSelectionSection: React.FC<WeaponSelectionSectionProps> = ({
     selected,
     onSelectionChange
 }) => {
-    const catalog = useChoiceCatalog();
+    const data = useChoiceCatalog(required > 0);
+    const { catalog } = data;
     if (required <= 0) return null;
     // Native options from declared packs; selections are stored by option name.
     const WEAPONS: string[] | null = catalog ? (catalog.weapon ?? []).map(option => option.name) : null;
@@ -46,7 +48,7 @@ export const WeaponSelectionSection: React.FC<WeaponSelectionSectionProps> = ({
             </p>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {WEAPONS === null && <p role="status" className="col-span-full italic">Loading options…</p>}
+                <CollectionStatus state={data} label="Loading options…" />
                 {WEAPONS?.length === 0 && <p role="alert" className="col-span-full text-red-800">No weapon options are available from declared Shadowdark data.</p>}
                 {(WEAPONS ?? []).map(weapon => {
                     const isSelected = selected.includes(weapon);

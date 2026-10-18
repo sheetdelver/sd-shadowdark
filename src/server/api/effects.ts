@@ -5,6 +5,7 @@ import { collectEffects, effectId, preferredShape, serializeChanges, type Editab
 import { CHANGE_TYPE_PRIORITY, modeToType, slugify } from '../../logic/foundry';
 import { documentId } from '../../logic/identity';
 import { shadowdarkAdapter } from '../ShadowdarkAdapter';
+import { callerFromRuntime, type Caller } from '../access';
 
 /**
  * ActiveEffect operations over `req.runtime`, addressed by owner-qualified
@@ -94,14 +95,14 @@ export function buildEffectUpdate(effect: any, patch: EffectPatch): Record<strin
 }
 
 /** Native predefined definition with its choice resolved, as one change. */
-async function predefinedChange(key: string, choice: unknown): Promise<{ name: string; img: string; change: EditableChange }> {
+async function predefinedChange(key: string, choice: unknown, caller: Caller): Promise<{ name: string; img: string; change: EditableChange }> {
     const definition = NATIVE_PREDEFINED_EFFECTS[key];
     if (!definition) throw new SdkError('validation', `Unknown predefined effect ${key}.`);
     if (NATIVE_REJECTED_PREDEFINED[key]) throw new SdkError('validation', NATIVE_REJECTED_PREDEFINED[key]);
     let effectKey = definition.key;
     let value: unknown = definition.value;
     if (effectKey.includes('REPLACEME') || value === 'REPLACEME') {
-        const options = await predefinedChoices(key);
+        const options = await predefinedChoices(key, caller);
         const selected = typeof choice === 'string' ? options.find(option => option.value === choice) : null;
         if (!selected) throw new SdkError('validation', `${definition.label} needs a valid choice before it is created.`);
         effectKey = effectKey.replace('REPLACEME', selected.value);
@@ -114,19 +115,23 @@ async function predefinedChange(key: string, choice: unknown): Promise<{ name: s
 }
 
 /** Choice options for a predefined effect from declared data; none means unsupported. */
-export async function predefinedChoices(key: string): Promise<Array<{ value: string; label: string }>> {
-    const catalog = await shadowdarkAdapter.getChoiceCatalog();
+export async function predefinedChoices(key: string, caller: Caller): Promise<Array<{ value: string; label: string }>> {
+    const catalog = await shadowdarkAdapter.getChoiceCatalog(caller);
+    const readable = async (id: string) => {
+        try { return await shadowdarkAdapter.getCollection(id, { caller }); }
+        catch (e: any) { if (e?.code === 'permission_denied') return []; throw e; }
+    };
     const fromCatalog = (kind: 'weapon' | 'armor' | 'spell') => (catalog[kind] ?? []).map(option => ({ value: option.slug, label: option.name }));
     switch (key) {
         case 'armorMastery': return fromCatalog('armor');
         case 'spellAdvantage': return fromCatalog('spell');
         case 'weaponDamageDieD12': return fromCatalog('weapon');
         case 'weaponDamageDieImprovementByProperty': {
-            const properties = await shadowdarkAdapter.getCollection('properties');
+            const properties = await readable('properties');
             return properties.map((doc: any) => ({ value: slugify(doc.name), label: doc.name }));
         }
         case 'spellcastingClasses': {
-            const classes = await shadowdarkAdapter.getCollection('classes');
+            const classes = await readable('classes');
             return classes.filter((doc: any) => doc.system?.spellcasting?.ability).map((doc: any) => ({ value: slugify(doc.name), label: doc.name }));
         }
         default: return [];
@@ -154,7 +159,7 @@ export async function handleEffects(
             return { predefined: PREDEFINED_EFFECTS_LIST, active: collectEffects(actor) };
 
         case 'choices':
-            return { options: await predefinedChoices(String(data?.key ?? '')) };
+            return { options: await predefinedChoices(String(data?.key ?? ''), callerFromRuntime(runtime)) };
 
         case 'toggle': {
             const ref = parseEffectRef(data?.ref);
@@ -170,7 +175,7 @@ export async function handleEffects(
             let img = data?.effect?.img;
             let changes: EditableChange[];
             if (data?.predefined?.key) {
-                const resolved = await predefinedChange(String(data.predefined.key), data.predefined.choice);
+                const resolved = await predefinedChange(String(data.predefined.key), data.predefined.choice, callerFromRuntime(runtime));
                 name ||= resolved.name;
                 img ??= resolved.img;
                 changes = [resolved.change];

@@ -8,7 +8,7 @@ import CompendiumSelectModal from './components/CompendiumSelectModal';
 import LanguageSelectionModal from './components/LanguageSelectionModal';
 import { shadowdarkTheme } from './themes/shadowdark';
 import { isRareLanguage } from '../logic/rules';
-import { useShadowdarkUI } from './context/ShadowdarkUIContext';
+import { useShadowdarkUI, useShadowdarkCollections } from './context/ShadowdarkUIContext';
 import { useShadowdarkActor } from './context/ShadowdarkActorContext';
 import { formatUuid } from '../logic/identity';
 
@@ -17,7 +17,7 @@ interface DetailsTabProps {
 }
 
 export default function DetailsTab({}: DetailsTabProps) {
-    const { systemData, collections, fetchPack, resolveName } = useShadowdarkUI();
+    const { collections, resolveName } = useShadowdarkUI();
     const { resolveImageUrl } = useSDK();
     const { ConfirmationModal } = useSDKComponents();
     const {
@@ -42,7 +42,8 @@ export default function DetailsTab({}: DetailsTabProps) {
     const [editingItem, setEditingItem] = useState<any>(null);
     const [itemToDelete, setItemToDelete] = useState<{ id: string; name: string } | null>(null);
     const [isLanguageModalOpen, setIsLanguageModalOpen] = useState(false);
-    const [fetchingCategory, setFetchingCategory] = useState<string | null>(null);
+    const selectionData = useShadowdarkCollections(selectionModal.dataKey ? [selectionModal.dataKey] : [], selectionModal.isOpen);
+    const fetchingCategory = selectionData.loading ? selectionModal.dataKey : null;
 
     const getClassName = () => {
         if (!actor.details?.class) {
@@ -54,7 +55,7 @@ export default function DetailsTab({}: DetailsTabProps) {
         return actor.details?.class;
     };
 
-    const openSelection = async (field: string, title: string, dataKey?: string, multiSelect = false) => {
+    const openSelection = (field: string, title: string, dataKey?: string, multiSelect = false) => {
         // Current Value (Calculate early for the loading state)
         let current: any = '';
         if (field.includes('.')) {
@@ -67,46 +68,14 @@ export default function DetailsTab({}: DetailsTabProps) {
             current = actor[field];
         }
 
-        // 1. Initial State: Open modal (Loading if data missing)
-        // Check both small indexing in systemData and hydrated cache in collections
-        const hasData = dataKey ? (!!systemData?.[dataKey] || !!collections?.[dataKey]) : true;
-        const activeCollection = dataKey ? (collections?.[dataKey] || systemData?.[dataKey] || []) : [];
-        
         setSelectionModal({
             isOpen: true,
             title,
-            options: hasData && dataKey ? activeCollection.map((o: any) => ({
-                name: o.name,
-                uuid: o.uuid,
-                description: o.description || o.system?.description?.value || o.data?.description?.value || ''
-            })) : [],
-            currentValue: hasData && dataKey ? resolveName(current, dataKey) : current,
+            dataKey,
+            currentValue: current,
             multiSelect,
-            isLoading: !hasData,
             onSelect: (option: any) => handleSelection(field, option, multiSelect)
         });
-
-        // 2. Hydration: If data is missing or incomplete, fetch it and update modal
-        if (!hasData && dataKey) {
-            setFetchingCategory(dataKey);
-            try {
-                const fetched = await fetchPack(dataKey);
-                if (Array.isArray(fetched)) {
-                    setSelectionModal((prev: any) => ({
-                        ...prev,
-                        isLoading: false,
-                         options: fetched.map((o: any) => ({
-                             name: o.name,
-                             uuid: o.uuid,
-                             description: o.description || o.system?.description?.value || o.data?.description?.value || ''
-                         })),
-                         currentValue: resolveName(current, dataKey)
-                     }));
-                }
-            } finally {
-                setFetchingCategory(null);
-            }
-        }
     };
 
     const handleSelection = (field: string, option: any, multiSelect: boolean) => {
@@ -362,14 +331,7 @@ export default function DetailsTab({}: DetailsTabProps) {
                                             </div>
                                         </div>
                                         <button
-                                            onClick={async () => {
-                                                if (!(collections?.languages || systemData?.languages)) {
-                                                    setFetchingCategory('languages');
-                                                    await fetchPack('languages');
-                                                    setFetchingCategory(null);
-                                                }
-                                                setIsLanguageModalOpen(true);
-                                            }}
+                                            onClick={() => setIsLanguageModalOpen(true)}
                                             className="bg-white text-black px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider border border-black hover:bg-neutral-200 transition-colors shadow-[2px_2px_0px_0px_rgba(255,255,255,0.2)]"
                                         >
                                             {fetchingCategory === 'languages' ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Edit'}
@@ -386,7 +348,7 @@ export default function DetailsTab({}: DetailsTabProps) {
                             const granted: any[] = (identity.grantedLanguages ?? []).map((entry: any) => ({ ...entry, granted: true }));
                             const resolvedLangs = [...languageEntries, ...granted].map((entry: any) => {
                                 const uuid = entry.ref ? formatUuid(entry.ref) : null;
-                                const match = uuid ? (collections?.languages || systemData?.languages)?.find((sl: any) => sl.uuid === uuid) : null;
+                                const match = uuid ? collections.languages?.find((sl: any) => sl.uuid === uuid) : null;
                                 return {
                                     name: `${entry.label ?? entry.value ?? 'Unavailable language'}${entry.granted ? ' (from effect)' : ''}`,
                                     desc: match ? (match.system?.description || match.description || '') : 'Description unavailable.',
@@ -516,7 +478,10 @@ export default function DetailsTab({}: DetailsTabProps) {
                 onClose={() => setSelectionModal((prev: any) => ({ ...prev, isOpen: false }))}
                 onSelect={selectionModal.onSelect}
                 title={selectionModal.title}
-                options={selectionModal.options}
+                options={selectionData.ready ? (selectionData.collections[selectionModal.dataKey] ?? []).map((o: any) => ({
+                    name: o.name, uuid: o.uuid, description: o.description || o.system?.description?.value || o.system?.description || ''
+                })) : []}
+                dataState={selectionData}
                 currentValue={selectionModal.currentValue}
                 multiSelect={selectionModal.multiSelect}
             />

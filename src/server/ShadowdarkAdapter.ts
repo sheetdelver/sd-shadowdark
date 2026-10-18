@@ -5,9 +5,13 @@ import type {
     FoundryActor,
     PreparedActorData,
 } from '@sheet-delver/sdk';
-import type { ModuleRuntime } from '@sheet-delver/sdk/server';
-import { ShadowdarkRegistry } from './Registry';
-import { canReadCollection, canReadPack, compendiumDenied, isRestrictedFor, visibleNameIndex, type Caller } from './access';
+import type { ModuleWorldSnapshot } from '@sheet-delver/sdk';
+import type { ModuleRuntime, ModuleRequestRuntime, ReadonlyDocumentStore } from '@sheet-delver/sdk/server';
+import { ShadowdarkRegistry, type PackFilter } from './Registry';
+import { canReadPack, compendiumDenied, readableRows, type Caller } from './access';
+import { ruleInputsFrom, UNAVAILABLE_RULE_INPUTS, type RuleInputs } from '../logic/world-settings';
+import { NATIVE_PREDEFINED_EFFECTS } from '../data/native-predefined-effects';
+import { BOON_TYPE_MAP, EFFECT_TRANSLATIONS_MAP } from '../data/talent-effects';
 import { ShadowdarkNormalizer, lookupsFromSystemData } from '../logic/normalization';
 import { getInitiativeFormula, isClassSpellcaster } from '../logic/rules';
 import { prepareActorCore } from '../logic/actor-preparation';
@@ -34,8 +38,15 @@ export class ShadowdarkAdapter extends BaseSystemAdapter {
     systemId = 'shadowdark';
     private static instance: ShadowdarkAdapter;
     private readonly _registry = new ShadowdarkRegistry();
-    /** Incremented per platform runtime (world/epoch); request-scoped caches key on it. */
+    /**
+     * Incremented per platform runtime (world/epoch); request-scoped caches key on
+     * it. A world-context change or same-world recovery does not change it, so an
+     * evaluated action is replayed, never rerolled, across a context change.
+     */
     runtimeGeneration = 0;
+    private world: ModuleRuntime['world'];
+    /** Rule inputs for the Actor being prepared (set only during prepareActorData). */
+    private preparationRules: RuleInputs | null = null;
 
     constructor() {
         super();
@@ -64,6 +75,7 @@ export class ShadowdarkAdapter extends BaseSystemAdapter {
     async initialize(runtime: ModuleRuntime): Promise<void> {
         await super.initialize(runtime);
         this.runtimeGeneration++;
+        this.world = runtime.world;
         // A new runtime (world/epoch) starts from an empty projection.
         this._registry.attach(runtime.compendium, runtime.documents);
         logger.info('[ShadowdarkAdapter] Service layer unified via runtime-backed Registry.');
@@ -72,6 +84,27 @@ export class ShadowdarkAdapter extends BaseSystemAdapter {
         } catch (e) {
             logger.warn('[ShadowdarkAdapter] System data warm-up deferred:', e);
         }
+    }
+
+    /** Current host rule inputs; unavailable without a live world context. */
+    currentRules(): RuleInputs {
+        try {
+            return ruleInputsFrom(this.world?.snapshot());
+        } catch {
+            return UNAVAILABLE_RULE_INPUTS;
+        }
+    }
+
+    /**
+     * Core world-context change (setting values, declared pack content, or a
+     * same-world recovery), called before Core rebuilds prepared Actors. Setting
+     * values reach preparation through `context.world`, so only pack-dependent
+     * projections need work: the registry is rebuilt from current packs before
+     * this returns. Bounded by one projection load; reads only; fenced by the
+     * registry generation. A failure rejects and Core holds the world unavailable.
+     */
+    async onWorldContextChanged(_next: Readonly<ModuleWorldSnapshot>, change: { keys: readonly string[]; recovery: boolean; packs?: readonly string[] }): Promise<void> {
+        if (change.recovery || (change.packs?.length ?? 0) > 0) await this._registry.refresh();
     }
 
     /** Preparation lookups over the hydrated declared-pack projection. */
@@ -105,66 +138,100 @@ export class ShadowdarkAdapter extends BaseSystemAdapter {
         return actor.systemId === 'shadowdark' || (hasShadowdarkType && hasShadowdarkSystem);
     }
 
+    /**
+     * Preparation with the context Core supplies for this Actor revision: the
+     * world snapshot's settings become the rule inputs of every derived value
+     * (luck mode, action consequences). Preparation stays user-invariant.
+     */
     prepareActorData(
         actor: FoundryActor,
         context: Readonly<ActorPreparationContext>,
     ): PreparedActorData {
-        return super.prepareActorData(actor, context);
+        this.preparationRules = ruleInputsFrom(context.world);
+        try {
+            return super.prepareActorData(actor, context);
+        } finally {
+            this.preparationRules = null;
+        }
     }
 
+    /** Full-GM legacy projection (Core serves it to full GMs only). */
     async getSystemData(_options?: { minimal?: boolean }): Promise<any> {
         return this._registry.getSystemData();
     }
 
-    /** System data as served to a caller: restricted packs are left out of the name index. */
-    async getSystemDataFor(caller: Pick<Caller, 'isGM'>): Promise<any> {
-        const data = await this._registry.getSystemData();
-        return { ...data, nameIndex: visibleNameIndex(data?.nameIndex ?? {}, caller) };
+    /**
+     * Caller-safe system data for Core's `/api/system/data` and the module index
+     * route. Built from the caller's own compendium reads (Core filters them by
+     * the caller's effective pack capability), re-checked against `access` after
+     * the reads; the warmed system projection is not used. Contains only the
+     * caller-readable name index, class titles and native rule tables.
+     */
+    async getSystemDataForUser(context: Pick<ModuleRequestRuntime, 'compendium' | 'access' | 'world'> & { documents: ReadonlyDocumentStore }): Promise<any> {
+        const [items, tables, actors] = await Promise.all([
+            context.compendium.findAll('Item'), context.compendium.findAll('RollTable'), context.compendium.findAll('Actor'),
+        ]);
+        const caller: Caller = { runtime: { documents: context.documents as any, access: context.access }, isGM: false };
+        const { collections, nameIndex } = ShadowdarkRegistry.project(readableRows([...items, ...tables, ...actors] as any[], caller));
+        return {
+            titles: collections.titles ?? {},
+            nameIndex,
+            PREDEFINED_EFFECTS: { ...NATIVE_PREDEFINED_EFFECTS },
+            BOON_TYPES: { ...BOON_TYPE_MAP },
+            EFFECT_TRANSLATIONS: { ...EFFECT_TRANSLATIONS_MAP },
+        };
     }
 
-    /** A declared collection; restricted collections (monsters) need a GM `caller`. */
-    async getCollection(id: string, options: { summary?: boolean; caller?: Pick<Caller, 'isGM'> } = {}): Promise<any[]> {
-        if (!canReadCollection(options.caller, id)) return [];
-        return this._registry.getCollection(id, { summary: options.summary });
+    /** The caller's pack capability as a registry row filter (evaluated per row, after the load). */
+    private readable(caller: Caller): PackFilter {
+        return pack => canReadPack(caller, pack);
     }
 
-    async drawTable(uuid: string, rollOverride?: number): Promise<any> {
-        return this._registry.draw(uuid, rollOverride);
+    /**
+     * A declared collection filtered to the caller's readable packs. A collection
+     * whose every row is in packs the caller cannot read is refused.
+     */
+    async getCollection(id: string, options: { summary?: boolean; caller: Caller }): Promise<any[]> {
+        const rows = await this._registry.getCollection(id, { summary: options.summary, readable: this.readable(options.caller) });
+        if (rows.length === 0 && await this._registry.collectionSize(id) > 0) throw compendiumDenied();
+        return rows;
     }
 
-    async getSpellsForClass(classUuid: string): Promise<any[]> {
-        return this._registry.getSpellsForClass(classUuid);
+    async drawTable(uuid: string, caller: Caller, rollOverride?: number): Promise<any> {
+        return this._registry.draw(uuid, this.readable(caller), rollOverride);
     }
 
-    async findUniqueByName(name: string, types: string[]): Promise<{ doc: any | null; ambiguous: string[] }> {
-        return this._registry.findUniqueByName(name, types);
+    async getSpellsForClass(classUuid: string, caller: Caller): Promise<any[]> {
+        return this._registry.getSpellsForClass(classUuid, this.readable(caller));
     }
 
-    async getChoiceCatalog(): Promise<ChoiceCatalog> {
-        return this._registry.getChoiceCatalog();
+    async findUniqueByName(name: string, types: string[], caller: Caller): Promise<{ doc: any | null; ambiguous: string[] }> {
+        return this._registry.findUniqueByName(name, types, this.readable(caller));
     }
 
-    async getRegistryIndex(): Promise<Record<string, string>> {
-        return this._registry.getIndex();
+    async getChoiceCatalog(caller: Caller): Promise<ChoiceCatalog> {
+        return this._registry.getChoiceCatalog(this.readable(caller));
     }
 
     normalizeActorData(actor: any): ActorSheetData {
-        return ShadowdarkNormalizer.normalizeActorData(actor, this._registry.getCachedSystemData(), this.lookups());
+        return ShadowdarkNormalizer.normalizeActorData(actor, this._registry.getCachedSystemData(), this.lookups(), undefined,
+            this.preparationRules ?? this.currentRules());
+    }
+
+    /** Like {@link resolveDocumentFor}, but content the caller cannot read is null instead of an error. */
+    async resolveReadable(uuid: string, caller: Caller): Promise<any | null> {
+        try {
+            return await this.resolveDocumentFor(uuid, caller);
+        } catch (e: any) {
+            if (e?.code === 'permission_denied') return null;
+            throw e;
+        }
     }
 
     /**
-     * Exact declared compendium document (system-level read of shared pack data
-     * only). Restricted packs are never served here; they need a caller
-     * ({@link resolveDocumentFor}).
-     */
-    async resolveDocument(uuid: string): Promise<any> {
-        if (isRestrictedFor(null, uuid)) return null;
-        return this._registry.getDocument(uuid);
-    }
-
-    /**
-     * Caller-bound resolution: declared compendium documents from the registry,
-     * subject to the caller's pack access (restricted content throws
+     * Caller-bound resolution: declared compendium documents from the shared
+     * projection when the caller's pack capability allows it, checked before and
+     * again after the awaited read (restricted content throws
      * `permission_denied`); world and embedded documents only through the
      * caller's request runtime, which applies Core's visibility projection.
      * Unsupported identities are null.
@@ -173,8 +240,10 @@ export class ShadowdarkAdapter extends BaseSystemAdapter {
         const ref = parseUuid(uuid);
         if (!ref) return null;
         if (ref.kind === 'compendium') {
-            if (!canReadPack(caller, ref.pack)) throw compendiumDenied();
-            return this._registry.getDocument(formatUuid(ref));
+            if (!canReadPack(caller, ref.pack)) throw compendiumDenied(ref.pack);
+            const doc = await this._registry.getDocument(formatUuid(ref));
+            if (!canReadPack(caller, ref.pack)) throw compendiumDenied(ref.pack);
+            return doc;
         }
         if (ref.kind === 'world') {
             return caller.runtime.documents.get(ref.documentType, ref.id);
@@ -186,15 +255,15 @@ export class ShadowdarkAdapter extends BaseSystemAdapter {
         return child ? { ...child, uuid: formatUuid(ref) } : null;
     }
 
-    async getLevelUpData(actor: any, classUuidOverride?: string, patronUuidOverride?: string, caller?: Caller) {
+    async getLevelUpData(actor: any, classUuidOverride: string | undefined, patronUuidOverride: string | undefined, caller: Caller) {
         const currentLevel = actor?.system?.level?.value || 0;
         const targetLevel = currentLevel + 1;
         const currentXP = actor?.system?.level?.xp || 0;
         const classUuid = classUuidOverride || actor?.system?.class;
         const patronUuid = patronUuidOverride || actor?.system?.patron;
-        const prepared = prepareActorCore(actor, this.lookups());
+        const prepared = prepareActorCore(actor, this.lookups(), this.currentRules());
         const conMod = prepared.abilities.con.mod;
-        const resolve = (uuid: string) => caller ? this.resolveDocumentFor(uuid, caller) : this.resolveDocument(uuid);
+        const resolve = (uuid: string) => this.resolveDocumentFor(uuid, caller);
 
         const classDoc = classUuid ? await resolve(classUuid) : null;
         const patronDoc = patronUuid ? await resolve(patronUuid) : null;
@@ -218,7 +287,7 @@ export class ShadowdarkAdapter extends BaseSystemAdapter {
             }
             const classRef = canonicalUuid(classDoc.uuid);
             if (classRef) {
-                availableSpells = await this.getSpellsForClass(classRef);
+                availableSpells = await this.getSpellsForClass(classRef, caller);
                 const granted = new Set((actor?.items || []).map((item: any) => sourceRef(item)).filter(Boolean)
                     .map((ref: any) => GRANTED_SPELLS[formatUuid(ref)]).filter(Boolean));
                 for (const spell of availableSpells) if (granted.has(canonicalUuid(spell.uuid))) spell.isInnate = true;
@@ -288,7 +357,9 @@ export class ShadowdarkAdapter extends BaseSystemAdapter {
                 && (!request!.attackType || entry.attack?.type === request!.attackType)
                 && (!request!.handedness || entry.attack?.handedness === request!.handedness))
             && !(request!.selected?.length));
-        const action = prepared ?? prepareRequestedAction(prepareActorCore(actor, lookups), actor, lookups, request);
+        // Re-preparation uses the rule inputs this Actor revision was prepared with.
+        const rules = ((actor.derived as any)?.ruleInputs as RuleInputs | undefined) ?? UNAVAILABLE_RULE_INPUTS;
+        const action = prepared ?? prepareRequestedAction(prepareActorCore(actor, lookups, rules), actor, lookups, request);
         if (!action || !action.available) return null;
         const overrides: RollOverrides = {
             abilityBonus: options.abilityBonus !== undefined ? Number(options.abilityBonus) : undefined,

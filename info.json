@@ -8,13 +8,33 @@
         "server": "module/server"
     },
     "compatibility": {
-        "coreVersion": ">=0.18.0",
+        "coreVersion": ">=0.19.1",
         "apiContracts": {
-            "module-api": ">=1.3.0 <2.0.0",
-            "ui-extension-api": ">=3.1.0 <4.0.0",
+            "module-api": ">=1.6.0 <2.0.0",
+            "ui-extension-api": ">=3.2.0 <4.0.0",
             "roll-engine-api": ">=1.0.0 <2.0.0"
         }
     },
+    "worldSettings": [
+        {
+            "key": "shadowdark.usePulpMode",
+            "scope": "world",
+            "systemVersion": ">=4.0.0 <=4.0.6",
+            "schema": { "type": "boolean" },
+            "default": { "value": false, "source": "native Shadowdark release-4.0.0 to release-4.0.6 src/settings.mjs: world Boolean usePulpMode, default false", "systemVersion": ">=4.0.0 <=4.0.6" },
+            "affectsPreparation": true,
+            "exposure": "authenticated"
+        },
+        {
+            "key": "shadowdark.autoConsumeAmmunition",
+            "scope": "world",
+            "systemVersion": ">=4.0.0 <=4.0.6",
+            "schema": { "type": "boolean" },
+            "default": { "value": true, "source": "native Shadowdark release-4.0.0 to release-4.0.6 src/settings.mjs: world Boolean autoConsumeAmmunition, default true", "systemVersion": ">=4.0.0 <=4.0.6" },
+            "affectsPreparation": true,
+            "exposure": "authenticated"
+        }
+    ],
     "combatTracking": {
         "attributes": [
             { "key": "hp", "label": "HP", "path": "system.attributes.hp", "kind": "resource", "showInRoster": true },

@@ -54,7 +54,7 @@ export default function ShadowdarkSheet(props: ShadowdarkSheetProps) {
     
     const { resolveImageUrl, addNotification } = useSDK();
     const { RollDialog, LoadingModal, ConfirmationModal } = useSDKComponents();
-    const { loadingSystem } = useShadowdarkUI();
+    const { loadingSystem, systemStatus, systemError, retrySystem } = useShadowdarkUI();
 
     // UI state
     const [activeTab, setActiveTab] = useState('details');
@@ -188,6 +188,12 @@ export default function ShadowdarkSheet(props: ShadowdarkSheetProps) {
         <div className={`flex flex-col h-full relative pb-0 font-crimson font-inter font-sans ${viewMode === 'simple' ? 'bg-black' : 'bg-neutral-100'} text-black`}>
             {/* Loading Overlay */}
             <LoadingModal message="Loading System Data..." visible={loadingSystem} theme={shadowdarkTheme.loadingModal} />
+            {systemStatus === 'failed' && (
+                <div role="alert" className="mx-2 mt-2 flex flex-wrap items-center gap-2 border-2 border-red-700 bg-red-50 p-2 text-sm font-bold text-red-800">
+                    <span className="min-w-0 flex-1">{systemError} Compendium names and choices stay unavailable until it loads.</span>
+                    <button type="button" onClick={retrySystem} className="border-2 border-red-800 bg-white px-2 py-1 hover:bg-red-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-700">Retry</button>
+                </div>
+            )}
 
             {viewMode === 'simple' ? (
                 <ShadowdarkPaperSheet

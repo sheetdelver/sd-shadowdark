@@ -1,5 +1,5 @@
-import { useEffect, useMemo } from 'react';
-import { useShadowdarkUI } from '../context/ShadowdarkUIContext';
+import { useMemo } from 'react';
+import { useShadowdarkCollections } from '../context/ShadowdarkUIContext';
 import { choiceCatalog, type ChoiceCatalog } from '../../logic/talent-choices';
 
 /**
@@ -7,12 +7,10 @@ import { choiceCatalog, type ChoiceCatalog } from '../../logic/talent-choices';
  * gear and magic-item packs. Returns null while loading; an empty list means the
  * declared data offers no options, which blocks the choice instead of guessing.
  */
-export function useChoiceCatalog(): ChoiceCatalog | null {
-    const { collections, fetchPack } = useShadowdarkUI();
-    useEffect(() => {
-        if (!collections?.gear) fetchPack('gear');
-        if (!collections?.['magic-items']) fetchPack('magic-items');
-    }, [collections?.gear, collections, fetchPack]);
-    return useMemo(() => collections?.gear && collections?.['magic-items']
-        ? choiceCatalog([...collections.gear, ...collections['magic-items']]) : null, [collections]);
+export function useChoiceCatalog(enabled = true) {
+    const data = useShadowdarkCollections(['gear', 'magic-items'], enabled);
+    const { collections, ready } = data;
+    const catalog: ChoiceCatalog | null = useMemo(() => ready
+        ? choiceCatalog([...collections.gear, ...collections['magic-items']]) : null, [collections, ready]);
+    return { ...data, catalog };
 }

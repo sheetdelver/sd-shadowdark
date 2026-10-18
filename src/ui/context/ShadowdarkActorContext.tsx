@@ -20,6 +20,9 @@ import type { ItemControl } from '../../logic/inventory-controls';
  * - Actions open the SDK RollDialog with prepared defaults; spells, Class
  *   Abilities and potions execute through the module action route, guarded
  *   against duplicate submission.
+ * - Setting-dependent writes (luck, actions, rolls) carry the prepared Actor's
+ *   world-context revision; Core refuses them when world rules changed, and the
+ *   page reloads the Actor prepared under the new rules.
  */
 export interface ActionResponse {
     success: boolean;
@@ -48,6 +51,8 @@ interface ShadowdarkActorState {
     isSaving: boolean;
     pending: number;
     updateActor: (path: string, value: any, options?: { immediate?: boolean }) => Promise<boolean>;
+    /** Luck in the prepared mode (Pulp count or standard token), through the context-fenced luck route. */
+    updateLuck: (mode: 'pulp' | 'standard', value: number | boolean, options?: { immediate?: boolean }) => Promise<boolean>;
     updateItem: (itemId: string, patch: Record<string, unknown>, deletedEffectRefs?: string[]) => Promise<boolean>;
     deleteItem: (itemId: string) => Promise<boolean>;
     createItem: (itemData: any) => Promise<boolean>;
@@ -92,6 +97,7 @@ export function ShadowdarkActorProvider({
     onUpdateItem,
     onRoll,
     onAction,
+    onLuck,
     onToggleEffect,
     onDeleteEffect,
     onCreateEffect,
@@ -106,6 +112,7 @@ export function ShadowdarkActorProvider({
     onUpdateItem: (itemId: string, patch: Record<string, unknown>, deletedEffectRefs?: string[]) => Promise<void>;
     onRoll: (type: string, key: string, options?: any) => Promise<void>;
     onAction?: (body: any) => Promise<ActionResponse>;
+    onLuck?: (mode: 'pulp' | 'standard', value: number | boolean) => Promise<void>;
     onToggleEffect: (ref: string, enabled: boolean) => Promise<void>;
     onDeleteEffect: (ref: string) => Promise<void>;
     onCreateEffect: (payload: any) => Promise<void>;
@@ -180,21 +187,34 @@ export function ShadowdarkActorProvider({
         });
     }, []);
 
-    const updateActor = useCallback(async (path: string, value: any, options: { immediate?: boolean } = {}) => {
+    /** Draft, then write now or after a short debounce; a failed write drops the draft. */
+    const draftWrite = useCallback(async (path: string, value: any, immediate: boolean, label: string, run: () => Promise<void>) => {
         const owner = actorIdRef.current;
         setDrafts(prev => ({ actorId: owner, values: { ...(prev.actorId === owner ? prev.values : {}), [path]: value } }));
         if (timers.current[path]) { clearTimeout(timers.current[path]); delete timers.current[path]; }
         const write = async () => {
             if (actorIdRef.current !== owner) return false;
-            const result = await track('Update', () => onUpdate(path, value));
+            const result = await track(label, run);
             if (!result.ok) clearDraft(path);
             return result.ok;
         };
-        if (options.immediate) return write();
+        if (immediate) return write();
         return new Promise<boolean>(resolve => {
             timers.current[path] = setTimeout(() => { delete timers.current[path]; write().then(resolve); }, 800);
         });
-    }, [onUpdate, track, clearDraft]);
+    }, [track, clearDraft]);
+
+    const updateActor = useCallback(async (path: string, value: any, options: { immediate?: boolean } = {}) =>
+        draftWrite(path, value, options.immediate === true, 'Update', () => onUpdate(path, value)), [draftWrite, onUpdate]);
+
+    const updateLuck = useCallback(async (mode: 'pulp' | 'standard', value: number | boolean, options: { immediate?: boolean } = {}) => {
+        const path = mode === 'pulp' ? 'system.luck.remaining' : 'system.luck.available';
+        return draftWrite(path, value, options.immediate === true, 'Luck', async () => {
+            // Luck depends on a world setting; there is no unfenced fallback write.
+            if (!onLuck) throw new Error('Luck cannot be changed here.');
+            await onLuck(mode, value);
+        });
+    }, [draftWrite, onLuck]);
 
     const updateItem = useCallback(async (itemId: string, patch: Record<string, unknown>, deletedEffectRefs: string[] = []) =>
         (await track('Item update', () => onUpdateItem(itemId, patch, deletedEffectRefs))).ok, [onUpdateItem, track]);
@@ -337,7 +357,7 @@ export function ShadowdarkActorProvider({
         actor: computedActor,
         isSaving: pending > 0,
         pending,
-        updateActor, updateItem, deleteItem, createItem, performRoll,
+        updateActor, updateLuck, updateItem, deleteItem, createItem, performRoll,
         getDraftValue, toggleEffect, deleteEffect, createEffect, updateEffect, refreshActor,
         triggerLevelUp, showLevelUpModal, levelUpData, closeLevelUp,
         rollDialog, startAction, triggerRollDialog, closeRollDialog, isActionBusy, runItemControl,

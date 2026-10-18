@@ -1,5 +1,35 @@
 # Proposal: module data migrations and world data access (Core/SDK)
 
+**October 18 current disposition:** Core 0.19.2 is released and selected for
+module resumption. CG-5/7/9/10 have Core closeout evidence; this proposal remains
+historical. Follow the [module checkpoint and resumption](../adr/0001-native-alignment-and-resource-cards.md#core-0192-checkpoint-and-resumption--october-18-2026)
+for RV-12/13 and remaining acceptance, not this document's earlier API proposals
+or inactive-catalog statements. Core and SDK version metadata are read-only in
+this module task.
+
+**October 17 disposition:** historical proposal. Core0.19.1 is released with
+admin-owned complete maintenance and authoritative world/caller context. Module
+agents must adopt the released public contract, not implement this earlier Core
+proposal or recreate privileged routes. The current module work is in the
+[ADR-0001 resumption addendum](../adr/0001-native-alignment-and-resource-cards.md#core-0191-resumption-and-module-corrective-checkpoints--october-17-2026).
+
+**Historical proposal; implementation contract now available.** As of October 16,
+Core **v0.19.0** includes ADR-0064 and has passed its selected native v13/v14
+acceptance. Its SDK 3.3 / module-api 1.5 / UI API 3.2 contracts were verified in
+the local release tag at `2f71597`; the user reports publication. Core 0.18.1
+does not contain them. Earlier speculative APIs and "Core
+cannot" statements in this report are not current implementation instructions.
+Use the [ADR-0001 adoption addendum](../adr/0001-native-alignment-and-resource-cards.md#addendum-core-contract-adoption-and-release-order-october-16-2026)
+and the supporting Core checkout's `docs/MODULE_MIGRATIONS.md`. The module's
+caller migration prototype was removed at its correction checkpoint; keep it
+absent while adopting the admin-owned runner. Module adoption is partly implemented
+(see the ADR's [G8 implementation record](../adr/0001-native-alignment-and-resource-cards.md#g8-implementation--october-16-2026));
+its migration catalog is staged inactive. The
+[independent G8 review](2026-10-15-native-alignment.md#independent-g8-verification--october-16-2026)
+confirms Core capacity, pack-parent, diagnostic and v13 policy gaps (CR64-09–12),
+plus module UI race RV-08. The user selected their follow-up under existing Core
+ADR-0064; the historical proposals below are not the corrective implementation plan.
+
 Status: **Original module proposal, reviewed with corrections below — not implemented.** Written October 16, 2026
 from Shadowdark module work (ADR-0001). Core and the SDK were inspected read-only
 at Core `ff65695` (package 0.18.1; SDK surface unchanged since `v0.18.0`).

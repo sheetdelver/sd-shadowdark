@@ -35,7 +35,7 @@ export async function handleLearnSpell(actorId: string, req: ModuleServerRequest
 /**
  * GET /api/modules/shadowdark/spells/list?class=<Class UUID>
  * Spells whose `system.class` contains the exact class UUID: declared-compendium
- * spells plus caller-visible world spells. Distinct documents stay distinct even
+ * spells from packs the caller can read, plus caller-visible world spells. Distinct documents stay distinct even
  * when they share a name and tier.
  */
 export async function handleGetSpellsBySource(req: ModuleServerRequest) {
@@ -44,7 +44,7 @@ export async function handleGetSpellsBySource(req: ModuleServerRequest) {
         const classUuid = canonicalUuid(searchParams.get('class'));
         if (!classUuid) return error('validation', 'class must be an exact Class UUID');
 
-        const local = await shadowdarkAdapter.getSpellsForClass(classUuid);
+        const local = await shadowdarkAdapter.getSpellsForClass(classUuid, callerOf(req));
         const world: any[] = [];
         try {
             const worldItems = await req.runtime.documents.list('Item', { filter: { type: 'Spell' } });
@@ -66,6 +66,7 @@ export async function handleGetSpellsBySource(req: ModuleServerRequest) {
         const merged = [...byUuid.values()].sort((a, b) => (a.tier ?? 0) - (b.tier ?? 0) || String(a.name).localeCompare(String(b.name)));
         return json({ success: true, spells: merged });
     } catch (e: unknown) {
+        if (isSdkError(e)) return error(e.code, e.message);
         logger.error('[API] Fetch Spells Error:', e);
         return error('internal', getErrorMessage(e));
     }

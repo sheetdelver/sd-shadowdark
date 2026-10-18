@@ -1,9 +1,10 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useSyncExternalStore, useMemo, useLayoutEffect } from 'react';
 import { logger } from '@sheet-delver/sdk';
 import { useSDK } from '@sheet-delver/sdk/react';
 import { canonicalUuid } from '../../logic/identity';
+import { createSystemIndexStore, type SystemIndexStatus, type CollectionState } from './system-index-store';
 
 /**
  * ARCHITECTURAL SAFEGUARD:
@@ -13,14 +14,26 @@ import { canonicalUuid } from '../../logic/identity';
  * - systemData: Is the immutable manifest containing metadata and the nameIndex.
  * - collections: Is an ephemeral, on-demand cache for full rule shards (spells, gear, etc.).
  *
- * Both caches belong to one world: a different world id (or a lost connection)
- * discards them, and a response for an earlier world is ignored.
+ * Both caches belong to one world, user, role and connection, and to the current
+ * world context. `system-index-store` owns the request lifecycle: a scope change
+ * or Core `world:contextChanged` event retires in-flight requests and retries,
+ * drops both caches and starts a replacement index request, which ends in
+ * current data or an explicit failure. The server filters both by the caller's
+ * pack capability, so a cache never outlives the access it was fetched under.
  */
 
 interface ShadowdarkUIState {
     systemData: any | null;
     collections: Record<string, any[]>;
+    collectionStates: Record<string, CollectionState>;
+    generation: number;
+    retainCollections: (ids: readonly string[]) => () => void;
+    retryCollection: (id: string) => void;
     loadingSystem: boolean;
+    systemStatus: SystemIndexStatus;
+    /** Why the system index is unavailable, when `systemStatus` is `failed`. */
+    systemError: string | null;
+    retrySystem: () => void;
     fetchPack: (packId: string) => Promise<any>;
     /** Label for an exact reference; a non-reference string is already a label. */
     resolveName: (value: string, collection?: string) => string;
@@ -29,64 +42,29 @@ interface ShadowdarkUIState {
 const ShadowdarkUIContext = createContext<ShadowdarkUIState | undefined>(undefined);
 
 export function ShadowdarkUIProvider({ children }: { children: React.ReactNode }) {
-    const { fetchWithAuth, isConnected, worldId } = useSDK();
-    const [systemData, setSystemData] = useState<any>(null);
-    const [collections, setCollections] = useState<Record<string, any[]>>({});
-    const [loadingSystem, setLoadingSystem] = useState(true);
-    const generation = useRef(0);
-    const scope = `${worldId ?? ''}:${isConnected ? 'up' : 'down'}`;
+    const { fetchWithAuth, isConnected, worldId, currentUser, events } = useSDK();
+    const fetchRef = useRef(fetchWithAuth);
+    useLayoutEffect(() => { fetchRef.current = fetchWithAuth; }, [fetchWithAuth]);
+    const [store] = useState(() => createSystemIndexStore({
+        fetchIndex: signal => fetchRef.current('/api/modules/shadowdark/index', { signal }),
+        fetchCollection: (packId, signal) => fetchRef.current(`/api/modules/shadowdark/fetch-pack/${packId}`, { signal }),
+        onError: (message, error) => error ? logger.error(`[ShadowdarkUIContext] ${message}`, error) : logger.warn(`[ShadowdarkUIContext] ${message}`),
+    }));
+    const userId = currentUser?.id ?? null;
+    const role = currentUser?.role ?? null;
+    const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
+    // Scope changes are applied before paint. Also mask retired data during the
+    // intervening render so consumers cannot copy another caller's cached rows.
+    const { status, systemData, collections, error, collectionStates, generation } = store.matchesScope({ worldId: worldId ?? null, userId, role, connected: isConnected })
+        ? snapshot : { status: 'offline' as const, systemData: null, collections: {}, error: null, collectionStates: {}, generation: snapshot.generation };
+    useLayoutEffect(() => {
+        store.setScope({ worldId: worldId ?? null, userId, role, connected: isConnected });
+        return () => store.release();
+    }, [store, worldId, userId, role, isConnected]);
+    useEffect(() => events.on('world:contextChanged', () => store.invalidate()), [events, store]);
 
-    useEffect(() => {
-        generation.current++;
-        setSystemData(null);
-        setCollections({});
-    }, [worldId]);
-
-    const fetchPack = useCallback(async (packId: string) => {
-        if (collections[packId]) return collections[packId];
-        const started = generation.current;
-        try {
-            const res = await fetchWithAuth(`/api/modules/shadowdark/fetch-pack/${packId}`);
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const data = await res.json();
-            if (started !== generation.current) return null;
-            setCollections(prev => prev[packId] ? prev : { ...prev, [packId]: data });
-            return data;
-        } catch (err) {
-            logger.error(`[ShadowdarkUIContext] Failed to fetch pack ${packId}:`, err);
-            return null;
-        }
-    }, [collections, fetchWithAuth]);
-
-    useEffect(() => {
-        if (!isConnected || systemData) return;
-        setLoadingSystem(true);
-        const started = generation.current;
-        let cancelled = false;
-
-        const fetchData = async (retries = 3, delay = 1000) => {
-            try {
-                const res = await fetchWithAuth('/api/modules/shadowdark/index');
-                if (res.status === 503 && retries > 0) {
-                    logger.warn(`[ShadowdarkUIContext] System initializing (503), retrying in ${delay / 1000}s...`);
-                    setTimeout(() => !cancelled && fetchData(retries - 1, delay * 2), delay);
-                    return;
-                }
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const data = await res.json();
-                if (cancelled || started !== generation.current) return;
-                setSystemData(data || {});
-                setLoadingSystem(false);
-            } catch (err) {
-                logger.error('[ShadowdarkUIContext] Failed to fetch system manifest:', err);
-                if (retries > 0) setTimeout(() => !cancelled && fetchData(retries - 1, delay * 2), delay);
-                else if (!cancelled) setLoadingSystem(false);
-            }
-        };
-
-        fetchData();
-        return () => { cancelled = true; };
-    }, [fetchWithAuth, isConnected, systemData, scope]);
+    const fetchPack = useCallback((packId: string) => store.fetchCollection(packId), [store]);
+    const retrySystem = useCallback(() => store.retry(), [store]);
 
     const resolveName = useCallback((value: any, collection?: string): string => {
         if (!value) return '';
@@ -99,7 +77,11 @@ export function ShadowdarkUIProvider({ children }: { children: React.ReactNode }
     }, [systemData, collections]);
 
     return (
-        <ShadowdarkUIContext.Provider value={{ systemData, collections, loadingSystem, fetchPack, resolveName }}>
+        <ShadowdarkUIContext.Provider value={{
+            systemData, collections, loadingSystem: status === 'loading', systemStatus: status, systemError: error,
+            retrySystem, fetchPack, resolveName, collectionStates, generation,
+            retainCollections: store.retainCollections, retryCollection: store.retryCollection,
+        }}>
             {children}
         </ShadowdarkUIContext.Provider>
     );
@@ -111,4 +93,25 @@ export function useShadowdarkUI() {
         throw new Error('useShadowdarkUI must be used within a ShadowdarkUIProvider');
     }
     return context;
+}
+
+/** Declare live demand once; the shared store handles readiness and generations. */
+export function useShadowdarkCollections(packIds: readonly string[], enabled = true) {
+    const { retainCollections, retryCollection, retrySystem, systemStatus, systemError, collectionStates, collections, generation } = useShadowdarkUI();
+    const key = JSON.stringify([...new Set(packIds)].sort());
+    const ids: string[] = useMemo(() => JSON.parse(key), [key]);
+    useEffect(() => enabled ? retainCollections(ids) : undefined, [retainCollections, ids, enabled]);
+    const failures = ids.flatMap(id => {
+        const state = collectionStates[id];
+        return state?.status === 'failed' ? [state.error] : [];
+    });
+    const error = !enabled ? null : systemStatus === 'failed' ? systemError
+        : systemStatus === 'offline' ? 'World data is unavailable while disconnected. Reconnect to load these collections.'
+        : failures.length ? failures.join(' ') : null;
+    const ready = enabled && systemStatus === 'ready' && ids.every(id => collectionStates[id]?.status === 'ready');
+    const retry = () => {
+        if (systemStatus !== 'ready') retrySystem();
+        else ids.forEach(retryCollection);
+    };
+    return { collections, collectionStates, generation, ready, loading: enabled && !ready && !error, error, retry };
 }

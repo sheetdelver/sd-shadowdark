@@ -5,7 +5,7 @@ import { assembleFinalItems } from './level-up-engine';
 import * as levelUpEngine from './level-up-engine';
 import { TALENT_HANDLERS } from '../../logic/talent-handlers';
 import { canonicalUuid } from '../../logic/identity';
-import { callerOf } from '../access';
+import { callerOf, requestRules } from '../access';
 import { hitPointRollFormula } from '../../logic/actions';
 import { prepareActorCore } from '../../logic/actor-preparation';
 
@@ -132,7 +132,7 @@ export async function handleRollHP(actorId: string | undefined, req: ModuleServe
         }
 
         // Native LevelUpSD applies system.roll.hp.advantage to the hit die (e.g. Stout).
-        const prepared = hitPointRollFormula(actor ? prepareActorCore(actor, shadowdarkAdapter.lookups()) : null, hitDie);
+        const prepared = hitPointRollFormula(actor ? prepareActorCore(actor, shadowdarkAdapter.lookups(), requestRules(req.runtime)) : null, hitDie);
         hitDie = prepared.formula;
 
         // Build speaker override from the already-fetched actor (or session for new chars).
@@ -249,7 +249,7 @@ export async function handleRollTalent(actorId: string | undefined, req: ModuleS
 
         while (attempts < maxAttempts) {
             attempts++;
-            const result = await shadowdarkAdapter.drawTable(tableUuid);
+            const result = await shadowdarkAdapter.drawTable(tableUuid, callerOf(req));
             if (!result) {
                 return error('not_found', `RollTable not available: ${tableUuid}`);
             }
@@ -257,7 +257,8 @@ export async function handleRollTalent(actorId: string | undefined, req: ModuleS
             finalRollResult = result;
             const processed = await levelUpEngine.processRollResult({
                 result,
-                table: result.table
+                table: result.table,
+                caller: callerOf(req),
             });
 
             item = processed.item;
@@ -390,9 +391,8 @@ export async function handleFinalizeLevelUp(actorId: string, req: ModuleServerRe
 
         const targetLevel = body.targetLevel || (actor?.system?.level?.value || 0) + 1;
 
-        // Assembly (the engine's resolution is runtime-backed via the adapter; the legacy
-        // `client` arg is unused).
-        const finalItems = await assembleFinalItems(state, targetLevel, classObj, ancestry, background, patron, undefined, actor);
+        // Assembly: compendium sources are limited to the caller's readable packs.
+        const finalItems = await assembleFinalItems(state, targetLevel, classObj, ancestry, background, patron, callerOf(req), actor);
 
         const actorUpdates: any = {};
         if (actor && actorId !== 'new') {

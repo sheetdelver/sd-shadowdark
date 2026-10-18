@@ -4,6 +4,7 @@ import { clone, finiteNumber, getProperty, setProperty, slugify } from './foundr
 import { resolveFormula } from './formula';
 import { getActiveEffectKeys, numericKey, type RollKeyItem } from './roll-keys';
 import { documentId, parseUuid, sourceRef, type DocumentRef } from './identity';
+import { UNAVAILABLE_RULE_INPUTS, type RuleInputs } from './world-settings';
 
 /**
  * Module-prepared Shadowdark Actor data following native 4.0.6 preparation:
@@ -101,6 +102,8 @@ export interface PreparedActorCore {
     initiative: { value: number; advantage: number };
     effects: CanonicalEffect[];
     items: PreparedItemBasics[];
+    /** World-setting rule inputs this preparation used (one context revision). */
+    rules: RuleInputs;
     diagnostics: string[];
 }
 
@@ -375,7 +378,7 @@ function playerArmorClass(effects: CanonicalEffect[], rollData: unknown, abiliti
     return numericKey(final, 'AC') ?? total;
 }
 
-export function prepareActorCore(source: any, lookups: PreparationLookups = {}): PreparedActorCore {
+export function prepareActorCore(source: any, lookups: PreparationLookups = {}, rules: RuleInputs = UNAVAILABLE_RULE_INPUTS): PreparedActorCore {
     const kind = actorKind(source);
     const diagnostics: string[] = [];
     const working = migrateSystem(kind, source?.system);
@@ -443,6 +446,6 @@ export function prepareActorCore(source: any, lookups: PreparationLookups = {}):
         hp: { value: finiteNumber(working.attributes?.hp?.value) ?? 0, max: finiteNumber(working.attributes?.hp?.max) ?? 0 },
         ac, acSource: kind === 'Player' ? 'prepared-armor' : 'npc-explicit', maxSlots,
         slotUsage: kind === 'Player' ? slotUsage(items, working.coins) : null,
-        spellcasting, initiative, effects, items: items.map(({ basics }: any) => basics), diagnostics,
+        spellcasting, initiative, effects, items: items.map(({ basics }: any) => basics), rules, diagnostics,
     };
 }

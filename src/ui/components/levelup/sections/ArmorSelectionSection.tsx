@@ -1,5 +1,6 @@
 import { Shield } from 'lucide-react';
 import { useChoiceCatalog } from '../../../hooks/useChoiceCatalog';
+import { CollectionStatus } from '../../CollectionStatus';
 
 interface ArmorSelectionSectionProps {
     required: number;
@@ -13,7 +14,8 @@ export const ArmorSelectionSection: React.FC<ArmorSelectionSectionProps> = ({
     selected,
     onSelectionChange
 }) => {
-    const catalog = useChoiceCatalog();
+    const data = useChoiceCatalog(required > 0);
+    const { catalog } = data;
     if (required <= 0) return null;
     // Native options from declared packs; selections are stored by option name.
     const ARMOR_TYPES: string[] | null = catalog ? (catalog.armor ?? []).map(option => option.name) : null;
@@ -46,7 +48,7 @@ export const ArmorSelectionSection: React.FC<ArmorSelectionSectionProps> = ({
             </p>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {ARMOR_TYPES === null && <p role="status" className="col-span-full italic">Loading options…</p>}
+                <CollectionStatus state={data} label="Loading options…" />
                 {ARMOR_TYPES?.length === 0 && <p role="alert" className="col-span-full text-red-800">No armor options are available from declared Shadowdark data.</p>}
                 {(ARMOR_TYPES ?? []).map(armor => {
                     const isSelected = selected.includes(armor);

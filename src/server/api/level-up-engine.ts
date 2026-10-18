@@ -7,15 +7,16 @@ import { TableService } from '../../utils/TableService';
 import { sanitizeItems } from '../../utils/Sanitizer';
 import { applyMasteryChoice, assertResolvedTalentChoices, masteryKind, type ChoiceCatalog } from '../../logic/talent-choices';
 import { canonicalUuid, sourceRef, formatUuid, ownedCopy } from '../../logic/identity';
+import type { Caller } from '../access';
 
 interface RollResultProcessorOptions {
     result: any;
     table: any;
-    client?: any;
+    caller: Caller;
 }
 
-export async function processRollResult({ result, table, client }: RollResultProcessorOptions) {
-    return await TableService.processRollResult(client, { result, table });
+export async function processRollResult({ result, table, caller }: RollResultProcessorOptions) {
+    return await TableService.processRollResult(caller, { result, table });
 }
 
 export function getChoices(table: any, sourceResults?: any[]): any[] {
@@ -186,8 +187,8 @@ export async function validateState(state: LevelUpState, requirements: any, acto
 /**
  * Assembles all items for finalization.
  */
-export async function assembleFinalItems(state: LevelUpState, targetLevel: number, classObj: any, ancestry?: any, background?: any, patron?: any, client?: any, actor?: any, catalogOverride?: ChoiceCatalog) {
-    const catalog = catalogOverride ?? await shadowdarkAdapter.getChoiceCatalog();
+export async function assembleFinalItems(state: LevelUpState, targetLevel: number, classObj: any, ancestry: any, background: any, patron: any, caller: Caller, actor?: any, catalogOverride?: ChoiceCatalog) {
+    const catalog = catalogOverride ?? await shadowdarkAdapter.getChoiceCatalog(caller);
     const items: any[] = [];
     // A template UUID identifies a source, not a grant. Each roll is independent;
     // repeated references within one fixed class/ancestry grant are aliases.
@@ -245,7 +246,7 @@ export async function assembleFinalItems(state: LevelUpState, targetLevel: numbe
     for (const handler of TALENT_HANDLERS) {
         if (handler.resolveItems && !['weapon-mastery', 'armor-mastery'].includes(handler.action ?? '')) {
             const extra = await handler.resolveItems(state, targetLevel, async (uuid: string) => {
-                return shadowdarkAdapter.resolveDocument(uuid);
+                return shadowdarkAdapter.resolveReadable(uuid, caller);
             }, catalog);
             extra.forEach((item, index) => append(item, 'other', `${handler.id}:${index}`));
         }
@@ -263,7 +264,7 @@ export async function assembleFinalItems(state: LevelUpState, targetLevel: numbe
         const processBaggageGroup = async (doc: any, resolveFn: any, group: string) => {
             if (!doc) return;
             
-            const baggage = await resolveFn(doc, client);
+            const baggage = await resolveFn(doc, caller);
             for (const item of baggage) {
                 const uuid = item.uuid || item.documentUuid;
                 const name = (item.name || "").trim().toLowerCase();
@@ -334,7 +335,7 @@ export async function assembleFinalItems(state: LevelUpState, targetLevel: numbe
 
         if (needsResolution) {
             try {
-                const doc = await shadowdarkAdapter.resolveDocument(uuid!);
+                const doc = await shadowdarkAdapter.resolveReadable(uuid!, caller);
                 if (doc) {
                     // DEEP CLONE: Prevent cache poisoning
                     clean = JSON.parse(JSON.stringify(doc));

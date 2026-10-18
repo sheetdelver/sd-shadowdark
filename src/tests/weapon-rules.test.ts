@@ -21,6 +21,9 @@ import { damageCases, damageFixture, propertyNames } from './fixtures/weapon-cas
 import { applyItemDataOverrides } from '../server/api/item-properties';
 import { handleFinalizeLevelUp } from '../server/api/level-up';
 
+/** A caller whose effective pack capability reads every declared pack. */
+const testCaller = { runtime: { documents: {} as any, access: { canReadPack: () => true, packs: () => [] } }, isGM: false };
+
 void React;
 
 // Native 4.0.6: WeaponSD, PlayerSD._calcAttackMainConfig/_calcDamageConfig,
@@ -45,15 +48,15 @@ const catalog = choiceCatalog([
 const view = (who: any) => prepareShadowdarkView(who, { propertyName: uuid => (nameIndex as Record<string, string>)[uuid] ?? null });
 
 async function masteryAssemblyRegression() {
-    const resolve = shadowdarkAdapter.resolveDocument;
+    const resolve = shadowdarkAdapter.resolveReadable;
     const catalogFn = shadowdarkAdapter.getChoiceCatalog;
     const templates = ['Weapon', 'Armor'].map(kind => ({ name: `${kind} Mastery`, type: 'Talent',
         uuid: `Compendium.shadowdark.talents.Item.${kind.toLowerCase()}`, system: {}, effects: [{ name: `${kind} Mastery`, changes: [
             { key: `system.roll.melee.bonus.REPLACEME`, mode: 2, value: '1+floor(@level.value/2)' },
         ] }] }));
     const original = JSON.stringify(templates);
-    shadowdarkAdapter.resolveDocument = async uuid => structuredClone(templates.find(item => item.uuid === uuid) ?? null);
-    shadowdarkAdapter.getChoiceCatalog = async () => catalog;
+    shadowdarkAdapter.resolveReadable = async (uuid: string) => structuredClone(templates.find(item => item.uuid === uuid) ?? null);
+    shadowdarkAdapter.getChoiceCatalog = async (_caller: unknown) => catalog;
     const state = (kind: string, choices: string[], rolled: any[]) => ({ rolledTalents: rolled, rolledBoons: [],
         selectedSpells: [], selectedLanguages: [], statSelection: { selected: [] }, statPool: {},
         extraSpellSelection: { selected: [] }, weaponMasterySelection: { required: 0, selected: [] },
@@ -64,11 +67,11 @@ async function masteryAssemblyRegression() {
             const kind = template.name.startsWith('Weapon') ? 'weapon' : 'armor';
             const choices = kind === 'weapon' ? ['Longsword', 'Dagger'] : ['Leather', 'Shield'];
             const fixed = { name: 'Fixed class', type: 'Class', uuid: 'Class.fixed', system: { talents: [template.uuid] } };
-            const repeated = await assembleFinalItems(state(kind, choices, [template, template]), 3, { system: {} });
+            const repeated = await assembleFinalItems(state(kind, choices, [template, template]), 3, { system: {} }, undefined, undefined, undefined, testCaller);
             assert.deepEqual(repeated.map(item => item.name), choices.map(choice => `${template.name} (${choice})`),
                 'repeated rolled templates are independent grants, not UUID duplicates');
             assert.ok(repeated.every(item => item._stats?.compendiumSource === template.uuid), 'created copies record their exact source');
-            const combined = await assembleFinalItems(state(kind, choices, [template]), 1, fixed);
+            const combined = await assembleFinalItems(state(kind, choices, [template]), 1, fixed, undefined, undefined, undefined, testCaller);
             assert.equal(combined.filter(item => item.name.startsWith(template.name)).length, 2,
                 'fixed and rolled mastery grants must both survive');
             const context = { addedSourceIds: new Set<string>(), addedNames: new Set<string>(), targetLevel: 1, actor: null, choices: catalog };
@@ -76,18 +79,18 @@ async function masteryAssemblyRegression() {
             assert.equal(generatorItems.filter(item => item.name.startsWith(template.name)).length, 2,
                 'generator enrichment must retain both already-resolved selections');
             const ancestry = { name: 'Independent ancestry', type: 'Ancestry', system: { talents: [template.uuid] } };
-            const fixedGrants = await assembleFinalItems(state(kind, choices, []), 1, fixed, ancestry);
+            const fixedGrants = await assembleFinalItems(state(kind, choices, []), 1, fixed, ancestry, undefined, undefined, testCaller);
             assert.equal(fixedGrants.filter(item => item.name.startsWith(template.name)).length, 2,
                 'independent class and ancestry grants are not fixed-reference aliases');
-            await assert.rejects(() => assembleFinalItems(state(kind, [choices[0]], [template]), 1, fixed),
+            await assert.rejects(() => assembleFinalItems(state(kind, [choices[0]], [template]), 1, fixed, undefined, undefined, undefined, testCaller),
                 /choice|selection/i, 'one selection cannot satisfy two independent grants');
             const aliases = { ...fixed, system: { talents: [template.uuid], abilities: [template.uuid] } };
-            const deduped = await assembleFinalItems(state(kind, [choices[0]], []), 1, aliases);
+            const deduped = await assembleFinalItems(state(kind, [choices[0]], []), 1, aliases, undefined, undefined, undefined, testCaller);
             assert.equal(deduped.filter(item => item.name.startsWith(template.name)).length, 1,
                 'two references to one fixed grant are an actual duplicate');
-            await assert.rejects(() => assembleFinalItems(state(kind, choices, []), 1, fixed), /choice|selection/i,
+            await assert.rejects(() => assembleFinalItems(state(kind, choices, []), 1, fixed, undefined, undefined, undefined, testCaller), /choice|selection/i,
                 'extra selections must not be silently ignored');
-            await assert.rejects(() => assembleFinalItems(state(kind, [], [template]), 3, { system: {} }), /choice|selection/i);
+            await assert.rejects(() => assembleFinalItems(state(kind, [], [template]), 3, { system: {} }, undefined, undefined, undefined, testCaller), /choice|selection/i);
             const existing = { _id: 'existing', system: { level: { value: 2 } }, items: [{ name: 'Existing talent' }] };
             const prior = structuredClone(existing);
             const writes: string[] = [];
@@ -96,11 +99,11 @@ async function masteryAssemblyRegression() {
                     items: { create: async () => writes.push('Item') } } } } as any);
             assert.deepEqual(writes, [], 'invalid/cancelled choices fail before Actor or Item writes');
             assert.deepEqual(existing, prior, 'rejected advancement preserves the existing Actor');
-            const reselected = await assembleFinalItems(state(kind, [choices[1]], [template]), 3, { system: {} });
+            const reselected = await assembleFinalItems(state(kind, [choices[1]], [template]), 3, { system: {} }, undefined, undefined, undefined, testCaller);
             assert.equal(reselected[0].name, `${template.name} (${choices[1]})`, 'a cancelled choice does not leak into a later attempt');
         }
     } finally {
-        shadowdarkAdapter.resolveDocument = resolve;
+        shadowdarkAdapter.resolveReadable = resolve;
         shadowdarkAdapter.getChoiceCatalog = catalogFn;
     }
     assert.equal(JSON.stringify(templates), original, 'assembly never mutates cached templates');
@@ -263,24 +266,24 @@ export async function run() {
     assert.equal(await enrichItem(mastery, multiple), null);
     assert.ok(await enrichItem(mastery, { ...multiple, bonusTo: 'Longsword' }));
     assert.ok(await enrichItem(mastery, { ...multiple, bonusTo: 'Dagger' }));
-    const resolve = shadowdarkAdapter.resolveDocument;
+    const resolve = shadowdarkAdapter.resolveReadable;
     const catalogFn = shadowdarkAdapter.getChoiceCatalog;
-    shadowdarkAdapter.resolveDocument = async uuid => uuid === mastery.uuid ? structuredClone(mastery) : null;
-    shadowdarkAdapter.getChoiceCatalog = async () => catalog;
+    shadowdarkAdapter.resolveReadable = async (uuid: string) => uuid === mastery.uuid ? structuredClone(mastery) : null;
+    shadowdarkAdapter.getChoiceCatalog = async (_caller: unknown) => catalog;
     const state: any = { rolledTalents: [], rolledBoons: [], selectedSpells: [], selectedLanguages: [],
         weaponMasterySelection: { required: 1, selected: ['Longsword'] }, armorMasterySelection: { required: 0, selected: [] },
         statSelection: { selected: [] }, statPool: {}, extraSpellSelection: { selected: [] } };
     try {
         const fixedClass = { name: 'Fighter', type: 'Class', system: { talents: [mastery.uuid] } };
-        const generated = await assembleFinalItems(state, 1, fixedClass);
+        const generated = await assembleFinalItems(state, 1, fixedClass, undefined, undefined, undefined, testCaller);
         assert.equal(generated.filter(item => item.name === 'Weapon Mastery (Longsword)').length, 1);
         assert.doesNotMatch(JSON.stringify(generated), /REPLACEME/);
-        await assert.rejects(() => assembleFinalItems({ ...state, weaponMasterySelection: { selected: [] } }, 1, fixedClass), /valid weapon/);
-        const advancement = await assembleFinalItems({ ...state, rolledTalents: [mastery] }, 3, { system: {} });
+        await assert.rejects(() => assembleFinalItems({ ...state, weaponMasterySelection: { selected: [] } }, 1, fixedClass, undefined, undefined, undefined, testCaller), /valid weapon/);
+        const advancement = await assembleFinalItems({ ...state, rolledTalents: [mastery] }, 3, { system: {} }, undefined, undefined, undefined, testCaller);
         assert.equal(advancement.length, 1);
         assert.doesNotMatch(JSON.stringify(advancement), /REPLACEME/);
     } finally {
-        shadowdarkAdapter.resolveDocument = resolve;
+        shadowdarkAdapter.resolveReadable = resolve;
         shadowdarkAdapter.getChoiceCatalog = catalogFn;
     }
     assert.equal(JSON.stringify(mastery), before, 'choice, import and advancement never mutate the cached template');
