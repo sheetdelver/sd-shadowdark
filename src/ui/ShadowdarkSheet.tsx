@@ -4,8 +4,6 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import ErrorBoundary from './components/ErrorBoundary';
 import { shadowdarkTheme } from './themes/shadowdark';
 
-import { calculateSpellBonus } from './sheet-utils';
-import { shouldShowSpellsTab } from '../logic/rules';
 import { Menu, X, Check } from 'lucide-react';
 import { useSDK, useSDKComponents } from '@sheet-delver/sdk/react';
 import { ShadowdarkUIProvider, useShadowdarkUI } from './context/ShadowdarkUIContext';
@@ -20,6 +18,7 @@ import DetailsTab from './DetailsTab';
 import EffectsTab from './EffectsTab';
 import NotesTab from './NotesTab';
 import { LevelUpModal } from './components/LevelUpModal';
+import ResourceDetailModal from './components/ResourceDetailModal';
 
 
 import ShadowdarkPaperSheet from './ShadowdarkPaperSheet';
@@ -47,12 +46,15 @@ export default function ShadowdarkSheet(props: ShadowdarkSheetProps) {
         triggerLevelUp,
         showLevelUpModal,
         levelUpData,
-        closeLevelUp
+        closeLevelUp,
+        pendingConfirmation,
+        cancelConfirmation,
+        isSaving,
     } = useShadowdarkActor();
     
     const { resolveImageUrl, addNotification } = useSDK();
-    const { RollDialog, LoadingModal } = useSDKComponents();
-    const { systemData, loadingSystem, resolveName } = useShadowdarkUI();
+    const { RollDialog, LoadingModal, ConfirmationModal } = useSDKComponents();
+    const { loadingSystem, systemStatus, systemError, retrySystem } = useShadowdarkUI();
 
     // UI state
     const [activeTab, setActiveTab] = useState('details');
@@ -105,9 +107,9 @@ export default function ShadowdarkSheet(props: ShadowdarkSheetProps) {
         const handleResize = () => {
             let currentTabs = [...tabsOrder];
 
-            // Spellcaster check: prefer pre-computed value on actor, fall back to rules function.
-            // No extra API call needed — this is already determined during normalization.
-            const showSpells = actor.computed?.showSpellsTab || shouldShowSpellsTab(actor);
+            // The prepared view decides; an authoritative false is not recomputed.
+            const showSpells = actor.derived?.showSpellsTab === true
+                || (actor.derived?.items ?? []).some((view: any) => ['Spell', 'Scroll', 'Wand'].includes(view.type));
 
             if (!showSpells) {
                 currentTabs = currentTabs.filter(t => t.id !== 'spells');
@@ -126,7 +128,11 @@ export default function ShadowdarkSheet(props: ShadowdarkSheetProps) {
         return () => window.removeEventListener('resize', handleResize);
     }, [tabsOrder, actor, getVisibleCount]);
 
-    // Level Up Modal is handled via hook
+    // A tab that disappears (for example Spells) cannot stay selected.
+    useEffect(() => {
+        const available = [...visibleTabs, ...overflowTabs];
+        if (available.length && !available.some(tab => tab.id === activeTab)) setActiveTab('details');
+    }, [visibleTabs, overflowTabs, activeTab]);
 
     const handleTabSelect = (tabId: string) => {
         setActiveTab(tabId);
@@ -182,6 +188,12 @@ export default function ShadowdarkSheet(props: ShadowdarkSheetProps) {
         <div className={`flex flex-col h-full relative pb-0 font-crimson font-inter font-sans ${viewMode === 'simple' ? 'bg-black' : 'bg-neutral-100'} text-black`}>
             {/* Loading Overlay */}
             <LoadingModal message="Loading System Data..." visible={loadingSystem} theme={shadowdarkTheme.loadingModal} />
+            {systemStatus === 'failed' && (
+                <div role="alert" className="mx-2 mt-2 flex flex-wrap items-center gap-2 border-2 border-red-700 bg-red-50 p-2 text-sm font-bold text-red-800">
+                    <span className="min-w-0 flex-1">{systemError} Compendium names and choices stay unavailable until it loads.</span>
+                    <button type="button" onClick={retrySystem} className="border-2 border-red-800 bg-white px-2 py-1 hover:bg-red-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-700">Retry</button>
+                </div>
+            )}
 
             {viewMode === 'simple' ? (
                 <ShadowdarkPaperSheet
@@ -209,6 +221,7 @@ export default function ShadowdarkSheet(props: ShadowdarkSheetProps) {
                                             {actor.details?.ancestry || ''} {actor.details?.class || ''}
                                         </p>
                                         <button
+                                            type="button"
                                             onClick={() => {
                                                 handleToggleView('simple');
                                             }}
@@ -246,6 +259,7 @@ export default function ShadowdarkSheet(props: ShadowdarkSheetProps) {
                                     <div className="flex items-center gap-1 font-serif font-bold text-xl md:text-2xl">
                                         <input
                                             type="number"
+                                            aria-label="Current hit points"
                                             value={getDraftValue('system.attributes.hp.value', actor.system.attributes.hp.value)}
                                             onChange={(e) => {
                                                 let val = parseInt(e.target.value) || 0;
@@ -273,9 +287,11 @@ export default function ShadowdarkSheet(props: ShadowdarkSheetProps) {
                                 </div>
                             )}
                             <button
+                                type="button"
                                 onClick={() => onToggleDiceTray?.()}
                                 className="ml-4 transition-all duration-300 hover:scale-110 active:scale-95 group shrink-0"
                                 title="Open Dice Tray"
+                                aria-label="Open dice tray"
                             >
                                 <img
                                     src="/icons/dice-d20.svg"
@@ -310,6 +326,9 @@ export default function ShadowdarkSheet(props: ShadowdarkSheetProps) {
                         {secondaryTabs.length > 0 && (
                             <div className="relative border-l-2 border-black flex-none" ref={menuRef}>
                                 <button
+                                    type="button"
+                                    aria-expanded={menuOpen}
+                                    aria-label="More sections"
                                     onClick={() => setMenuOpen(!menuOpen)}
                                     className={`h-full px-4 flex items-center justify-center gap-2 font-bold uppercase tracking-widest text-xs md:text-sm transition-colors
                                 ${menuOpen || secondaryTabs.some(t => t.id === activeTab) ? 'bg-black text-white' : 'hover:bg-neutral-800 text-neutral-400'}`}
@@ -405,6 +424,19 @@ export default function ShadowdarkSheet(props: ShadowdarkSheetProps) {
                 }}
                 onClose={closeRollDialog}
             />
+
+            <ResourceDetailModal />
+            {pendingConfirmation && (
+                <ConfirmationModal
+                    isOpen
+                    title={pendingConfirmation.title}
+                    message={pendingConfirmation.message}
+                    confirmLabel="Confirm"
+                    onConfirm={pendingConfirmation.onConfirm}
+                    onCancel={cancelConfirmation}
+                />
+            )}
+            {isSaving && <div role="status" aria-live="polite" className="fixed bottom-3 left-3 z-[80] bg-black text-white text-xs font-bold uppercase tracking-widest px-3 py-1.5">Saving…</div>}
 
             {/* Level-Up Modal */}
             {

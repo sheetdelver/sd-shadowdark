@@ -1,13 +1,18 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
 
 import { LevelUpModal } from '../components/LevelUpModal';
 import { logger } from '@sheet-delver/sdk';
 import { useSDK, useSDKComponents } from '@sheet-delver/sdk/react';
-import { useShadowdarkUI, ShadowdarkUIProvider } from '../context/ShadowdarkUIContext';
+import { useShadowdarkUI, ShadowdarkUIProvider, useShadowdarkCollections } from '../context/ShadowdarkUIContext';
+import { CollectionStatus } from '../components/CollectionStatus';
 import { enrichItem, resolveSubItems, EnrichmentContext } from '../../logic/actor-enricher';
 import { assertResolvedTalentChoices } from '../../logic/talent-choices';
+import { ownedCopy } from '../../logic/identity';
+import { presentDescription } from '../../logic/description';
+import { prepareActorCore } from '../../logic/actor-preparation';
+import { advancementHitPoints } from '../../logic/advancement';
 
 export default function Generator() {
     return (
@@ -18,10 +23,10 @@ export default function Generator() {
 }
 
 function GeneratorContent() {
-    const { systemData, collections, fetchPack, resolveName, loadingSystem } = useShadowdarkUI();
+    const { systemData, collections, resolveName, loadingSystem } = useShadowdarkUI();
     const { foundryUrl, isConnected, navigate, fetchWithAuth } = useSDK();
     const { LoadingModal } = useSDKComponents();
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
 
     // Randomize All
     const skipLanguageReset = useRef(false);
@@ -33,9 +38,6 @@ function GeneratorContent() {
         amount: number;
     } | null>(null);
 
-    const [ancestryDetails, setAncestryDetails] = useState<any>(null);
-    const [classDetails, setClassDetails] = useState<any>(null);
-    const [patronDetails, setPatronDetails] = useState<any>(null);
     const [showPatronModal, setShowPatronModal] = useState(false);
 
     // Ancestry Choice State
@@ -65,6 +67,24 @@ function GeneratorContent() {
         hp: 0,
         gold: 0
     });
+
+    // Level 0 has no patron selection. Level 1 must also load that collection;
+    // every identity/language collection used by the selected mode must be ready.
+    const data = useShadowdarkCollections(['ancestries', 'classes', 'backgrounds', 'deities', 'languages',
+        ...(!formData.level0 ? ['patrons'] : [])]);
+    // Identity shards contain full native documents. Always derive these from
+    // the current caller's collection instead of retaining a prior context's doc.
+    const fromCollection = (id: string, uuid: string) => data.ready
+        ? collections[id]?.find(doc => doc.uuid === uuid || doc._id === uuid) ?? null : null;
+    const ancestryDetails = fromCollection('ancestries', formData.ancestry);
+    const classDetails = fromCollection('classes', formData.class);
+    const patronDetails = fromCollection('patrons', formData.patron);
+    const documentScope = useRef<{ generation: number; controller: AbortController } | null>(null);
+    useLayoutEffect(() => {
+        const scope = { generation: data.generation, controller: new AbortController() };
+        documentScope.current = scope;
+        return () => { scope.controller.abort(); if (documentScope.current === scope) documentScope.current = null; };
+    }, [data.generation]);
 
 
 
@@ -101,6 +121,8 @@ function GeneratorContent() {
     };
 
     const fetchDocument = useCallback(async (uuid: string) => {
+        const scope = documentScope.current;
+        if (!scope || scope.generation !== data.generation || scope.controller.signal.aborted) return null;
         // 1. Check loaded shards
         for (const shard of Object.values(collections)) {
             const found = shard.find((i: any) => i.uuid === uuid || i.id === uuid || i._id === uuid);
@@ -121,81 +143,22 @@ function GeneratorContent() {
 
         // 3. Fallback to network
         try {
-            const res = await fetchWithAuth(`/api/modules/shadowdark/document/${uuid}`);
-            if (res.ok) return await res.json();
+            const res = await fetchWithAuth(`/api/modules/shadowdark/document/${uuid}`, { signal: scope.controller.signal });
+            if (res.ok) {
+                const doc = await res.json();
+                return documentScope.current === scope && !scope.controller.signal.aborted ? doc : null;
+            }
         } catch (e) {
+            if (scope.controller.signal.aborted) return null;
             logger.warn(`Failed to fetch document ${uuid} via network, checking local index:`, e);
         }
 
-        // 4. Last Resource: Check Name Index (for simple resolution if possible)
-        if (systemData?.nameIndex?.[uuid]) {
-            return { uuid, name: systemData.nameIndex[uuid], type: 'Unknown' };
-        }
-
         return null;
-    }, [fetchWithAuth, collections, systemData]);
+    }, [fetchWithAuth, collections, systemData, data.generation]);
 
-    // Load Shards and Index
-    useEffect(() => {
-        if (!isConnected || collections.ancestries) return;
-        const loadRequiredData = async () => {
-            try {
-                setLoading(true);
-                // Fetch Identity Shards needed for Character Creation
-                await Promise.all([
-                    fetchPack('ancestries'),
-                    fetchPack('classes'),
-                    fetchPack('backgrounds'),
-                    fetchPack('deities'),
-                    fetchPack('patrons'),
-                    fetchPack('languages')
-                ]);
-                setLoading(false);
-            } catch (err) {
-                logger.error("Failed to load character creation shards:", err);
-                setLoading(false);
-            }
-        };
-
-        loadRequiredData();
-    }, [fetchPack, isConnected, collections.ancestries]);
-
-    // Consolidated Readiness Logic
-    const isAppLoading = loading || loadingSystem || !systemData || !collections.ancestries;
-    // Handle initial loading state sync
-    useEffect(() => {
-        if (systemData && collections.ancestries) {
-            setLoading(false);
-        }
-    }, [systemData, collections.ancestries]);
+    const isAppLoading = loading || data.loading;
 
 
-
-    // Fetch Class Details on change
-    useEffect(() => {
-        if (!formData.class) {
-            setClassDetails(null);
-            return;
-        }
-
-        // Only fetch if it's actually different from what we have
-        if (classDetails && (classDetails.uuid === formData.class || classDetails._id === formData.class)) {
-            return;
-        }
-
-        fetchDocument(formData.class).then(data => {
-            setClassDetails(data);
-        });
-    }, [formData.class, classDetails, fetchDocument]);
-
-    // Fetch Patron Details on change
-    useEffect(() => {
-        if (!formData.patron) {
-            setPatronDetails(null);
-            return;
-        }
-        fetchDocument(formData.patron).then(data => setPatronDetails(data));
-    }, [formData.patron, fetchDocument]);
 
 
 
@@ -283,11 +246,7 @@ function GeneratorContent() {
             if (!res.ok) throw new Error('Randomization failed');
             const data = await res.json();
 
-            // 1. Update Details State (Batch these to ensure Effects see consistent data)
-            setAncestryDetails(data.ancestry);
-            setClassDetails(data.class);
-
-            // 2. Update Form Data
+            // Identity documents come from current caller collections.
             setFormData(prev => ({
                 ...prev,
                 stats: data.stats,
@@ -371,20 +330,13 @@ function GeneratorContent() {
     // Effect: Load Ancestry Details & Talents & Languages
     useEffect(() => {
         if (!formData.ancestry) {
-            setAncestryDetails(null);
             setAncestryTalents({ fixed: [], choice: [], choiceCount: 0 });
             return;
         }
 
         const loadAncestry = async () => {
             try {
-                let details = ancestryDetails;
-
-                // 1. Fetch details if missing or different
-                if (!details || (details.uuid !== formData.ancestry && details._id !== formData.ancestry)) {
-                    details = await fetchDocument(formData.ancestry);
-                    setAncestryDetails(details);
-                }
+                const details = ancestryDetails;
 
                 if (!details?.system) return;
 
@@ -489,7 +441,7 @@ function GeneratorContent() {
             setArmorNames([]);
             return;
         }
-
+        let active = true;
         const loadDetails = async () => {
             // 1. TALENTS & ABILITIES
             const enrichmentContext: EnrichmentContext = {
@@ -500,6 +452,7 @@ function GeneratorContent() {
             };
 
             const subItems = await resolveSubItems(classDetails, fetchDocument, enrichmentContext);
+            if (!active) return;
             
             const fixed = subItems.map(i => ({
                 uuid: i.flags?.core?.sourceId || i.uuid || i._id,
@@ -512,6 +465,7 @@ function GeneratorContent() {
             if (classDetails.system.talentChoices?.length > 0) {
                 try {
                     const docs = await Promise.all(classDetails.system.talentChoices.map((u: string) => fetchDocument(u)));
+                    if (!active) return;
                     choice.push(...docs.map((d, i) => d ? {
                         uuid: classDetails.system.talentChoices[i],
                         name: d.name,
@@ -521,7 +475,7 @@ function GeneratorContent() {
                     logger.error("Talent choice load error", e);
                 }
             }
-
+            if (!active) return;
             setClassTalents({ 
                 fixed, 
                 choice, 
@@ -533,8 +487,10 @@ function GeneratorContent() {
             if (Array.isArray(classDetails.system.weapons) && classDetails.system.weapons.length > 0) {
                 try {
                     const docs = await Promise.all(classDetails.system.weapons.map((u: string) => fetchDocument(u)));
+                    if (!active) return;
                     setWeaponNames(docs.filter(d => d && d.name).map(d => d.name));
                 } catch (e) {
+                    if (!active) return;
                     logger.error("Weapon load error", e);
                     setWeaponNames([]);
                 }
@@ -546,8 +502,10 @@ function GeneratorContent() {
             if (Array.isArray(classDetails.system.armor) && classDetails.system.armor.length > 0) {
                 try {
                     const docs = await Promise.all(classDetails.system.armor.map((u: string) => fetchDocument(u)));
+                    if (!active) return;
                     setArmorNames(docs.filter(d => d && d.name).map(d => d.name));
                 } catch (e) {
+                    if (!active) return;
                     logger.error("Armor load error", e);
                     setArmorNames([]);
                 }
@@ -556,11 +514,13 @@ function GeneratorContent() {
             }
         };
 
-        loadDetails();
+        void loadDetails();
+        return () => { active = false; };
     }, [classDetails, formData.level0, fetchDocument]);
 
     // Combined Language Effect
     useEffect(() => {
+        let active = true;
         const loadLanguages = async () => {
             let common = 0;
             let rare = 0;
@@ -618,7 +578,7 @@ function GeneratorContent() {
                 const docs = await Promise.all(fixedUuids.map(u => fetchDocument(u)));
                 fixedResolved = docs.map((d, i) => d ? { uuid: fixedUuids[i], name: d.name } : null).filter(d => d);
             }
-
+            if (!active) return;
             setLanguageConfig({ common, rare, ancestry: ancestryPool, class: classPool, fixed: fixedUuids });
 
             setKnownLanguages(prev => ({
@@ -627,7 +587,8 @@ function GeneratorContent() {
             }));
         };
 
-        loadLanguages();
+        void loadLanguages();
+        return () => { active = false; };
     }, [ancestryDetails, classDetails, formData.level0, formData.stats.INT, fetchDocument]);
 
 
@@ -636,15 +597,16 @@ function GeneratorContent() {
 
     // Create Character
     const createCharacter = async (extraItems: any[] = [], extraData: any = {}, levelUpComplete = false) => {
+        if (!data.ready) return;
         setCreationError(null);
         setFormErrors({});
 
         // Validation
         const errors: Record<string, boolean> = {};
         if (!formData.name) errors.name = true;
-        if (!formData.ancestry) errors.ancestry = true;
-        if (!formData.background) errors.background = true;
-        if (!formData.level0 && !formData.class) errors.class = true;
+        if (!ancestryDetails) errors.ancestry = true;
+        if (!collections.backgrounds.some(doc => doc.uuid === formData.background)) errors.background = true;
+        if (!formData.level0 && !classDetails) errors.class = true;
 
         // Details Validation
         if (ancestryTalents.choiceCount > 0 && selectedAncestryTalents.length < ancestryTalents.choiceCount) {
@@ -814,22 +776,19 @@ function GeneratorContent() {
                     patron: effectivePatronUuid || "",    // Link to Compendium UUID (Correct for Shadowdark)
                     alignment: formData.alignment,
                     deity: formData.deity,
-                    details: {
-                        title: formData.title || ""
-                    },
                     languages: languageUuids, // Populate with selected language UUIDs
                     level: {
                         value: formData.level0 ? 0 : 1,
-                        xp: 0,
-                        next: formData.level0 ? 0 : 10
+                        xp: 0
                     },
+                    // PlayerSD attributeModel stores only `value`; title is derived from the class.
                     abilities: {
-                        str: { value: formData.stats.STR.value, base: formData.stats.STR.value, bonus: 0 },
-                        dex: { value: formData.stats.DEX.value, base: formData.stats.DEX.value, bonus: 0 },
-                        con: { value: formData.stats.CON.value, base: formData.stats.CON.value, bonus: 0 },
-                        int: { value: formData.stats.INT.value, base: formData.stats.INT.value, bonus: 0 },
-                        wis: { value: formData.stats.WIS.value, base: formData.stats.WIS.value, bonus: 0 },
-                        cha: { value: formData.stats.CHA.value, base: formData.stats.CHA.value, bonus: 0 }
+                        str: { value: formData.stats.STR.value },
+                        dex: { value: formData.stats.DEX.value },
+                        con: { value: formData.stats.CON.value },
+                        int: { value: formData.stats.INT.value },
+                        wis: { value: formData.stats.WIS.value },
+                        cha: { value: formData.stats.CHA.value }
                     },
                     attributes: {
                         hp: { value: extraData.hpRoll ?? formData.hp, max: extraData.hpRoll ?? formData.hp }
@@ -841,8 +800,16 @@ function GeneratorContent() {
                     },
                     notes: formData.description
                 },
-                items: items
+                // Owned copies record their exact compendium source.
+                items: items.map(item => ownedCopy(item))
             };
+
+            if (!formData.level0) {
+                // Share advancement's native first-level rule, including CON
+                // effects in the assembled ancestry/talents and the minimum HP.
+                actorData.system.attributes.hp = advancementHitPoints(
+                    prepareActorCore(actorData), 1, extraData.hpRoll ?? formData.hp);
+            }
 
             // 3. Send to API
 
@@ -877,6 +844,13 @@ function GeneratorContent() {
     };
 
     // 3. Main Render
+    if (data.error) {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-neutral-100 p-4 text-black">
+                <CollectionStatus state={data} label="Loading character creation data…" />
+            </div>
+        );
+    }
     if (isAppLoading) {
         // Use the standard application loading aesthetic requested by the user
         const bootstrapMessage = loadingSystem ? "Loading Manifest..." :
@@ -1221,7 +1195,7 @@ function GeneratorContent() {
                         {classDetails?.system?.description && !formData.level0 && (
                             <div
                                 className="mb-2 italic leading-tight"
-                                dangerouslySetInnerHTML={{ __html: classDetails.system.description.value || classDetails.system.description }}
+                                dangerouslySetInnerHTML={{ __html: presentDescription(classDetails.system.description) }}
                             />
                         )}
 
@@ -1231,8 +1205,7 @@ function GeneratorContent() {
                                 <div className="leading-tight mb-2">
                                     {(() => {
                                         const rawDesc = ancestryDetails.system?.description?.value || ancestryDetails.system?.description || "";
-                                        const cleanDesc = rawDesc.replace(/<[^>]+>/g, ' ');
-                                        return <span dangerouslySetInnerHTML={{ __html: cleanDesc }} />;
+                                        return <span>{String(rawDesc).replace(/<[^>]+>/g, ' ')}</span>;
                                     })()}
                                 </div>
 
@@ -1315,7 +1288,7 @@ function GeneratorContent() {
                                                                     <div className={`font-serif font-black text-sm uppercase tracking-widest ${isSelected ? 'text-black' : 'text-neutral-600'}`}>{t.name}</div>
                                                                     {isSelected && <span className="text-indigo-600 font-bold">✓</span>}
                                                                 </div>
-                                                                <div className="text-xs text-neutral-500 mt-2 font-medium" dangerouslySetInnerHTML={{ __html: t.description }}></div>
+                                                                <div className="text-xs text-neutral-500 mt-2 font-medium" dangerouslySetInnerHTML={{ __html: presentDescription(t.description) }}></div>
                                                             </div>
                                                         );
                                                     })}
@@ -1567,7 +1540,7 @@ function GeneratorContent() {
                                             Edit/Change
                                         </button>
                                         <div className="italic text-neutral-600 text-[11px] mt-1 leading-tight ml-4 border-l-2 border-neutral-200 pl-2">
-                                            <span dangerouslySetInnerHTML={{ __html: (patronDetails.system?.description?.value || patronDetails.system?.description || "").replace(/<[^>]+>/g, ' ') }}></span>
+                                            <span>{String(patronDetails.system?.description?.value || patronDetails.system?.description || '').replace(/<[^>]+>/g, ' ')}</span>
                                         </div>
                                     </span>
                                 ) : (

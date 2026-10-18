@@ -1,7 +1,23 @@
 # Shadowdark module architecture
 
-`info.json` is the compatibility authority. The module requires Core 0.18.0,
-UI API 3.1 and module API 1.3; the complete ranges are declared there.
+**Current status (October18, completed):** ADR-0001's selected native alignment,
+resource cards and G8 adoption are accepted on actual Foundry13.351/14.367 with
+native Shadowdark4.0.6 and Core0.19.2. The [final ADR closeout](adr/0001-native-alignment-and-resource-cards.md#final-native-v14-acceptance-and-closeout--october-18-2026)
+records evidence and retained qualifications. Explicit feature deferrals and
+CG-4/6/8 remain separately qualified; historical pending text is not a new queue.
+
+The [adoption evidence](audits/2026-10-15-native-alignment.md#core-0192-adoption-implementation--october-18-2026)
+separates controlled results from the completed native acceptance. Resource dialogs
+clear floating tools at active layer160 and lower to90 while suspended beneath
+the shared SDK roller/confirmation. Phone footer actions remain reachable while
+the host retains its shared dialog focus/lifecycle.
+
+`info.json` is the compatibility authority. Its Core floor is **>=0.19.2**;
+the CI checkout, reusable release workflow and `core_ref` select **v0.19.2**.
+Module API `>=1.6.0 <2.0.0`, UI API
+`>=3.2.0 <4.0.0` and roll-engine API `>=1.0.0 <2.0.0` remain unchanged. Aggregate
+SDK 3.4.0 is informational and has no manifest field. `info.json` owns the module release version; SDK/API versions do not change
+with a module point release.
 
 Initialization warms the runtime-backed registry. The adapter then prepares
 Actors deterministically for sheets, cards and rolls without writing derived
@@ -30,65 +46,405 @@ The SDK roller frame displays the resolved formula/audience read-only and
 returns a roll choice or final manual total. It does not execute native
 Foundry browser hooks or import the sheet's bonus/audience controls into the HUD.
 
+## Source, prepared view and identity
+
+Native authority is released Shadowdark 4.0.6 (`release-4.0.6`). The adapter
+prepares one module view from serialized source and publishes it as `derived`
+(`computed` is an alias of the same object). It is SheetDelver's preparation of
+native rules, not native browser-prepared data. Preparation never mutates source:
+raw items, effects and reference fields stay as Foundry stored them.
+
+- `logic/effects.ts` reads ActiveEffects in both shapes: Foundry 14
+  `system.changes` (string `type`, `phase`, `priority`) and legacy top-level
+  `changes` (numeric `mode`). When both are present, `system.changes` wins, as in
+  Foundry 14 `migrateData`. Owner-qualified refs (`ActiveEffect.<id>`,
+  `Item.<itemId>.ActiveEffect.<id>`) address writes; the serializer writes the
+  effect's own shape and keeps unknown change fields. Suppression (stashed,
+  unequipped Weapon/Armor, unidentified), transfer and situational state follow
+  native `ActiveEffectSD`.
+- `logic/actor-preparation.ts` follows `PlayerSD`/`NpcSD`: `base` → `value`
+  migration, `initial` then `final` effect phases ordered by priority, bounded
+  Player modifiers (−4..+4), explicit NPC modifiers and AC, native best/bonus
+  armor AC, slots `10 + effects + max(0, STR − 10)`, spellcasting classes and
+  initiative. Effects on `system.bonuses*` and `system.attributes.ac` are
+  rejected as in native `applyRules`.
+- `logic/formula.ts` resolves numbers, `@path` references, arithmetic, rounding
+  functions and dice terms without `eval`. A missing reference is a failure with
+  a diagnostic, never zero.
+- `logic/roll-keys.ts` ports `_getActiveEffectKeys` for `system.roll.*` selectors
+  (ADD, then MULTIPLY, then OVERRIDE). Situational effects are listed as options;
+  the roll UI does not select them yet.
+- `logic/identity.ts` parses exact UUIDs. Views carry structured references
+  (`{ kind, pack, documentType, id }`) with prepared labels. Core 0.19 keeps
+  canonical source strings in Actor responses and adds a separate,
+  caller-filtered `referenceLabels` map (Core 0.18 rewrote `Compendium.` strings
+  into names); the sheets and cards present the prepared labels, so neither
+  response shape shows a raw UUID or loses a label. Editors send diff patches and
+  never echo reference fields. A terminal ID or name is never treated as an
+  identity. Prepared labels come from user-invariant preparation, so a label for
+  a reference held by a visible Actor is part of that Actor's projection.
+
+The registry indexes declared packs only (including the `shadowdark.monsters`
+Actor pack). It is a system-level warmed projection used for user-invariant
+preparation lookups. `attach` (a new runtime) and `refresh` (a world-context
+change) start a new generation: a load from an older generation cannot publish,
+and the previous projection keeps answering synchronous lookups until the new one
+replaces it whole. World and embedded documents are always read through
+`req.runtime`, so Core's caller projection applies; the shared resolver serves
+declared compendium UUIDs only.
+
+Compendium content reaches callers under one policy, `server/access.ts`: Core's
+effective native pack capability for the calling user,
+`req.runtime.access.canReadPack(pack)` (module-api 1.5). It applies to every
+pack, as the world's compendium ownership configuration sets it, and to every
+serving path: `document/[uuid]` and every other caller-bound resolution
+(`resolveDocumentFor`, `resolveReadable`), `fetch-pack/*` collections, the
+`index` route and Core's `/api/system/data`, bestiary list and cards, class spell
+lists, level-up sources and table draws, effect choice options, the generator and
+the importer. Rows are filtered after the awaited cache read and single documents
+are checked before and again after it, so a revocation applies to warm caches at
+once and a GM's earlier read is never served to a player. There is no system-level
+serving path and no fallback: a runtime without `access` reads no pack content.
+A collection whose rows are all unreadable is refused (403). Core 0.19.2 applies
+native role ownership on both Foundry 13 and 14 (a Player reads packs that grant
+`PLAYER: OBSERVER`); the module adds nothing to Core's answer.
+
+`getSystemDataForUser` (the host hook behind `/api/system/data`, also served by
+the module `index` route) builds the caller's name index and class titles from
+the caller's own `compendium.findAll` reads, rechecks each row against `access`,
+and adds the native rule tables. It never returns the warmed projection. The
+legacy `getSystemData` remains for Core's full-GM path.
+
+Effect keys follow native 4.0.6. `logic/effect-key-coverage.ts` maps every key
+in the pinned native packs to its consumer (actor data, roll-key selector, choice
+template, native no-op, or out of scope such as scene light). Pre-4.0 keys
+(`system.bonuses.*`, `system.abilities.<stat>.bonus|base`, and others in native
+`Update_251001_1`) are not applied, matching native. Each is reported on its
+effect with the native 4.0 replacement (`logic/legacy-effect-keys.ts`). Effect
+definitions come only from compendium documents and the generated
+`data/native-predefined-effects.ts`. Languages added by effects appear as
+granted, not as editable languages. Level-up HP rolls apply
+`system.roll.hp.advantage`.
+
+## Actions and consequences
+
+`logic/actions.ts` is the single action preparer for checks, weapon and NPC
+attacks, owned/scroll/wand/NPC spells, Class Abilities and potions. Sheets,
+cards, dialog defaults and the server use it. An unsupported situation is
+`available: false` with a reason; there is no generic d20 fallback.
+
+Each Weapon attack mode is a separate action with its own label: the weapon's
+type (Melee or Ranged), an added Thrown attack for Thrown melee weapons, and for
+Versatile weapons both grips (one-handed and two-handed damage), stored grip first.
+Native rolls one stored grip and toggles it on the sheet; SheetDelver offers both
+as actions without writing the grip. A two-handed grip is unavailable while a
+shield is equipped. Sheet attack lists and inventory details omit unavailable
+modes; the item card shows them disabled with the reason. The server only rolls
+modes the weapon has.
+
+Attacks roll through the existing item-roll hook. Spells, Class Abilities and
+potions go through `POST actors/[id]/actions`, which re-reads the Actor through
+the caller, requires owner access, refuses unavailable actions before rolling,
+rolls through `req.runtime.rolls` and then applies native consequences: lost
+spell on failure (not on focus checks), scroll consumed, wand spell lost and
+wand broken on a critical failure, limited uses and loss on failure, potion
+consumed after confirmation. Consequence writes are sequential, not atomic;
+each outcome is reported and the response `state` is `complete` or `partial`.
+
+A `requestId` is bound to the adapter runtime (world/epoch), the user, the
+Actor and the request body, for ten minutes (process-local). Repeating it with
+the same body re-checks owner access, then returns the first result with
+`replayed: true` without rolling or consuming again; reusing it with a different
+body is a 409 conflict. A failure before a result exists (refusal, unavailable
+action, failed roll call) can be retried. Once a roll is evaluated it is final:
+a chat failure after that is returned in `warnings`, and a replay of a
+`partial` result re-reads the Actor and applies only the consequences it does
+not already show. The sheets send a new id per action, so this replay path
+serves client retries of the same request.
+
+World settings: `info.json.worldSettings` declares the two native settings the
+rules use, `shadowdark.usePulpMode` (default false) and
+`shadowdark.autoConsumeAmmunition` (default true): world-scoped Booleans,
+identical in native releases 4.0.0–4.0.6, so declared for exactly that range,
+`affectsPreparation: true`, `exposure: authenticated`. Core resolves each to the
+stored world value, the declared registered default when no world row exists, or
+unavailable (not ready, unsupported native version, invalid value).
+`logic/world-settings.ts` turns a Core snapshot into rule inputs and never
+substitutes a default for an unavailable value. Preparation reads
+`context.world` and records the inputs and their context revision in
+`derived.ruleInputs`; request routes read `req.runtime.world`; the browser reads
+the prepared Actor. Re-preparation for an option-dependent roll uses the Actor's
+own recorded inputs. No route reads Setting documents, localStorage or Actor data
+for these values.
+
+Luck: `derived.luck.mode` is `pulp`, `standard` or null (unavailable), with
+native `hasLuckToken`. Presentation (user decision, October 16): no visible label
+in either mode. Standard shows only the centred tick box (`luck.available`);
+Pulp shows only a number input (`luck.remaining`), with −/+ spinner buttons where
+there is space; the paper sheet's compact box shows the input alone. The "Luck"
+box headings stay. Unavailable shows an inert placeholder whose accessible name
+and tooltip give the reason; no mode is guessed. Writes go through
+`POST actors/[id]/luck` with the mode the sheet showed and the Actor's prepared
+context revision; the route re-reads the mode from the request's world context
+and refuses a stale or unknown mode (409) before writing the caller's own patch.
+
+Ammunition: with `autoConsumeAmmunition` on, a Player weapon with an
+`ammoClass` states native's behavior (one ammunition per attack, refused without
+any) and that SheetDelver does not consume it; off, nothing is stated; unknown,
+a diagnostic says so. Consumption itself is not implemented.
+
+World context changes: Core calls `onWorldContextChanged` before it rebuilds
+prepared Actors. A setting-only change needs nothing from the adapter (values
+reach preparation through `context.world`); a declared pack change or same-world
+recovery rebuilds the registry before the hook returns, and a failure rejects so
+Core keeps the world unavailable. The rebuild reads Core's compendium cache:
+content Core itself did not re-read (for example a pack edited in Foundry while
+SheetDelver was disconnected) is not seen until Core does (audit CG-4). Setting-dependent requests (actions, rolls,
+luck) send `X-SheetDelver-Context-Revision`; Core refuses a stale one (409) and
+the page reloads the re-prepared Actor. When the context changes while a request
+is already running, Core fails the request runtime's reads with a plain `Error`;
+the index, collection, luck and action routes check `world.assertRevision`
+against the revision captured at the start (`server/access.ts`
+`contextConflict`) and answer 409 instead of an internal 500.
+
+The browser's caller-scoped caches (`ui/context/system-index-store.ts`, used by
+`ShadowdarkUIProvider`) belong to one world, user, role and connection. A change
+of any of these, Core's `world:contextChanged` event or a manual retry starts a
+new generation: in-flight requests are aborted, the retry timer cleared, late
+responses discarded, the index and collection shards dropped, and a replacement
+index request starts at once, even while the first request is still pending.
+The index request ends in current data or an explicit, retryable failure (the
+sheet shows an alert with Retry). Each collection independently records loading,
+ready or failed, including a denied/unavailable/read-error reason. An HTTP 200
+array, including `[]`, is ready; an invalid response, denied read or failed read
+never populates a successful empty cache. Collection retry retries failed shards
+and preserves successful shards. There is no automatic collection failure loop.
+
+`useShadowdarkCollections` registers active demand in that same store. Mounts
+before index readiness wait for the current index; a context/caller/role/world/
+connection change reloads each demanded shard after its replacement index is
+ready. Requests are deduplicated across consumers. The last consumer leaving
+aborts unused pending reads and settles their promises; retirement discards late
+results even when transport ignores abort. Provider renders also mask data from
+a different scope before its layout effect applies that scope. Gear retains
+search and expanded categories, Spells and the spell/language/mastery/details
+pickers show collection-specific failures and Retry, and dependent selections
+are gated until current data is ready. Generator requires ancestries, classes,
+backgrounds, deities and languages for both modes, and patrons for level 1.
+It derives identity documents from current full collection rows; document reads
+and derived async results are retired on generation changes/unmount. Manual form
+values survive refresh; missing selected identities must be selected again.
+
+For the index, 5xx, 429 and 409 responses are retried with backoff;
+other client errors fail at once. The action replay key
+does not include the context revision and recovery does not change the adapter
+generation, so a replay after a context change returns the recorded result and
+never rolls again.
+
+Not implemented, stated in the UI: luck spending, rest and recovery, ammunition
+consumption, damage auto-roll, duration expiry and custom change types.
+
 ## Weapon and mastery preparation
 
-Native 4.0.6 weapon preparation is shared by attack summaries, sheet dialog
-defaults and server attack rolls in `logic/weapon-rules.ts`. Resolve properties
-by exact declared-pack UUID/name-index lookup; use native 1h/2h damage and
-never add STR to damage implicitly. Missing damage remains unavailable.
-`prepareWeaponBase` reads the selected native hand only; blank handedness derives
-from an exact Two-Handed property or an absent one-handed/present two-handed die.
-Player `damage.value` is not a substitute. Native `NPC Attack` uses its separate
-`damage.value`, ranges and item bonuses, without Player mastery/ability modifiers.
-Inventory rows and paper item details label **Base damage** separately from
-**Actor damage**; Abilities/paper attacks show Actor-adjusted damage. Missing
-damage carries the exact source field diagnostic rather than invented dice.
-Thrown melee/ranged modes are distinct. Numeric roll effects support native
-selectors, ADD/MULTIPLY/OVERRIDE and bounded arithmetic references (including
-`1+floor(@level.value/2)`). Situational effects remain unselected; unsupported
-effects carry preparation warnings. This is not full Foundry hook/effect parity
-or a migration to the previously inspected 4.1.0 development reference.
-Numeric damage effects aggregate ADD, then MULTIPLY, then ordered OVERRIDE across
-all effects/Items. Prepared weapon calculations retain Actor-only effect
-provenance separately from the sheet's flattened effect display, so Actor effects
-are not lost and Item effects are not counted twice. The server item-roll hook
-executes the attack roll only; this does not add automatic native damage chains.
+Weapons use native 1h/2h damage and properties resolved by exact declared-pack
+UUID; blank handedness follows the native rule. STR is never added to damage
+implicitly. Missing damage stays **Damage unavailable** with the source field.
+Thrown modes are separate attack rows. `NPC Attack` uses its own damage, ranges
+and item bonuses. Inventory shows **Base damage** separately from **Actor
+damage**. A Foundry 14 Weapon Mastery effect (`type: "add"`, value
+`1+floor(@level.value/2)`, `phase: "initial"`) gives a level-1 STR 9 Longsword
+`+0 d8+1` on every surface.
 
-Fixed class/ancestry mastery talents join the existing advancement selection
-UI. New generator/import/advancement items resolve validated choice keys while
-preserving formula values, and reject remaining required placeholders before
-creation. Original templates and existing Actors are not repaired or rewritten.
-Sheet/tool navigation flows below Core's HUD without assuming its height.
-Final assembly tracks rolled occurrences and fixed-source grants. A class-fixed
-mastery plus a rolled mastery requires two choices, not one; two rolled copies
-also require two. Repeated aliases within one fixed source collapse, while
-independent class/ancestry grants remain separate. Required/selected cardinality
-must match exactly before any Actor/Item writes. The UI counts the same grants.
-Already-resolved custom-template choices survive generator enrichment; importer
-source-plus-choice deduplication stays unchanged. No existing Actor repair.
+Mastery and other choices come from declared base weapons/armor/spells and the
+39 native predefined effects. `REPLACEME` is resolved in both shapes; unresolved
+required choices block creation before any write. Fixed/rolled grants keep exact
+counts. Learning a spell validates a Spell source on the class list and copies
+the full document with `_stats.compendiumSource`. Level-up resolves grants on
+the server and ignores client-supplied class objects. Finalization follows native
+4.0.6 `LevelUpSD._finalizeLevelUp`: advancement from level zero sets XP to zero;
+otherwise it subtracts the Actor's current level × 10 and preserves the remainder
+(level 1 with 25 XP becomes level 2 with 15 XP). This is the server's single XP
+write path for advancement; it does not repair previously discarded XP.
+`logic/advancement.ts` shares HP calculation between Generator and server:
+prepare the assembled grants first; level1 replaces HP with `max(hit die +
+prepared CON modifier, 1)`, while later levels add the die to prepared current
+and maximum HP, retaining wounds. Existing Actor HP is not retrospectively
+repaired. The level-up UI reads bare documents from the module's caller-safe
+`document/:uuid` route; missing required references block completion.
+The importer resolves
+references first and asks for confirmation before creating unresolved or custom
+items. Existing Actors are not repaired.
+
+## Sheets, cards and bestiary
+
+Both layouts read the prepared view. Edits are Actor-scoped drafts with
+debounced writes cancelled on Actor change, sequenced responses, optimistic
+rollback with an error, and shared confirmation dialogs. The paper sheet lists
+every attack. Selecting a spell, item or feature opens one module dialog
+(`ResourceDetailModal`) built from `logic/resource-cards.ts`. On tablet and
+desktop the card is 24rem × 24rem and grows to 34rem wide and 88dvh tall for
+longer content; phones use the full width. Cast and Use
+delegate to the shared action and open the SDK RollDialog above it, and Drink
+asks for confirmation. An owned spell card's Class comes from the prepared view's `spellClasses`
+labels (robust to both Core 0.18's name rewrite and Core 0.19's preserved UUIDs). Owned physical items also show inventory controls on
+their card (Equip/Unequip for Weapon and Armor, Stash/Retrieve, Light/Put out
+for native light sources, quantity). `logic/inventory-controls.ts` follows the
+native sheet handlers: equipping clears stashed and stashing clears equipped;
+equipping a shield switches equipped two-handed Versatile weapons to one hand
+and unequips other two-handed weapons; lighting a source puts out any other lit
+source. Light sources come from `system.light.isSource`, not item names. The
+inventory row uses the same helper. Scene light, light chat cards and the light
+tracker are not run. Cards show
+the current identified presentation only, never the alternate identification
+fields. Descriptions go through `logic/description.ts` and the SDK sanitizer.
+
+The Bestiary dashboard tool lists world NPCs visible to the caller and, when the
+caller's pack capability allows it, the declared monster pack (the
+`server/access.ts` policy above).
+It is read-only: no spawn, encounter or sharing action.
 
 ## Known alignment limits
 
-The behavior above describes the bounded Core ADR-0063 implementation and its legacy
-fixtures. Module 0.9.4 has confirmed v14 serialized-effect and broader rules/data
-issues; those fixtures do not establish v14 or full native action parity.
-[The native-alignment audit](audits/2026-10-15-native-alignment.md) records the
-findings. [Shadowdark ADR-0001](adr/0001-native-alignment-and-resource-cards.md)
-proposes module-owned corrections, shared resource details and bestiary support
-against released native 4.0.6. Development-only 4.1 behavior is outside that baseline.
-
-The existing weapon suite covers fourteen legacy damage fixtures across helpers,
-normalization, server hooks and rendered components. Native/operator acceptance
-and raw serialized-format coverage are distinct evidence requirements.
+[Shadowdark ADR-0001](adr/0001-native-alignment-and-resource-cards.md) and the
+[native-alignment audit](audits/2026-10-15-native-alignment.md) record findings,
+dispositions and external dependencies. Offline tests and fixtures are not
+native/operator acceptance, now completed for the selected scope above. Development-only 4.1 behavior
+is outside the supported baseline.
 
 ## Distribution and verification
 
-`info.json` declares the module version and API compatibility. CI/release
-workflows currently use the released Core `v0.18.0` toolchain. Release assets
-include the package archive, checksum, catalog manifest and release history.
-A module release tag identifies the matching manifest version.
+`info.json` declares the module version, API compatibility and world settings.
+CI checkout, the reusable release workflow and its `core_ref` all use the
+Core `v0.19.2` toolchain. CI also runs on `migration.json` and
+`migrations/**` changes. Release assets include the package archive, checksum,
+catalog manifest and release history. A module release tag identifies the
+matching manifest version. With the root `migration.json`, packaging compiles
+each hook to confined `.cjs`, rewrites the packaged definition and writes a
+`sheet-delver-release.v2` manifest whose catalog digest and step count Core
+derives from the packaged catalog.
 
 Repository workflow and verification commands live in [AGENTS.md](../AGENTS.md).
 The shared contracts are described in Core's
-[module authoring guide](https://github.com/sheetdelver/sheetdelver/blob/v0.18.0/docs/MODULE_AUTHORING.md)
-and [release process](https://github.com/sheetdelver/sheetdelver/blob/v0.18.0/docs/RELEASING.md).
+[module authoring guide](https://github.com/sheetdelver/sheetdelver/blob/v0.19.2/docs/MODULE_AUTHORING.md),
+[world context and migrations](https://github.com/sheetdelver/sheetdelver/blob/v0.19.2/docs/MODULE_MIGRATIONS.md)
+and [release process](https://github.com/sheetdelver/sheetdelver/blob/v0.19.2/docs/RELEASING.md).
+
+## Effect-key migration
+
+Stored pre-4.0 effect keys are repaired only by Core's admin-approved maintenance
+job, never by a module route, initialization, preparation or rendering. The root
+`migration.json` names the native milestone `4.0.6`; `migrations/4.0.6/` holds
+`definition.json` (`dataReadVersion` `>=4.0.0 <=4.0.6`) and synchronous pure
+`check`/`plan`/`verify` hooks over `effect-keys.ts`, which uses
+`logic/effect-key-migration.ts`. Both steps share those hooks and the parameter
+`nativeSpellSlugs`, generated from the native spells pack.
+
+| Step | Required | Targets | Reads |
+| --- | --- | --- | --- |
+| `shadowdark-effect-keys-4.0` | yes | `ActiveEffect`, `ActorDelta` | relations: `parent` and `baseActor`, field `type` only |
+| `shadowdark-effect-keys-4.0-world-packs` | yes | `WorldPack` | relation: `parent`, field `type` only |
+
+Paths are `changes` and `system.changes`. Neither step declares whole-kind
+`reads.targets` or `reads.packs`, so each hook receives only its target and the
+projected `type` of the related documents, and Core can refresh just the
+affected roots during execution. `ActorDelta` is a target kind (the hooks report
+non-effects as current) because Core enumerates unlinked token deltas only when
+that kind is selected; their Items and effects then arrive as `Item` and
+`ActiveEffect` targets with `baseActorUuid`.
+
+Scope and results follow native `Update_251001_1`: Player Actor-level effects and
+every Item effect, `.this` keys for Weapon parents, each effect's stored shape,
+order, unknown fields and priorities kept, Weapon Mastery's extra change appended,
+and keys native cannot migrate left alone. Parent types come from Foundry's own
+merge rules, never a guess:
+
+- A token delta's `type` is optional; `ActorDelta.applyDelta` drops a null or
+  absent value, so the base Actor's type applies, and a stored delta type wins.
+- A token delta Item is a complete Item that replaces the base Actor's Item of
+  the same id; Foundry never merges the two (`#mergeEmbeddedCollection`) and
+  validates it against the full Item schema. Its type is its own stored `type`.
+  A delta Item without one is invalid in Foundry and has no inherited type, so
+  its effects block with that identity. There is no base-Item lookup.
+- A missing parent relation, an Actor or Item without a stored type, or a
+  spell-advantage value that is not a native spell (by slug or SheetDelver 0.9.4's
+  stored name) is unresolved with an actionable reason. In the required step
+  this blocks the world until it is repaired in Foundry; Core shows the reason
+  to administrators.
+
+World-owned Actor/Item packs are covered by a required step: every eligible
+effect must verify before readiness. Pack-only legacy data requires maintenance;
+an unresolved effect blocks with its identity and repair reason. System and
+package packs, tombstones and lazily null deltas are not targets.
+
+**Strict lock policy (RV-09):** Core 0.19.2 refuses enumeration when any world
+Actor/Item pack is locked or unreadable, even if its effects might be current.
+The module leaves its lock, permissions and contents untouched. The catalog
+description explains that administrators must inspect those pack locks and
+service-account access in Foundry, then retry/check/review; retry is not write
+approval. Intentionally locked packs cannot currently be excluded while requiring
+every eligible unlocked effect. That policy would need a Core provision for
+scoped enumeration and visible exclusions. `required: false` does not express it.
+Core 0.19.2 corrects CG-7: an absent or null lock override defaults to unlocked
+for proven world packs; metadata is not an override. Unavailable/malformed
+configuration and unresolved provenance still block. The strict module policy
+does not acquire an intentional-lock exclusion merely from this correction.
+
+Core 0.19.2 plans the complete inventory in its own workers with no global
+deadline (each hook keeps Core's one-second bound). Because `dataReadVersion` is
+`>=4.0.0 <=4.0.6`, Core refuses to serve a world whose native system version is
+outside that range while this catalog is installed.
+
+## Independent review limitations (October 16, 2026)
+
+*Superseded by the Core 0.19.1 implementation (October 17): RV-05 and RV-08 are
+fixed with offline and isolated real-Core evidence; RV-06 has isolated real-Core
+recovery evidence; the migration catalog is active. The paragraphs below are the
+historical review-time state.*
+
+The [independent review addendum](audits/2026-10-15-native-alignment.md#independent-review-addendum--october-16-2026)
+qualifies the supported behavior described above. The module-only corrections
+are in place and covered offline (see the audit's
+[module correction pass](audits/2026-10-15-native-alignment.md#module-correction-pass--october-16-2026)):
+one compendium caller policy on every route (RV-01), request identity and
+reconciliation for action replays (RV-03) and spell card classes from prepared
+labels (RV-04). The migration prototype route and hook were removed; the pure
+planner `logic/effect-key-migration.ts` remains, with direct planner and
+serializer tests, for Core's eventual runner (RV-02). No caller can migrate
+data today; existing Actors keep their stored keys, which are reported.
+
+Still open: the native-default settings seam does not read the current world
+setting (RV-05; the luck presentation itself is the user's decision above, not a
+pending correction), and registry attachment reset does not cover Core's
+retained adapter on same-world recovery (RV-06). Both need the Core contracts below.
+
+Core ADR-0064 proposes bounded settings/context and permission contracts. Its
+migration design is now an admin-owned release upgrade job: the module provides a
+separate migration.json catalog/version-directory definitions with pure
+check/plan/verify hooks, while Core previews, authorizes, gates access,
+executes and verifies changes across restart. No module maintenance-write runtime
+or owner repair fallback is selected. Ordinary bootstrap may resume an approved
+job but cannot start new repairs. It must check fresh data even when its ledger
+says complete, blocking world readiness after an incompatible external restore.
+Native-user lockout and world backup/undo are excluded; admin receives a backup
+limitation warning. World-setting context continues to refresh live.
+Nothing in this module currently implements those proposed APIs.
+Native/operator acceptance and real host-boundary checks remain pending; the
+module's ADR stays open.
+
+Core ADR-0064 G0a also requires a full-Gamemaster **service account** for every
+world connection, with lower-role/demotion blocking and admin correction/retry.
+This enforcement shipped in Core 0.19.0 and does not change human Assistant/player
+module permissions. No module-side role promotion or privileged fallback is allowed.
+
+## Pack-permission signal boundary (CG-9)
+
+Core 0.19.2 advances the world-context revision on effective ownership changes,
+restoration and override removal. The normal `world:contextChanged` publication
+may have empty `keys`; the module invalidates on the event itself, not on a
+specific setting name. Core keeps raw ownership data private. New generations
+retire index and collection requests, clear cached data, and refetch mounted
+consumer demand. Fresh failures show explicit reasons and retry. The module
+must verify these paths through the installed host as well as the controlled
+consumer suite; it must not add privileged Setting reads or polling. This fixes
+the ownership-only signal gap reported on 0.19.1, not the separately recorded
+CG-4 content-freshness concern across an offline interval.

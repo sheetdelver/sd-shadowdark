@@ -1,5 +1,6 @@
 import { Shield } from 'lucide-react';
-import { MASTERY_ARMOR } from '../../../../logic/talent-choices';
+import { useChoiceCatalog } from '../../../hooks/useChoiceCatalog';
+import { CollectionStatus } from '../../CollectionStatus';
 
 interface ArmorSelectionSectionProps {
     required: number;
@@ -7,14 +8,17 @@ interface ArmorSelectionSectionProps {
     onSelectionChange: (selected: string[]) => void;
 }
 
-const ARMOR_TYPES = MASTERY_ARMOR;
 
 export const ArmorSelectionSection: React.FC<ArmorSelectionSectionProps> = ({
     required,
     selected,
     onSelectionChange
 }) => {
+    const data = useChoiceCatalog(required > 0);
+    const { catalog } = data;
     if (required <= 0) return null;
+    // Native options from declared packs; selections are stored by option name.
+    const ARMOR_TYPES: string[] | null = catalog ? (catalog.armor ?? []).map(option => option.name) : null;
 
     const toggleArmor = (armor: string) => {
         if (selected.includes(armor)) {
@@ -44,7 +48,9 @@ export const ArmorSelectionSection: React.FC<ArmorSelectionSectionProps> = ({
             </p>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {ARMOR_TYPES.map(armor => {
+                <CollectionStatus state={data} label="Loading options…" />
+                {ARMOR_TYPES?.length === 0 && <p role="alert" className="col-span-full text-red-800">No armor options are available from declared Shadowdark data.</p>}
+                {(ARMOR_TYPES ?? []).map(armor => {
                     const isSelected = selected.includes(armor);
                     const isDisabled = !isSelected && selected.length >= required;
 

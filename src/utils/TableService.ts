@@ -1,5 +1,6 @@
 import { logger } from '@sheet-delver/sdk';
 import { shadowdarkAdapter } from '../server/ShadowdarkAdapter';
+import type { Caller } from '../server/access';
 import { ROLL_TABLE_FILTER, ROLL_TABLE_TALENT_MAP, ROLL_TABLE_PATRON_BOONS } from '../data/roll-table-patterns';
 import { TALENT_HANDLERS } from '../logic/talent-handlers';
 
@@ -20,7 +21,7 @@ export class TableService {
     /**
      * Processes a single roll result (or set of results) from a table.
      */
-    static async processRollResult(client: any, { result, table }: { result: any; table: any }): Promise<ProcessedRollResult> {
+    static async processRollResult(caller: Caller, { result, table }: { result: any; table: any }): Promise<ProcessedRollResult> {
         logger.info(`[TableService] processRollResult for table: ${table?.name}`, { result });
         const matchedItems = result.items || [];
         const matchedResults = result.results || [];
@@ -87,12 +88,12 @@ export class TableService {
         }
 
         // 3. Hydrate Documents
-        if (item) item = await this.resolveItem(client, item);
+        if (item) item = await this.resolveItem(caller, item);
 
         if (choiceOptions.length > 0) {
             const resolved = [];
             for (const opt of choiceOptions) {
-                const res = await this.resolveItem(client, opt);
+                const res = await this.resolveItem(caller, opt);
                 if (res) {
                     res.text = res.text || res.name || "Unknown Option";
                     this.attachHandlerData(res);
@@ -113,13 +114,13 @@ export class TableService {
         return { item, needsChoice, choiceOptions, choiceCount, action, config };
     }
 
-    private static async resolveItem(client: any, target: any) {
+    private static async resolveItem(caller: Caller, target: any) {
         if (!target) return null;
         const type = String(target.type || "");
         if (type === 'document' || type === '2') {
             const uuid = target.documentUuid || target.uuid;
             if (uuid) {
-                const resolved = await shadowdarkAdapter.resolveDocument(uuid);
+                const resolved = await shadowdarkAdapter.resolveReadable(uuid, caller);
                 if (resolved) {
                     const clean = JSON.parse(JSON.stringify(resolved));
                     if (target.text && !clean.name) clean.name = target.text;
@@ -136,7 +137,9 @@ export class TableService {
             if (!name.trim()) return false;
             return !name.includes("choose 1") && !name.includes("choose one") && !name.includes("or (can");
         }).map(r => {
-            if (mapDistribute) {
+            // Document results are native talents with native effects; only text
+            // instructions may become module selection markers.
+            if (mapDistribute && !r.documentUuid && !r.documentId) {
                 const name = (r.text || r.name || "").toLowerCase();
                 if (name.includes("+2 points") || name.includes("distribute") || name.includes("+2 to") || name.includes("+1 to")) {
                     return this.createSyntheticDistributeStats(true);

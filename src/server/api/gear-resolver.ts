@@ -1,6 +1,7 @@
 import { logger } from '@sheet-delver/sdk';
 import { shadowdarkAdapter } from '../../server/ShadowdarkAdapter';
 import { sanitizeItem } from '../../utils/Sanitizer';
+import type { Caller } from '../access';
 
 function getUuidRef(ref: unknown): string | null {
     if (typeof ref === 'string') return ref;
@@ -13,7 +14,7 @@ function getUuidRef(ref: unknown): string | null {
 /**
  * Resolves all associated documents (talents, features, gear) for a class or ancestry.
  */
-export async function resolveBaggage(doc: any, client?: any): Promise<any[]> {
+export async function resolveBaggage(doc: any, caller: Caller): Promise<any[]> {
     if (!doc || !doc.system) return [];
 
     const baggage: any[] = [];
@@ -38,7 +39,7 @@ export async function resolveBaggage(doc: any, client?: any): Promise<any[]> {
         const uuid = getUuidRef(ref);
         if (uuid) {
             try {
-                const item = await shadowdarkAdapter.resolveDocument(uuid);
+                const item = await shadowdarkAdapter.resolveReadable(uuid, caller);
                 if (item) {
                     // DEEP CLONE: Prevent cache poisoning by ensuring each resolved item is a fresh instance
                     const clean = JSON.parse(JSON.stringify(sanitizeItem(item)));
@@ -61,7 +62,7 @@ export async function resolveBaggage(doc: any, client?: any): Promise<any[]> {
 /**
  * Legacy-style gear resolver that scans a document for any arrays of UUID strings.
  */
-export async function resolveGear(doc: any, client?: any): Promise<any[]> {
+export async function resolveGear(doc: any, caller: Caller): Promise<any[]> {
     if (!doc) return [];
 
     const candidates = new Set<string>();
@@ -90,7 +91,7 @@ export async function resolveGear(doc: any, client?: any): Promise<any[]> {
     const resolvedItems = [];
     for (const entry of candidates) {
         try {
-            const item = await shadowdarkAdapter.resolveDocument(entry);
+            const item = await shadowdarkAdapter.resolveReadable(entry, caller);
             if (item) {
                 // DEEP CLONE: Prevent cache poisoning
                 const clean = JSON.parse(JSON.stringify(sanitizeItem(item)));

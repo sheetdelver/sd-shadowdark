@@ -1,17 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import {
-    formatDescription,
-    getSafeDescription
-} from './sheet-utils';
 import { useSDK } from '@sheet-delver/sdk/react';
+import { presentDescription } from '../logic/description';
 
 import { useShadowdarkActor } from './context/ShadowdarkActorContext';
 
 export default function TalentsTab() {
-    const { resolveImageUrl } = useSDK();
-    const { actor, triggerRollDialog } = useShadowdarkActor();
+    const { resolveImageUrl, foundryUrl } = useSDK();
+    const { actor, triggerRollDialog, openCard, performRoll } = useShadowdarkActor();
     const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
 
     const toggleItem = (id: string) => {
@@ -36,7 +33,14 @@ export default function TalentsTab() {
                 const stat = rollBtn.getAttribute('data-stat');
                 if (stat) triggerRollDialog('ability', stat);
             }
+            if (action === 'roll-formula') {
+                const formula = rollBtn.getAttribute('data-formula');
+                if (formula) performRoll('formula', formula);
+            }
+            return;
         }
+        const link = target.closest('[data-uuid]') as HTMLElement | null;
+        if (link?.dataset.uuid) { e.preventDefault(); openCard({ kind: 'document', uuid: link.dataset.uuid }); }
     };
 
     // Filter Logic
@@ -80,8 +84,10 @@ export default function TalentsTab() {
                     return (
                         <div key={item.id || item._id || `talent-${idx}`} className={cardStyle}>
                             {/* Header */}
-                            <div
-                                className="flex items-center gap-2 cursor-pointer hover:bg-neutral-50 p-1 transition-colors"
+                            <button
+                                type="button"
+                                aria-expanded={isExpanded}
+                                className="w-full text-left flex items-center gap-2 hover:bg-neutral-50 p-1 min-h-11"
                                 onClick={() => toggleItem(item.id || item._id)}
                             >
                                 {/* Image / Fallback */}
@@ -95,7 +101,7 @@ export default function TalentsTab() {
 
                                 {/* Name & Info */}
                                 <div className="flex-1 flex flex-col justify-center overflow-hidden">
-                                    <div className="font-serif font-bold text-lg uppercase leading-none truncate text-black">
+                                    <div className="font-serif font-bold text-lg uppercase leading-tight break-words text-black">
                                         {item.name}
                                     </div>
                                     <div className="text-[10px] font-bold uppercase tracking-widest text-neutral-500 mt-1">
@@ -109,7 +115,7 @@ export default function TalentsTab() {
 
                                 {/* Toggle Icon */}
                                 <div className="">
-                                    <button className="w-10 h-10 flex items-center justify-center text-neutral-400 hover:text-black transition-colors touch-manipulation">
+                                    <span aria-hidden="true" className="w-10 h-10 flex items-center justify-center text-neutral-500">
                                         {isExpanded ? (
                                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
                                                 <path fillRule="evenodd" d="M14.77 12.79a.75.75 0 01-1.06-.02L10 8.832 6.29 12.77a.75.75 0 11-1.08-1.04l4.25-4.5a.75.75 0 011.08 0l4.25 4.5a.75.75 0 01-.02 1.06z" clipRule="evenodd" />
@@ -119,9 +125,9 @@ export default function TalentsTab() {
                                                 <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
                                             </svg>
                                         )}
-                                    </button>
+                                    </span>
                                 </div>
-                            </div>
+                            </button>
 
                             {/* Expanded Content */}
                             {isExpanded && (
@@ -129,9 +135,11 @@ export default function TalentsTab() {
                                     <div className="mt-2 text-sm font-serif leading-relaxed text-neutral-800">
                                         <div
                                             className="prose prose-sm max-w-none"
-                                            dangerouslySetInnerHTML={{ __html: formatDescription(getSafeDescription(item.system)) || '<span class="italic text-neutral-400">No description available.</span>' }}
+                                            dangerouslySetInnerHTML={{ __html: presentDescription(item.system?.description, foundryUrl) || '<span class="italic">No description available.</span>' }}
                                             onClick={handleDescriptionClick}
                                         />
+                                        <button type="button" onClick={() => openCard({ kind: 'item', itemId: String(item.id ?? item._id) })}
+                                            className="mt-2 text-xs font-bold uppercase underline min-h-11">Open details</button>
                                     </div>
                                 </div>
                             )}

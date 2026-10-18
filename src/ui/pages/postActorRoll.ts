@@ -6,7 +6,7 @@ type RollClient = Pick<SDKContextValue, 'fetchWithAuth' | 'addNotification'>;
 /** The actor roll endpoint posts chat on success; the host owns its preview and dice. */
 export async function postActorRoll(
     client: RollClient,
-    actor: { id: string; name: string },
+    actor: { id: string; name: string; worldContextRevision?: unknown },
     type: string,
     key: string,
     options: Record<string, unknown> = {},
@@ -15,7 +15,9 @@ export async function postActorRoll(
     try {
         const response = await client.fetchWithAuth(`/api/actors/${actor.id}/roll`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            // The prepared revision fences the roll: Core refuses it if world rules changed.
+            headers: { 'Content-Type': 'application/json', ...(typeof actor.worldContextRevision === 'number'
+                ? { 'X-SheetDelver-Context-Revision': String(actor.worldContextRevision) } : {}) },
             body: JSON.stringify({
                 type, key,
                 options: {

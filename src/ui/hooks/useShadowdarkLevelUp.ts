@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useShadowdarkUI } from '../context/ShadowdarkUIContext';
+import { formatUuid } from '../../logic/identity';
 
 /**
  * Shared hook to manage the Shadowdark Level-Up process.
@@ -9,7 +10,7 @@ export function useShadowdarkLevelUp(
     actor: any, 
     addNotification: (msg: string, type: 'success' | 'error' | 'info' | 'warning') => void
 ) {
-    const { systemData, fetchPack: onFetchPack, resolveUuid } = useShadowdarkUI();
+    const { fetchPack: onFetchPack } = useShadowdarkUI();
     const [showLevelUpModal, setShowLevelUpModal] = useState(false);
     const [levelUpData, setLevelUpData] = useState<any>(null);
     const [isFetching, setIsFetching] = useState(false);
@@ -58,14 +59,16 @@ export function useShadowdarkLevelUp(
         const data = {
             currentLevel,
             targetLevel,
-            classObj: actor.computed?.classDetails,
-            ancestry: actor.system?.ancestry,
-            patron: actor.computed?.patronDetails,
-            abilities: actor.system?.abilities,
+            classObj: actor.items?.find((item: any) => item.type === 'Class') ?? null,
+            ancestry: actor.items?.find((item: any) => item.type === 'Ancestry') ?? null,
+            patron: actor.items?.find((item: any) => item.type === 'Patron') ?? null,
+            abilities: actor.derived?.abilities,
             spells: actor.items?.filter((i: any) => i.type === 'Spell') || [],
-            // If Level 0, force empty classUuid so modal prompts for class selection
-            classUuid: currentLevel === 0 ? "" : resolveUuid(actor.system?.class || '', 'classes'),
-            patronUuid: resolveUuid(actor.system?.patron || '', 'patrons'),
+            // Exact references come from the prepared view; the host projection
+            // turns raw compendium UUIDs into names (SD01-05), which are never
+            // mapped back by name. Level 0 prompts for a class.
+            classUuid: currentLevel === 0 || !actor.derived?.identity?.class?.ref ? '' : formatUuid(actor.derived.identity.class.ref),
+            patronUuid: actor.derived?.identity?.patron?.ref ? formatUuid(actor.derived.identity.patron.ref) : '',
             // Pass the collections explicitly to ensure modal is ready
             availableClasses: fetchedClasses,
             availablePatrons: fetchedPatrons,
@@ -74,7 +77,7 @@ export function useShadowdarkLevelUp(
         
         setLevelUpData(data);
         setShowLevelUpModal(true);
-    }, [actor, onFetchPack, resolveUuid]);
+    }, [actor, onFetchPack]);
 
     const closeLevelUp = useCallback(() => {
         setShowLevelUpModal(false);
