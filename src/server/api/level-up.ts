@@ -5,7 +5,7 @@ import { assembleFinalItems } from './level-up-engine';
 import * as levelUpEngine from './level-up-engine';
 import { TALENT_HANDLERS, extraSpellClassName } from '../../logic/talent-handlers';
 import { canonicalUuid } from '../../logic/identity';
-import { callerOf, requestRules, requestRevision, contextConflict } from '../access';
+import { callerOf, requestRules, requestRevision, contextConflict, requireOwnedActor } from '../access';
 import { hitPointRollFormula } from '../../logic/actions';
 import { prepareActorCore } from '../../logic/actor-preparation';
 import { advancementHitPoints } from '../../logic/advancement';
@@ -80,7 +80,7 @@ export async function handleGetLevelUpData(actorId: string | undefined, req: Mod
 
         let actor = null;
         if (actorId && actorId !== 'undefined' && actorId !== 'null' && actorId !== 'new') {
-            actor = await req.runtime.documents.get('Actor', actorId, { minOwnership: 'owner' });
+            actor = await requireOwnedActor(req.runtime, actorId);
         }
 
         const data = await shadowdarkAdapter.getLevelUpData(actor, classId || undefined, patronId || undefined, callerOf(req));
@@ -369,8 +369,7 @@ async function finalizeLevelUp(actorId: string, req: ModuleServerRequest) {
 
         let actor: any = null;
         if (actorId && actorId !== 'new') {
-            actor = await req.runtime.documents.get('Actor', actorId, { minOwnership: 'owner' });
-            if (!actor) return error('not_found', 'Actor not found');
+            actor = await requireOwnedActor(req.runtime, actorId);
         }
 
         // Server assembly resolves every source by exact identity through the

@@ -7,7 +7,7 @@ import { actionFormula, evaluateOutcome, planConsequences, planPrerequisites, pr
     type ActionRequest, type ConsequenceWrite, type RollOverrides } from '../../logic/actions';
 import { documentId } from '../../logic/identity';
 import { spellReview } from '../../logic/spell-review';
-import { callerOf, contextConflict, requestRevision, requestRules } from '../access';
+import { callerOf, contextConflict, requestRevision, requestRules, requireOwnedActor } from '../access';
 import { operationProcess, withActorLock } from '../operation-lock';
 
 /** Native ordered operation: prerequisites → one result attempt → consequences.
@@ -63,8 +63,7 @@ function applyLocal(actor: any, write: ConsequenceWrite) {
     }
 }
 async function ownerActor(actorId: string, req: ModuleServerRequest): Promise<any> {
-    const actor = await req.runtime.documents.get('Actor', actorId, { minOwnership: 'owner' });
-    if (!actor) throw new ActionError('not_found', 'Actor not found or not visible.');
+    const actor = await requireOwnedActor(req.runtime, actorId);
     return structuredClone(actor);
 }
 /** Confirmed source projections can reconcile idempotent post-result patches;

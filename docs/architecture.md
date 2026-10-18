@@ -123,13 +123,13 @@ Details and the ordinary inventory picker impose no creation quota, classify by
 source field only, retain custom/unreadable entries and make unchanged saves a
 no-op. Actor identity exposes current caller-readable language rarity/labels.
 
-## Released0.9.5 action and language baseline
+## Released0.9.5 action and language baseline before ADR-0002
 
-The current executor spends limited uses after the result, despite native
+The released baseline executor spent limited uses after the result, despite native
 spend-before-roll/chat ordering. Potion use posts before identifying and updates
 only the identified flag; native also swaps name/description and enables effects.
 Incomplete consumption therefore leaves inconsistent source. NPC spell failure
-currently inherits the Player focus exemption. Shared outcome evaluation treats
+inherited the Player focus exemption. Shared outcome evaluation treats
 a zero critical-success threshold as always successful, while native disables it.
 SD02-09/10/11/13 define corrections and ordered-state/failure evidence.
 
@@ -589,3 +589,10 @@ when the reference itself addresses that Actor+embedded Item. Caller identity
 lookups remain bounded and permission-checked. Hidden/absent action Actors return
 404; explicit owner denials retain403, including durable receipt replays. Explicit
 native session kicks and ordinary transport loss have separate recovery evidence.
+
+Owner-bound workflows share an SDK guard that distinguishes a visible non-owner
+(403) from hidden/absent source (404) using observer visibility only after an
+unsuccessful strict owner read. No denied operation writes. Pending action UI
+callbacks retire with context/scope; late results require source review and cannot
+authorize replay under a new context. Generator SDK creation avoids the generic
+Core Actor writer's demonstrated string-array cleaning.

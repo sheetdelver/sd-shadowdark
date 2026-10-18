@@ -274,3 +274,10 @@ Creation uses native Class/Ancestry fixed/common/rare/select fields with separat
 restricted pools and server validation. No implicit Common/INT or Background
 allowance is added. Ordinary inventory editing has no creation quota and retains
 custom/unreadable entries. Source filters constrain browsing, not fixed grants.
+
+For owner-bound operations, SDK strict get reads can return null at a higher
+threshold even when observer-visible. Use the shared requireOwnedActor guard to
+retain403 versus concealed404 semantics. Context revalidation preserves mounted
+manual state but retires action callbacks/results; keep both browser regressions.
+Actor creation uses the caller SDK route, never the generic writer that strips
+native Item string arrays.

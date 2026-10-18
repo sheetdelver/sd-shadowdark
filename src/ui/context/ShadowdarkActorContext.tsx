@@ -125,7 +125,10 @@ export function ShadowdarkActorProvider({
     onRefresh: () => Promise<void>;
 }) {
     const actorId = String(initialActor?.id ?? initialActor?._id ?? '');
-    const { addNotification } = useSDK();
+    const { addNotification, events, worldId, currentUser, isConnected } = useSDK();
+    const authorityKey = JSON.stringify([actorId, initialActor?.worldContextRevision, worldId, currentUser?.id, currentUser?.role, isConnected]);
+    const authority = useRef({ key: authorityKey, generation: 0 });
+    if (authority.current.key !== authorityKey) authority.current = { key: authorityKey, generation: authority.current.generation + 1 };
     const [pending, setPending] = useState(0);
     const [drafts, setDrafts] = useState<{ actorId: string; values: Record<string, any> }>({ actorId, values: {} });
     const [optimisticDeletedIds, setOptimisticDeletedIds] = useState<Set<string>>(new Set());
@@ -153,6 +156,22 @@ export function ShadowdarkActorProvider({
         return () => { for (const timer of Object.values(active)) clearTimeout(timer); timers.current = {}; };
     }, [actorId]);
 
+    // ActorPage keeps mounted manual state during revalidation. Retire action
+    // callbacks immediately; a pending result remains review-only, never a new
+    // request/retry under different authority.
+    useEffect(() => {
+        const retire = () => {
+            authority.current.generation++;
+            for (const timer of Object.values(timers.current)) clearTimeout(timer);
+            timers.current = {};
+            setPendingConfirmation(null);
+            setRollDialog(prev => ({ ...prev, open: false, callback: null }));
+            if (recovery.current) setActionRecovery({ label: 'Action needs review', phase: 'Character context changed. Review current source and recorded results before starting another action.', retryable: false });
+        };
+        retire();
+        return events.on('world:contextChanged', retire);
+    }, [authorityKey, events]);
+
     // Drop drafts the server now reflects; prune optimistic deletions it confirmed.
     useEffect(() => {
         setDrafts(prev => {
@@ -173,12 +192,13 @@ export function ShadowdarkActorProvider({
     }, [initialActor, actorId]);
 
     const track = useCallback(async <T,>(label: string, run: () => Promise<T>): Promise<{ ok: true; value: T } | { ok: false }> => {
+        const generation = authority.current.generation;
         setPending(count => count + 1);
         try {
             return { ok: true, value: await run() };
         } catch (error) {
             logger.error(`[ShadowdarkActorContext] ${label} failed:`, error);
-            if (mounted.current) addNotification(`${label} failed: ${(error as Error)?.message ?? 'Unknown error'}`, 'error');
+            if (mounted.current && generation === authority.current.generation) addNotification(`${label} failed: ${(error as Error)?.message ?? 'Unknown error'}`, 'error');
             return { ok: false };
         } finally {
             if (mounted.current) setPending(count => Math.max(0, count - 1));
@@ -196,11 +216,11 @@ export function ShadowdarkActorProvider({
 
     /** Draft, then write now or after a short debounce; a failed write drops the draft. */
     const draftWrite = useCallback(async (path: string, value: any, immediate: boolean, label: string, run: () => Promise<void>) => {
-        const owner = actorIdRef.current;
+        const owner = actorIdRef.current, generation = authority.current.generation;
         setDrafts(prev => ({ actorId: owner, values: { ...(prev.actorId === owner ? prev.values : {}), [path]: value } }));
         if (timers.current[path]) { clearTimeout(timers.current[path]); delete timers.current[path]; }
         const write = async () => {
-            if (actorIdRef.current !== owner) return false;
+            if (actorIdRef.current !== owner || generation !== authority.current.generation) return false;
             const result = await track(label, run);
             if (!result.ok) clearDraft(path);
             return result.ok;
@@ -269,7 +289,7 @@ export function ShadowdarkActorProvider({
 
     const runAction = useCallback(async (action: PreparedAction, body: Record<string, unknown>, onSettled?: (result: ActionResponse | null) => void) => {
         if (busyActions.has(action.id) || !onAction) { onSettled?.(null); return; }
-        const owner = actorIdRef.current;
+        const owner = actorIdRef.current, generation = authority.current.generation;
         const payload = { requestId: requestId(), kind: action.kind, itemId: action.itemId,
             spellIndex: action.spell?.index ?? undefined,
             rollMode: typeof window !== 'undefined' ? window.localStorage.getItem('sheetdelver_roll_mode') || 'publicroll' : 'publicroll', ...body };
@@ -277,8 +297,8 @@ export function ShadowdarkActorProvider({
         setActionRecovery({ label: action.label, phase: 'Request pending', retryable: false });
         setBusyActions(prev => new Set(prev).add(action.id));
         const result = await track(action.label, () => onAction(payload));
-        if (mounted.current) setBusyActions(prev => { const next = new Set(prev); next.delete(action.id); return next; });
-        if (!mounted.current || actorIdRef.current !== owner) return;
+        if (!mounted.current || actorIdRef.current !== owner || generation !== authority.current.generation) return;
+        setBusyActions(prev => { const next = new Set(prev); next.delete(action.id); return next; });
         if (!result.ok) { setActionRecovery({ label: action.label, phase: 'No confirmed response. Retry the same recorded request to reconcile its receipt.', retryable: true }); onSettled?.(null); return; }
         const response = result.value;
         if (response.state === 'partial') setActionRecovery({ label: action.label, phase: response.phase ?? 'Partially applied', retryable: response.retryable !== false });
@@ -384,14 +404,14 @@ export function ShadowdarkActorProvider({
     return (
         <ShadowdarkActorContext.Provider value={value}>
             <ModuleDialog open={!!actionRecovery} title={actionRecovery?.label ?? 'Action receipt'} layer={180}
-                onClose={() => { if (!pending) { recovery.current = null; setActionRecovery(null); void refreshActor(); } }}>
+                onClose={() => { if (!pending) { recovery.current = null; setActionRecovery(null); setBusyActions(new Set()); void refreshActor(); } }}>
             {actionRecovery && <div role="status" className="text-black space-y-2">
                 <p>{actionRecovery.phase}</p>
                 <p>Review actual Actor state after an uncertain result. A recorded retry does not authorize a new roll or spend.</p>
                 {actionRecovery.retryable && <button type="button" disabled={pending > 0} className="min-h-11 border-2 border-black px-3 mr-2" onClick={() => {
                     const saved = recovery.current; if (saved && saved.owner === actorIdRef.current) void runAction(saved.action, saved.body, saved.onSettled);
                 }}>Retry recorded action</button>}
-                <button type="button" disabled={pending > 0} className="min-h-11 border-2 border-black px-3" onClick={async () => { await refreshActor(); recovery.current = null; setActionRecovery(null); }}>Review refreshed Actor and close</button>
+                <button type="button" disabled={pending > 0} className="min-h-11 border-2 border-black px-3" onClick={async () => { await refreshActor(); recovery.current = null; setActionRecovery(null); setBusyActions(new Set()); }}>Review refreshed Actor and close</button>
             </div>}
             </ModuleDialog>
             {children}

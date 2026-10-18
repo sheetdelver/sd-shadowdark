@@ -153,7 +153,7 @@ const wizardActor = (extra: any = {}) => ({
         { _id: 'talent', name: 'Spellcasting (Wizard)', type: 'Talent', system: {}, effects: [{ _id: 'e', name: 'Spell Class', system: { changes: [{ key: 'system.spellcasting.classes', type: 'add', value: 'wizard', phase: 'initial' }] } }] },
         { _id: 'mm', name: 'Magic Missile', type: 'Spell', system: { tier: 1, class: ['Compendium.shadowdark.classes.Item.wiz'], lost: false, range: 'far', duration: { type: 'instant', value: '-1' } }, effects: [] },
         { _id: 'lost', name: 'Sleep', type: 'Spell', system: { tier: 1, class: ['Compendium.shadowdark.classes.Item.wiz'], lost: true }, effects: [] },
-        { _id: 'scroll', name: 'Scroll', type: 'Scroll', system: { intent: 'inventory', spellUuid: 'Compendium.shadowdark.spells.Item.light' }, effects: [] },
+        { _id: 'scroll', name: 'Scroll', type: 'Scroll', system: { spellUuid: 'Compendium.shadowdark.spells.Item.light' }, effects: [] },
         { _id: 'wand', name: 'Wand', type: 'Wand', system: { broken: false, spells: [{ uuid: 'Compendium.shadowdark.spells.Item.light', lost: false }, { uuid: 'Compendium.shadowdark.spells.Item.missing', lost: false }] }, effects: [] },
         { _id: 'turn', name: 'Turn', type: 'Class Ability', system: { ability: 'cha', dc: 12, limitedUses: true, uses: { available: 1, max: 1 }, loseOnFailure: true }, effects: [] },
         { _id: 'potion', name: 'Draught', type: 'Potion', system: { identification: { identified: false, name: 'Healing Potion' } }, effects: [] },
@@ -194,10 +194,10 @@ async function actions() {
             const { status } = await statusOf(await handleActorAction('w1', request(runtime, { requestId: 'req-lost-0001', kind: 'spell', itemId: 'lost' }) as any));
             assert.equal(status, 409); assert.equal(rolls(), 0); assert.equal(writes.length, 0);
         });
-        await check('C4', 'concealed non-owners cannot run actions (404, no roll)', async () => {
+        await check('C4', 'observable non-owners cannot run actions (403, no roll)', async () => {
             const { runtime, rolls } = fakeRuntime(wizardActor(), { owner: false });
             const { status } = await statusOf(await handleActorAction('w1', request(runtime, { requestId: 'req-owner-001', kind: 'spell', itemId: 'mm' }) as any));
-            assert.equal(status, 404); assert.equal(rolls(), 0);
+            assert.equal(status, 403); assert.equal(rolls(), 0);
         });
         await check('C4', 'failed spell is lost; a focus check is not', async () => {
             const failed = fakeRuntime(wizardActor(), { rolls: [3] });
@@ -509,7 +509,7 @@ async function reviewCorrections() {
             const beforeReplayReads = reads;
             owner = false;
             const replay = await statusOf(await handleActorAction('a1', request(runtime, body) as any));
-            assert.equal(replay.status, 404); assert.equal(reads, beforeReplayReads + 1, 'the replay re-read the Actor under current ownership');
+            assert.equal(replay.status, 403); assert.equal(reads, beforeReplayReads + 2, 'the replay re-read the Actor under current ownership');
             assert.doesNotMatch(JSON.stringify(replay.body), /Healing Potion/);
             assert.equal(writes.filter(write => write[0] === 'item.delete').length, 1);
         });

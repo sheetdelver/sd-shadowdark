@@ -40,7 +40,7 @@ This is a new corrective scope. It does not reopen the completed Core migration
 implementation or assert that an admin effect-key migration reconstructs all
 historical character content.
 
-## Proposed decisions
+## Selected decisions
 
 ### 1. Keep native eligibility and explain failures precisely
 
@@ -570,3 +570,37 @@ The full native A02-01–15 procedure, exact fixture/source choices, before/afte
 oracles, account/permission scope and cleanup requirements are prepared in
 [native acceptance run sheet](../native-parity-acceptance.md). Every actual native
 row remains open until scoped operator authorization and execution.
+
+## D6c writer provenance and mounted action retirement — October 18, 2026
+
+The public generic Core Actor-create route was reproduced on released0.19.2 and
+current0.19.3 with a sanitized Spell source: it deletes the Item's string-array
+`system.class`. The module's validated creation route uses public
+`runtime.documents.create` and preserves the same source arrays/effects, without
+subsequent repair. This demonstrates an omission path relevant to L02; it does
+not prove who wrote the historical operator records. Core remains read-only.
+The generic route's cleaning is a precise external limitation for other callers,
+not a blocker for this module's supported SDK path. Exact-source GM import also
+retains the native Class identity and every fixed Talent effect.
+
+Real SDK strict reads return null for any unmet threshold. Owner-bound module
+operations now use one shared guard: an OWNER read succeeds; if null, an OBSERVER
+read distinguishes visible/non-owner403 from concealed/absent404. Neither read
+raises authority, and no write is attempted on denial. The guard is shared by
+actions, management, advancement, inventory source copy and Actor language plans.
+Durable receipts remain behind that current guard. Controlled13/13 action-phase
+cases and boundaries53/53 pass; installed final verification follows.
+
+Keeping sheets mounted during revalidation also requires retiring their action
+callbacks. Empty-key context events, source revision and caller/world/connection
+scope changes cancel open roll/confirmation callbacks. A pending result becomes
+review-only; its late response cannot publish stale result/notice or enable a
+retry. Debounced old-context writes retire. The actual card/provider browser
+suite grows from4 to6 cases: the two new cases fail against `fd358ab` and pass
+with this correction. Manual sheet/picker state still follows the shared store.
+
+The native-method oracle now compares L01–L04 eligibility through actual native
+`PlayerSD.isSpellCaster` and `_getSpellcastingAbility` methods, using explicitly
+supplied sanitized prepared grant inputs and exact native Class documents. All20
+checks pass, alongside the69/31/9/4/9 controls. This is controlled method evidence,
+not a full Foundry preparation/effect lifecycle or native A02 acceptance.

@@ -71,6 +71,7 @@ await check('SD02-13 zero/custom/default thresholds and unknown natural are dist
 });
 await check('SD02-08 concealed/absent Actors return404 without exposing an action receipt; observer SDK denial remains403',async()=>{
  const t=fixture(); await t.send(); const before=[...t.events];
+ t.runtime.documents.get=async(_type:string,_id:string,opts:any)=>opts?.minOwnership==='owner'?null:structuredClone(t.actor); assert.equal((await t.send()).status,403); assert.deepEqual(t.events,before);
  t.runtime.documents.get=async()=>null; assert.equal((await t.send()).status,404); assert.deepEqual(t.events,before);
  t.runtime.documents.get=async()=>{throw new SdkError('permission_denied','Observer lacks owner access')}; assert.equal((await t.send()).status,403); assert.deepEqual(t.events,before);
 });

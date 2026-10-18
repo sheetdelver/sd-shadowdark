@@ -5,7 +5,8 @@ Historical entries are reconstructed from [published releases](https://github.co
 ## Unreleased
 
 - Preserve required native grants and exact Class authority
-- Retain open sheet state through caller context revalidation
+- Retain open sheet state and retire stale action callbacks during context changes
+- Preserve native creation arrays and precise caller denial responses
 
 - Exact caller spell dependencies and native alternate progression
 - Required advancement spell validation before writes

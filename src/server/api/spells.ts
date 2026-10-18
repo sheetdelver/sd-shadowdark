@@ -2,7 +2,7 @@ import { json, error, type ModuleServerRequest } from '@sheet-delver/sdk/server'
 import { getErrorMessage, isSdkError, logger } from '@sheet-delver/sdk';
 import { shadowdarkAdapter } from '../../server/ShadowdarkAdapter';
 import { canonicalUuid, ownedCopy } from '../../logic/identity';
-import { callerOf, contextConflict, requestRevision } from '../access';
+import { callerOf, contextConflict, requestRevision, requireOwnedActor } from '../access';
 
 /**
  * POST /api/modules/shadowdark/actors/[id]/spells/learn
@@ -17,8 +17,7 @@ export async function handleLearnSpell(actorId: string, req: ModuleServerRequest
         const canonical = canonicalUuid(spellUuid);
         if (!canonical) return error('validation', 'A Spell UUID is required');
 
-        const actor = await req.runtime.documents.get('Actor', actorId, { minOwnership: 'owner' });
-        if (!actor) return error('not_found', 'Actor not found or not owned');
+        const actor = await requireOwnedActor(req.runtime, actorId);
 
         const spellData = await shadowdarkAdapter.resolveDocumentFor(canonical, callerOf(req));
         if (!spellData) return error('not_found', `Spell not available: ${canonical}`);

@@ -20,6 +20,9 @@ globalThis.ui = { notifications: { warn: s => { throw Error(s); }, error: s => {
 globalThis.Hooks = { call: async () => true };
 globalThis.shadowdark = { defaults: { FREE_COIN_CARRY: 100, BASE_ARMOR_CLASS: 10 }, dice: { createToolTip: () => '', setRollTarget: () => {}, rollDialog: async () => true }, chat: { renderRollMessage: async () => ({}) } };
 String.prototype.slugify ??= function () { return this.toLowerCase().replace(/\s+/g, '-'); };
+const { prepareShadowdarkView } = await source('logic/prepared-view.ts');
+const { formatUuid } = await source('logic/identity.ts');
+const { default: NativeClass } = await native('models/items/ClassSD.mjs');
 const { default: Player } = await native('models/PlayerSD.mjs');
 const { default: Npc } = await native('models/NpcSD.mjs');
 const { ActorBaseSD: Base } = await native('models/_ActorBaseSD.mjs');
@@ -192,6 +195,28 @@ check('SD02-11 NPC focus cannot prevent loss', () => assert.equal(results.defect
 check('SD02-12 native rarity', () => assert.equal(index.languages[0].rarity, language.system.rarity));
 for(const row of results.defects.languages.cases)check(`SD02-12 ${row.name} actual native generator`,()=>{assert.deepEqual(row.moduleCounts,row.nativeCounts);assert.equal(row.moduleValid,true);});
 for(const row of results.defects.potionFailureMatrix)check(`SD02-10 Potion ${row.failure} native state/order`,()=>{assert.deepEqual(row.module,row.native);assert.deepEqual(row.moduleEvents,row.nativeEvents);});
+// Native eligibility methods, independently supplied sanitized prepared grant
+// inputs. This is not a full Foundry data-model/effect lifecycle acceptance run.
+const classDocuments=new Map(pack('classes').map(doc=>[`Compendium.shadowdark.classes.Item.${doc._id}`,doc]));
+const nativeSpells=pack('spells');
+const cases=[['L01 missing grant','035nuVkU9q2wtMPs',[],false],['L02 missing Spell Class','035nuVkU9q2wtMPs',['wizard'],true],['L03 source-less Priest',null,['priest'],false],['L04 wrong Knight grant','KGnBAFiTiLHZJUND',['knight-of-st.-ydris'],false]];
+// Resolve Priest by the exact Class reference on the pinned granted Spell.
+const priestRef=nativeSpells.find(doc=>doc._id==='mByUvcHIVEPWscfH').system.class[0];
+results.parity.nativeEligibility=[];
+const notify=ui.notifications.error;ui.notifications.error=()=>{};
+try {for(const [name,id,grants,missing] of cases){
+ const classRef=name.startsWith('L03')?priestRef:`Compendium.shadowdark.classes.Item.${id}`;
+ const sourceSpell=nativeSpells.find(doc=>(doc.system.class??[]).includes(classRef));assert.ok(sourceSpell,name);
+ const spell=clone(sourceSpell);spell._id='ownedSpell';if(missing)spell.system.class=[];delete spell._stats;
+ const actor=actorBase();actor.system.class=name.startsWith('L04')?'Compendium.shadowdark.classes.Item.0uVUOXKuX9xfJ600':classRef;actor.items=[spell];actor.effects=grants.map((grant,index)=>({_id:`grant${index}`,disabled:false,changes:[{key:'system.spellcasting.classes',mode:2,value:grant}]}));
+ const nativeData={spellcasting:{classes:grants,allowAllItems:false,itemAbility:''},abilities:Object.fromEntries(['str','dex','con','int','wis','cha'].map(key=>[key,{mod:0}]))};
+ globalThis.fromUuid=async uuid=>{if(uuid==='Actor.fixture.Item.ownedSpell')return spell;const doc=classDocuments.get(uuid);if(!doc)return null;return {...clone(doc),system:{...clone(doc.system),isCastingClass:Object.getOwnPropertyDescriptor(NativeClass.prototype,'isCastingClass').get.call(doc.system)}}};
+ const caster=Object.getOwnPropertyDescriptor(Player.prototype,'isSpellCaster').get.call(nativeData);
+ const ability=await Player.prototype._getSpellcastingAbility.call(nativeData,'Actor.fixture.Item.ownedSpell');
+ const action=prepareShadowdarkView(actor,{classDocument:ref=>classDocuments.get(formatUuid(ref))??null}).actions.find(row=>row.kind==='spell');
+ check(`SD02-01 ${name} native eligibility`,()=>{assert.equal(action.available,caster&&!!ability);if(action.available)assert.equal(action.ability,ability);});
+ results.parity.nativeEligibility.push({name,nativeCaster:caster,nativeAbility:ability,moduleAvailable:action.available,moduleReason:action.reason});
+}}finally{ui.notifications.error=notify;}
 results.checks = checks;
 if (process.env.SHADOWDARK_EVIDENCE) writeFileSync(process.env.SHADOWDARK_EVIDENCE, JSON.stringify(results, null, 2));
 const selected=process.argv.includes('--gate=D5a')?checks.filter(row=>!row.id.startsWith('SD02-12')):checks;

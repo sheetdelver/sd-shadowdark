@@ -1,7 +1,7 @@
 import { json, error, type ModuleServerRequest } from '@sheet-delver/sdk/server';
 import { isSdkError, getErrorMessage, SdkError } from '@sheet-delver/sdk';
 import { shadowdarkAdapter } from '../ShadowdarkAdapter';
-import { callerOf, requestRevision, contextConflict } from '../access';
+import { callerOf, requestRevision, contextConflict, requireOwnedActor } from '../access';
 import { callerLanguagePlan } from '../languages';
 import { canonicalUuid } from '../../logic/identity';
 import { prepareShadowdarkView } from '../../logic/prepared-view';
@@ -24,8 +24,7 @@ export async function handleLanguagePlan(req: ModuleServerRequest) {
         const classDoc = await resolveLanguageIdentity(body.classUuid, 'Class', req);
         let existing: string[] = [];
         if (body.actorId) {
-            const actor: any = await req.runtime.documents.get('Actor', body.actorId, { minOwnership: 'owner' });
-            if (!actor) return error('not_found', 'Actor is not available to you as owner.');
+            const actor: any = await requireOwnedActor(req.runtime, body.actorId);
             existing = Array.isArray(actor.system?.languages) ? actor.system.languages : [];
         }
         const plan = await callerLanguagePlan(callerOf(req), ancestry, classDoc, existing);

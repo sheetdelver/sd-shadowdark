@@ -40,6 +40,9 @@ export async function proveParityContracts(options: { context: any; api: string;
     });
     const preservedSpellUuid='Compendium.shadowdark.spells.Item.mByUvcHIVEPWscfH';
     const preservedSpell=structuredClone(exact.get(preservedSpellUuid)!);delete preservedSpell._id;preservedSpell._stats={...(preservedSpell._stats??{}),compendiumSource:preservedSpellUuid};sourceItems.push(preservedSpell);
+    // The controlled upstream does not run Foundry's embedded-ID allocator.
+    // Supply explicit fixture IDs so restart enumeration has valid identities.
+    sourceItems.forEach((item:Doc,index:number)=>{item._id=`sd02Created${String(index).padStart(5,'0')}`;});
     const creationSource={name:'SD02 validated creation',type:'Player',system:{...structuredClone(actor.system),class:'',ancestry:ancestryUuid,level:{value:0,xp:0},languages:[...used]},items:sourceItems,effects:[],flags:{sd02:{preserve:true}}};
     const createdResponse=await post('/api/modules/shadowdark/characters/create',{actor:creationSource,languageChoices:choices});
     assert.equal(createdResponse.status(),200,await createdResponse.text());const creation=await createdResponse.json();

@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { json, error, type ModuleServerRequest } from '@sheet-delver/sdk/server';
 import { SdkError, getErrorMessage, isSdkError } from '@sheet-delver/sdk';
 import { shadowdarkAdapter } from '../ShadowdarkAdapter';
-import { callerOf, contextConflict, requestRevision, requestRules } from '../access';
+import { callerOf, contextConflict, requestRevision, requestRules, requireOwnedActor } from '../access';
 import { canonicalUuid, documentId, formatUuid, ownedCopy } from '../../logic/identity';
 import { prepareShadowdarkView } from '../../logic/prepared-view';
 import { spellReview } from '../../logic/spell-review';
@@ -32,8 +32,7 @@ export async function handleManageSpells(actorId: string, req: ModuleServerReque
         const key = `spell-operation-${digest(`${actorScope}:${callerId}:${body.requestId}`)}`;
         const print = digest(JSON.stringify(body));
         return await withActorLock(actorScope, async () => {
-            let actor: any = await req.runtime.documents.get('Actor', actorId, { minOwnership: 'owner' });
-            if (!actor) return error('not_found', 'Actor not found or not owned');
+            let actor: any = await requireOwnedActor(req.runtime, actorId);
             const store = req.runtime.dataStore;
             let journal = await store.get<Journal>(key);
             if (journal && journal.fingerprint !== print) return error('conflict', 'This requestId already identifies different spell changes.');
