@@ -56,8 +56,12 @@ export function prepareSpellModel(actor: any, core: PreparedActorCore, lookups: 
         const origin = sourceRef(item);
         const classes = (Array.isArray(item.system?.class) ? item.system.class : []).map((value: unknown) => canonicalUuid(value));
         const innate = !!origin && granted.has(formatUuid(origin));
+        const resolved = classes.length && classes.every((uuid: string | null) => {
+            const ref = parseUuid(uuid);
+            return ref && (lookups.classDocument?.(ref) || items.some(owned => owned.type === 'Class' && sourceRef(owned) && formatUuid(sourceRef(owned)!) === uuid));
+        });
         return { actorId: documentId(actor), itemId: documentId(item), name: item.name, tier: item.system?.tier ?? null,
-            source: origin, classes, innate, classification: innate ? 'granted' : classes.length && classes.every(Boolean) ? 'ordinary' : 'unresolved' };
+            source: origin, classes, innate, classification: innate ? 'granted' : resolved ? 'ordinary' : 'unresolved' };
     });
     const diagnostics: string[] = [];
     if (core.kind === 'Player') {

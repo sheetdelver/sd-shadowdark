@@ -39,6 +39,7 @@ function fakeRuntime(actor: any, options: { owner?: boolean; rolls?: number[]; f
     const rolls = [...(options.rolls ?? [])];
     let rollCount = 0;
     const runtime: any = {
+        access: { canReadPack: () => true, packs: () => [] },
         documents: {
             get: async (type: string, id: string, opts?: any) => {
                 if (type !== 'Actor' || id !== (actor?._id)) return null;
@@ -166,7 +167,7 @@ async function actions() {
     const lookupsFn = shadowdarkAdapter.lookups;
     shadowdarkAdapter.lookups = () => lookups as any;
     const resolveFor = shadowdarkAdapter.resolveDocumentFor;
-    shadowdarkAdapter.resolveDocumentFor = async (uuid: string) => spellDocs[uuid] ?? null;
+    shadowdarkAdapter.resolveDocumentFor = async (uuid: string) => spellDocs[uuid] ?? classDocs[uuid] ?? null;
     try {
         const core = prepareActorCore(wizardActor(), lookups);
         await check('SD01-08', 'spell ability comes from the spell class (PlayerSD._getSpellcastingAbility)', () => {
@@ -178,7 +179,7 @@ async function actions() {
             assert.match(prepareRequestedAction(core, wizardActor(), lookups, { kind: 'spell', itemId: 'lost' })!.reason!, /lost/);
             const fighter = wizardActor(); fighter.items = fighter.items.filter((item: any) => item._id !== 'talent');
             assert.match(prepareRequestedAction(prepareActorCore(fighter, lookups), fighter, lookups, { kind: 'spell', itemId: 'mm' })!.reason!, /not a spellcaster/);
-            assert.match(prepareRequestedAction(core, wizardActor(), { ...lookups, classDocument: () => null }, { kind: 'spell', itemId: 'mm' })!.reason!, /not available from declared/);
+            assert.match(prepareRequestedAction(core, wizardActor(), { ...lookups, classDocument: () => null }, { kind: 'spell', itemId: 'mm' })!.reason!, /unavailable or not visible/);
         });
         await check('SD01-08', 'each wand spell is its own action; a missing spell is unavailable', () => {
             const wandActions = listActions(core, wizardActor(), lookups).filter(action => action.itemId === 'wand');
@@ -396,7 +397,7 @@ async function registryAndRoutes() {
             const body = { targetLevel: 1, classUuid: 'Compendium.shadowdark.classes.Item.wiz', classObj: { name: 'Injected', type: 'Class' },
                 selectedSpells: [{ name: 'Cure', uuid: 'Compendium.shadowdark.spells.Item.heal' }] };
             const response = await statusOf(await handleFinalizeLevelUp('a1', request(runtime, body) as any));
-            assert.equal(response.status, 500); assert.match(response.body.error, /not on the Wizard spell list/);
+            assert.equal(response.status, 400); assert.match(response.body.error, /not on the exact Class spell list/);
             assert.equal(writes.length, 0);
         } finally { shadowdarkAdapter.resolveDocumentFor = resolveFor; }
     });
@@ -478,7 +479,7 @@ async function reviewCorrections() {
         });
         await check('RV-01', 'every caller-bound document path applies the same policy (spell learning)', async () => {
             const { runtime: owned, writes } = fakeRuntime({ _id: 'a1', type: 'Player', system: {}, items: [] });
-            const learn = await statusOf(await handleLearnSpell('a1', { ...caller(false), runtime: owned, json: async () => ({ spellUuid: monsterUuid }) } as any));
+            const learn = await statusOf(await handleLearnSpell('a1', { ...caller(false), runtime: { ...owned, access: packAccess(() => false) }, json: async () => ({ spellUuid: monsterUuid }) } as any));
             assert.equal(learn.status, 403); assert.equal(writes.length, 0);
             assert.doesNotMatch(JSON.stringify(learn.body), /Synthetic Ogre/);
         });
@@ -488,6 +489,8 @@ async function reviewCorrections() {
 
     const lookupsFn = shadowdarkAdapter.lookups;
     shadowdarkAdapter.lookups = () => lookups as any;
+    const resolver = shadowdarkAdapter.resolveDocumentFor;
+    shadowdarkAdapter.resolveDocumentFor = async (uuid, caller) => classDocs[uuid] ?? spellDocs[uuid] ?? resolver.call(shadowdarkAdapter, uuid, caller);
     try {
         const potionActor = () => ({ _id: 'a1', name: 'Drinker', type: 'Player', system: { abilities: {} }, effects: [],
             items: [{ _id: 'potion', name: 'Healing Potion', type: 'Potion', system: {}, effects: [] },
@@ -561,6 +564,7 @@ async function reviewCorrections() {
         });
     } finally {
         shadowdarkAdapter.lookups = lookupsFn;
+        shadowdarkAdapter.resolveDocumentFor = resolver;
     }
 }
 

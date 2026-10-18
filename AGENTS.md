@@ -255,3 +255,9 @@ toolchain, with the read-only native4.0.6 reference available. `--baseline` reco
 known failures and is never passing acceptance. Caller-bound spell dependencies
 remain request-local and use the common preparer; never warm private world
 Class/Spell documents into the user-invariant registry.
+
+Spell inventory management uses explicit additions and owned Item-ID removals;
+never derive deletion from catalog membership. The shared spell catalog exposes
+partial-source failures, and native sourceFilters affects browsing only. Durable
+operation receipts may reconcile confirmed IDs, never guessed names/origins;
+partial operations from another process need fresh review.

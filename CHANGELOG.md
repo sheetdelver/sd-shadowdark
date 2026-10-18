@@ -6,6 +6,8 @@ Historical entries are reconstructed from [published releases](https://github.co
 
 - Exact caller spell dependencies and native alternate progression
 - Required advancement spell validation before writes
+- Explicit owned-spell changes, durable receipts and safe partial recovery
+- Caller spell catalogs, native source filters and accessible selection dialogs
 
 ## 0.9.5
 

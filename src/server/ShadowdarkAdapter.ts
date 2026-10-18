@@ -9,14 +9,14 @@ import type { ModuleWorldSnapshot } from '@sheet-delver/sdk';
 import type { ModuleRuntime, ModuleRequestRuntime, ReadonlyDocumentStore } from '@sheet-delver/sdk/server';
 import { ShadowdarkRegistry, type PackFilter } from './Registry';
 import { canReadPack, compendiumDenied, readableRows, type Caller } from './access';
-import { ruleInputsFrom, UNAVAILABLE_RULE_INPUTS, type RuleInputs } from '../logic/world-settings';
+import { ruleInputsFrom, readSourceFilters, sourceAllowed, UNAVAILABLE_RULE_INPUTS, type RuleInputs } from '../logic/world-settings';
 import { NATIVE_PREDEFINED_EFFECTS } from '../data/native-predefined-effects';
 import { BOON_TYPE_MAP, EFFECT_TRANSLATIONS_MAP } from '../data/talent-effects';
 import { ShadowdarkNormalizer, lookupsFromSystemData } from '../logic/normalization';
 import { getInitiativeFormula, isClassSpellcaster } from '../logic/rules';
 import { prepareActorCore } from '../logic/actor-preparation';
 import { actionFormula, prepareRequestedAction, type ActionRequest, type RollOverrides } from '../logic/actions';
-import { canonicalUuid, documentId, formatUuid, parseUuid, sourceRef } from '../logic/identity';
+import { canonicalUuid, DECLARED_PACKS, documentId, formatUuid, parseUuid, sourceRef } from '../logic/identity';
 import type { ViewLookups } from '../logic/prepared-view';
 import type { ChoiceCatalog } from '../logic/talent-choices';
 import { advancementSpellChoices, grantedSpellSources, spellListIdentity } from '../logic/spell-model';
@@ -290,6 +290,46 @@ export class ShadowdarkAdapter extends BaseSystemAdapter {
                 : documents.get(formatUuid(ref))?.name ?? (ref.kind === 'compendium' ? base.label?.(ref) : null) ?? null };
     }
 
+    /** Caller catalog coverage is explicit; exact dependency reads remain separate. */
+    async spellCatalog(caller: Caller, classUuid?: string) {
+        const sources: Array<{ source: string; status: 'ready' | 'failed'; reason?: string }> = [];
+        const rows: any[] = [];
+        const filters = readSourceFilters(caller.runtime.world?.snapshot());
+        if (filters.value === null) return { rows, sources: [{ source: 'world source filters', status: 'failed' as const, reason: filters.reason }], state: 'failed' as const };
+        try {
+            rows.push(...await this._registry.getCollection('spells', { readable: pack => canReadPack(caller, pack) }));
+            for (const pack of DECLARED_PACKS.filter(pack => pack.type === 'Item')) sources.push({ source: pack.id,
+                status: canReadPack(caller, pack.id) ? 'ready' : 'failed', ...(!canReadPack(caller, pack.id) ? { reason: 'Pack is not readable by this caller.' } : {}) });
+        } catch (e: any) { sources.push({ source: 'declared packs', status: 'failed', reason: String(e?.message ?? e) }); }
+        try {
+            let page = 1, count = 0;
+            do {
+                const result = await caller.runtime.documents.list('Item', { filter: { type: 'Spell' }, page, pageSize: 200 });
+                if (!Array.isArray(result.rows)) throw new Error('World Item read returned no source rows.');
+                for (const doc of result.rows) if (doc.type === 'Spell') rows.push({ ...doc, uuid: `Item.${documentId(doc)}` });
+                count += result.rows.length;
+                if (count >= result.total) break;
+                if (!result.rows.length) throw new Error('World Item pagination ended before its reported total.');
+                page++;
+            } while (true);
+            sources.push({ source: 'world Items', status: 'ready' });
+        } catch (e: any) { sources.push({ source: 'world Items', status: 'failed', reason: String(e?.message ?? e) }); }
+        // Recheck capabilities after all awaits; a warm read is never authorization.
+        const unique = new Map<string, any>();
+        for (const doc of rows) {
+            const uuid = canonicalUuid(doc.uuid), ref = parseUuid(uuid);
+            if (!uuid || !ref || doc.type !== 'Spell' || (ref.kind === 'compendium' && !canReadPack(caller, ref.pack))) continue;
+            if (classUuid && !(doc.system?.class ?? []).some((value: unknown) => canonicalUuid(value) === classUuid)) continue;
+            if (sourceAllowed(doc, filters.value)) unique.set(uuid, { ...doc, uuid, tier: doc.system?.tier ?? null });
+        }
+        for (const source of sources) if (source.status === 'ready' && source.source !== 'world Items' && !canReadPack(caller, source.source)) {
+            source.status = 'failed'; source.reason = 'Pack access changed while loading.';
+        }
+        const ready = sources.filter(source => source.status === 'ready').length;
+        return { rows: [...unique.values()].sort((a,b) => Number(a.tier) - Number(b.tier) || String(a.name).localeCompare(String(b.name))), sources,
+            state: !ready ? 'failed' as const : sources.some(source => source.status === 'failed') ? 'partial' as const : 'complete' as const };
+    }
+
     async getLevelUpData(actor: any, classUuidOverride: string | undefined, patronUuidOverride: string | undefined, caller: Caller) {
         const currentLevel = actor?.system?.level?.value || 0;
         const targetLevel = currentLevel + 1;
@@ -320,7 +360,9 @@ export class ShadowdarkAdapter extends BaseSystemAdapter {
             else diagnostics.push('The exact Class has no spells-known table.');
             const classRef = spellListIdentity(classDoc, classDoc.uuid);
             if (classRef) {
-                availableSpells = await this.getSpellsForClass(classRef, caller);
+                const catalog = await this.spellCatalog(caller, classRef);
+                availableSpells = catalog.rows;
+                diagnostics.push(...catalog.sources.filter(source => source.status === 'failed').map(source => `${source.source}: ${source.reason}`));
                 const granted = grantedSpellSources(actor?.items ?? []);
                 for (const spell of availableSpells) if (granted.has(canonicalUuid(spell.uuid) ?? '')) spell.isInnate = true;
             } else diagnostics.push('The class is not a declared compendium document, so its spell list is unavailable.');
@@ -343,6 +385,8 @@ export class ShadowdarkAdapter extends BaseSystemAdapter {
             canRollBoons: classDoc?.system?.patron?.required || false,
             startingBoons: (targetLevel === 1 && classDoc?.system?.patron?.startingBoons) || 0,
             isSpellcaster: isSpellcasterChar,
+            progressionReady: !!classDoc && (!isSpellcasterChar || (!!spellListIdentity(classDoc, classDoc.uuid)
+                && advancementSpellChoices(classDoc, currentLevel, targetLevel).diagnostics.length === 0)),
             spellsToChoose,
             availableSpells,
             conMod,

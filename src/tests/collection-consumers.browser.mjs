@@ -8,6 +8,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
+import { execFileSync } from 'node:child_process';
+const parityOnly = process.argv.includes('--parity-only');
+const baseline = process.argv.find(arg => arg.startsWith('--baseline='))?.slice(11);
 const { chromium } = await import(process.env.SHADOWDARK_PLAYWRIGHT_MODULE || 'playwright');
 const moduleRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const out = path.resolve(process.argv[2] || path.join(moduleRoot, 'temp/collection-consumers'));
@@ -31,20 +34,22 @@ const rope={_id:'rope',uuid:'Compendium.shadowdark.gear.Item.rope',name:'Current
 window.sdk={isConnected:true,worldId:'w',currentUser:{id:'p',role:1},foundryUrl:'',
  events:{on:(_,fn)=>{listeners.add(fn);return ()=>listeners.delete(fn)}},resolveImageUrl:x=>x||'',addNotification:()=>{},navigate:()=>{},
  fetchWithAuth:async (url,options={})=>{
-  const key=url.split('/').at(-1);const call={key,signal:options.signal};window.calls.push(call);
+  const key=url.split('/').at(-1).split('?')[0];const call={key,signal:options.signal};window.calls.push(call);
   const reference=url.includes('/document/')?decodeURIComponent(url.split('/document/')[1]):url.includes('uuid=')?decodeURIComponent(url.split('uuid=')[1]):null;
   if(reference&&window.initial.documents)return Response.json(window.initial.documents[reference]||{error:'Not found'},{status:window.initial.documents[reference]?200:404});
   const p=window.policy[key]||{};
   if(p.hold)return new Promise(resolve=>window.pending.push({call,resolve}));
   if(p.network)throw new TypeError('Connection interrupted');
-  return Response.json(p.body??(key==='index'?{nameIndex:{}}:key==='gear'?[rope]:[]),{status:p.status||200});
+  return Response.json(p.body??(key==='index'?{nameIndex:{}}:key==='data'?{success:true,data:{isSpellcaster:false,spellsToChoose:{},availableSpells:[],progressionReady:true}}:key==='gear'?[rope]:[]),{status:p.status||200});
  }};
 window.actorContext={actor:{id:'a',items:[],derived:{actions:[],items:[],spellcasting:{classes:[]}}},isActionBusy:()=>false,getDraftValue:(_,value)=>value};
 const root=createRoot(document.getElementById('root')); let mounted=true, show=true;
 const advancementClass={uuid:'Compendium.shadowdark.classes.Item.thief',name:'Thief',system:{hitPoints:'d4',patron:{required:false},talents:['Compendium.shadowdark.talents.Item.backstab']}};
 const advancementProps={actorId:'',currentLevel:0,targetLevel:1,classObj:advancementClass,classUuid:advancementClass.uuid,ancestry:null,abilities:{},spells:[],skipLanguageSelection:true,onComplete:()=>{},onCancel:()=>{}};
 function Advancement(){const {state,actions}=useLevelUp(advancementProps);window.completeAdvancement=()=>{actions.setHpRoll(4);actions.setGoldRoll(60);actions.setRolledTalents([{name:'Native rolled talent',type:'Talent',system:{},effects:[]}]);};return <><output>{state.error||'No error'}</output><button disabled={!actions.isComplete()}>Finish advancement</button></>;}
+function ParityPicker(){const [open,setOpen]=React.useState(false);return <><button onClick={()=>setOpen(true)}>Open spell manager</button><SpellPicker isOpen={open} onClose={()=>setOpen(false)} onSave={intent=>window.saved=intent} title="Manage spells" tier={1} classUuid="Compendium.shadowdark.classes.Item.wizard" knownSpells={window.initial.owned||[]} maxSelections={window.initial.limit} actor={window.initial.actor}/></>;}
 function Consumer(){switch(window.initial.which){
+case 'parity-picker':return <ParityPicker/>;
 case 'advancement':return <Advancement/>;
 case 'dialog':return <><button style={{position:'fixed',bottom:0,left:0,width:'100%',height:80,zIndex:150}}>Host tools</button><ModuleDialog open title="Resource card" suspended={!!window.suspendDialog} onClose={()=>{}} footer={<button onClick={()=>window.cardClicked=true}>Use resource</button>}>Resource details</ModuleDialog>{window.suspendDialog&&<div style={{position:'fixed',inset:0,zIndex:100}}><button onClick={()=>window.hostClicked=true}>Shared host action</button></div>}</>;
 case 'gear':return <Gear isOpen onClose={()=>{}} onCreate={async()=>{}}/>;
@@ -60,6 +65,7 @@ window.change=values=>{window.sdk={...window.sdk,...values};window.render()};
 window.answer=(index,body,status=200)=>window.pending[index].resolve(Response.json(body,{status}));
 window.render();
 `, resolveDir: moduleRoot, loader: 'tsx' }, bundle: true, write: false, format: 'iife', platform: 'browser', jsx: 'automatic', plugins: [{ name: 'sdk-test-boundary', setup(b) {
+    if(baseline)b.onLoad({filter:/SpellSelectionModal\.tsx$/},a=>({loader:'tsx',resolveDir:path.dirname(a.path),contents:execFileSync('git',['show',baseline+':src/ui/components/SpellSelectionModal.tsx'],{cwd:moduleRoot,encoding:'utf8'})}));
     b.onResolve({ filter: /^@sheet-delver\/sdk(?:\/react)?$/ }, a => ({ path: a.path, namespace: 'stub' }));
     b.onResolve({ filter: /ShadowdarkActorContext$/ }, () => ({ path: 'actor', namespace: 'stub' }));
     b.onLoad({ filter: /.*/, namespace: 'stub' }, a => ({ loader: 'tsx', resolveDir: moduleRoot, contents: a.path === 'actor' ? 'export const useShadowdarkActor=()=>window.actorContext;' : a.path.endsWith('/react') ? `import React from 'react';export const useSDK=()=>window.sdk;export const useSDKComponents=()=>({ConfirmationModal:()=>null,LoadingModal:({message})=><div role="status">{message}</div>});` : `export const logger={info(){},warn(){},error(){},debug(){}};export const processHtmlContent=x=>x;export const getErrorMessage=e=>String(e);` }));
@@ -67,6 +73,7 @@ window.render();
 const browser = await chromium.launch({ ...(process.env.SHADOWDARK_CHROME ? { executablePath: process.env.SHADOWDARK_CHROME } : {}), headless: true, args: ['--no-sandbox', '--disable-background-networking'] });
 const results = [];
 async function test(name, initial, run) {
+    if(parityOnly&&!name.startsWith('SD02'))return;
     const page = await browser.newPage(); const errors = []; page.setDefaultTimeout(3000);
     page.on('pageerror', e => errors.push(e.message)); await page.route('**/*', r => r.abort());
     try {
@@ -206,6 +213,50 @@ try {
         await p.getByRole('button', { name: 'Retry', exact: true }).click(); await p.getByRole('button', { name: 'Sailor', exact: true }).waitFor();
         await p.getByPlaceholder('Search Background...').fill('Sailor'); await p.evaluate(() => window.retire());
         await p.getByRole('button', { name: 'Sailor', exact: true }).waitFor(); assert.equal(await p.getByPlaceholder('Search Background...').inputValue(), 'Sailor'); assert.equal(await count(p, 'backgrounds'), 3);
+    });
+    const spell = {type:'Spell', uuid:'Compendium.shadowdark.spells.Item.light',name:'Light',system:{tier:1,class:['Compendium.shadowdark.classes.Item.wizard'],duration:{type:'rounds',value:2}}};
+    const owned = [{itemId:'customA',name:'Source-less spell',tier:1,uuid:null},{itemId:'customB',name:'Source-less spell',tier:1,uuid:null}];
+    await test('SD02-04/05 loaded picker preserves source-less duplicate Item IDs and unchanged save has empty intent', {which:'parity-picker',owned,limit:3,policy:{spells:{body:[]}}},async p=>{
+        await p.getByRole('button',{name:'Open spell manager'}).click();
+        await p.getByRole('button',{name:'Remove owned Source-less spell (customA)',exact:true}).waitFor();
+        await p.getByRole('button',{name:'Remove owned Source-less spell (customB)',exact:true}).waitFor();
+        await p.getByRole('button',{name:'SAVE CHANGES',exact:true}).click();
+        assert.deepEqual(await p.evaluate(()=>window.saved),{additions:[],removals:[]});
+    });
+    await test('SD02-04/05 explicit removal identifies only the reviewed duplicate; catalog denial never removes', {which:'parity-picker',owned,limit:3,policy:{spells:{status:403}}},async p=>{
+        await p.getByRole('button',{name:'Open spell manager'}).click();await p.getByRole('alert').waitFor();
+        assert.equal(await p.getByRole('button',{name:'SAVE CHANGES',exact:true}).isDisabled(),true);
+        await p.evaluate(()=>window.policy={spells:{body:[]}});await p.getByRole('button',{name:'Retry',exact:true}).click();
+        await p.getByRole('button',{name:'Remove owned Source-less spell (customB)',exact:true}).click();
+        await p.getByRole('button',{name:'SAVE CHANGES',exact:true}).click();
+        assert.deepEqual(await p.evaluate(()=>window.saved),{additions:[],removals:['customB']});
+    });
+    await test('SD02-07/08 zero quota disables additions and keyboard details use shared duration/range', {which:'parity-picker',owned:[],limit:0,policy:{spells:{body:[spell]}}},async p=>{
+        const opener=p.getByRole('button',{name:'Open spell manager'});await opener.focus();await p.keyboard.press('Enter');
+        await p.getByRole('dialog',{name:'Manage spells'}).waitFor();
+        assert.equal(await p.getByRole('button',{name:'Add Light',exact:true}).isDisabled(),true);
+        await p.getByRole('button',{name:'Light',exact:true}).focus();await p.keyboard.press('Enter');
+        await p.getByText('Range: Unavailable · Duration: 2 Rounds',{exact:true}).waitFor();
+        const save=p.getByRole('button',{name:'SAVE CHANGES',exact:true});await save.focus();await p.keyboard.press('Tab');
+        assert.equal(await p.evaluate(()=>document.querySelector('[role=dialog]').contains(document.activeElement)),true);
+        await p.keyboard.press('Escape');await p.getByRole('dialog').waitFor({state:'hidden'});assert.equal(await opener.evaluate(el=>el===document.activeElement),true);
+    });
+    await test('SD02-06/08 partial source failure remains explicit with owned rows and working recovery', {which:'parity-picker',owned,limit:3,policy:{spells:{body:{rows:[spell],state:'partial',sources:[{source:'world Items',status:'failed',reason:'permission denied'}]}}}},async p=>{
+        await p.getByRole('button',{name:'Open spell manager'}).click();await p.getByText(/Partial catalog/).waitFor();
+        await p.getByRole('button',{name:'Remove owned Source-less spell (customA)',exact:true}).waitFor();
+        await p.evaluate(()=>window.policy={spells:{body:[]}});await p.getByRole('button',{name:'Retry unavailable sources',exact:true}).click();
+        await p.getByText('No spells found matching your filter.',{exact:true}).waitFor();
+        assert.equal(await count(p,'spells'),2);
+    });
+    await test('SD02-04/08 pending context change retires late catalog, preserves owned rows/search and requires new intent', {which:'parity-picker',owned,limit:3,policy:{spells:{hold:true}}},async p=>{
+        await p.getByRole('button',{name:'Open spell manager'}).click();await p.waitForFunction(()=>window.pending.length===1);
+        await p.getByPlaceholder('Filter spells by name...').fill('Light');await p.evaluate(()=>{window.policy={spells:{body:[]}};window.retire()});
+        await p.getByText('No spells found matching your filter.',{exact:true}).waitFor();
+        await p.evaluate(spell=>window.answer(0,[spell]),spell);
+        assert.equal(await p.getByPlaceholder('Filter spells by name...').inputValue(),'Light');
+        assert.equal(await p.getByRole('button',{name:'Add Light',exact:true}).count(),0);
+        await p.getByRole('button',{name:'Remove owned Source-less spell (customA)',exact:true}).waitFor();
+        await p.getByRole('button',{name:'SAVE CHANGES',exact:true}).click();assert.deepEqual(await p.evaluate(()=>window.saved),{additions:[],removals:[]});
     });
 } finally { await browser.close(); fs.writeFileSync(path.join(out, 'results.json'), JSON.stringify(results, null, 2)); }
 console.log(`${results.filter(r => r.ok).length}/${results.length} passed`);

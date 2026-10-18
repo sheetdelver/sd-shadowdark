@@ -136,6 +136,7 @@ export function worldSnapshot(revision: number, stored: { usePulpMode?: unknown;
         settings: {
             'shadowdark.usePulpMode': result('usePulpMode', false),
             'shadowdark.autoConsumeAmmunition': result('autoConsumeAmmunition', true),
+            'shadowdark.sourceFilters': { status: 'registered-default', value: [] },
         },
     };
 }

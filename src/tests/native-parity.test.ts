@@ -10,14 +10,16 @@ import { handleActorView } from '../server/api/actor-view';
 import { prepareShadowdarkView } from '../logic/prepared-view';
 import { spellReview } from '../logic/spell-review';
 import { spellLimit } from '../logic/spell-model';
+import { handleManageSpells } from '../server/api/manage-spells';
+import { SdkError } from '@sheet-delver/sdk';
 const nativeRoot = process.env.SHADOWDARK_NATIVE ?? path.resolve(process.cwd(), 'temp/shadowdark');
 const packs = nativePacks(nativeRoot, DECLARED_PACKS.map(p => p.id));
 const rows: any[] = Object.entries(packs).flatMap(([pack, docs]) => docs.map(doc => ({ ...doc, pack, uuid: `Compendium.${pack}.${doc.type === 'Player' || doc.type === 'NPC' ? 'Actor' : pack.endsWith('tables') ? 'RollTable' : 'Item'}.${doc._id}` })));
 const byUuid = new Map(rows.map(doc => [doc.uuid, doc]));
 const adapter = new ShadowdarkAdapter();
-const documents: any = { get: async () => null, list: async () => ({ contents: [] }) };
-const caller: any = { runtime: { documents, access: { canReadPack: () => true } }, isGM: false };
-await adapter.initialize({ compendium: { findAll: async (type: string) => rows.filter(doc => type === 'Item' ? !['Player','NPC'].includes(doc.type) : type === doc.type), getById: async (pack: string, id: string) => rows.find(doc => doc.pack === pack && doc._id === id) ?? null }, documents, logger: console, world: { snapshot: () => worldSnapshot } } as any);
+const documents: any = { get: async () => null, list: async () => ({ rows: [], total: 0 }) };
+const caller: any = { runtime: { documents, access: { canReadPack: () => true }, world: { snapshot: () => worldSnapshot(1), assertRevision: () => {} } }, isGM: false };
+await adapter.initialize({ compendium: { findAll: async (type: string) => rows.filter(doc => type === 'Item' ? !['Player','NPC'].includes(doc.type) : type === doc.type), getById: async (_type: string, uuid: string) => byUuid.get(uuid) ?? null }, documents, logger: console, world: caller.runtime.world } as any);
 const KNIGHT = 'Compendium.shadowdark.classes.Item.0uVUOXKuX9xfJ600';
 const WITCH = 'Compendium.shadowdark.classes.Item.KGnBAFiTiLHZJUND';
 const talent = rows.find(doc => doc._id === 'XRW3jhpTni15hwFc')!;
@@ -85,6 +87,65 @@ await check('SD02-07 crafted advancement missing mandatory spell makes zero writ
     const res = await handleFinalizeLevelUp(actor._id, req);
     assert.equal(writes, 0, 'missing required spell must block HP/XP and Item writes');
     assert.equal(res.status, 400);
+});
+function management(failure = '') {
+    const actor = castingActor(); const events: string[] = []; let sequence = 0;
+    const receipts = new Map<string, any>();
+    const classDoc = { ...structuredClone(byUuid.get(WIZARD)), _id: 'worldClass', uuid: 'Item.worldClass' };
+    const spell = { _id: 'newSpell', uuid: 'Item.newSpell', name: 'Custom spell', type: 'Spell', system: { class: ['Item.worldClass'], tier: 1, source: { title: '' }, unknownField: { preserved: true } }, effects: [{ _id: 'unknownEffect', name: 'Source effect', disabled: false, transfer: true, changes: [], flags: { keep: true } }] };
+    const runtime: any = { world: caller.runtime.world, access: caller.runtime.access,
+        dataStore: { get: async (key: string) => receipts.has(key) ? structuredClone(receipts.get(key)) : null, set: async (key: string, value: any) => { receipts.set(key, structuredClone(value)); } },
+        documents: { get: async (type: string, id: string) => type === 'Actor' && id === actor._id ? structuredClone(actor)
+            : type === 'Item' && id === 'worldClass' ? structuredClone(classDoc) : type === 'Item' && id === 'newSpell' ? structuredClone(spell) : null,
+            list: async () => ({ rows: [spell], total: 1 }), items: {
+                create: async (_parent: any, data: any) => { events.push('create'); if (failure === 'denied') throw new SdkError('permission_denied', 'Controlled denial');
+                    const item = { ...structuredClone(data), _id: `created${++sequence}` }; actor.items.push(item); if (failure === 'lost-receipt') throw new Error('Create response lost'); return structuredClone(item); },
+                delete: async (_parent: any, id: string) => { events.push('delete'); if (failure === 'delete') throw new SdkError('permission_denied', 'Controlled deletion denial'); actor.items = actor.items.filter((item: any) => item._id !== id); },
+            } } };
+    const body = { requestId: `manage-${Math.random().toString(36).slice(2)}`, baseline: spellReview(actor), listUuid: 'Item.worldClass', tier: 1, additions: ['Item.newSpell'], removals: ['spellA'] };
+    const run = () => handleManageSpells(actor._id, { runtime, userSession: { userId: 'sanitized' }, json: async () => structuredClone(body) } as any);
+    return { actor, events, receipts, body, runtime, run, recover: () => { failure = ''; } };
+}
+await check('SD02-04/05 no-op save, duplicate copies and explicit exact-ID removal', async () => {
+    const test = management(); const before = structuredClone(test.actor);
+    test.body.additions = []; test.body.removals = [];
+    assert.equal((await test.run()).status, 200); assert.deepEqual(test.events, []); assert.deepEqual(test.actor, before);
+    const replacement = management();
+    const res: any = await (await replacement.run()).json(); assert.equal(res.state, 'complete'); assert.deepEqual(replacement.events, ['create','delete']);
+    assert.equal(replacement.actor.items[0]._stats.compendiumSource, 'Item.newSpell');
+    assert.deepEqual(replacement.actor.items[0].system.unknownField, { preserved: true });
+    assert.deepEqual(replacement.actor.items[0].effects[0].flags, { keep: true });
+    assert.equal((await (await replacement.run()).json() as any).replayed, true); assert.deepEqual(replacement.events, ['create','delete']);
+});
+await check('SD02-05 failed addition never removes; permission restoration retries same receipt', async () => {
+    const test = management('denied');
+    const first: any = await (await test.run()).json(); assert.equal(first.state, 'partial'); assert.deepEqual(test.events, ['create']); assert.equal(test.actor.items[0]._id, 'spellA');
+    test.recover(); const retry: any = await (await test.run()).json(); assert.equal(retry.state, 'complete'); assert.deepEqual(test.events, ['create','create','delete']);
+});
+await check('SD02-05 uncertain create and restart-shaped receipts never duplicate or remove', async () => {
+    const test = management('lost-receipt');
+    const first: any = await (await test.run()).json(); assert.equal(first.operations[0].status, 'uncertain'); assert.deepEqual(test.events, ['create']);
+    assert.equal(test.actor.items.length, 2); test.recover();
+    await test.run(); assert.deepEqual(test.events, ['create']); assert.equal(test.actor.items.length, 2);
+    for (const row of test.receipts.values()) row.operations[0].status = 'started';
+    await test.run(); assert.deepEqual(test.events, ['create']);
+});
+await check('SD02-05 deletion retry does not repeat confirmed addition; actor edits require review', async () => {
+    const test = management('delete');
+    assert.equal((await (await test.run()).json() as any).state, 'partial'); assert.deepEqual(test.events, ['create','delete']);
+    test.recover(); assert.equal((await (await test.run()).json() as any).state, 'complete'); assert.deepEqual(test.events, ['create','delete','delete']);
+    const stale = management('delete'); await stale.run(); stale.actor.system.level.xp++;
+    assert.equal((await stale.run()).status, 409); assert.deepEqual(stale.events, ['create','delete']);
+});
+await check('SD02-06 partial catalog, source filters and legitimate empty preserve ownership', async () => {
+    const test = management(); const before = structuredClone(test.actor);
+    test.runtime.documents.list = async () => { throw new SdkError('permission_denied', 'World Items denied'); };
+    let catalog = await adapter.spellCatalog({ runtime: test.runtime, isGM: false }, WIZARD);
+    assert.equal(catalog.state, 'partial'); assert.ok(catalog.rows.length); assert.ok(catalog.sources.some(row => row.reason?.includes('denied')));
+    test.runtime.world = { snapshot: () => ({ ...worldSnapshot(2), settings: { ...worldSnapshot(2).settings, 'shadowdark.sourceFilters': { status: 'world', value: ['No native source selected'] } } }) };
+    test.runtime.documents.list = async () => ({ rows: [], total: 0 });
+    catalog = await adapter.spellCatalog({ runtime: test.runtime, isGM: false }, 'Item.noClass');
+    assert.equal(catalog.state, 'complete'); assert.deepEqual(catalog.rows, []); assert.deepEqual(test.actor, before);
 });
 console.log(JSON.stringify({ method: 'Controlled native pack sources and actual module routes; not native acceptance', checks }, null, 2));
 if (checks.some(row => !row.passed) && !process.argv.includes('--baseline')) process.exitCode = 1;

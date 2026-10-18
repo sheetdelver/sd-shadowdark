@@ -6,6 +6,7 @@ import { handleGetDocument } from './api/document';
 import { handleEffects } from './api/effects';
 import { handleActorAction } from './api/actions';
 import { handleActorView } from './api/actor-view';
+import { handleManageSpells } from './api/manage-spells';
 import { handleLuck } from './api/luck';
 import { handleBestiaryCard, handleBestiaryList } from './api/bestiary';
 import { getErrorMessage, isSdkError } from '@sheet-delver/sdk';
@@ -101,6 +102,9 @@ export const apiRoutes = {
     },
     'actors/[id]/level-up/roll-boon': async (req: ModuleServerRequest, { params }: ModuleServerParams) => {
         return handleRollBoon(await actorIdFrom(params), req);
+    },
+    'actors/[id]/spells/manage': async (req: ModuleServerRequest, { params }: ModuleServerParams) => {
+        return handleManageSpells(await actorIdFrom(params), req);
     },
     'actors/[id]/spells/learn': async (req: ModuleServerRequest, { params }: ModuleServerParams) => {
         return handleLearnSpell(await actorIdFrom(params), req);

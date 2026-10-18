@@ -113,5 +113,6 @@ export function useShadowdarkCollections(packIds: readonly string[], enabled = t
         if (systemStatus !== 'ready') retrySystem();
         else ids.forEach(retryCollection);
     };
-    return { collections, collectionStates, generation, ready, loading: enabled && !ready && !error, error, retry };
+    const warnings = ids.flatMap(id => { const state = collectionStates[id]; return state?.status === 'ready' ? state.warnings ?? [] : []; });
+    return { collections, collectionStates, generation, ready, loading: enabled && !ready && !error, error, warnings, retry };
 }

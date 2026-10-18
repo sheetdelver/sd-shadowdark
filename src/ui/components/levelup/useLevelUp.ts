@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { isClassSpellcaster } from '../../../logic/rules';
 import { logger } from '@sheet-delver/sdk';
 import { useSDK } from '@sheet-delver/sdk/react';
@@ -80,7 +80,7 @@ export const useLevelUp = (props: LevelUpProps) => {
         onComplete,
     } = props;
 
-    const { systemData, collections } = useShadowdarkUI();
+    const { systemData, collections, generation } = useShadowdarkUI();
     const { fetchWithAuth } = useSDK();
 
     const availableClasses = useMemo(() => {
@@ -111,6 +111,11 @@ export const useLevelUp = (props: LevelUpProps) => {
     const [confirmReroll, setConfirmReroll] = useState(false);
 
     const [targetClassUuid, setTargetClassUuid] = useState(classUuid || "");
+    const authorityKey = JSON.stringify([actorId, targetClassUuid, classUuid, currentLevel, targetLevel, generation]);
+    const authorityRef = useRef(authorityKey); authorityRef.current = authorityKey;
+    const dataSequence = useRef(0);
+    const [levelData, setLevelData] = useState<{ key: string; ready: boolean }>({ key: '', ready: false });
+    useEffect(() => () => { dataSequence.current++; }, []);
     const [activeClassObj, setActiveClassObj] = useState<any>(classObj);
 
     // Sync props to state if not yet set
@@ -248,6 +253,9 @@ export const useLevelUp = (props: LevelUpProps) => {
 
     const fetchLevelUpData = useCallback(async (classUuidOverride?: string) => {
         if (!actorId && !classUuidOverride) return;
+        const key = authorityKey, sequence = ++dataSequence.current;
+        const stale = () => key !== authorityRef.current || sequence !== dataSequence.current;
+        setLevelData({ key, ready: false });
         try {
             let url = `/api/modules/shadowdark/actors/${actorId || 'new'}/level-up/data`;
             const params = new URLSearchParams();
@@ -261,9 +269,13 @@ export const useLevelUp = (props: LevelUpProps) => {
 
             const res = await fetchWithAuth(url, { headers, cache: 'no-store' });
             const json = await res.json();
+            if (stale()) return;
+            if (!res.ok || !json.success || !json.data) throw new Error(json.error?.message ?? json.error ?? `Advancement data HTTP ${res.status}`);
 
             if (json.success && json.data) {
                 const apiData = json.data;
+                setLevelData({ key, ready: apiData.progressionReady !== false });
+                if (apiData.diagnostics?.length) setError(apiData.diagnostics.join(' '));
                 const isCaster = apiData.isSpellcaster;
                 if (isCaster !== undefined) setIsSpellcaster(isCaster);
 
@@ -294,10 +306,13 @@ export const useLevelUp = (props: LevelUpProps) => {
                 }));
             }
         } catch (e) {
+            if (stale()) return;
             logger.error("Failed to fetch level up data", e);
+            setError(`Advancement data is unavailable: ${getErrorMessage(e)}. Reopen after refreshing to retry.`);
+            setLevelData({ key, ready: false });
             setStatuses(prev => ({ ...prev, class: 'ERROR' }));
         }
-    }, [actorId, fetchWithAuth, selectedPatronUuid]);
+    }, [actorId, fetchWithAuth, selectedPatronUuid, authorityKey]);
 
     const handlePatronChange = useCallback((uuid: string) => {
         setSelectedPatronUuid(uuid);
@@ -1246,6 +1261,7 @@ export const useLevelUp = (props: LevelUpProps) => {
 
     // Validation
     const isComplete = useCallback(() => {
+        if (levelData.key !== authorityKey || !levelData.ready) return false;
         if (!fixedChoices || fixedChoices.key !== fixedChoiceKey || fixedChoices.error) return false;
         // 1. Talents
         for (const handler of TALENT_HANDLERS) {
@@ -1352,7 +1368,7 @@ export const useLevelUp = (props: LevelUpProps) => {
 
         return true;
     }, [
-        rolledTalents, requiredTalents, targetLevel, existingItems, statSelection, statPool, weaponMasterySelection, armorMasterySelection, activeClassObj, fixedChoices, fixedChoiceKey,
+        rolledTalents, requiredTalents, targetLevel, existingItems, statSelection, statPool, weaponMasterySelection, armorMasterySelection, activeClassObj, fixedChoices, fixedChoiceKey, levelData, authorityKey,
         rolledBoons, choiceRolls,
         extraSpellSelection, extraSpellData.ready, extraSpellsList, needsMastery, masteryData.ready, masteryData.catalog,
         languageGroups, availableLanguages, fixedLanguages, selectedLanguages, knownLanguages,

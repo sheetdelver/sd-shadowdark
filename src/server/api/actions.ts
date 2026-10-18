@@ -179,7 +179,7 @@ async function execute(actorId: string, body: ActionBody, req: ModuleServerReque
     const triggering = items.find(item => documentId(item) === body.itemId);
     if (!triggering) throw new ActionError('not_found', 'The item is no longer on this Actor.');
 
-    const lookups = await shadowdarkAdapter.callerLookups(actor, callerOf(req));
+    const lookups = body.kind === 'spell' ? await shadowdarkAdapter.callerLookups(actor, callerOf(req)) : shadowdarkAdapter.lookups();
     // Rule inputs from the request's world context; Core pins its revision for this request.
     const core = prepareActorCore(actor, lookups, requestRules(req.runtime));
     const request: ActionRequest = { kind: body.kind!, itemId: body.itemId, spellIndex: body.spellIndex, selected: body.selected };

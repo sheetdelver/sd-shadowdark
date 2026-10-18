@@ -654,3 +654,31 @@ SD02-07: explicit null/zero and unavailable limits are distinguished. The crafte
 missing-choice advancement changes from one Actor write to400 and zero writes.
 The maintained native-parity suite passes6/6 controlled checks; module/UI/hook
 typing passes. These are module/source tests, not native Foundry acceptance.
+
+## D3/D4 correction evidence — October 18, 2026
+
+- SD02-04: two source-less duplicates remain separate owned rows with Item IDs.
+  An unchanged mounted save emits empty intent; a deliberate removal identifies
+  only the selected duplicate. Catalog omissions never establish deletion.
+- SD02-05: failed creation leaves the old spell; restored permission retries the
+  same receipt. Lost create acknowledgement leaves both copies and stops all
+  later removals. Restart-shaped started receipts never create again. Deletion
+  retry does not repeat confirmed additions; unrelated source edits yield409.
+  These controlled tests do not assert distributed/atomic writes.
+- SD02-06: world-read denial gives partial coverage and keeps readable pack rows.
+  Valid empty results remain complete. Native sourceFilters is consumed through
+  world context; no Setting transport or privileged fallback was added.
+- SD02-07: zero disables additions; unknown limits are explicit. Advancement
+  requires exact Class/list/count data before HP/XP/items and remains incomplete
+  when a required catalog is empty. HP/XP controls still pass61/61 alignment.
+- SD02-08: the actual picker has shared dialog semantics/focus containment,
+  keyboard expansion and Escape/restoration; shared duration displays2 Rounds
+  and missing range is Unavailable. Pending invalidation retires a late catalog
+  while retaining search and owned rows.
+
+`collection-consumers.browser.mjs --parity-only --baseline=f5838a8` exercises the
+old maintained picker with the same current fixtures/assertions:0/5 pass. Current
+code passes5/5 and34/34 including the previous RV-10/11/RV-16 controls.
+`native-parity.test.ts` passes11/11 controlled cases. Explicit module/UI/hook
+typing passes on Core0.19.3; final packaged/public Core0.19.2 proof is pending.
+No actual native A02 case is marked passed by these results.

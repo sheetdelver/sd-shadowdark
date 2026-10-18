@@ -412,6 +412,9 @@ async function levelUpExperience() {
     // Native 4.0.6 LevelUpSD._finalizeLevelUp carries excess XP after paying
     // current level * 10; the first advancement from level zero starts at zero.
     // Literal outcomes include the independently reproduced native 25 -> 15 case.
+    const resolve = shadowdarkAdapter.resolveDocumentFor;
+    const fighter = { _id: 'hO7KrvqDRH6kvftJ', uuid: 'Compendium.shadowdark.classes.Item.hO7KrvqDRH6kvftJ', name: 'Fighter', type: 'Class', system: { hitPoints: 'd8', spellcasting: { ability: '', class: '__not_spellcaster__' } }, effects: [] };
+    shadowdarkAdapter.resolveDocumentFor = async uuid => uuid === fighter.uuid ? structuredClone(fighter) : null;
     const catalog = shadowdarkAdapter.getChoiceCatalog;
     shadowdarkAdapter.getChoiceCatalog = async () => choiceCatalog([]);
     try {
@@ -419,7 +422,7 @@ async function levelUpExperience() {
             [0, 7, 1, 0], [1, 10, 2, 0], [1, 25, 2, 15], [2, 35, 3, 15],
         ]) {
             await check('RV-14', `level ${currentLevel} / ${xp} XP advances to ${targetLevel} / ${expectedXp} XP`, async () => {
-                const actor: any = primLike();
+                const actor: any = primLike(); actor.items.push({ ...structuredClone(fighter), _id: 'ownedClass', _stats: { compendiumSource: fighter.uuid } });
                 actor.system.level = { value: currentLevel, xp };
                 const before = structuredClone(actor);
                 const patches: any[] = [];
@@ -439,18 +442,21 @@ async function levelUpExperience() {
                 assert.deepEqual(actor, before, 'advancement must not mutate its read source');
             });
         }
-    } finally { shadowdarkAdapter.getChoiceCatalog = catalog; }
+    } finally { shadowdarkAdapter.getChoiceCatalog = catalog; shadowdarkAdapter.resolveDocumentFor = resolve; }
 }
 
 async function levelUpHitPoints() {
     // Literal native LevelUpSD outcomes: first level replaces the pool with
     // hit die + prepared CON (minimum one); later levels add to prepared HP.
+    const resolve = shadowdarkAdapter.resolveDocumentFor;
+    const fighter = { _id: 'hO7KrvqDRH6kvftJ', uuid: 'Compendium.shadowdark.classes.Item.hO7KrvqDRH6kvftJ', name: 'Fighter', type: 'Class', system: { hitPoints: 'd8', spellcasting: { ability: '', class: '__not_spellcaster__' } }, effects: [] };
+    shadowdarkAdapter.resolveDocumentFor = async uuid => uuid === fighter.uuid ? structuredClone(fighter) : null;
     const catalog = shadowdarkAdapter.getChoiceCatalog;
     shadowdarkAdapter.getChoiceCatalog = async () => choiceCatalog([]);
     try {
         for (const [level, con, roll, expected] of [[0, 12, 3, 4], [0, 6, 1, 1], [0, 18, 3, 7], [1, 12, 3, 11]]) {
             await check('RV-15', `native HP at level ${level + 1}, CON ${con}, roll ${roll} is ${expected}`, async () => {
-                const actor: any = primLike(); actor.system.level = { value: level, xp: 20 };
+                const actor: any = primLike(); actor.items.push({ ...structuredClone(fighter), _id: 'ownedClass', _stats: { compendiumSource: fighter.uuid } }); actor.system.level = { value: level, xp: 20 };
                 actor.system.abilities.con = { value: con };
                 const before = structuredClone(actor);
                 const response = await handleFinalizeLevelUp(actor._id, {
@@ -464,9 +470,9 @@ async function levelUpHitPoints() {
                 assert.deepEqual(actor, before);
             });
         }
-    } finally { shadowdarkAdapter.getChoiceCatalog = catalog; }
+    } finally { shadowdarkAdapter.getChoiceCatalog = catalog; shadowdarkAdapter.resolveDocumentFor = resolve; }
     await check('RV-15', 'generator and advancement prepare granted CON before first-level HP', () => {
-        const actor: any = primLike(); actor.system.abilities.con = { value: 8 };
+        const actor: any = primLike(); actor.items.push({ ...structuredClone(fighter), _id: 'ownedClass', _stats: { compendiumSource: fighter.uuid } }); actor.system.abilities.con = { value: 8 };
         actor.items.push({ _id: 'conGrant', name: '+2 Constitution', type: 'Talent', system: {}, effects: [{
             _id: 'conEffect', changes: [{ key: 'system.abilities.con.value', mode: 2, value: '2' }],
         }] });
@@ -475,7 +481,7 @@ async function levelUpHitPoints() {
         assert.deepEqual(actor, before);
     });
     await check('RV-15', 'later advancement retains wounds and native prepared HP bonuses', () => {
-        const actor: any = primLike(); actor.system.attributes.hp = { value: 4, max: 8 };
+        const actor: any = primLike(); actor.items.push({ ...structuredClone(fighter), _id: 'ownedClass', _stats: { compendiumSource: fighter.uuid } }); actor.system.attributes.hp = { value: 4, max: 8 };
         actor.effects = [{ _id: 'hpGrant', name: 'HP grant', changes: [{ key: 'system.attributes.hp.max', mode: 2, value: '2' }] }];
         assert.deepEqual(advancementHitPoints(prepareActorCore(actor), 3, 3), { value: 7, max: 13 });
     });

@@ -17,6 +17,7 @@
 export const WORLD_SETTING_KEYS = {
     usePulpMode: 'shadowdark.usePulpMode',
     autoConsumeAmmunition: 'shadowdark.autoConsumeAmmunition',
+    sourceFilters: 'shadowdark.sourceFilters',
 } as const;
 
 export type WorldSettingName = keyof typeof WORLD_SETTING_KEYS;
@@ -31,6 +32,20 @@ export interface RuleInputs {
     contextRevision: number | null;
     usePulpMode: RuleSetting;
     autoConsumeAmmunition: RuleSetting;
+    sourceFilters?: SourceFilters;
+}
+export type SourceFilters = { status: 'world' | 'registered-default'; value: string[] }
+    | { status: 'unavailable'; value: null; reason: string };
+export function readSourceFilters(snapshot: WorldSnapshotLike | null | undefined): SourceFilters {
+    const row = snapshot?.settings?.[WORLD_SETTING_KEYS.sourceFilters] as any;
+    if ((row?.status === 'world' || row?.status === 'registered-default') && Array.isArray(row.value) && row.value.every((value: unknown) => typeof value === 'string'))
+        return { status: row.status, value: [...row.value] };
+    return { status: 'unavailable', value: null, reason: 'Native source filters are unavailable or invalid; refresh the world context.' };
+}
+/** CompendiumsSD._documents: empty selection/all blank source titles remain visible. */
+export function sourceAllowed(doc: any, filters: readonly string[]): boolean {
+    const title = doc?.system?.source?.title ?? '';
+    return filters.length === 0 || title === '' || filters.includes(title);
 }
 
 /** Structural subset of the SDK `ModuleWorldSnapshot`, so this file stays environment-neutral. */
@@ -56,6 +71,7 @@ export function ruleInputsFrom(snapshot: WorldSnapshotLike | null | undefined): 
         contextRevision: typeof snapshot?.identity?.contextRevision === 'number' ? snapshot.identity.contextRevision : null,
         usePulpMode: readSetting(snapshot, WORLD_SETTING_KEYS.usePulpMode),
         autoConsumeAmmunition: readSetting(snapshot, WORLD_SETTING_KEYS.autoConsumeAmmunition),
+        sourceFilters: readSourceFilters(snapshot),
     };
 }
 

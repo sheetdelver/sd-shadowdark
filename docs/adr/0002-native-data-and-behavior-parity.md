@@ -363,3 +363,42 @@ missing-choice request. Explicit module/UI/hook typing passes on current Core.
 The existing native-alignment suite passed 61/61 before the advancement preflight;
 full rerun follows this checkpoint. Installed 0.19.2/0.19.3 public-interface proof,
 managed intent, catalog/UI and native acceptance remain required.
+
+## D3/D4 explicit inventory intent and caller catalog — October 18, 2026
+
+Spell management now sends exact source additions and deliberate owned Item-ID
+removals to one owner-bound server operation. It preflights list/tier, quotas,
+source filters, permissions and a source review before writing. Additions precede
+removals; an unsuccessful/uncertain addition stops replacement. Durable SDK
+DataStore receipts store operation identities, review hashes and outcomes, not a
+world-data cache. Confirmed operations are not repeated. An interrupted create is
+uncertain, never identified by a name/origin guess. Process-local Actor queues
+serialize these operations; the public SDK supplies no distributed CAS/atomicity.
+Partial receipts from a previous server process require fresh inventory review;
+completed receipts replay without writes. Installed restart proof remains D6.
+
+The picker keeps source-less/duplicate owned rows independently of catalog data.
+Cancel/unchanged save has no writes. Failed reads cannot generate removals.
+Unresolved class rows remain visible/count separately and block quota additions
+until exact-source resolution. Existing excess is preserved. Progression errors
+and empty required catalogs block advancement; its Class is resolved from the
+actual Actor when omitted by the request.
+
+The existing shared collection store now accepts an explicit complete/partial
+spell catalog. It combines caller-readable declared packs and world Items, keeps
+per-source failures, and exposes recovery without treating missing data as empty
+success. It does not claim arbitrary undeclared-pack discovery (F06).
+`shadowdark.sourceFilters` is an authenticated preparation-affecting world Array;
+native declarations/default[] match across4.0.0–4.0.6. Choices follow native source
+title filtering; owned content and grants are unaffected.
+
+Spell selection uses ModuleDialog and shared range/duration formatting. Owned
+removal and catalog addition buttons are keyboard operable, named and distinct.
+Refresh retains search; changed authority retires intent. Resource-card stacking
+uses suspension. The five new actual-consumer browser regressions fail against
+`f5838a8` (0/5), pass against the implementation (5/5), and the complete maintained
+consumer run passes34/34. Eleven controlled native-parity cases pass; explicit
+typing passes. The older suites retain their assertions, with caller/Class
+fixtures corrected to exercise the now-required preflight; native alignment is
+61/61, boundaries53/53 and world adoption13/13. Final floor/current installed
+archive checks and all A02 native acceptance remain pending.

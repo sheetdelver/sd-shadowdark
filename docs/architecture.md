@@ -57,6 +57,25 @@ planned/active grants. Mandatory tier choices are validated before all writes;
 missing catalogs and invalid progression do not waive choices. HP/XP computation
 is unchanged. Generic Core preparation remains synchronous and user-invariant.
 
+The spell picker consumes `derived.spellModel` owned rows and the shared caller
+spell catalog. Management sends exact additions and owned Item-ID removals to
+`actors/:id/spells/manage`; it never subtracts the catalog from inventory. The
+server validates the reviewed source, list, tier, progression limit and native
+source filters before writes. Adds run first and stop removal on failure or
+uncertainty. Durable module operation receipts preserve confirmed identities;
+unknown creates require explicit inventory review. The process queue is not a
+distributed transaction. Partial receipts from another process require fresh
+review; completed receipts never repeat their writes.
+
+`fetch-pack/spells` and `spells/list` use one catalog over readable declared packs
+and caller-visible world Items. The collection store retains rows plus explicit
+partial-source warnings/retry, under its existing world/caller/context lifecycle.
+Native `sourceFilters` is a world Array (default[] proven4.0.0–4.0.6) read from
+Core context, filtering choices by native source title without changing owned
+items. Known exact undeclared-pack reads and catalog discovery are separate.
+The picker uses ModuleDialog, shared range/duration facts and separate owned
+removal/addition controls. Search survives refresh; authority changes retire intent.
+
 ## Known spell workflow gaps in 0.9.5
 
 Casting actions are shared, but spell management is not yet a unified model.

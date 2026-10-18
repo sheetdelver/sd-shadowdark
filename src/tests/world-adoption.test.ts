@@ -101,7 +101,7 @@ async function projections() {
     let allowSpells = true;
     // This world restricts monsters from the player and, mid-test, revokes spells.
     const player = () => ({ runtime: { documents: { get: async () => null, list: async () => ({ rows: [], total: 0 }), fetchByUuid: async () => null },
-        compendium: packReader(rows), access: packAccess(pack => pack !== 'shadowdark.monsters' && (allowSpells || pack !== 'shadowdark.spells')) },
+        compendium: packReader(rows), world: worldHandle(worldSnapshot(1)), access: packAccess(pack => pack !== 'shadowdark.monsters' && (allowSpells || pack !== 'shadowdark.spells')) },
         url: 'http://localhost/x?class=Compendium.shadowdark.classes.Item.wiz', userSession: { userId: 'p1', isGM: false } }) as any;
     const gm = () => ({ ...player(), runtime: { ...player().runtime, access: packAccess(() => true) }, userSession: { userId: 'gm', isGM: true } }) as any;
 
@@ -125,7 +125,9 @@ async function projections() {
         allowSpells = false;
         try {
             assert.equal((await statusOf(await handleGetDocument(player(), params(['document', SPELL.uuid])))).status, 403, 'revocation applies to a warm cache');
-            assert.equal((await statusOf(await handleGetCollection(player(), 'spells'))).status, 403);
+            const catalog = await statusOf(await handleGetCollection(player(), 'spells'));
+            assert.equal(catalog.status, 200); assert.equal(catalog.body.state, 'partial'); assert.deepEqual(catalog.body.rows, []);
+            assert.ok(catalog.body.sources.some((source: any) => source.source === 'shadowdark.spells' && source.status === 'failed'));
             assert.deepEqual((await statusOf(await handleGetSpellsBySource(player()))).body.spells, [], 'class spell list follows the capability');
             assert.equal(await shadowdarkAdapter.drawTable(TABLE.uuid, { runtime: player().runtime, isGM: false }).then((draw: any) => draw.items.length), 0,
                 'a drawn result in a revoked pack is not hydrated');

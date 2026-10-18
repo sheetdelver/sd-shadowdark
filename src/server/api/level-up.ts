@@ -9,7 +9,7 @@ import { callerOf, requestRules } from '../access';
 import { hitPointRollFormula } from '../../logic/actions';
 import { prepareActorCore } from '../../logic/actor-preparation';
 import { advancementHitPoints } from '../../logic/advancement';
-import { advancementSpellChoices, spellListIdentity } from '../../logic/spell-model';
+import { advancementSpellChoices, grantedSpellSources, prepareSpellModel, spellListIdentity } from '../../logic/spell-model';
 
 /**
  * Rolled talents/boons and chosen spells are re-read from their exact source.
@@ -371,7 +371,8 @@ export async function handleFinalizeLevelUp(actorId: string, req: ModuleServerRe
             if (!doc || doc.type !== type) throw new Error(`${type} ${String(uuid)} is not available.`);
             return { ...doc, uuid: canonicalUuid(uuid) ?? doc.uuid };
         };
-        const classObj = await resolveTyped(body.classUuid, 'Class');
+        const classObj = await resolveTyped(body.classUuid ?? actor?.system?.class, 'Class');
+        if (!classObj) return error('validation', 'An exact readable Class is required before advancement.');
         const ancestry = await resolveTyped(body.ancestryUuid, 'Ancestry');
         const background = await resolveTyped(body.backgroundUuid, 'Background');
         const patron = await resolveTyped(body.patronUuid, 'Patron');
@@ -404,13 +405,17 @@ export async function handleFinalizeLevelUp(actorId: string, req: ModuleServerRe
         const planned = { ...(actor ?? { type: 'Player', items: [], effects: [] }),
             system: { ...(actor?.system ?? {}), class: classObj?.uuid ?? actor?.system?.class },
             items: [...(actor?.items ?? []), ...finalItems] };
-        const core = prepareActorCore(planned, await shadowdarkAdapter.callerLookups(planned, callerOf(req)), requestRules(req.runtime));
+        const lookups = await shadowdarkAdapter.callerLookups(planned, callerOf(req));
+        const core = prepareActorCore(planned, lookups, requestRules(req.runtime));
         const casting = 'classes' in core.spellcasting && core.spellcasting.classes.length > 0;
         const choices = casting ? advancementSpellChoices(classObj, currentLevel, targetLevel) : { required: {} as Record<number, number>, diagnostics: [] };
         if (classObj?.system?.spellcasting?.ability && !casting) return error('validation', 'Missing casting grant; review the exact Class talents before advancing.');
+        if (classObj?.system?.spellcasting?.ability && !prepareSpellModel(planned, core, lookups).sources.length) return error('validation', 'The Actor’s active grant does not match its exact spell-list Class.');
         if (choices.diagnostics.length) return error('validation', choices.diagnostics.join(' '));
         const selected = state.selectedSpells;
         const identities = selected.map((spell: any) => canonicalUuid(spell.uuid));
+        const innate = grantedSpellSources(planned.items);
+        if (identities.some((uuid: string | null) => uuid && innate.has(uuid))) return error('validation', 'Granted spells do not fill required ordinary spell choices.');
         if (new Set(identities).size !== identities.length) return error('validation', 'A required spell source may be selected only once.');
         if (selected.some((spell: any) => !Number.isInteger(spell.system?.tier) || spell.system.tier < 1 || spell.system.tier > 5)) return error('validation', 'Selected spell has an invalid native tier.');
         for (let tier = 1; tier <= 5; tier++) {
