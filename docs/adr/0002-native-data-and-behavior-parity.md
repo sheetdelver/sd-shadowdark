@@ -629,3 +629,28 @@ floor's public workflow13. Full14 suites+parity+typing passed both hosts, and20
 native-method checks matched. The final source archive and affected installed
 checks are rerun; no intermediate run is promoted to final acceptance. Every
 actual native A02 row remains open.
+
+## Final controlled verification — October 18, 2026
+
+The final runtime checkpoint is `50759ae`; module0.9.5 archive SHA-256 is
+`76d127ee33cb463ad93f0ab5f01f0678e3e8c67d1158e106a8d8546e73ac14a3`.
+All fourteen maintained suites, parity17/17 and explicit module/UI/hook typing
+pass on Core0.19.2 and0.19.3. Native-source conformance is89/89; actual controlled
+native-method comparisons20/20 retain the69/31/9/4/9 controls. Mounted collection/
+action/Actor lifecycle cases pass41/6/5. Module checking and isolated packaging pass.
+The installed final archive passes30 released-floor development checks (all eight
+width/theme cases) and22 current-production checks (matrix explicitly omitted).
+World Item permission/source events, pending/loaded invalidation, exact caller
+privacy, creation/import source preservation,1000 additional inventory rows,
+explicit replacement and real restart receipts all pass. Both migration shapes
+and every location pass independent source/receipt/restart/restored-data checks;
+existing required identities/history and broader inventory evidence are preserved.
+
+See the [durable validation record](../audits/2026-10-18-adr-0002-validation.md)
+for commit contents, finding-specific before/after evidence, artifact paths and
+scope qualifications. Generic Core Actor creation still strips string arrays;
+this module uses the proven public SDK path. Explicit session-kick recovery is
+separate from passing transient reconnect, with no module workaround.
+All task services stopped; operator services preserved. No native world was
+contacted. **D6 native, D7 final closure and A02-01–15 remain open on both native
+generations** pending confirmed disposable-world authority and execution.

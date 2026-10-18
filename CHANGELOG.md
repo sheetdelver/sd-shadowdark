@@ -8,10 +8,10 @@ Historical entries are reconstructed from [published releases](https://github.co
 - Retain open sheet state and retire stale action callbacks during context changes
 - Preserve native creation arrays and precise caller denial responses
 
-- Exact caller spell dependencies and native alternate progression
+- Exact caller spell dependencies, advancement dice and native alternate progression
 - Required advancement spell validation before writes
 - Explicit owned-spell changes, durable receipts and safe partial recovery
-- Caller spell catalogs, native source filters and accessible selection dialogs
+- Reactive caller/world spell catalogs, native source filters and accessible selection dialogs
 - Native ability spending and complete Potion identification before results
 - Safe action receipt recovery, NPC focus loss and disabled critical thresholds
 - Native language rarity and separate validated creation choices

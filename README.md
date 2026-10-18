@@ -41,3 +41,7 @@ management with partial-operation receipts, native action phases and separate
 language choices. Historical omissions require [exact-source GM review](docs/native-source-remediation.md).
 Native A02 acceptance remains open; controlled-upstream checks are not Foundry
 acceptance. Compatibility and module version remain unchanged.
+
+The [ADR-0002 validation record](docs/audits/2026-10-18-adr-0002-validation.md)
+records final archive identity, checkpoint commits, controlled results and the
+remaining native A02-01–15 gates.

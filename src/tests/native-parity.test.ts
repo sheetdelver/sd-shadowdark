@@ -196,8 +196,11 @@ await check('SD02-01 native fixed grants survive creation copies; exact-source h
     assert.equal(prepareShadowdarkView(explicit, { classDocument: () => byUuid.get(WIZARD) }).actions.find(row => row.kind === 'spell')!.available, true);
     explicit.items.pop(); assert.deepEqual(explicit, missing);
     const wrong = knight(); wrong.items[1].effects[0].changes.find((change: any) => change.key === 'system.spellcasting.classes').value = 'knight-of-st.-ydris';
+    wrong.items[1].effects[0].flags = { custom: { keep: true } };
+    wrong.items[1].effects[0].changes[0].unknownSourceField = 'keep';
     const reviewedKnight = structuredClone(wrong);
-    reviewedKnight.items[1].effects[0].changes = structuredClone(talent.effects[0].changes);
+    const nativeGrant = talent.effects[0].changes.find((change: any) => change.key === 'system.spellcasting.classes');
+    reviewedKnight.items[1].effects[0].changes.find((change: any) => change.key === nativeGrant.key).value = nativeGrant.value;
     const knightLookups = { classDocument: (ref: any) => byUuid.get(ref.kind === 'compendium' ? `Compendium.${ref.pack}.${ref.documentType}.${ref.id}` : '') };
     assert.equal(prepareShadowdarkView(reviewedKnight, knightLookups).spellModel.sources[0].listUuid, WITCH);
     reviewedKnight.items[1].effects[0].changes = structuredClone(wrong.items[1].effects[0].changes); assert.deepEqual(reviewedKnight, wrong);

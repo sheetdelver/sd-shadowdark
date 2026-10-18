@@ -601,3 +601,7 @@ World Item detail/directory hints coalesce into the same collection generation
 invalidation as context changes; pending catalog responses retire and open pickers
 retain search. HP rolls read the exact referenced Class die, never an unrelated
 owned copy or an unavailable-source fallback.
+
+Final controlled evidence and package identity are recorded in the
+[ADR-0002 validation record](audits/2026-10-18-adr-0002-validation.md).
+Actual native A02-01–15 acceptance remains open on both generations.

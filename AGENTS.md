@@ -281,3 +281,8 @@ retain403 versus concealed404 semantics. Context revalidation preserves mounted
 manual state but retires action callbacks/results; keep both browser regressions.
 Actor creation uses the caller SDK route, never the generic writer that strips
 native Item string arrays.
+
+World Spell catalog changes use public Item document/detail-directory hints,
+coalesced through the existing shared store; cover loaded and pending consumers.
+Advancement HP dice come from the exact selected Class; missing source is an
+explicit failure, not an owned-copy or generic-die fallback.
