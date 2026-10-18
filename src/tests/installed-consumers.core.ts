@@ -64,6 +64,7 @@ const state: WorldState = {
     chat: [], packs, packMetadata: metadata,
 };
 const parity = parityFixtures(packs, WIZARD); state.actors.push(parity.actor); state.items.push(parity.worldClass, parity.spell);
+const catalogWorldSpell = { ...structuredClone(WIZARD.items.find((item:Doc)=>item.type==='Spell' && item.system?.tier===1)), _id:'sd02CatalogWorldSpell', name:'SD02 catalog spell', ownership:{default:0,player:2} }; state.items.push(catalogWorldSpell);
 const upstream = new ControlledUpstream(state);
 const root = path.join(out, 'run'); fs.rmSync(root, { recursive: true, force: true }); fs.mkdirSync(root, { recursive: true });
 const workspace = prepareWorkspace(root, production);
@@ -422,6 +423,22 @@ async function main() {
         await page.getByRole('button',{name:'Create Character',exact:true}).waitFor({timeout:60000});
         await shot(page,'rv11-generator-recovered');
         pass('RV-11 installed UI: generator partial success stays blocked on classes 403 and recovers after a real context change');
+
+        await page.goto(`${origin}/actors/${WIZARD._id}`,{timeout:300000});
+        await page.getByRole('button',{name:'Manage Character Sheet'}).click();
+        await page.getByRole('button',{name:'Spells',exact:true}).first().click();
+        await page.getByRole('button',{name:/TIER 1/}).first().click();
+        const spellManager=page.getByRole('dialog',{name:/Manage Wizard Spells/});
+        await spellManager.getByPlaceholder('Filter spells by name...').fill('SD02 catalog');
+        const worldAddition=spellManager.getByRole('button',{name:'Add SD02 catalog spell',exact:true});await worldAddition.waitFor({timeout:60000});
+        upstream.externalUpdate('Item',[{_id:catalogWorldSpell._id,ownership:{default:0,player:0}}]);
+        await worldAddition.waitFor({state:'hidden',timeout:60000});
+        assert.equal(await spellManager.getByPlaceholder('Filter spells by name...').inputValue(),'SD02 catalog');
+        upstream.externalUpdate('Item',[{_id:catalogWorldSpell._id,ownership:{default:0,player:2}}]);
+        await worldAddition.waitFor({timeout:60000});await spellManager.getByRole('button',{name:'CANCEL',exact:true}).click();
+        pass('SD02 installed world Item permission events retire and restore the loaded spell catalog without losing search');
+        await page.goto(`${origin}/tools/shadowdark/generator`,{timeout:300000});
+        await page.getByRole('button',{name:'Create Character',exact:true}).waitFor({timeout:60000});
 
         // Exercise actual packaged managed-JS errors across the SDK loading
         // boundary. The native effect is copied intact from a pinned pregen.

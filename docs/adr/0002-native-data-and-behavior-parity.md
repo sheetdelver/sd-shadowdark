@@ -604,3 +604,28 @@ The native-method oracle now compares L01–L04 eligibility through actual nativ
 supplied sanitized prepared grant inputs and exact native Class documents. All20
 checks pass, alongside the69/31/9/4/9 controls. This is controlled method evidence,
 not a full Foundry preparation/effect lifecycle or native A02 acceptance.
+
+## D6d final source paths — October 18, 2026
+
+The remaining HP-roll helper used the first owned Class and could silently fall
+back to1d4 after an unresolved selected Class. It now reads the exact caller-visible
+Class, keeps established Class identity, validates its actual hit die and refuses
+unavailable data before a roll. Only native class-less level-zero creation retains
+its explicit1d4 die. HP/XP finalization and native HP-advantage handling remain.
+The same mutable-copy/unresolved-source input fails before and passes after;
+public installed verification also requires no roll/write when that Class is denied.
+
+World Item edits now invalidate the existing shared collection store through the
+public document/detail-directory events. Duplicate hints in one turn coalesce;
+there is no second world store. Loaded and initially pending spell catalogs retire
+old responses/intent while search survives. Both new actual-provider tests fail
+against `b045ad1` and pass current code; all41 collection consumers pass. The final
+installed harness additionally revokes/restores one world Spell while its picker
+remains open. This extends context-event coverage to the actual catalog source.
+
+Before these last source-path changes, the packaged browser run passed29 checks,
+including all eight width/theme combinations; production passed21 and the released
+floor's public workflow13. Full14 suites+parity+typing passed both hosts, and20
+native-method checks matched. The final source archive and affected installed
+checks are rerun; no intermediate run is promoted to final acceptance. Every
+actual native A02 row remains open.

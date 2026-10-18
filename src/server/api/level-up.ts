@@ -100,43 +100,22 @@ export async function handleGetLevelUpData(actorId: string | undefined, req: Mod
  */
 export async function handleRollHP(actorId: string | undefined, req: ModuleServerRequest) {
     logger.info(`[API] handleRollHP called for actorId: ${actorId}`);
+    const revision = requestRevision(req.runtime);
     try {
         const body = await req.json<any>();
         const { isReroll: _isReroll, classId } = body;
 
-        let hitDie = '1d4';
-
-        // Fetch actor once and reuse for both hit die and speaker override.
-        let actor: any = null;
-        if (actorId && actorId !== 'new' && actorId !== 'undefined') {
-            try {
-                actor = await req.runtime.documents.get('Actor', actorId);
-                const classItem = actor?.items?.find((i: any) => i.type === 'Class');
-                if (classItem?.system?.hitPoints) {
-                    hitDie = classItem.system.hitPoints;
-                }
-            } catch { /* ignore — fallback to 1d4 */ }
-        }
-
-        // Fallback: Use classId override if provided (e.g. for Level 1 creation)
-        if (hitDie === '1d4' && classId) {
-            try {
-                const classDoc = await shadowdarkAdapter.resolveDocumentFor(classId, callerOf(req));
-                if (classDoc?.system?.hitPoints) {
-                    hitDie = classDoc.system.hitPoints;
-                }
-            } catch (err) {
-                logger.error(`[API] Error fetching class doc:`, err);
-            }
-        }
-
-        // Sanitize hitDie to a proper dice formula
-        const str = String(hitDie).trim();
-        if (/^\d+$/.test(str)) {
-            hitDie = `1d${str}`;          // "4" -> "1d4"
-        } else if (/^d\d+$/i.test(str)) {
-            hitDie = `1${str}`;           // "d6" -> "1d6"
-        }
+        const actor = actorId && !['new','undefined','null'].includes(actorId) ? await requireOwnedActor(req.runtime, actorId) : null;
+        const reference = canonicalUuid(classId || actor?.system?.class);
+        if (actor?.system?.level?.value > 0 && classId && reference !== canonicalUuid(actor.system?.class)) return error('validation', 'HP advancement must use the Actor’s exact Class.');
+        let hitDie = '1d4'; // native level-zero Generator die, only without a Class
+        if (classId || actor?.system?.class) {
+            if (!reference) return error('validation', 'HP advancement requires an exact Class reference.');
+            const classDoc = await shadowdarkAdapter.resolveDocumentFor(reference, callerOf(req));
+            const source = classDoc?.system?.hitPoints;
+            if (classDoc?.type !== 'Class' || typeof source !== 'string' || !/^(?:1)?d[1-9]\d*$/i.test(source)) return error('validation', 'The exact Class hit die is unavailable or unsupported; no die was inferred from an owned copy.');
+            hitDie = /^d/i.test(source) ? `1${source}` : source;
+        } else if (actor?.system?.level?.value > 0) return error('validation', 'The Actor has no exact Class for its HP roll.');
 
         // Native LevelUpSD applies system.roll.hp.advantage to the hit die (e.g. Stout).
         const prepared = hitPointRollFormula(actor ? prepareActorCore(actor, shadowdarkAdapter.lookups(), requestRules(req.runtime)) : null, hitDie);
@@ -150,6 +129,7 @@ export async function handleRollHP(actorId: string | undefined, req: ModuleServe
             speakerOverride = { alias: req.userSession.username };
         }
 
+        const conflict = contextConflict(req.runtime, revision); if (conflict) return conflict;
         // Roll + post via the runtime; the structured result carries the total.
         const result = await req.runtime.rolls.roll(hitDie, 'Hit Point Roll (Level Up)', {
             displayChat: true,
@@ -172,6 +152,7 @@ export async function handleRollHP(actorId: string | undefined, req: ModuleServe
         });
 
     } catch (e: unknown) {
+        const conflict = contextConflict(req.runtime, revision); if (conflict) return conflict;
         if (isSdkError(e)) return error(e.code, e.message);
         logger.error('[API] Roll HP Error:', e);
         return error('internal', getErrorMessage(e) || 'Failed to roll HP');

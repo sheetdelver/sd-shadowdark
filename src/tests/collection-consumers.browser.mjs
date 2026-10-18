@@ -11,6 +11,7 @@ import { build } from 'esbuild';
 import { execFileSync } from 'node:child_process';
 const parityOnly = process.argv.includes('--parity-only');
 const baseline = process.argv.find(arg => arg.startsWith('--baseline='))?.slice(11);
+const providerBaseline=process.argv.find(arg=>arg.startsWith('--provider-baseline='))?.split('=')[1];
 const languageBaseline = process.argv.find(arg => arg.startsWith('--language-baseline='))?.split('=')[1];
 const { chromium } = await import(process.env.SHADOWDARK_PLAYWRIGHT_MODULE || 'playwright');
 const moduleRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -29,11 +30,11 @@ import {useLevelUp} from '${moduleRoot}/src/ui/components/levelup/useLevelUp';
 import ModuleDialog from '${moduleRoot}/src/ui/components/ModuleDialog';
 import {WeaponSelectionSection} from '${moduleRoot}/src/ui/components/levelup/sections/WeaponSelectionSection';
 import {ArmorSelectionSection} from '${moduleRoot}/src/ui/components/levelup/sections/ArmorSelectionSection';
-const listeners=new Set(); window.calls=[]; window.pending=[];
+const listeners=new Map();const emit=(event,payload)=>listeners.get(event)?.forEach(fn=>fn(payload)); window.calls=[]; window.pending=[];
 window.policy=window.initial.policy||{};
 const rope={_id:'rope',uuid:'Compendium.shadowdark.gear.Item.rope',name:'Current Rope',type:'Basic',pack:'shadowdark.gear',system:{cost:{gp:1}}};
 window.sdk={isConnected:true,worldId:'w',currentUser:{id:'p',role:1},foundryUrl:'',
- events:{on:(_,fn)=>{listeners.add(fn);return ()=>listeners.delete(fn)}},resolveImageUrl:x=>x||'',addNotification:()=>{},navigate:()=>{},
+ events:{on:(event,fn)=>{if(!listeners.has(event))listeners.set(event,new Set());listeners.get(event).add(fn);return ()=>listeners.get(event).delete(fn)}},resolveImageUrl:x=>x||'',addNotification:()=>{},navigate:()=>{},
  fetchWithAuth:async (url,options={})=>{
   const key=url.split('/').at(-1).split('?')[0];const call={key,signal:options.signal,body:options.body};window.calls.push(call);
   const reference=url.includes('/document/')?decodeURIComponent(url.split('/document/')[1]):url.includes('uuid=')?decodeURIComponent(url.split('uuid=')[1]):null;
@@ -62,11 +63,12 @@ case 'details':return <Details/>;
 default:return <Spells/>;}}
 function Delayed(){const [ready,setReady]=React.useState(!window.initial.delay);React.useEffect(()=>{const timer=setTimeout(()=>setReady(true),window.initial.delay||0);return ()=>clearTimeout(timer)},[]);return ready&&show?<Consumer/>:null;}
 window.render=()=>root.render(mounted?(window.initial.which==='generator'?<Generator/>:<ShadowdarkUIProvider><Delayed key={show?'open':'closed'}/></ShadowdarkUIProvider>):null);
-window.retire=()=>listeners.forEach(fn=>fn({keys:[],identity:{worldId:'w',contextRevision:2}})); window.consumerUnmount=()=>{show=false;window.render()};window.unmount=()=>{mounted=false;window.render()};
+window.retire=()=>emit('world:contextChanged',{keys:[],identity:{worldId:'w',contextRevision:2}});window.sourceChanged=()=>{emit('document:changed',{type:'Item',id:'worldSpell',action:'delete'});emit('document:listInvalidated',{type:'Item',reason:'changed'});}; window.consumerUnmount=()=>{show=false;window.render()};window.unmount=()=>{mounted=false;window.render()};
 window.change=values=>{window.sdk={...window.sdk,...values};window.render()};
 window.answer=(index,body,status=200)=>window.pending[index].resolve(Response.json(body,{status}));
 window.render();
 `, resolveDir: moduleRoot, loader: 'tsx' }, bundle: true, write: false, format: 'iife', platform: 'browser', jsx: 'automatic', plugins: [{ name: 'sdk-test-boundary', setup(b) {
+    if(providerBaseline)b.onLoad({filter:/ShadowdarkUIContext\.tsx$/},a=>({loader:'tsx',resolveDir:path.dirname(a.path),contents:execFileSync('git',['show',providerBaseline+':src/ui/context/ShadowdarkUIContext.tsx'],{cwd:moduleRoot,encoding:'utf8'})}));
     if(languageBaseline)b.onLoad({filter:/(?:LanguageSelectionModal\.tsx|Generator\.tsx|logic\/rules\.ts)$/},a=>({loader:a.path.endsWith('.tsx')?'tsx':'ts',resolveDir:path.dirname(a.path),contents:execFileSync('git',['show',languageBaseline+':'+path.relative(moduleRoot,a.path)],{cwd:moduleRoot,encoding:'utf8'})}));
     if(baseline)b.onLoad({filter:/SpellSelectionModal\.tsx$/},a=>({loader:'tsx',resolveDir:path.dirname(a.path),contents:execFileSync('git',['show',baseline+':src/ui/components/SpellSelectionModal.tsx'],{cwd:moduleRoot,encoding:'utf8'})}));
     b.onResolve({ filter: /^@sheet-delver\/sdk(?:\/react)?$/ }, a => ({ path: a.path, namespace: 'stub' }));
@@ -76,6 +78,7 @@ window.render();
 const browser = await chromium.launch({ ...(process.env.SHADOWDARK_CHROME ? { executablePath: process.env.SHADOWDARK_CHROME } : {}), headless: true, args: ['--no-sandbox', '--disable-background-networking'] });
 const results = [];
 async function test(name, initial, run) {
+    if(providerBaseline&&!name.startsWith('SD02-06') )return;
     if((languageBaseline||process.argv.includes('--language-only'))&&!name.startsWith('SD02-12'))return;
     if(parityOnly&&!name.startsWith('SD02'))return;
     if(baseline&&name.startsWith('SD02-12'))return;
@@ -223,6 +226,15 @@ try {
         await p.getByRole('button',{name:/TIER 1/}).waitFor(); assert.equal(await count(p,'classes'),0);
         await p.evaluate(()=>window.retire()); await p.getByRole('button',{name:/TIER 1/}).waitFor();
         assert.equal(await p.getByText('Loading classes…',{exact:true}).count(),0);
+    });
+    const worldSpell={uuid:'Item.worldSpell',name:'World-only spell',type:'Spell',system:{tier:1,class:['Compendium.shadowdark.classes.Item.wizard']}};
+    await test('SD02-06 loaded world spell catalog follows public Item events once and preserves search',{which:'parity-picker',owned:[],limit:3,policy:{spells:{body:[worldSpell]}}},async p=>{
+        await p.getByRole('button',{name:'Open spell manager'}).click();await p.getByRole('button',{name:'Add World-only spell',exact:true}).waitFor();await p.getByPlaceholder('Filter spells by name...').fill('World');
+        await p.evaluate(()=>{window.policy.spells={body:[]};window.sourceChanged()});await p.getByText(/No spells found/).waitFor();assert.equal(await p.getByPlaceholder('Filter spells by name...').inputValue(),'World');assert.equal(await count(p,'spells'),2);assert.equal(await count(p,'index'),2);
+    });
+    await test('SD02-06 Item source change retires a pending catalog response',{which:'parity-picker',owned:[],limit:3,policy:{spells:{hold:true}}},async p=>{
+        await p.getByRole('button',{name:'Open spell manager'}).click();await p.waitForFunction(()=>window.pending.length===1);
+        await p.evaluate(()=>{window.policy.spells={body:[]};window.sourceChanged()});await p.getByText(/No spells found/).waitFor();await p.evaluate(row=>window.answer(0,[row]),worldSpell);await settled(p);assert.equal(await p.getByRole('button',{name:'Add World-only spell',exact:true}).count(),0);assert.equal(await count(p,'spells'),2);
     });
     const spell = {type:'Spell', uuid:'Compendium.shadowdark.spells.Item.light',name:'Light',system:{tier:1,class:['Compendium.shadowdark.classes.Item.wizard'],duration:{type:'rounds',value:2}}};
     const owned = [{itemId:'customA',name:'Source-less spell',tier:1,uuid:null},{itemId:'customB',name:'Source-less spell',tier:1,uuid:null}];

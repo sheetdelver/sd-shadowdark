@@ -5,7 +5,7 @@ import { nativePacks } from './core0191/world';
 import { ShadowdarkAdapter } from '../server/ShadowdarkAdapter';
 import { DECLARED_PACKS, ownedCopy } from '../logic/identity';
 import { primLike, worldSnapshot } from './fixtures/native-406';
-import { handleFinalizeLevelUp } from '../server/api/level-up';
+import { handleFinalizeLevelUp, handleRollHP } from '../server/api/level-up';
 import { handleActorView } from '../server/api/actor-view';
 import { prepareShadowdarkView } from '../logic/prepared-view';
 import { spellReview } from '../logic/spell-review';
@@ -82,6 +82,14 @@ await check('SD02-03 Knight progression keeps Knight counts and Witch list', asy
     assert.equal(data.availableSpells.length, 46);
     assert.ok(data.availableSpells.every((spell: any) => spell.system.class.includes(WITCH)));
     assert.deepEqual(input, before);
+});
+await check('SD02-03 advancement HP roll uses the exact referenced Class and refuses unresolved source',async()=>{
+ const actor=castingActor();actor.items.push({_id:'mutableCopy',type:'Class',name:'Unrelated copied Class',system:{hitPoints:'d12'}});let rolls:string[]=[];
+ const classDoc={...structuredClone(byUuid.get(WIZARD)),_id:'worldClass'};
+ const runtime:any={...caller.runtime,documents:{get:async(type:string,id:string)=>type==='Actor'?structuredClone(actor):id==='worldClass'?structuredClone(classDoc):null},rolls:{roll:async(formula:string)=>{rolls.push(formula);return{total:3}}}};
+ let response=await handleRollHP(actor._id,{runtime,json:async()=>({classId:'Item.worldClass'})} as any);assert.equal(response.status,200);assert.deepEqual(rolls,['1d4']);
+ rolls=[];runtime.documents.get=async(type:string)=>type==='Actor'?structuredClone(actor):null;
+ response=await handleRollHP(actor._id,{runtime,json:async()=>({classId:'Item.worldClass'})} as any);assert.equal(response.status,400);assert.deepEqual(rolls,[]);
 });
 await check('SD02-07 crafted advancement missing mandatory spell makes zero writes', async () => {
     const actor = knight(); let writes = 0;

@@ -596,3 +596,8 @@ unsuccessful strict owner read. No denied operation writes. Pending action UI
 callbacks retire with context/scope; late results require source review and cannot
 authorize replay under a new context. Generator SDK creation avoids the generic
 Core Actor writer's demonstrated string-array cleaning.
+
+World Item detail/directory hints coalesce into the same collection generation
+invalidation as context changes; pending catalog responses retire and open pickers
+retain search. HP rolls read the exact referenced Class die, never an unrelated
+owned copy or an unavailable-source fallback.
