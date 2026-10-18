@@ -18,7 +18,7 @@ import { ruleInputsFrom, UNAVAILABLE_RULE_INPUTS, type RuleInputs } from '../log
  * content: there is no allow-all fallback.
  */
 export interface Caller {
-    runtime: Pick<ModuleRequestRuntime, 'documents'> & { access?: ModuleRequestRuntime['access'] };
+    runtime: Pick<ModuleRequestRuntime, 'documents'> & Partial<Pick<ModuleRequestRuntime, 'access' | 'compendium' | 'world'>>;
     /** Informational only; never used to grant pack access. */
     isGM: boolean;
 }

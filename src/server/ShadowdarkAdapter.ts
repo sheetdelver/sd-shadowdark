@@ -19,11 +19,7 @@ import { actionFormula, prepareRequestedAction, type ActionRequest, type RollOve
 import { canonicalUuid, documentId, formatUuid, parseUuid, sourceRef } from '../logic/identity';
 import type { ViewLookups } from '../logic/prepared-view';
 import type { ChoiceCatalog } from '../logic/talent-choices';
-
-/** Exact talent → granted spell pairs (native priest Turn Undead). */
-const GRANTED_SPELLS: Record<string, string> = {
-    'Compendium.shadowdark.talents.Item.LfHTnYW8I65x8Y31': 'Compendium.shadowdark.spells.Item.mByUvcHIVEPWscfH',
-};
+import { advancementSpellChoices, grantedSpellSources, spellListIdentity } from '../logic/spell-model';
 
 /**
  * ShadowdarkAdapter — the Shadowdark system adapter (ADR-0027 conformed).
@@ -241,18 +237,57 @@ export class ShadowdarkAdapter extends BaseSystemAdapter {
         if (!ref) return null;
         if (ref.kind === 'compendium') {
             if (!canReadPack(caller, ref.pack)) throw compendiumDenied(ref.pack);
-            const doc = await this._registry.getDocument(formatUuid(ref));
+            const doc = await this._registry.getDocument(formatUuid(ref))
+                ?? await caller.runtime.compendium?.getById(ref.documentType, formatUuid(ref));
             if (!canReadPack(caller, ref.pack)) throw compendiumDenied(ref.pack);
-            return doc;
+            // A public exact-UUID read must never become terminal-ID substitution.
+            return doc && canonicalUuid(doc.uuid) === formatUuid(ref) ? doc : null;
         }
         if (ref.kind === 'world') {
-            return caller.runtime.documents.get(ref.documentType, ref.id);
+            const doc = await caller.runtime.documents.get(ref.documentType, ref.id);
+            return doc ? { ...doc, uuid: formatUuid(ref) } : null;
         }
         if (ref.parentType !== 'Actor' || !['Item', 'ActiveEffect'].includes(ref.documentType)) return null;
         const parent: any = await caller.runtime.documents.get('Actor', ref.parentId);
         const children = ref.documentType === 'Item' ? parent?.items : parent?.effects;
         const child = Array.isArray(children) ? children.find((entry: any) => documentId(entry) === ref.id) : null;
         return child ? { ...child, uuid: formatUuid(ref) } : null;
+    }
+
+    /** Request-local bounded dependencies; never published to the shared registry. */
+    async callerLookups(actor: any, caller: Caller): Promise<ViewLookups> {
+        const base = this.lookups();
+        const documents = new Map<string, any>();
+        const visited = new Set<string>();
+        const resolve = async (value: unknown) => {
+            const uuid = canonicalUuid(value);
+            if (!uuid || visited.has(uuid)) return;
+            visited.add(uuid);
+            try {
+                const doc = await this.resolveDocumentFor(uuid, caller);
+                if (doc) documents.set(uuid, doc);
+            } catch (e: any) {
+                // Denial/missing data is a bounded unavailable dependency, never
+                // permission to fall back to the warmed privileged projection.
+                if (!['permission_denied', 'not_found'].includes(e?.code)) throw e;
+            }
+        };
+        const items: any[] = Array.isArray(actor?.items) ? actor.items : [];
+        await Promise.all([resolve(actor?.system?.class), ...items.flatMap(item => item.type === 'Scroll' ? [resolve(item.system?.spellUuid)]
+            : item.type === 'Wand' ? (item.system?.spells ?? []).map((s: any) => resolve(s.uuid)) : [])]);
+        const spells = [...items.filter(item => item.type === 'Spell'), ...[...documents.values()].filter(doc => doc.type === 'Spell')];
+        await Promise.all(spells.flatMap(spell => (Array.isArray(spell.system?.class) ? spell.system.class : []).map(resolve)));
+        await Promise.all([...documents.values()].filter(doc => doc.type === 'Class').map(doc => resolve(doc.system?.spellcasting?.class)));
+        const read = (ref: any, type: string) => {
+            const uuid = formatUuid(ref);
+            if (ref.kind === 'compendium' && !canReadPack(caller, ref.pack)) return null;
+            const doc = documents.get(uuid);
+            return doc?.type === type ? doc : null;
+        };
+        return { propertyName: base.propertyName,
+            classDocument: ref => read(ref, 'Class'), spellDocument: ref => read(ref, 'Spell'),
+            label: ref => ref.kind === 'compendium' && !canReadPack(caller, ref.pack) ? null
+                : documents.get(formatUuid(ref))?.name ?? (ref.kind === 'compendium' ? base.label?.(ref) : null) ?? null };
     }
 
     async getLevelUpData(actor: any, classUuidOverride: string | undefined, patronUuidOverride: string | undefined, caller: Caller) {
@@ -278,19 +313,16 @@ export class ShadowdarkAdapter extends BaseSystemAdapter {
         if (isSpellcasterChar && classDoc) {
             const skTable = classDoc.system?.spellcasting?.spellsknown;
             if (skTable) {
-                const currentSpells = skTable[String(currentLevel)] || {};
-                const targetSpells = skTable[String(targetLevel)] || {};
-                for (let tier = 1; tier <= 5; tier++) {
-                    const diff = (Number(targetSpells[String(tier)]) || 0) - (Number(currentSpells[String(tier)]) || 0);
-                    if (diff > 0) spellsToChoose[tier] = diff;
-                }
+                const choices = advancementSpellChoices(classDoc, currentLevel, targetLevel);
+                Object.assign(spellsToChoose, choices.required);
+                diagnostics.push(...choices.diagnostics);
             }
-            const classRef = canonicalUuid(classDoc.uuid);
+            else diagnostics.push('The exact Class has no spells-known table.');
+            const classRef = spellListIdentity(classDoc, classDoc.uuid);
             if (classRef) {
                 availableSpells = await this.getSpellsForClass(classRef, caller);
-                const granted = new Set((actor?.items || []).map((item: any) => sourceRef(item)).filter(Boolean)
-                    .map((ref: any) => GRANTED_SPELLS[formatUuid(ref)]).filter(Boolean));
-                for (const spell of availableSpells) if (granted.has(canonicalUuid(spell.uuid))) spell.isInnate = true;
+                const granted = grantedSpellSources(actor?.items ?? []);
+                for (const spell of availableSpells) if (granted.has(canonicalUuid(spell.uuid) ?? '')) spell.isInnate = true;
             } else diagnostics.push('The class is not a declared compendium document, so its spell list is unavailable.');
         }
 

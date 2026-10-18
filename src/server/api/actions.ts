@@ -179,18 +179,7 @@ async function execute(actorId: string, body: ActionBody, req: ModuleServerReque
     const triggering = items.find(item => documentId(item) === body.itemId);
     if (!triggering) throw new ActionError('not_found', 'The item is no longer on this Actor.');
 
-    const baseLookups = shadowdarkAdapter.lookups();
-    // Scroll/wand spells may be world documents: resolve them through the caller.
-    const spellRefs = triggering.type === 'Scroll' ? [triggering.system?.spellUuid]
-        : triggering.type === 'Wand' ? (triggering.system?.spells ?? []).map((entry: any) => entry?.uuid) : [];
-    const resolvedSpells = new Map<string, any>();
-    for (const value of spellRefs) {
-        const ref = parseUuid(value);
-        if (!ref) continue;
-        const doc = await shadowdarkAdapter.resolveDocumentFor(formatUuid(ref), callerOf(req));
-        if (doc?.type === 'Spell') resolvedSpells.set(formatUuid(ref), doc);
-    }
-    const lookups = { ...baseLookups, spellDocument: (ref: any) => resolvedSpells.get(formatUuid(ref)) ?? baseLookups.spellDocument?.(ref) ?? null };
+    const lookups = await shadowdarkAdapter.callerLookups(actor, callerOf(req));
     // Rule inputs from the request's world context; Core pins its revision for this request.
     const core = prepareActorCore(actor, lookups, requestRules(req.runtime));
     const request: ActionRequest = { kind: body.kind!, itemId: body.itemId, spellIndex: body.spellIndex, selected: body.selected };

@@ -7,7 +7,8 @@ actor-data omissions, alternate spell lists, owned-spell accounting and selectio
 safety, plus action phases, Potion identification, NPC focus/outcomes and language
 fields (SD02-01–13). The audit includes bounded matching native-method controls,
 a model coverage matrix and separately scoped F01–F06 feature proposals.
-No ADR-0002 correction is implemented by this documentation pass.
+ADR-0002 implementation is in progress. The released0.9.5 gap descriptions below
+are historical baseline; current corrections are recorded here and in its checkpoint record.
 The older acceptance below remains scoped evidence, not a claim that every
 historical actor or spell-management workflow has been validated.
 
@@ -40,6 +41,21 @@ Core owns authorization, world/session lifecycle and shared chat/media/dice
 presentation. Generator/importer pages own only their resource loading and
 Actor-specific operations. Spell-description references are not starting
 inventory; do not convert linked templates into owned items implicitly.
+
+## Caller spell preparation
+
+`logic/spell-model.ts` supplies owned Item-ID rows, exact identity/list/grant
+inputs and explicit known/unavailable progression limits. `callerLookups` reads
+only the selected Actor's bounded dependencies through public caller capabilities;
+these never enter the registry. The sheet's caller-view route uses the same
+preparer as actions, compares source reviews around awaited reads, and rejects
+stale results. ActorPage retires responses by Actor, caller, role, world and
+connection; public Item/context events refresh dependency results.
+
+Advancement uses the exact alternate list, the Actor Class's own table and native
+planned/active grants. Mandatory tier choices are validated before all writes;
+missing catalogs and invalid progression do not waive choices. HP/XP computation
+is unchanged. Generic Core preparation remains synchronous and user-invariant.
 
 ## Known spell workflow gaps in 0.9.5
 

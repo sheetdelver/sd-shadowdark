@@ -6,9 +6,13 @@ import { ShadowdarkAdapter } from '../server/ShadowdarkAdapter';
 import { DECLARED_PACKS, ownedCopy } from '../logic/identity';
 import { primLike, worldSnapshot } from './fixtures/native-406';
 import { handleFinalizeLevelUp } from '../server/api/level-up';
+import { handleActorView } from '../server/api/actor-view';
+import { prepareShadowdarkView } from '../logic/prepared-view';
+import { spellReview } from '../logic/spell-review';
+import { spellLimit } from '../logic/spell-model';
 const nativeRoot = process.env.SHADOWDARK_NATIVE ?? path.resolve(process.cwd(), 'temp/shadowdark');
 const packs = nativePacks(nativeRoot, DECLARED_PACKS.map(p => p.id));
-const rows = Object.entries(packs).flatMap(([pack, docs]) => docs.map(doc => ({ ...doc, pack, uuid: `Compendium.${pack}.${doc.type === 'Player' || doc.type === 'NPC' ? 'Actor' : pack.endsWith('tables') ? 'RollTable' : 'Item'}.${doc._id}` })));
+const rows: any[] = Object.entries(packs).flatMap(([pack, docs]) => docs.map(doc => ({ ...doc, pack, uuid: `Compendium.${pack}.${doc.type === 'Player' || doc.type === 'NPC' ? 'Actor' : pack.endsWith('tables') ? 'RollTable' : 'Item'}.${doc._id}` })));
 const byUuid = new Map(rows.map(doc => [doc.uuid, doc]));
 const adapter = new ShadowdarkAdapter();
 const documents: any = { get: async () => null, list: async () => ({ contents: [] }) };
@@ -20,6 +24,52 @@ const talent = rows.find(doc => doc._id === 'XRW3jhpTni15hwFc')!;
 const checks: any[] = [];
 async function check(id: string, fn: () => unknown | Promise<unknown>) { try { await fn(); checks.push({ id, passed: true }); } catch (e) { checks.push({ id, passed: false, error: (e as Error).message }); } }
 const knight = () => { const a: any = primLike(); a.items = [{ ...ownedCopy(byUuid.get(KNIGHT), KNIGHT), _id: 'class' }, { ...ownedCopy(talent, talent.uuid), _id: 'talent' }]; a.effects = []; a.system.class = KNIGHT; a.system.level = { value: 2, xp: 35 }; return a; };
+const WIZARD = 'Compendium.shadowdark.classes.Item.035nuVkU9q2wtMPs';
+const castingActor = () => { const a: any = primLike(); a.items = [{ _id: 'spellA', name: 'Custom spell', type: 'Spell', system: { class: ['Item.worldClass'], tier: 1, lost: false }, effects: [] }];
+    a.effects = [{ _id: 'grant', changes: [{ key: 'system.spellcasting.classes', mode: 2, value: 'wizard', priority: 20 }], disabled: false, transfer: true }]; a.system.class = 'Item.worldClass'; return a; };
+await check('SD02-01 L01/L02/L04 diagnostics do not infer missing native data', () => {
+    const a = castingActor(); const source = structuredClone(a); a.effects = [];
+    const missingGrant = prepareShadowdarkView(a, { classDocument: () => byUuid.get(WIZARD) });
+    assert.match(missingGrant.actions.find(row => row.kind === 'spell')!.reason!, /Missing casting grant/);
+    a.effects = source.effects; a.items[0].system.class = [];
+    assert.match(prepareShadowdarkView(a).actions.find(row => row.kind === 'spell')!.reason!, /no class reference/);
+    a.items[0].system.class = [WIZARD]; a.effects[0].changes[0].value = 'knight-of-st.-ydris';
+    assert.match(prepareShadowdarkView(a, { classDocument: () => byUuid.get(WIZARD) }).actions.find(row => row.kind === 'spell')!.reason!, /does not match/);
+    assert.equal(a.items[0]._stats, undefined);
+});
+await check('SD02-02 caller world Class reaches shared display/action preparation without registry cache', async () => {
+    const a = castingActor(); const before = structuredClone(a);
+    const worldClass = { ...structuredClone(byUuid.get(WIZARD)), _id: 'worldClass', uuid: 'Item.worldClass' };
+    const runtime: any = { documents: { get: async (type: string, id: string) => type === 'Actor' && id === a._id ? structuredClone(a) : type === 'Item' && id === 'worldClass' ? structuredClone(worldClass) : null } };
+    const req: any = { runtime, json: async () => ({ baseline: spellReview(a) }) };
+    const res = await handleActorView(a._id, req); assert.equal(res.status, 200);
+    const view: any = await res.json(); assert.equal(view.derived.actions.find((row: any) => row.kind === 'spell').available, true);
+    assert.equal(adapter.lookups().classDocument!({ kind: 'world', documentType: 'Item', id: 'worldClass' }), null);
+    assert.deepEqual(a, before);
+    assert.equal(view.derived.spellModel.owned[0].itemId, 'spellA'); assert.equal(view.derived.spellModel.owned[0].source, null);
+    a.items.push({ ...structuredClone(a.items[0]), _id: 'spellB' });
+    const lookups = await adapter.callerLookups(a, { runtime, isGM: false });
+    assert.deepEqual(prepareShadowdarkView(a, lookups).spellModel.owned.map(row => row.itemId), ['spellA', 'spellB']);
+});
+await check('SD02-02 exact embedded Class and denied/retired dependencies', async () => {
+    const a = castingActor(); a.items[0].system.class = ['Actor.other.Item.class'];
+    const worldClass = { ...structuredClone(byUuid.get(WIZARD)), _id: 'class' };
+    const runtime: any = { documents: { get: async (type: string, id: string) => id === 'other' ? { items: [worldClass] } : structuredClone(a) } };
+    let lookups = await adapter.callerLookups(a, { runtime, isGM: false });
+    assert.equal(prepareShadowdarkView(a, lookups).actions.find(row => row.kind === 'spell')!.available, true);
+    runtime.documents.get = async (_type: string, id: string) => id === a._id ? structuredClone(a) : null;
+    lookups = await adapter.callerLookups(a, { runtime, isGM: false });
+    assert.match(prepareShadowdarkView(a, lookups).actions.find(row => row.kind === 'spell')!.reason!, /unavailable|not visible/);
+    let calls = 0;
+    runtime.documents.get = async (_type: string, id: string) => { if (id !== a._id) return null; if (++calls > 1) a.system.level.value++; return structuredClone(a); };
+    const res = await handleActorView(a._id, { runtime, json: async () => ({ baseline: spellReview(a) }) } as any);
+    assert.equal(res.status, 409);
+});
+await check('SD02-07 zero/null/missing/invalid progression limits stay distinct', () => {
+    assert.deepEqual(spellLimit({ 2: null }, 2, 1), { status: 'known', value: 0 });
+    assert.deepEqual(spellLimit({ 2: { 1: 0 } }, 2, 1), { status: 'known', value: 0 });
+    for (const table of [null, {}, { 2: {} }, { 2: { 1: -1 } }, { 2: { 1: '2' } }]) assert.equal(spellLimit(table, 2, 1).status, 'unavailable');
+});
 await check('SD02-03 Knight progression keeps Knight counts and Witch list', async () => {
     const before = knight(); const input = structuredClone(before);
     const data = await adapter.getLevelUpData(input, undefined, undefined, caller);

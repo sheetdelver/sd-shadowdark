@@ -4,6 +4,7 @@ import { UNAVAILABLE_RULE_INPUTS, hasLuckToken, luckMode, type RuleInputs } from
 import type { CanonicalEffect } from './effects';
 import { documentId, formatUuid, parseUuid, type DocumentRef } from './identity';
 import { slugify } from './foundry';
+import { grantedSpellSources, prepareSpellModel } from './spell-model';
 
 /**
  * The single module-prepared Shadowdark view, published as `derived` (with
@@ -61,11 +62,6 @@ const CATEGORY: Record<string, string> = {
     Class: 'identity', Ancestry: 'identity', Background: 'identity', Deity: 'identity', Patron: 'identity', Language: 'identity',
 };
 
-/** Exact-UUID talent → granted spell pairs (native priest Turn Undead). */
-const GRANTED_SPELLS: Record<string, string> = {
-    'Compendium.shadowdark.talents.Item.LfHTnYW8I65x8Y31': 'Compendium.shadowdark.spells.Item.mByUvcHIVEPWscfH',
-};
-
 function labelled(value: unknown, lookups: ViewLookups, owned?: any): LabelledRef {
     if (value === null || value === undefined || value === '') return { ref: null, value: null, label: null };
     const ref = parseUuid(value);
@@ -96,8 +92,7 @@ export function prepareShadowdarkView(source: any, lookups: ViewLookups = {}, ru
     const byItem = new Map<string, PreparedAction[]>();
     for (const action of actions) if (action.itemId) byItem.set(action.itemId, [...(byItem.get(action.itemId) ?? []), action]);
 
-    const grantedSpells = new Set(items.map(item => parseUuid(item?._stats?.compendiumSource ?? item?.flags?.core?.sourceId))
-        .filter((ref): ref is DocumentRef => !!ref).map(ref => GRANTED_SPELLS[formatUuid(ref)]).filter(Boolean));
+    const grantedSpells = grantedSpellSources(items);
 
     const itemViews: ItemView[] = core.items.map(basics => {
         const item = items.find(entry => documentId(entry) === basics.id);
@@ -191,7 +186,8 @@ export function prepareShadowdarkView(source: any, lookups: ViewLookups = {}, ru
         spellcastingAbility: null,
         isSpellcaster,
         canUseMagicItems,
-        showSpellsTab: isSpellcaster || canUseMagicItems,
+        showSpellsTab: isSpellcaster || canUseMagicItems || items.some(item => ['Spell', 'Scroll', 'Wand'].includes(item.type)),
+        spellModel: prepareSpellModel(source, core, lookups),
         maxSlots: core.maxSlots,
         gearSlots: core.maxSlots,
         slotsUsed: core.slotUsage?.total ?? null,

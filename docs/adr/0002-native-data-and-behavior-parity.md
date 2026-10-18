@@ -1,6 +1,6 @@
 # ADR-0002: Native data and behavior parity
 
-**Status:** Proposed
+**Status:** In progress
 
 **Date:** October 18, 2026
 
@@ -243,7 +243,7 @@ explicit treatment rather than assumed native rules.
 
 ## Implementation checkpoints
 
-All checkpoints are **not started** at this documentation checkpoint. Each
+The table defines the acceptance gates; the implementation record below tracks current evidence. Each
 implementation update must name the finding, affected surfaces, evidence,
 remaining limits and changed files. Save one local prior ADR snapshot before
 substantial status revisions, then update this decision record rather than
@@ -317,8 +317,7 @@ unchanged offline suites pass; the new defect probes reproduce independently.
 No application, test, migration, manifest, workflow or release metadata changed.
 The initial audit made no Git or remote changes. The user subsequently authorized
 a documentation checkpoint and preparation for remediation; the module handoff
-records its branch/commit and execution order. Implementation and all A02
-acceptance remain pending. F01–F06 retain their separate scope decisions.
+records its branch/commit and execution order. Implementation is authorized; all A02 native acceptance remains pending. F01–F06 retain their separate scope decisions.
 
 ## Implementation checkpoint D0 — October 18, 2026
 
@@ -338,3 +337,29 @@ writing HP/XP despite a missing required spell. `native-parity.oracles.mjs
 roll outcomes). Baseline mode reports failures explicitly; ordinary invocation
 returns failure until corrected. This is controlled upstream evidence, not
 Foundry acceptance. D1–D7 and A02-01–15 remain open.
+
+## D2 shared model and advancement preflight — October 18, 2026
+
+`logic/spell-model.ts` separates exact Class identity, active grants, alternate
+list and progression. Owned rows retain Actor/embedded Item identity without
+requiring provenance; the Turn Undead mapping is shared. Explicit table null is
+zero; missing, negative and invalid entries stay unavailable. Knight progression
+now offers the native 46-spell Witch list while retaining Knight counts.
+
+`callerLookups` resolves only the selected Actor's Class, owned Spell Class refs
+and linked Scroll/Wand Spell/Class dependencies. Results are request-local;
+permission checks surround compendium reads. The caller view and execution use
+`prepareShadowdarkView`/`prepareActorCore`, without populating the user-invariant
+registry. ActorPage retires late responses across source/context/caller/world/
+connection changes and refreshes on public Item events. The view compares its
+source review before and after dependency reads. Core's generic cached preparation
+remains synchronous; bounded caller enrichment belongs to the module sheet route.
+
+Server advancement validates exact alternate-list membership and mandatory tier
+counts against planned/actual native grants before writes. The UI no longer
+waives required spells when the catalog is empty or deduplicates by name.
+Six sanitized regressions pass, including zero writes for the previously accepted
+missing-choice request. Explicit module/UI/hook typing passes on current Core.
+The existing native-alignment suite passed 61/61 before the advancement preflight;
+full rerun follows this checkpoint. Installed 0.19.2/0.19.3 public-interface proof,
+managed intent, catalog/UI and native acceptance remain required.

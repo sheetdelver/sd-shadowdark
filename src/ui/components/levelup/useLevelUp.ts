@@ -278,7 +278,7 @@ export const useLevelUp = (props: LevelUpProps) => {
                     const unique = new Map();
                     if (Array.isArray(apiData.availableSpells)) {
                         apiData.availableSpells.forEach((s: any) => {
-                            if (!unique.has(s.name)) unique.set(s.name, s);
+                            if (!unique.has(s.uuid)) unique.set(s.uuid, s);
                         });
                         setAvailableSpells(Array.from(unique.values()));
                     }
@@ -1327,11 +1327,11 @@ export const useLevelUp = (props: LevelUpProps) => {
         }
 
         // 8. Spells
-        if (isSpellcaster && spellsToChooseTotal > 0 && availableSpells && availableSpells.length > 0) {
-            if (selectedSpells.length < spellsToChooseTotal) return false;
+        if (isSpellcaster && spellsToChooseTotal > 0) {
+            if (selectedSpells.length !== spellsToChooseTotal || !availableSpells?.length) return false;
             for (const [tier, count] of Object.entries(spellsToChoose)) {
                 const selectedInTier = selectedSpells.filter(s => Number(s.tier || s.system?.tier || 0) === Number(tier)).length;
-                if (selectedInTier < count) return false;
+                if (selectedInTier !== count) return false;
             }
         }
 

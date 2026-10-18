@@ -248,3 +248,10 @@ before/after transient transport loss. `--server-disconnect` selects an explicit
 native session kick instead; keep that diagnostic result separate from ordinary
 reconnect and never add automatic relogin to make it pass. Resource dialog tests
 also cover floating-tool clearance and yielding to shared SDK dialogs.
+
+ADR-0002 regressions additionally run `src/tests/native-parity.test.ts` and
+`node --import tsx src/tests/native-parity.oracles.mjs` from the configured Core
+toolchain, with the read-only native4.0.6 reference available. `--baseline` records
+known failures and is never passing acceptance. Caller-bound spell dependencies
+remain request-local and use the common preparer; never warm private world
+Class/Spell documents into the user-invariant registry.

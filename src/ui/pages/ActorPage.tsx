@@ -8,6 +8,7 @@ import ShadowdarkSheet from '../ShadowdarkSheet';
 import { postActorRoll } from './postActorRoll';
 import { ShadowdarkActorProvider } from '../context/ShadowdarkActorContext';
 import { ShadowdarkUIProvider } from '../context/ShadowdarkUIContext';
+import { spellReview } from '../../logic/spell-review';
 
 export interface ShadowdarkActorPageProps {
     actorId: string;
@@ -22,10 +23,13 @@ export interface ShadowdarkActorPageProps {
  * the module's `actorPage` surface in `module/ui.tsx`.
  */
 export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProps) {
-    const { foundryUrl, addNotification: addToast, isDiceTrayOpen, toggleDiceTray, events, fetchWithAuth, navigate, isConnected } = useSDK();
+    const { foundryUrl, addNotification: addToast, isDiceTrayOpen, toggleDiceTray, events, fetchWithAuth, navigate, isConnected, worldId, currentUser } = useSDK();
     const { LoadingModal, SharedContentModal } = useSDKComponents();
 
-    const [actor, setActor] = useState<any>(null);
+    const scope = JSON.stringify([worldId, currentUser?.id, currentUser?.role, isConnected]);
+    const [loaded, setLoaded] = useState<{ scope: string; actor: any } | null>(null);
+    const actor = loaded?.scope === scope ? loaded.actor : null;
+    const setActor = useCallback((value: any) => setLoaded({ scope, actor: value }), [scope]);
     const [loading, setLoading] = useState(true);
     const [actorError, setActorError] = useState<string | null>(null);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -66,16 +70,22 @@ export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProp
             const data = await res.json();
             if (stale()) return;
             if (data && !data.error) {
-                setActor(data);
+                const view = await fetchWithAuth(`/api/modules/shadowdark/actors/${id}/view`, { method: 'POST',
+                    headers: { 'Content-Type': 'application/json', ...(typeof data.worldContextRevision === 'number' ? { 'X-SheetDelver-Context-Revision': String(data.worldContextRevision) } : {}) },
+                    body: JSON.stringify({ baseline: spellReview(data) }) });
+                const projection = await view.json();
+                if (stale()) return;
+                if (!view.ok || !projection.derived) throw new Error(getErrorMessage(projection.error ?? `Dependency read HTTP ${view.status}`));
+                setActor({ ...data, derived: projection.derived, computed: projection.derived });
                 setActorError(null);
                 setShowDeleteModal(false);
             } else if (!silent) setActorError(data?.error || 'Could not load this character.');
-        } catch {
-            if (!silent && !stale()) setActorError('Character data is temporarily unavailable.');
+        } catch (e) {
+            if (!stale()) { setActor(null); setActorError(`Character data is unavailable: ${getErrorMessage(e)}`); }
         } finally {
             if (!silent && !stale()) setLoading(false);
         }
-    }, [fetchWithAuth]);
+    }, [fetchWithAuth, setActor]);
 
     const loadingRef = useRef(loading);
     useEffect(() => { loadingRef.current = loading; }, [loading]);
@@ -86,7 +96,7 @@ export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProp
 
         // Realtime refresh via the SDK event bus (replaces the raw socket actorChanged).
         const off = events.on('document:changed', ({ type, id }) => {
-            if (type === 'Actor' && id === actorId) {
+            if ((type === 'Actor' && id === actorId) || type === 'Item') {
                 fetchActor(actorId, true);
             }
         });
@@ -103,9 +113,10 @@ export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProp
         return () => {
             off();
             offContext();
+            requestSeq.current++;
             clearTimeout(timeout);
         };
-    }, [actorId, fetchActor, addNotification, events]);
+    }, [actorId, fetchActor, addNotification, events, worldId, currentUser?.id, currentUser?.role, isConnected]);
 
     // Core owns the world outage overlay. Revalidate this module-local Actor
     // once the same world becomes ready again without remounting its sheet.

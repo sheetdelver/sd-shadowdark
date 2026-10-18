@@ -324,6 +324,8 @@ function spellcastingAbility(core: PreparedActorCore, spell: any, viaItem: boole
     const spellcasting = core.spellcasting as { classes: string[]; allowAllItems: boolean; itemAbility: string };
     if (viaItem && spellcasting.itemAbility) return { ability: spellcasting.itemAbility as AbilityKey, reason: null };
     const classRefs: unknown[] = Array.isArray(spell?.system?.class) ? spell.system.class : [];
+    if (!classRefs.length) return { ability: null, reason: 'The spell has no class reference.' };
+    if (!viaItem && !spellcasting.classes.length) return { ability: null, reason: 'Missing casting grant: no active effect grants this Actor a casting class.' };
     const unresolved: string[] = [];
     let classes = classRefs.flatMap(value => {
         const ref = parseUuid(value);
@@ -338,13 +340,13 @@ function spellcastingAbility(core: PreparedActorCore, spell: any, viaItem: boole
     });
     if (!classes.length) {
         return { ability: null, reason: unresolved.length
-            ? `Spell class ${unresolved.join(', ')} is not available from declared Shadowdark data.`
+            ? `Spell class ${unresolved.join(', ')} is unavailable or not visible to this caller.`
             : 'The spell names no casting class.' };
     }
     const allowAll = viaItem && spellcasting.allowAllItems;
     if (!allowAll) {
         classes = classes.filter(entry => spellcasting.classes.includes(entry.name));
-        if (!classes.length) return { ability: null, reason: 'None of the spell\'s classes is one of this character\'s spellcasting classes.' };
+        if (!classes.length) return { ability: null, reason: 'The spell’s Class does not match this Actor’s active casting grant.' };
         if (classes.length === 1) return { ability: classes[0].ability, reason: null };
     }
     let best = classes[0];
@@ -396,7 +398,7 @@ export function prepareSpellAction(core: PreparedActorCore, triggering: any, sou
     const spellcasting = core.spellcasting as { classes: string[]; allowAllItems: boolean };
     let canCast = spellcasting.classes.length > 0;
     if (triggerType !== 'Spell' && spellcasting.allowAllItems) canCast = true;
-    if (!canCast) return unavailable(action, 'This character is not a spellcaster.');
+    if (!canCast) return unavailable(action, 'Missing casting grant: this character is not a spellcaster; no active effect grants a casting class.');
     const owned = ownedItems.filter(entry => entry?.type === 'Class');
     const casting = spellcastingAbility(core, spell, true, lookups, owned);
     if (!casting.ability) return unavailable(action, casting.reason ?? 'Unable to determine the casting ability.');

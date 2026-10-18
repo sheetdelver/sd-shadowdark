@@ -5,6 +5,7 @@ import { handleLearnSpell, handleGetSpellsBySource } from './api/spells';
 import { handleGetDocument } from './api/document';
 import { handleEffects } from './api/effects';
 import { handleActorAction } from './api/actions';
+import { handleActorView } from './api/actor-view';
 import { handleLuck } from './api/luck';
 import { handleBestiaryCard, handleBestiaryList } from './api/bestiary';
 import { getErrorMessage, isSdkError } from '@sheet-delver/sdk';
@@ -65,6 +66,9 @@ export const apiRoutes = {
     'actors/[id]/effects/delete': async (req: ModuleServerRequest, { params }: ModuleServerParams) => {
         const url = new URL(req.url, 'http://localhost');
         return effectRoute(async () => ({ success: true, result: await handleEffects(await actorIdFrom(params), req.runtime, 'delete', { ref: url.searchParams.get('ref') }) }));
+    },
+    'actors/[id]/view': async (req: ModuleServerRequest, { params }: ModuleServerParams) => {
+        return handleActorView(await actorIdFrom(params), req);
     },
     'actors/[id]/actions': async (req: ModuleServerRequest, { params }: ModuleServerParams) => {
         return handleActorAction(await actorIdFrom(params), req);

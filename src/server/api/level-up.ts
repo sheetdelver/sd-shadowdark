@@ -1,5 +1,5 @@
 import { json, error, type ModuleServerRequest } from '@sheet-delver/sdk/server';
-import { getErrorMessage, isSdkError, logger } from '@sheet-delver/sdk';
+import { getErrorMessage, isSdkError, logger, SdkError } from '@sheet-delver/sdk';
 import { shadowdarkAdapter } from '../../server/ShadowdarkAdapter';
 import { assembleFinalItems } from './level-up-engine';
 import * as levelUpEngine from './level-up-engine';
@@ -9,6 +9,7 @@ import { callerOf, requestRules } from '../access';
 import { hitPointRollFormula } from '../../logic/actions';
 import { prepareActorCore } from '../../logic/actor-preparation';
 import { advancementHitPoints } from '../../logic/advancement';
+import { advancementSpellChoices, spellListIdentity } from '../../logic/spell-model';
 
 /**
  * Rolled talents/boons and chosen spells are re-read from their exact source.
@@ -34,14 +35,14 @@ async function verifyGrants(body: any, classObj: any, req: ModuleServerRequest) 
         }
         return { name: entry.name ?? entry.text, type: 'Talent', system: { ...(entry?.system ?? {}) }, effects: [] };
     };
-    const classUuid = canonicalUuid(classObj?.uuid);
+    const classUuid = spellListIdentity(classObj, classObj?.uuid);
     const resolveSpell = async (entry: any, requireClass: boolean) => {
         const uuid = canonicalUuid(entry?.uuid);
         if (!uuid) throw new Error(`${entry?.name || 'A selected spell'} has no source reference.`);
         const doc = await shadowdarkAdapter.resolveDocumentFor(uuid, callerOf(req));
         if (!doc || doc.type !== 'Spell') throw new Error(`${entry?.name || uuid} is not an available Spell.`);
-        if (requireClass && classUuid && !(doc.system?.class ?? []).some((value: unknown) => canonicalUuid(value) === classUuid)) {
-            throw new Error(`${doc.name} is not on the ${classObj.name} spell list.`);
+        if (requireClass && (!classUuid || !(doc.system?.class ?? []).some((value: unknown) => canonicalUuid(value) === classUuid))) {
+            throw new SdkError('validation', `${doc.name} is not on the exact Class spell list.`);
         }
         return { ...doc, uuid };
     };
@@ -74,7 +75,7 @@ export async function handleGetLevelUpData(actorId: string | undefined, req: Mod
 
         let actor = null;
         if (actorId && actorId !== 'undefined' && actorId !== 'null' && actorId !== 'new') {
-            actor = await req.runtime.documents.get('Actor', actorId);
+            actor = await req.runtime.documents.get('Actor', actorId, { minOwnership: 'owner' });
         }
 
         const data = await shadowdarkAdapter.getLevelUpData(actor, classId || undefined, patronId || undefined, callerOf(req));
@@ -358,7 +359,7 @@ export async function handleFinalizeLevelUp(actorId: string, req: ModuleServerRe
 
         let actor: any = null;
         if (actorId && actorId !== 'new') {
-            actor = await req.runtime.documents.get('Actor', actorId);
+            actor = await req.runtime.documents.get('Actor', actorId, { minOwnership: 'owner' });
             if (!actor) return error('not_found', 'Actor not found');
         }
 
@@ -391,9 +392,31 @@ export async function handleFinalizeLevelUp(actorId: string, req: ModuleServerRe
         };
 
         const targetLevel = body.targetLevel || (actor?.system?.level?.value || 0) + 1;
+        const currentLevel = actor?.system?.level?.value ?? 0;
+        if (!Number.isInteger(targetLevel) || targetLevel !== currentLevel + 1) return error('validation', 'Advancement must be exactly one level.');
+        if (actor && currentLevel > 0 && canonicalUuid(actor.system?.class) !== canonicalUuid(classObj?.uuid)) return error('validation', 'Advancement must keep the Actor’s exact Class identity.');
 
         // Assembly: compendium sources are limited to the caller's readable packs.
         const finalItems = await assembleFinalItems(state, targetLevel, classObj, ancestry, background, patron, callerOf(req), actor);
+
+        // Evaluate actual/planned native grants, then validate every tier before
+        // HP, XP, language or embedded Item writes. Empty catalogs cannot waive it.
+        const planned = { ...(actor ?? { type: 'Player', items: [], effects: [] }),
+            system: { ...(actor?.system ?? {}), class: classObj?.uuid ?? actor?.system?.class },
+            items: [...(actor?.items ?? []), ...finalItems] };
+        const core = prepareActorCore(planned, await shadowdarkAdapter.callerLookups(planned, callerOf(req)), requestRules(req.runtime));
+        const casting = 'classes' in core.spellcasting && core.spellcasting.classes.length > 0;
+        const choices = casting ? advancementSpellChoices(classObj, currentLevel, targetLevel) : { required: {} as Record<number, number>, diagnostics: [] };
+        if (classObj?.system?.spellcasting?.ability && !casting) return error('validation', 'Missing casting grant; review the exact Class talents before advancing.');
+        if (choices.diagnostics.length) return error('validation', choices.diagnostics.join(' '));
+        const selected = state.selectedSpells;
+        const identities = selected.map((spell: any) => canonicalUuid(spell.uuid));
+        if (new Set(identities).size !== identities.length) return error('validation', 'A required spell source may be selected only once.');
+        if (selected.some((spell: any) => !Number.isInteger(spell.system?.tier) || spell.system.tier < 1 || spell.system.tier > 5)) return error('validation', 'Selected spell has an invalid native tier.');
+        for (let tier = 1; tier <= 5; tier++) {
+            const count = selected.filter((spell: any) => spell.system.tier === tier).length;
+            if (count !== (choices.required[tier] ?? 0)) return error('validation', `Tier ${tier} requires exactly ${choices.required[tier] ?? 0} new spell(s); received ${count}.`);
+        }
 
         const actorUpdates: any = {};
         if (actor && actorId !== 'new') {

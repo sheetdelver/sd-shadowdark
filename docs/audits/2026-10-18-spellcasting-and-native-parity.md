@@ -638,3 +638,19 @@ Core public SDK documentation establishes synchronous, user-invariant Actor
 preparation and caller-bound asynchronous exact document reads as distinct
 contracts. Caller dependency delivery and installed-host proof are D1 work; no
 Core blocker is claimed from the current module's declared-pack restriction.
+
+## Shared-model implementation evidence — October 18, 2026
+
+SD02-01: sanitized L01/L02/L04 mechanical shapes now distinguish missing grants,
+missing Spell Class refs and a grant mismatch; no history is inferred or repaired.
+SD02-02: actual caller-view route resolves world/embedded Class dependencies,
+keeps them out of the registry, rejects source changes during reads, and leaves
+inputs unchanged. Installed-host proof remains D1/D6 work.
+SD02-03: the same Knight fixture changes from zero offered spells to46 exact
+Witch-list documents with one tier-1 choice and unchanged Knight identity.
+SD02-04: shared owned rows preserve two source-less copies as separate Item IDs;
+mounted management validation remains pending.
+SD02-07: explicit null/zero and unavailable limits are distinguished. The crafted
+missing-choice advancement changes from one Actor write to400 and zero writes.
+The maintained native-parity suite passes6/6 controlled checks; module/UI/hook
+typing passes. These are module/source tests, not native Foundry acceptance.
