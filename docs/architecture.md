@@ -1,5 +1,16 @@
 # Shadowdark module architecture
 
+**Active follow-up (October 18):** the post-release 0.9.5
+[native parity audit](audits/2026-10-18-spellcasting-and-native-parity.md) and proposed
+[ADR-0002](adr/0002-native-data-and-behavior-parity.md) cover newly observed
+actor-data omissions, alternate spell lists, owned-spell accounting and selection
+safety, plus action phases, Potion identification, NPC focus/outcomes and language
+fields (SD02-01–13). The audit includes bounded matching native-method controls,
+a model coverage matrix and separately scoped F01–F06 feature proposals.
+No ADR-0002 correction is implemented by this documentation pass.
+The older acceptance below remains scoped evidence, not a claim that every
+historical actor or spell-management workflow has been validated.
+
 **Current status (October18, completed):** ADR-0001's selected native alignment,
 resource cards and G8 adoption are accepted on actual Foundry13.351/14.367 with
 native Shadowdark4.0.6 and Core0.19.2. The [final ADR closeout](adr/0001-native-alignment-and-resource-cards.md#final-native-v14-acceptance-and-closeout--october-18-2026)
@@ -29,6 +40,56 @@ Core owns authorization, world/session lifecycle and shared chat/media/dice
 presentation. Generator/importer pages own only their resource loading and
 Actor-specific operations. Spell-description references are not starting
 inventory; do not convert linked templates into owned items implicitly.
+
+## Known spell workflow gaps in 0.9.5
+
+Casting actions are shared, but spell management is not yet a unified model.
+`SpellsTab` derives class sources/counts/limits; `SpellSelectionModal` represents
+selection by catalog UUID; adapter/server level-up uses another class/list path.
+The current picker omits source-less owned spells, collapses duplicate origins
+and can derive removals from missing catalog rows. Add failures do not stop its
+subsequent removals. These are SD02-03–07 correction targets, not supported
+inventory semantics. Paper/tabs/cards must retain owned Item identity and the
+same source-based availability reasons in the proposed replacement.
+
+Native casting eligibility comes from active grants. A class's casting ability,
+its alternate spell list and its progression table serve different purposes.
+Knight of St. Ydris uses the Witch list with Knight's own spells-known table;
+current advancement ignores that list override. Missing Class references on a
+Spell and missing casting grants on an Actor need separate diagnostics and a
+proven repair disposition, not class-name or spell-name inference.
+
+Current synchronous lookups use declared pack data. Public Core 0.19.3 supports
+caller world/embedded reads and exact known, present compendium UUID reads;
+connecting these bounded dependencies to preparation is module work to prove.
+Arbitrary pack catalog discovery is a distinct capability question. Native
+`sourceFilters` is not yet declared/consumed by the module. The existing world
+Array-setting contract can support it without inventing a settings transport.
+
+These statements describe observed current gaps. Proposed remedies, acceptance
+and historical-data qualifications are owned by ADR-0002 and its active audit.
+
+## Known action and language gaps in 0.9.5
+
+The current executor spends limited uses after the result, despite native
+spend-before-roll/chat ordering. Potion use posts before identifying and updates
+only the identified flag; native also swaps name/description and enables effects.
+Incomplete consumption therefore leaves inconsistent source. NPC spell failure
+currently inherits the Player focus exemption. Shared outcome evaluation treats
+a zero critical-success threshold as always successful, while native disables it.
+SD02-09/10/11/13 define corrections and ordered-state/failure evidence.
+
+Registry and language UI infer rarity from names, ignoring `system.rarity`.
+The general language-limit helper also infers allowances from nonempty pools and
+combines restricted choices. Native fields already provide explicit counts and
+separate class/ancestry pools; ordinary language editing has a distinct contract.
+SD02-12 plans one field-based projection and validation path across consumers.
+
+New controlled comparisons match native defaults for 31 weapons, 69 physical
+item slot records, nine no-effect armor configurations, four mixed inventory/coin
+configurations and nine ordinary roll outcomes. These are bounded source/method
+comparisons; they neither establish whole-system parity nor replace A02 native
+acceptance. The twelve existing offline suites pass despite the new defects.
 
 ## Initiative
 
@@ -145,10 +206,12 @@ modes the weapon has.
 Attacks roll through the existing item-roll hook. Spells, Class Abilities and
 potions go through `POST actors/[id]/actions`, which re-reads the Actor through
 the caller, requires owner access, refuses unavailable actions before rolling,
-rolls through `req.runtime.rolls` and then applies native consequences: lost
-spell on failure (not on focus checks), scroll consumed, wand spell lost and
-wand broken on a critical failure, limited uses and loss on failure, potion
-consumed after confirmation. Consequence writes are sequential, not atomic;
+rolls through `req.runtime.rolls` and then applies planned consequences: lost
+spell on failure, scroll consumed, wand spell lost and wand broken on a critical
+failure, limited uses and loss on failure, potion consumed after confirmation.
+This describes the current implementation, **not complete native sequence parity**:
+ability spending, Potion identification and NPC focus have the defects above.
+Consequence writes are sequential, not atomic;
 each outcome is reported and the response `state` is `complete` or `partial`.
 
 A `requestId` is bound to the adapter runtime (world/epoch), the user, the

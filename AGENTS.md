@@ -93,11 +93,34 @@ Document consumers must use the route's actual bare-document response shape.
 Use native source and handler comparisons for these rules;
 successful writes alone do not establish parity.
 
-The native-alignment plan is [Shadowdark ADR-0001](docs/adr/0001-native-alignment-and-resource-cards.md),
-with evidence in the [native-alignment audit](docs/audits/2026-10-15-native-alignment.md).
-Its released-system baseline and future-version exclusions are explicit there;
-local source checkout details belong in the handoff. Existing legacy effect
-fixtures do not establish v14 serialized-effect parity.
+The active post-release plan is [Shadowdark ADR-0002](docs/adr/0002-native-data-and-behavior-parity.md),
+with findings SD02-01–13 in the [native parity audit](docs/audits/2026-10-18-spellcasting-and-native-parity.md).
+It is proposed, not implemented. Follow its checkpoints when implementation is
+authorized; do not treat its existence as branch, live-write or release authority.
+[ADR-0001](docs/adr/0001-native-alignment-and-resource-cards.md) and the
+[native-alignment audit](docs/audits/2026-10-15-native-alignment.md) remain completed
+within their selected scope. Their released-system baseline, future-version
+exclusions and explicit deferrals remain. Local source checkout details belong
+in the handoff. Existing legacy effect fixtures do not establish v14 serialized-effect parity.
+
+Spell corrections must distinguish actor class, active casting grants, alternate
+spell-list identity, progression table and optional source provenance. Never
+infer a casting grant from a class name or infer a Spell identity from its name.
+Owned spell identity is the Actor plus embedded Item ID; catalog filtering must
+not hide or implicitly remove owned items. Preserve custom/source-less and
+duplicate copies. Successful effect-key migration is not proof that all native
+character content exists. Diagnose missing data and prove repair preconditions
+before proposing new admin migration steps; keep applied history unchanged.
+
+Compare native behavior in order as well as final values. Limited-use abilities
+spend before rolling/posting; Potion identification swaps active/alternate
+name/description and enables effects before consumption. Current execution has
+documented gaps (SD02-09/10); do not call action descriptions proof of execution.
+Player focus is not an NPC exemption, and zero disables a native critical
+threshold. Languages use native rarity and separate explicit class/ancestry choice
+counts/pools, not English name inference or a nonempty-options fallback. Maintain
+the audit's coverage matrix and distinguish controlled native-method probes from
+real Foundry acceptance. F01–F06 feature proposals remain separately scoped.
 
 Effect definitions come from native data only: compendium documents (copied
 with their effects) and `src/data/native-predefined-effects.ts`, generated from

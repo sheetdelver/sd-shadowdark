@@ -24,6 +24,14 @@ See the [releases](https://github.com/sheetdelver/sd-shadowdark/releases),
 [changelog](CHANGELOG.md), [module architecture](docs/architecture.md) and
 [working guidance](AGENTS.md).
 
+Known post-release native behavior gaps are tracked in the
+[active audit](docs/audits/2026-10-18-spellcasting-and-native-parity.md) and proposed
+[ADR-0002](docs/adr/0002-native-data-and-behavior-parity.md). The plan covers
+native class/list handling, incomplete existing actor data, owned-spell identity,
+safe selection, resource action ordering, identification and language choices.
+The audit separates confirmed matches, defects and feature gaps. Its corrections
+are not yet implemented.
+
 ## Third-party license
 
 This product is an independent product published under the Shadowdark RPG Third-Party License and is not affiliated with The Arcane Library, LLC. Shadowdark RPG © 2023 The Arcane Library, LLC.
