@@ -1,410 +1,170 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useSDK } from '@sheet-delver/sdk/react';
-import { useShadowdarkUI } from './context/ShadowdarkUIContext';
+import React from 'react';
 
+import { useSDK } from '@sheet-delver/sdk/react';
 import { useShadowdarkActor } from './context/ShadowdarkActorContext';
+import type { PreparedAction } from '../logic/actions';
+import { bonusLabel } from '../logic/actions';
+import { LuckControl } from './components/LuckControl';
+
+/**
+ * Advanced Abilities tab. Every value comes from the prepared view
+ * (`actor.derived`): abilities, AC, HP, attacks and actions. Rows are buttons
+ * with accessible names; details open the shared resource card.
+ */
+const cardStyle = "bg-white border-2 border-black p-4 text-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] relative";
+const header = (title: string, extra?: React.ReactNode) => (
+    <div className="bg-black text-white p-1 -mx-4 -mt-4 mb-2 px-2 flex justify-between items-center border-b border-white">
+        <h3 className="font-serif font-bold text-lg uppercase">{title}</h3>{extra}
+    </div>
+);
 
 export default function AbilitiesTab() {
-    const { resolveName } = useShadowdarkUI();
     const { resolveImageUrl } = useSDK();
-    const {
-        actor,
-        updateActor,
-        performRoll,
-        getDraftValue,
-        triggerRollDialog
-    } = useShadowdarkActor();
+    const { actor, updateActor, updateItem, getDraftValue, startAction, openCard, isActionBusy } = useShadowdarkActor();
+    const derived = actor.derived ?? {};
+    const actions: PreparedAction[] = derived.actions ?? [];
+    const isNpc = derived.kind === 'NPC';
 
-    // Common container style for standard sheet feel
-    const cardStyle = "bg-white border-2 border-black p-4 text-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] relative";
-
-    return (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full overflow-hidden">
-
-
-            {/* LEFT COLUMN: Vitals, Stats */}
-            <div className="md:col-span-1 flex flex-col gap-4 overflow-y-auto pr-2 pb-20">
-
-                {/* HP Box */}
-                {actor.system?.attributes?.hp && (
-                    <div className={cardStyle}>
-                        <div className="bg-black text-white p-1 -mx-4 -mt-4 mb-2 flex justify-between items-center px-2 border-b border-white">
-                            <span className="font-serif font-bold text-lg">HP</span>
-                            <button className="text-neutral-400 hover:text-white"><i className="fas fa-pen text-xs"></i></button>
-                        </div>
-                        <div className="flex justify-center items-baseline gap-2 font-serif text-3xl font-bold pt-2">
-                            <input
-                                type="number"
-                                value={getDraftValue('system.attributes.hp.value', actor.system.attributes.hp.value)}
-                                onChange={(e) => {
-                                    let val = parseInt(e.target.value) || 0;
-                                    const max = actor.computed?.maxHp ?? actor.system?.attributes?.hp?.max ?? 1;
-                                    if (val > max) val = max;
-                                    updateActor('system.attributes.hp.value', val);
-                                }}
-                                onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-                                className="w-16 text-center bg-neutral-100 rounded border-b-2 border-neutral-300 focus:border-black outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                            />
-                            <span className="text-neutral-400 text-xl font-sans font-light">/</span>
-                            <span>{actor.computed?.maxHp ?? actor.system?.attributes?.hp?.max ?? 0}</span>
-                        </div>
-                    </div>
-                )}
-
-                {/* AC & Luck Row */}
-                <div className="grid grid-cols-2 gap-4">
-                    {/* AC */}
-                    <div className={cardStyle}>
-                        <div className="bg-black text-white p-1 -mx-4 -mt-4 mb-2 px-2 flex justify-between border-b border-white">
-                            <span className="font-serif font-bold text-lg">AC</span>
-                            <img src="/icons/shield.svg" className="w-4 h-4 invert opacity-50" alt="" />
-                        </div>
-                        <div className="text-center font-serif text-3xl font-bold py-2">
-                            {actor.computed?.ac ?? actor.system?.attributes?.ac?.value ?? 10}
-                        </div>
-                    </div>
-                    {/* Luck */}
-                    <div className={cardStyle}>
-                        <div className="bg-black text-white p-1 -mx-4 -mt-4 mb-2 px-2 flex justify-between border-b border-white">
-                            <span className="font-serif font-bold text-lg">LUCK</span>
-                        </div>
-                        <div className="flex justify-center py-2 h-full items-center">
-                            <button
-                                onClick={() => updateActor('system.luck.available', !actor.system?.luck?.available, { immediate: true })}
-                                className={`w-8 h-8 rounded border-2 border-black shadow-sm flex items-center justify-center transition-all bg-white hover:bg-neutral-100`}
-                            >
-                                {actor.system?.luck?.available && (
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" className="w-5 h-5 text-black">
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                    </svg>
-                                )}
+    const attackList = (rows: any[], kind: 'melee' | 'ranged') => (
+        <ul className="space-y-2">
+            {rows.map((row: any, idx: number) => {
+                const action = actions.find(entry => entry.id === row.actionId);
+                return (
+                    <li key={row.actionId ?? `${kind}-${idx}`} className="bg-neutral-50 p-2 border border-neutral-200 flex justify-between items-center gap-2 hover:border-black">
+                        <button type="button" className="text-left min-w-0 flex-1 min-h-11" onClick={() => openCard({ kind: 'item', itemId: row.id })}
+                            aria-label={`${row.name} details`}>
+                            <span className="font-bold font-serif text-lg leading-none break-words">
+                                {row.derived?.count > 1 ? `${row.derived.count} × ` : ''}{row.name}
+                            </span>
+                            {row.derived?.modes > 1 && <span className="ml-2 text-[10px] uppercase tracking-wider font-bold border border-black px-1">{row.derived.mode}</span>}
+                            {row.derived?.range && <span className="ml-2 text-[10px] text-neutral-500 uppercase tracking-wider font-bold">{row.derived.range}</span>}
+                            <span className="block text-sm text-neutral-700 font-sans mt-1">
+                                <span className="font-bold">{row.derived?.toHit}</span> to hit, <span title={row.derived?.warnings?.join(' ')} className="font-bold">{row.derived?.damage}</span> dmg
+                                {row.derived?.special ? `, ${row.derived.special}` : ''}
+                            </span>
+                        </button>
+                        {action && (
+                            <button type="button" onClick={() => startAction(action)} disabled={!action.available || isActionBusy(action.id)}
+                                title={action.reason ?? `Roll ${row.name} (${row.derived?.mode ?? kind})`} aria-label={`Roll ${row.name} ${String(row.derived?.mode ?? kind).toLowerCase()} attack`}
+                                className="shrink-0 w-11 h-11 rounded-full bg-black flex items-center justify-center hover:scale-110 active:scale-95 disabled:opacity-40">
+                                <img src="/icons/dice-d20.svg" alt="" className="w-8 h-8 brightness-0 invert" />
                             </button>
-                        </div>
+                        )}
+                    </li>
+                );
+            })}
+            {rows.length === 0 && <li className="text-neutral-500 text-sm italic text-center py-2">{isNpc ? 'No attacks.' : `No ${kind} weapons equipped.`}</li>}
+        </ul>
+    );
+
+    const abilityActions = actions.filter(action => action.kind === 'ability');
+    return (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pb-20">
+            <div className="md:col-span-1 flex flex-col gap-4">
+                <div className={cardStyle}>
+                    {header('HP')}
+                    <div className="flex justify-center items-baseline gap-2 font-serif text-3xl font-bold pt-2">
+                        <label className="sr-only" htmlFor="sd-hp-advanced">Current hit points</label>
+                        <input id="sd-hp-advanced" type="number" min={0} max={derived.hp?.max}
+                            value={getDraftValue('system.attributes.hp.value', actor.system?.attributes?.hp?.value ?? 0)}
+                            onChange={(e) => updateActor('system.attributes.hp.value', Math.min(Number(derived.hp?.max ?? 0), Math.max(0, parseInt(e.target.value) || 0)))}
+                            onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                            className="w-16 text-center bg-neutral-100 rounded border-b-2 border-neutral-300 focus:border-black outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                        <span className="text-neutral-400 text-xl font-sans font-light" aria-hidden="true">/</span>
+                        <span aria-label="Maximum hit points">{derived.hp?.max ?? 0}</span>
                     </div>
                 </div>
 
-                {/* XP Progress */}
-                {actor.system?.level && (
+                <div className="grid grid-cols-2 gap-4">
                     <div className={cardStyle}>
-                        <div className="bg-black text-white p-1 -mx-4 -mt-4 mb-2 px-2 flex justify-between items-center border-b border-white">
-                            <span className="font-serif font-bold text-lg">LEVEL {actor.system.level.value}</span>
-                            {actor.computed?.levelUp && (
-                                <span className="bg-amber-500 text-black px-2 py-0.5 text-xs font-bold rounded animate-pulse">
-                                    LEVEL UP!
-                                </span>
-                            )}
-                        </div>
+                        {header('AC')}
+                        <div className="text-center font-serif text-3xl font-bold py-2" title={derived.acSource === 'npc-explicit' ? 'Explicit NPC AC' : 'Prepared from armor and effects'}>{derived.ac ?? '—'}</div>
+                    </div>
+                    {!isNpc && <div className={cardStyle}>{header('Luck')}<LuckControl /></div>}
+                    {isNpc && derived.npc && (
+                        <div className={cardStyle}>{header('Move')}<div className="text-center font-serif font-bold py-2">{derived.npc.move}{derived.npc.moveNote ? ` (${derived.npc.moveNote})` : ''}</div></div>
+                    )}
+                </div>
+
+                {!isNpc && actor.system?.level && (
+                    <div className={cardStyle}>
+                        {header(`Level ${derived.level ?? 0}`, derived.levelUp ? <span className="bg-amber-500 text-black px-2 py-0.5 text-xs font-bold rounded">LEVEL UP!</span> : null)}
                         <div className="py-2">
                             <div className="flex justify-between text-sm mb-1">
                                 <span className="text-neutral-600">XP Progress</span>
-                                <span className="font-bold">
-                                    {actor.system.level.xp ?? 0} / {actor.computed?.xpNextLevel ?? (actor.system.level.value * 10)}
-                                </span>
+                                <span className="font-bold">{actor.system.level.xp ?? 0} / {derived.xpNextLevel}</span>
                             </div>
-                            <div className="w-full bg-neutral-200 rounded-full h-2 overflow-hidden">
-                                <div
-                                    className="bg-black h-full transition-all duration-300"
-                                    style={{
-                                        width: `${Math.min(100, ((actor.system.level.xp ?? 0) / (actor.computed?.xpNextLevel ?? (actor.system.level.value * 10))) * 100)}%`
-                                    }}
-                                />
+                            <div className="w-full bg-neutral-200 rounded-full h-2 overflow-hidden" role="progressbar" aria-label="XP progress"
+                                aria-valuemin={0} aria-valuemax={derived.xpNextLevel || 1} aria-valuenow={actor.system.level.xp ?? 0}>
+                                <div className="bg-black h-full" style={{ width: `${derived.xpNextLevel ? Math.min(100, ((actor.system.level.xp ?? 0) / derived.xpNextLevel) * 100) : 100}%` }} />
                             </div>
                         </div>
                     </div>
                 )}
 
-                {/* Stats Grid */}
                 <div className={cardStyle}>
-                    <div className="bg-black text-white p-1 -mx-4 -mt-4 mb-2 px-2 flex justify-between border-b border-white">
-                        <span className="font-serif font-bold text-lg">STATS</span>
-                        <button className="text-neutral-400 hover:text-white"><i className="fas fa-pen text-xs"></i></button>
-                    </div>
+                    {header('Stats')}
                     <div className="grid grid-cols-2 gap-2 pt-2">
-                        {Object.entries(actor.attributes || actor.computed?.abilities || actor.system?.abilities || {}).map(([key, stat]: [string, any], idx) => (
-                            <div key={`stat-${key}-${idx}`}
-                                className="flex flex-col items-center bg-neutral-100 border-2 border-neutral-300 rounded cursor-pointer transition-all hover:border-black hover:bg-white hover:scale-105 active:scale-95 group overflow-hidden"
-                                onClick={() => triggerRollDialog('ability', key)}>
-                                <div className="w-full bg-neutral-200 text-center py-1 border-b border-neutral-300 group-hover:bg-neutral-800 transition-colors">
-                                    <span className="font-bold text-xs uppercase tracking-widest text-neutral-600 group-hover:text-white transition-colors">{key}</span>
-                                </div>
-                                <div className="flex flex-col items-center py-2">
-                                    <span className="font-serif text-2xl font-bold leading-none mb-1 text-black">{stat.value}</span>
-                                    <span className="text-neutral-500 text-xs font-serif font-bold">
-                                        ({stat.mod >= 0 ? '+' : ''}{stat.mod})
+                        {Object.entries(derived.abilities ?? {}).map(([key, stat]: [string, any]) => {
+                            const action = actions.find(entry => entry.kind === 'check' && entry.request.stat === key);
+                            return (
+                                <button type="button" key={key} onClick={() => action && startAction(action)} disabled={!action}
+                                    aria-label={`${key.toUpperCase()} check, modifier ${bonusLabel(stat.mod)}`}
+                                    className="flex flex-col items-center bg-neutral-100 border-2 border-neutral-300 rounded min-h-11 hover:border-black hover:bg-white focus-visible:border-black group overflow-hidden">
+                                    <span className="w-full bg-neutral-200 text-center py-1 border-b border-neutral-300 font-bold text-xs uppercase tracking-widest text-neutral-700">{key}</span>
+                                    <span className="flex flex-col items-center py-2">
+                                        {stat.value !== null && stat.value !== undefined && <span className="font-serif text-2xl font-bold leading-none mb-1">{stat.value}</span>}
+                                        <span className={`font-serif font-bold ${stat.value === null ? 'text-2xl' : 'text-neutral-600 text-xs'}`}>({bonusLabel(stat.mod)})</span>
                                     </span>
-                                </div>
-                            </div>
-                        ))}
+                                </button>
+                            );
+                        })}
                     </div>
                 </div>
-
             </div>
 
-            {/* RIGHT COLUMN: Combat & Attacks */}
-            <div className="md:col-span-2 flex flex-col gap-6 overflow-y-auto pb-20">
+            <div className="md:col-span-2 flex flex-col gap-6">
+                <section className={cardStyle} aria-label="Melee attacks">{header(isNpc ? 'Close Attacks' : 'Melee Attacks')}{attackList(derived.attacks?.melee ?? [], 'melee')}</section>
+                <section className={cardStyle} aria-label="Ranged attacks">{header('Ranged Attacks')}{attackList(derived.attacks?.ranged ?? [], 'ranged')}</section>
 
-                {/* Melee Attacks */}
-                <div className={cardStyle}>
-                    <div className="bg-black text-white p-1 -mx-4 -mt-4 mb-2 px-2 border-b border-white">
-                        <span className="font-serif font-bold text-lg uppercase">Melee Attacks</span>
-                    </div>
-                    <div className="space-y-2">
-                        {(actor.derived?.attacks?.melee || []).map((item: any, idx: number) => (
-                            <div
-                                key={item.id || item._id || `melee-${idx}`}
-                                onClick={() => triggerRollDialog('item', item._realId || item.id || item._id, { attackType: 'Melee', handedness: item.derived?.handedness })}
-                                className="bg-neutral-50 p-2 border border-neutral-200 flex justify-between items-center hover:border-black transition-colors cursor-pointer group"
-                            >
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        <span className="font-bold font-serif text-lg leading-none">{item.name}</span>
-                                    </div>
-                                    <div className="text-sm text-neutral-700 font-sans mt-1">
-                                        <span className="font-bold">{item.derived?.toHit}</span> to hit, <span title={item.derived?.warnings?.join(' ')} className="font-bold">{item.derived?.damage}</span> dmg
-                                    </div>
-                                    {/* Property Pills */}
-                                    {item.derived?.properties && item.derived.properties.length > 0 && (
-                                        <div className="flex flex-wrap gap-1 mt-1.5">
-                                            {item.derived.properties.map((prop: string, pIdx: number) => (
-                                                <div key={`prop-${pIdx}`} className="flex items-center bg-black/5 px-1.5 py-0.5 border border-black/20 rounded-sm">
-                                                    <span className="text-[9px] font-black uppercase text-black/70">{prop}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                                {/*
-                                <button
-                                    className="opacity-0 group-hover:opacity-100 w-8 h-8 rounded-full bg-black text-white flex items-center justify-center hover:scale-110 transition-all"
-                                >
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" className="text-white">
-                                        <path d="M12 2L2 22h20L12 2zm0 3.5 6 12H6l6-12z" />
-                                        <text x="12" y="19" fontSize="8" fontWeight="bold" textAnchor="middle" fill="black">20</text>
-                                    </svg>
-                                </button>
-                                */}
-                                <button
-                                    className={`flex flex-col items-center group -mb-1 transition-colors bg-black rounded-full transition-all duration-300 hover:scale-110 active:scale-95 cursor-pointer`}
-                                >
-                                    <div className={`w-10 h-10 flex items-center justify-center transition-all duration-300`}>
-                                        <img src="/icons/dice-d20.svg" alt="Roll" className="w-full h-full brightness-0 invert transition-all group-hover:drop-shadow-[0_0_8px_rgba(245,158,11,0.8)] drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)]" />
-                                    </div>
-                                </button>
-                            </div>
-                        ))}
-                        {(!actor.derived?.attacks?.melee || actor.derived.attacks.melee.length === 0) && (
-                            <div className="text-neutral-400 text-sm italic text-center py-2">No melee weapons equipped.</div>
-                        )}
-                    </div>
-                </div>
-
-                {/* Ranged Attacks */}
-                <div className={cardStyle}>
-                    <div className="bg-black text-white p-1 -mx-4 -mt-4 mb-2 px-2 border-b border-white">
-                        <span className="font-serif font-bold text-lg uppercase">Ranged Attacks</span>
-                    </div>
-                    <div className="space-y-2">
-                        {(actor.derived?.attacks?.ranged || []).map((item: any, idx: number) => (
-                            <div
-                                key={item.id || item._id || `ranged-${idx}`}
-                                onClick={() => triggerRollDialog('item', item._realId || item.id || item._id, { attackType: 'Ranged', handedness: item.derived?.handedness })}
-                                className="bg-neutral-50 p-2 border border-neutral-200 flex justify-between items-center hover:border-black transition-colors cursor-pointer group"
-                            >
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        <span className="font-bold font-serif text-lg leading-none">{item.name}</span>
-                                        {item.derived?.range && (
-                                            <span className="text-[10px] text-neutral-400 uppercase tracking-wider font-bold">
-                                                {item.derived.range.charAt(0).toUpperCase() + item.derived.range.slice(1)}
+                {abilityActions.length > 0 && (
+                    <section className={cardStyle} aria-label="Class abilities">
+                        {header('Class Abilities')}
+                        <ul className="divide-y divide-neutral-200">
+                            {abilityActions.map(action => {
+                                const item = (actor.items ?? []).find((entry: any) => String(entry.id) === action.itemId);
+                                const view = (derived.items ?? []).find((entry: any) => entry.id === action.itemId);
+                                if (!item || !view) return null;
+                                const uses = view.uses;
+                                return (
+                                    <li key={action.id} className="py-2 flex flex-wrap items-center gap-2 text-sm">
+                                        <button type="button" onClick={() => openCard({ kind: 'item', itemId: view.id })} className="flex-1 min-w-0 flex items-center gap-2 text-left min-h-11" aria-label={`${item.name} details`}>
+                                            <img src={resolveImageUrl(item.img)} className="w-8 h-8 border border-black object-cover bg-neutral-200" alt="" />
+                                            <span className={`font-serif font-bold text-lg leading-tight break-words ${view.lost ? 'opacity-60 line-through' : ''}`}>{item.name}</span>
+                                            {view.lost && <span className="text-[10px] font-bold uppercase border border-red-700 text-red-800 px-1">Lost</span>}
+                                        </button>
+                                        {uses?.limited && (
+                                            <span className="flex items-center gap-1" aria-label={`${uses.available} of ${uses.max} uses`}>
+                                                <button type="button" aria-label={`Remove a use of ${item.name}`} className="w-8 h-8 border border-neutral-300 disabled:opacity-30"
+                                                    disabled={uses.available <= 0} onClick={() => updateItem(view.id, { 'system.uses.available': uses.available - 1 })}>−</button>
+                                                <span className="font-mono font-bold min-w-[4ch] text-center">{uses.available}/{uses.max}</span>
+                                                <button type="button" aria-label={`Restore a use of ${item.name}`} className="w-8 h-8 border border-neutral-300 disabled:opacity-30"
+                                                    disabled={uses.available >= uses.max} onClick={() => updateItem(view.id, { 'system.uses.available': uses.available + 1 })}>+</button>
                                             </span>
                                         )}
-                                    </div>
-                                    <div className="text-sm text-neutral-700 font-sans mt-1">
-                                        <span className="font-bold">{item.derived?.toHit}</span> to hit, <span title={item.derived?.warnings?.join(' ')} className="font-bold">{item.derived?.damage}</span> dmg
-                                    </div>
-                                    {/* Property Pills */}
-                                    {item.derived?.properties && item.derived.properties.length > 0 && (
-                                        <div className="flex flex-wrap gap-1 mt-1.5">
-                                            {item.derived.properties.map((prop: string, pIdx: number) => (
-                                                <div key={`prop-${pIdx}`} className="flex items-center bg-black/5 px-1.5 py-0.5 border border-black/20 rounded-sm">
-                                                    <span className="text-[9px] font-black uppercase text-black/70">{prop}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                                {/*
-                                <button
-                                    className="opacity-0 group-hover:opacity-100 w-8 h-8 rounded-full bg-black text-white flex items-center justify-center hover:scale-110 transition-all"
-                                >
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" className="text-white">
-                                        <path d="M12 2L2 22h20L12 2zm0 3.5 6 12H6l6-12z" />
-                                        <text x="12" y="19" fontSize="8" fontWeight="bold" textAnchor="middle" fill="black">20</text>
-                                    </svg>
-                                </button>
-                                */}
-                                <button
-                                    className={`flex flex-col items-center group -mb-1 transition-colors bg-black rounded-full transition-all duration-300 hover:scale-110 active:scale-95 cursor-pointer`}
-                                >
-                                    <div className={`w-10 h-10 flex items-center justify-center transition-all duration-300`}>
-                                        <img src="/icons/dice-d20.svg" alt="Roll" className="w-full h-full brightness-0 invert transition-all group-hover:drop-shadow-[0_0_8px_rgba(245,158,11,0.8)] drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)]" />
-                                    </div>
-                                </button>
-                            </div>
-                        ))}
-                        {(!actor.derived?.attacks?.ranged || actor.derived.attacks.ranged.length === 0) && (
-                            <div className="text-neutral-400 text-sm italic text-center py-2">No ranged weapons equipped.</div>
-                        )}
-                    </div>
-                </div>
-
-                {/* Special Abilities (Limited Use) */}
-                <div className={cardStyle}>
-                    <div className="bg-black text-white p-1 -mx-4 -mt-4 mb-2 px-2 border-b border-white">
-                        <span className="font-serif font-bold text-lg uppercase">Special Abilities</span>
-                    </div>
-                    <div className="space-y-4">
-                        {(() => {
-
-
-                            const specialItems = (actor.items?.filter((i: any) =>
-                                ['Talent', 'Feature', 'Ability', 'NPC Feature', 'Class Ability'].includes(i.type) &&
-                                (i.system?.uses?.max > 0 || i.system?.uses?.value > 0)
-                            ) || []);
-
-                            if (specialItems.length === 0) {
-                                return <div className="text-neutral-400 text-sm italic text-center py-2">No special abilities with limited uses.</div>;
-                            }
-
-                            // Grouping
-                            const grouped: Record<string, any[]> = {};
-                            specialItems.forEach((item: any) => {
-                                let group = "General";
-                                const src = item.system?.source;
-                                if (src) {
-                                    if (typeof src === 'string') group = src;
-                                    else if (typeof src === 'object') group = src.title || src.name || src.label || "General";
-                                }
-                                else if (item.system?.talentClass === 'class') group = actor.computed?.resolvedNames?.class || resolveName(actor.system?.class, 'classes') || "Class";
-                                else if (item.system?.talentClass === 'ancestry') group = actor.computed?.resolvedNames?.ancestry || resolveName(actor.system?.ancestry, 'ancestries') || "Ancestry";
-
-                                if (!grouped[group]) grouped[group] = [];
-                                grouped[group].push(item);
-                            });
-
-                            return Object.entries(grouped).map(([group, items], gIdx) => (
-                                <div key={`group-${group}-${gIdx}`}>
-                                    {/* Header Row */}
-                                    <div className="flex justify-between items-center border-b-2 border-black pb-1 mb-1 text-black font-bold text-sm uppercase">
-                                        <div className="flex-1">{group}</div>
-                                        <div className="w-24 text-center">Uses</div>
-                                        <div className="w-16 text-right">Actions</div>
-                                    </div>
-
-                                    <div className="divide-y divide-neutral-200">
-                                        {items.map((item: any, idx) => {
-                                            // Uses and Lost paths
-                                            const usesKey = item.system?.uses?.available !== undefined ? 'available' : 'value';
-                                            const usesPath = `items.${item.id}.system.uses.${usesKey}`;
-                                            const lostPath = `items.${item.id}.system.lost`;
-
-                                            const realCurrent = item.system?.uses?.[usesKey] ?? 0;
-                                            const currentUses = getDraftValue(usesPath, realCurrent);
-                                            const maxUses = item.system?.uses?.max || 0;
-                                            const isLost = getDraftValue(lostPath, item.system?.lost || false);
-
-                                            return (
-                                                <div
-                                                    key={item.id || item._id || `ability-${idx}`}
-                                                    className="py-2 flex items-center text-sm hover:bg-neutral-50 group"
-                                                >
-                                                    {/* Col 1: Image + Name */}
-                                                    <div className="flex-1 flex items-center gap-2">
-                                                        <img
-                                                            src={resolveImageUrl(item.img)}
-                                                            className="w-8 h-8 border border-black object-cover bg-neutral-200"
-                                                            alt={item.name}
-                                                        />
-                                                        <span className={`font-serif font-bold text-lg leading-tight ${isLost ? 'opacity-50 line-through' : ''}`}>{item.name}</span>
-                                                    </div>
-
-                                                    {/* Col 2: Uses (- X/Y +) */}
-                                                    <div className="w-24 flex items-center justify-center gap-1">
-                                                        <button
-                                                            onClick={() => {
-                                                                if (currentUses > 0) updateActor(usesPath, currentUses - 1, { immediate: true });
-                                                            }}
-                                                            className="w-5 h-5 flex items-center justify-center hover:bg-neutral-200 rounded text-neutral-600 font-bold disabled:opacity-30"
-                                                            disabled={currentUses <= 0 || isLost}
-                                                        >
-                                                            -
-                                                        </button>
-                                                        <span className={`font-mono font-bold text-sm min-w-[3ch] text-center ${isLost ? 'opacity-50' : ''}`}>
-                                                            {currentUses}/{maxUses}
-                                                        </span>
-                                                        <button
-                                                            onClick={() => {
-                                                                if (currentUses < maxUses) updateActor(usesPath, currentUses + 1, { immediate: true });
-                                                            }}
-                                                            className="w-5 h-5 flex items-center justify-center hover:bg-neutral-200 rounded text-neutral-600 font-bold disabled:opacity-30"
-                                                            disabled={currentUses >= maxUses || isLost}
-                                                        >
-                                                            +
-                                                        </button>
-                                                    </div>
-
-                                                    {/* Col 3: Actions (Use Die | Checkbox) */}
-                                                    <div className="w-16 flex items-center justify-end gap-2 pr-1">
-                                                        {/* Use Item Button */}
-                                                        <button
-                                                            className="text-neutral-400 hover:text-black transition-colors transform hover:scale-110 flex items-center justify-center p-1 disabled:opacity-30 disabled:hover:scale-100 disabled:hover:text-neutral-400"
-                                                            title="Use Ability (Post to Chat)"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                if (currentUses > 0) {
-                                                                    performRoll('use-item', item.id); // Direct call via context
-                                                                    updateActor(usesPath, currentUses - 1, { immediate: true });
-                                                                }
-                                                            }}
-                                                            disabled={currentUses <= 0 || isLost}
-                                                        >
-                                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                                                                <path d="M12 2L2 22h20L12 2zm0 3.5 6 12H6l6-12z" />
-                                                                <text x="12" y="19" fontSize="8" fontWeight="bold" textAnchor="middle" fill="white">20</text>
-                                                            </svg>
-                                                        </button>
-
-                                                        {/* Lost Toggle (Optimistic) */}
-                                                        <button
-                                                            className={`transition-all flex items-center justify-center rounded-full w-6 h-6 border shadow-sm ${isLost ? 'bg-red-100 border-red-500 text-red-600 hover:scale-110' : 'bg-white border-neutral-300 text-neutral-300 hover:border-black hover:text-black hover:scale-110'}`}
-                                                            title={isLost ? "Restore Ability" : "Mark as Lost"}
-                                                            onClick={() => updateActor(lostPath, !isLost, { immediate: true })}
-                                                        >
-                                                            {isLost ? (
-                                                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3 h-3">
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
-                                                                </svg>
-                                                            ) : (
-                                                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3 h-3">
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                                                </svg>
-                                                            )}
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            ));
-                        })()}
-                    </div>
-                </div>
-
-
-
+                                        <button type="button" onClick={() => startAction(action)} disabled={!action.available || isActionBusy(action.id)}
+                                            title={action.reason ?? undefined} className="min-h-11 px-3 bg-black text-white text-xs font-bold uppercase disabled:opacity-40">Use</button>
+                                        <button type="button" onClick={() => updateItem(view.id, { 'system.lost': !view.lost })}
+                                            className="min-h-11 px-3 border border-black text-xs font-bold uppercase">{view.lost ? 'Restore' : 'Mark lost'}</button>
+                                        {!action.available && action.reason && <span className="basis-full text-xs text-red-800">{action.reason}</span>}
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                    </section>
+                )}
             </div>
         </div>
     );

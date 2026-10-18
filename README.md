@@ -9,14 +9,20 @@ Character sheets and tools for playing Shadowdark RPG with SheetDelver.
 - Ability rolls, formatted chat cards and a guided level-up wizard.
 - Character generation and Shadowdarklings.net JSON import.
 - Mobile-friendly gear browsing and Combat HUD initiative rolling.
+- Spell, item and monster detail cards.
+- Live world settings and admin-managed effect migrations.
 
 <img src="https://github.com/sheetdelver/sheetdelver/blob/main/images/sheets/shadowdark/sd-character-sheet.png" alt="Shadowdark character sheet" width="25%">
 <img src="https://github.com/sheetdelver/sheetdelver/blob/main/images/sheets/shadowdark/sd-paper-view.png" alt="Shadowdark paper-style sheet" width="25%">
 
-Requires **SheetDelver Core 0.18.0 or later**.
+Requires **SheetDelver Core 0.19.2 or later**.
+
+Verified with native Shadowdark4.0.6 on Foundry13.351 and14.367. Core owns
+world maintenance approval; the module does not repair data from player sheets.
 
 See the [releases](https://github.com/sheetdelver/sd-shadowdark/releases),
-[changelog](CHANGELOG.md) and [developer guide](docs/DEVELOPMENT.md).
+[changelog](CHANGELOG.md), [module architecture](docs/architecture.md) and
+[working guidance](AGENTS.md).
 
 ## Third-party license
 

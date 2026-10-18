@@ -8,16 +8,16 @@ import CompendiumSelectModal from './components/CompendiumSelectModal';
 import LanguageSelectionModal from './components/LanguageSelectionModal';
 import { shadowdarkTheme } from './themes/shadowdark';
 import { isRareLanguage } from '../logic/rules';
-import { useShadowdarkUI } from './context/ShadowdarkUIContext';
+import { useShadowdarkUI, useShadowdarkCollections } from './context/ShadowdarkUIContext';
 import { useShadowdarkActor } from './context/ShadowdarkActorContext';
-import { LevelUpModal } from './components/LevelUpModal';
+import { formatUuid } from '../logic/identity';
 
 interface DetailsTabProps {
     foundryUrl?: string;
 }
 
 export default function DetailsTab({}: DetailsTabProps) {
-    const { systemData, collections, fetchPack, resolveName } = useShadowdarkUI();
+    const { collections, resolveName } = useShadowdarkUI();
     const { resolveImageUrl } = useSDK();
     const { ConfirmationModal } = useSDKComponents();
     const {
@@ -27,19 +27,23 @@ export default function DetailsTab({}: DetailsTabProps) {
         createItem,
         updateItem,
         getDraftValue,
-        refreshActor,
-        // Level-up state — single shared instance from context
+        // Level-up modal is rendered once by the sheet shell.
         triggerLevelUp,
-        showLevelUpModal,
-        levelUpData,
-        closeLevelUp
     } = useShadowdarkActor();
+    // Exact identities from the prepared view: the host projection shows raw
+    // compendium UUIDs as names (SD01-05), which are never mapped back by name.
+    const identity = actor.derived?.identity ?? {};
+    const languageEntries: any[] = identity.languages ?? [];
+    const languageIds: string[] = languageEntries.map(entry => entry.ref ? formatUuid(entry.ref) : entry.value).filter(Boolean);
+    const ownedClass = (actor.items ?? []).find((item: any) => item.type === 'Class');
+    const usesPatron = !!identity.patron?.ref || ownedClass?.system?.patron?.required === true;
     const [selectionModal, setSelectionModal] = useState<any>({ isOpen: false });
     const [isCreatingBoon, setIsCreatingBoon] = useState(false);
     const [editingItem, setEditingItem] = useState<any>(null);
     const [itemToDelete, setItemToDelete] = useState<{ id: string; name: string } | null>(null);
     const [isLanguageModalOpen, setIsLanguageModalOpen] = useState(false);
-    const [fetchingCategory, setFetchingCategory] = useState<string | null>(null);
+    const selectionData = useShadowdarkCollections(selectionModal.dataKey ? [selectionModal.dataKey] : [], selectionModal.isOpen);
+    const fetchingCategory = selectionData.loading ? selectionModal.dataKey : null;
 
     const getClassName = () => {
         if (!actor.details?.class) {
@@ -51,7 +55,7 @@ export default function DetailsTab({}: DetailsTabProps) {
         return actor.details?.class;
     };
 
-    const openSelection = async (field: string, title: string, dataKey?: string, multiSelect = false) => {
+    const openSelection = (field: string, title: string, dataKey?: string, multiSelect = false) => {
         // Current Value (Calculate early for the loading state)
         let current: any = '';
         if (field.includes('.')) {
@@ -64,50 +68,20 @@ export default function DetailsTab({}: DetailsTabProps) {
             current = actor[field];
         }
 
-        // 1. Initial State: Open modal (Loading if data missing)
-        // Check both small indexing in systemData and hydrated cache in collections
-        const hasData = dataKey ? (!!systemData?.[dataKey] || !!collections?.[dataKey]) : true;
-        const activeCollection = dataKey ? (collections?.[dataKey] || systemData?.[dataKey] || []) : [];
-        
         setSelectionModal({
             isOpen: true,
             title,
-            options: hasData && dataKey ? activeCollection.map((o: any) => ({
-                name: o.name,
-                uuid: o.uuid,
-                description: o.description || o.system?.description?.value || o.data?.description?.value || ''
-            })) : [],
-            currentValue: hasData && dataKey ? resolveName(current, dataKey) : current,
+            dataKey,
+            currentValue: current,
             multiSelect,
-            isLoading: !hasData,
             onSelect: (option: any) => handleSelection(field, option, multiSelect)
         });
-
-        // 2. Hydration: If data is missing or incomplete, fetch it and update modal
-        if (!hasData && dataKey) {
-            setFetchingCategory(dataKey);
-            try {
-                const fetched = await fetchPack(dataKey);
-                if (Array.isArray(fetched)) {
-                    setSelectionModal((prev: any) => ({
-                        ...prev,
-                        isLoading: false,
-                         options: fetched.map((o: any) => ({
-                             name: o.name,
-                             uuid: o.uuid,
-                             description: o.description || o.system?.description?.value || o.data?.description?.value || ''
-                         })),
-                         currentValue: resolveName(current, dataKey)
-                     }));
-                }
-            } finally {
-                setFetchingCategory(null);
-            }
-        }
     };
 
     const handleSelection = (field: string, option: any, multiSelect: boolean) => {
-        const valToStore = option.uuid || option.name;
+        // Reference fields store exact UUIDs only.
+        if (!option?.uuid) return;
+        const valToStore = option.uuid;
 
         // Handle Multi-Select (Toggle)
         if (multiSelect) {
@@ -116,18 +90,11 @@ export default function DetailsTab({}: DetailsTabProps) {
                 const modalOptions = prev.options;
 
                 // Sanitize & Normalize to UUIDs
-                const cleanArray = (Array.isArray(currentVal) ? currentVal : []).filter((c: any) => c != null).map((c: any) => {
-                    const val = typeof c === 'object' ? (c.uuid || c.name) : c;
-                    if (!val) return '';
-
-                    const match = modalOptions.find((o: any) => o.uuid === val || o.name === val);
-                    if (match && match.uuid) return match.uuid;
-
-                    return val;
-                }).filter((c: any) => c !== '');
+                void modalOptions;
+                const cleanArray = (Array.isArray(currentVal) ? currentVal : []).filter((c: any) => typeof c === 'string' && c !== '');
 
                 const newArray = Array.from(new Set(cleanArray));
-                const targetVal = option.uuid || option.name;
+                const targetVal = option.uuid;
                 const existingIndex = newArray.findIndex((c: any) => c === targetVal);
 
                 if (existingIndex >= 0) {
@@ -215,10 +182,11 @@ export default function DetailsTab({}: DetailsTabProps) {
                                 type="number"
                                 value={getDraftValue('system.level.xp', actor.system?.level?.xp || 0)}
                                 min={0}
-                                max={actor.level?.next || 10}
+                                max={actor.derived?.xpNextLevel}
+                                aria-label="Experience points"
                                 disabled={!actor.system?.level?.value || actor.system.level.value === 0}
                                 onChange={(e) => {
-                                    const nextXP = actor.level?.next || 10;
+                                    const nextXP = Number(actor.derived?.xpNextLevel ?? 0);
                                     let val = parseInt(e.target.value) || 0;
                                     if (val < 0) val = 0;
                                     if (val > nextXP) val = nextXP;
@@ -226,8 +194,8 @@ export default function DetailsTab({}: DetailsTabProps) {
                                 }}
                                 className={`w-12 bg-neutral-100 border-b border-black text-center outline-none px-1 disabled:bg-transparent disabled:border-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
                             />
-                            <span className="text-neutral-400">/</span>
-                            <span>{actor.level?.next || 10}</span>
+                            <span className="text-neutral-600" aria-hidden="true">/</span>
+                            <span aria-label="Experience needed">{actor.derived?.xpNextLevel ?? '-'}</span>
                         </div>
                     </div>
 
@@ -268,7 +236,7 @@ export default function DetailsTab({}: DetailsTabProps) {
                     </div>
 
                     {/* Alignment */}
-                    <div className={`${cardStyleWithoutPadding} ${(actor.details?.class || '').toLowerCase().includes('warlock')
+                    <div className={`${cardStyleWithoutPadding} ${usesPatron
                         ? 'md:col-span-2 lg:col-span-1'
                         : 'md:col-span-1 lg:col-span-1.5'
                         }`}>
@@ -289,7 +257,7 @@ export default function DetailsTab({}: DetailsTabProps) {
                     </div>
 
                     {/* Deity */}
-                    <div className={`${cardStyleWithoutPadding} ${(actor.details?.class || '').toLowerCase().includes('warlock')
+                    <div className={`${cardStyleWithoutPadding} ${usesPatron
                         ? 'md:col-span-1 lg:col-span-1'
                         : 'md:col-span-2 lg:col-span-1.5'
                         }`}>
@@ -308,12 +276,12 @@ export default function DetailsTab({}: DetailsTabProps) {
                             </button>
                         </div>
                         <div className="p-2 font-serif text-lg bg-white font-bold">
-                            {actor.computed?.resolvedNames?.deity || resolveName(actor.system?.deity, 'deities') || '-'}
+                            {identity.deity?.label ?? identity.deity?.value ?? '-'}
                         </div>
                     </div>
 
                     {/* Patron (Only for Warlock) */}
-                    {(actor.details?.class || '').toLowerCase().includes('warlock') && (
+                    {usesPatron && (
                         <div className={`${cardStyleWithoutPadding} md:col-span-1 lg:col-span-1`}>
                             <div className="bg-black text-white p-1 px-2 border-b border-white flex justify-between items-center">
                                 <div className="flex items-center gap-2">
@@ -330,7 +298,7 @@ export default function DetailsTab({}: DetailsTabProps) {
                                 </button>
                             </div>
                             <div className="p-2 font-serif text-lg bg-white font-bold">
-                                {actor.computed?.resolvedNames?.patron || resolveName(actor.system?.patron, 'patrons') || '-'}
+                                {identity.patron?.label ?? identity.patron?.value ?? '-'}
                             </div>
                         </div>
                     )}
@@ -345,15 +313,9 @@ export default function DetailsTab({}: DetailsTabProps) {
                             {(() => {
                                 const { maxCommon = 0, maxRare = 0 } = actor.computed?.languageLimits || {};
                                 // Split languages by rarity using the centralized helper
-                                const allLangs = (actor.system?.languages || []);
-                                const currentCommon = allLangs.filter((id: string) => {
-                                    const lang = (collections?.languages || systemData?.languages)?.find((l: any) => l.uuid === id || l.name === id);
-                                    return !isRareLanguage(resolveName(id, 'languages'));
-                                }).length;
-                                const currentRare = allLangs.filter((id: string) => {
-                                    const lang = (collections?.languages || systemData?.languages)?.find((l: any) => l.uuid === id || l.name === id);
-                                    return isRareLanguage(resolveName(id, 'languages'));
-                                }).length;
+                                const labels = languageEntries.map(entry => entry.label ?? entry.value ?? '');
+                                const currentRare = labels.filter(isRareLanguage).length;
+                                const currentCommon = labels.length - currentRare;
 
                                 const totalCurrent = currentCommon + currentRare;
                                 const totalMax = maxCommon + maxRare;
@@ -369,14 +331,7 @@ export default function DetailsTab({}: DetailsTabProps) {
                                             </div>
                                         </div>
                                         <button
-                                            onClick={async () => {
-                                                if (!(collections?.languages || systemData?.languages)) {
-                                                    setFetchingCategory('languages');
-                                                    await fetchPack('languages');
-                                                    setFetchingCategory(null);
-                                                }
-                                                setIsLanguageModalOpen(true);
-                                            }}
+                                            onClick={() => setIsLanguageModalOpen(true)}
                                             className="bg-white text-black px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider border border-black hover:bg-neutral-200 transition-colors shadow-[2px_2px_0px_0px_rgba(255,255,255,0.2)]"
                                         >
                                             {fetchingCategory === 'languages' ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Edit'}
@@ -389,18 +344,15 @@ export default function DetailsTab({}: DetailsTabProps) {
                     <div className="p-2 flex flex-wrap gap-2 bg-white">
                         {(() => {
                             const RARE_LANGS = ['celestial', 'diabolic', 'draconic', 'primordial', 'abyssal', 'undercommon'];
-                            const actorLangs = actor.system?.languages || [];
-                            const resolvedLangs = actorLangs.map((l: any) => {
-                                const id = typeof l === 'string' ? l : (l.name || l.uuid || '');
-                                // Find extra info in systemData/collections for tooltips
-                                const match = (collections?.languages || systemData?.languages)?.find((sl: any) =>
-                                    sl.uuid === id || sl.name === id || (typeof id === 'string' && id.endsWith(sl.uuid?.split('.').pop() || ""))
-                                );
-
+                            // Effect-granted languages are listed but are not part of the editable selection.
+                            const granted: any[] = (identity.grantedLanguages ?? []).map((entry: any) => ({ ...entry, granted: true }));
+                            const resolvedLangs = [...languageEntries, ...granted].map((entry: any) => {
+                                const uuid = entry.ref ? formatUuid(entry.ref) : null;
+                                const match = uuid ? collections.languages?.find((sl: any) => sl.uuid === uuid) : null;
                                 return {
-                                    name: match ? match.name : id,
-                                    desc: match ? (match.description || match.desc) : (typeof l === 'object' ? (l.description || l.desc) : 'Description unavailable.'),
-                                    rarity: match ? match.rarity : (typeof l === 'object' ? l.rarity : 'common')
+                                    name: `${entry.label ?? entry.value ?? 'Unavailable language'}${entry.granted ? ' (from effect)' : ''}`,
+                                    desc: match ? (match.system?.description || match.description || '') : 'Description unavailable.',
+                                    rarity: match?.rarity ?? (isRareLanguage(entry.label ?? '') ? 'rare' : 'common'),
                                 };
                             });
 
@@ -429,7 +381,7 @@ export default function DetailsTab({}: DetailsTabProps) {
                                     );
                                 });
                         })()}
-                        {(!actor.system?.languages || actor.system.languages.length === 0) && <span className="text-neutral-500 text-sm italic">None known</span>}
+                        {languageEntries.length === 0 && <span className="text-neutral-600 text-sm italic">None known</span>}
                     </div>
                 </div>
 
@@ -501,8 +453,6 @@ export default function DetailsTab({}: DetailsTabProps) {
                         onCreate={createItem}
                         onUpdate={updateItem}
                         initialData={editingItem}
-                        systemConfig={{ ...systemData, ...collections }}
-                        predefinedEffects={collections?.PREDEFINED_EFFECTS || systemData?.PREDEFINED_EFFECTS}
                     />
                 )
             }
@@ -528,7 +478,10 @@ export default function DetailsTab({}: DetailsTabProps) {
                 onClose={() => setSelectionModal((prev: any) => ({ ...prev, isOpen: false }))}
                 onSelect={selectionModal.onSelect}
                 title={selectionModal.title}
-                options={selectionModal.options}
+                options={selectionData.ready ? (selectionData.collections[selectionModal.dataKey] ?? []).map((o: any) => ({
+                    name: o.name, uuid: o.uuid, description: o.description || o.system?.description?.value || o.system?.description || ''
+                })) : []}
+                dataState={selectionData}
                 currentValue={selectionModal.currentValue}
                 multiSelect={selectionModal.multiSelect}
             />
@@ -540,36 +493,12 @@ export default function DetailsTab({}: DetailsTabProps) {
                         setIsLanguageModalOpen(false);
                         updateActor('system.languages', langs, { immediate: true });
                     }}
-                    currentLanguages={actor.system?.languages || []}
+                    currentLanguages={languageIds}
                     maxCommon={actor.computed?.languageLimits?.maxCommon || 0}
                     maxRare={actor.computed?.languageLimits?.maxRare || 0}
                 />
             )}
 
-            {/* Level-Up Modal — shared state from ShadowdarkActorContext, rendered here for the Details tab Level card */}
-            {showLevelUpModal && levelUpData && (
-                <LevelUpModal
-                    actorId={actor._id || actor.id}
-                    actorName={actor.name}
-                    currentLevel={levelUpData.currentLevel}
-                    targetLevel={levelUpData.targetLevel}
-                    ancestry={levelUpData.ancestry}
-                    classObj={levelUpData.classObj}
-                    classUuid={levelUpData.classUuid}
-                    patron={levelUpData.patron}
-                    patronUuid={levelUpData.patronUuid}
-                    abilities={levelUpData.abilities}
-                    spells={levelUpData.spells}
-                    availableClasses={levelUpData.availableClasses}
-                    availablePatrons={levelUpData.availablePatrons}
-                    availableLanguages={levelUpData.availableLanguages}
-                    onComplete={async (_data: any) => {
-                        await refreshActor();
-                        closeLevelUp();
-                    }}
-                    onCancel={closeLevelUp}
-                />
-            )}
         </div>
 
     );

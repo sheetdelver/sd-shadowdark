@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
 import { X, Search } from 'lucide-react';
 import { isRareLanguage } from '../../logic/rules';
-import { useShadowdarkUI } from '../context/ShadowdarkUIContext';
+import { useShadowdarkCollections } from '../context/ShadowdarkUIContext';
+import { CollectionStatus } from './CollectionStatus';
 
 interface Language {
     name: string;
@@ -28,13 +29,13 @@ export default function LanguageSelectionModal({
     maxCommon,
     maxRare
 }: LanguageSelectionModalProps) {
-    const { collections } = useShadowdarkUI();
+    const data = useShadowdarkCollections(['languages'], isOpen);
+    const { collections } = data;
     const [search, setSearch] = useState('');
 
     const availableLanguages = useMemo(() => {
-        if (propsAvailableLanguages && propsAvailableLanguages.length > 0) return propsAvailableLanguages;
-        return collections?.languages || [];
-    }, [propsAvailableLanguages, collections]);
+        return data.ready ? collections.languages : [];
+    }, [data.ready, collections]);
     const [selected, setSelected] = useState<string[]>(currentLanguages);
 
     const filteredLanguages = useMemo(() => {
@@ -111,6 +112,7 @@ export default function LanguageSelectionModal({
 
                 {/* Content */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
+                    <CollectionStatus state={data} label="Loading languages…" />
 
                     {/* Common Section */}
                     {commonLanguages.length > 0 && (
@@ -174,7 +176,7 @@ export default function LanguageSelectionModal({
                         </div>
                     )}
 
-                    {filteredLanguages.length === 0 && (
+                    {data.ready && filteredLanguages.length === 0 && (
                         <div className="text-center py-10 text-neutral-400 font-bold uppercase tracking-widest text-xs italic">No languages matched.</div>
                     )}
                 </div>
@@ -188,7 +190,8 @@ export default function LanguageSelectionModal({
                         Cancel
                     </button>
                     <button
-                        onClick={() => onSelect(selected)}
+                        onClick={() => { if (data.ready) onSelect(selected); }}
+                        disabled={!data.ready}
                         className="h-12 bg-black text-white border-2 border-black px-10 font-black font-serif uppercase tracking-widest text-base hover:bg-neutral-800 transition-all active:translate-x-[2px] active:translate-y-[2px] shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-none"
                     >
                         Save Languages

@@ -1,9 +1,6 @@
 // 'use client';
 
 import { useState, useEffect } from 'react';
-import {
-    calculateItemSlots,
-} from './sheet-utils';
 import { useSDK, useSDKComponents } from '@sheet-delver/sdk/react';
 import { shadowdarkTheme } from './themes/shadowdark';
 import { ItemRow } from './InventoryComponents';
@@ -15,7 +12,7 @@ import { Gem, Plus } from 'lucide-react';
 import { useShadowdarkActor } from './context/ShadowdarkActorContext';
 
 export default function InventoryTab() {
-    const { resolveImageUrl } = useSDK();
+
     const { ConfirmationModal } = useSDKComponents();
     const {
         actor,
@@ -25,6 +22,7 @@ export default function InventoryTab() {
         updateItem,
         getDraftValue
     } = useShadowdarkActor();
+    const { addNotification } = useSDK();
     const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
     const [isGemModalOpen, setIsGemModalOpen] = useState(false);
     const [isCreateTreasureModalOpen, setIsCreateTreasureModalOpen] = useState(false);
@@ -44,78 +42,49 @@ export default function InventoryTab() {
     // Confirm Delete State
     const [itemToDelete, setItemToDelete] = useState<string | null>(null);
 
-    // Context-provided applyOverrides (Bridge if needed, but here we just use what we have)
-    // Actually, InventoryTab was using applyOverrides from useOptimisticOverrides.
-    // I should check if I can just use actor.derived?.inventory directly as context handles drafting.
-    // This function is now provided by useOptimisticOverrides
-
-    // Exclude non-inventory types
-    const NON_INVENTORY_TYPES = ['Patron', 'Talent', 'Effect', 'Background', 'Ancestry', 'Class', 'Deity', 'Title', 'Language', 'Class Ability', 'Gem'];
-    const filterInventory = (list: any[]) => list.filter((i: any) => !NON_INVENTORY_TYPES.includes(i.type));
-
-    const equippedItems = filterInventory(actor.derived?.inventory?.equipped || []).sort((a: any, b: any) => a.name.localeCompare(b.name));
-    const carriedItems = filterInventory(actor.derived?.inventory?.carried || []).sort((a: any, b: any) => a.name.localeCompare(b.name));
-    const stashedItems = filterInventory(actor.derived?.inventory?.stashed || []).sort((a: any, b: any) => a.name.localeCompare(b.name));
-
-    // For slot calculation, we need to include gems specifically since they are excluded from the gear lists
-    const gems = (actor.items || []).filter((i: any) => i.type === 'Gem');
-
-
-    // Separate treasure items from regular gear
-    const isTreasure = (i: any) => !!i.system?.treasure;
-    const isNotTreasure = (i: any) => !i.system?.treasure;
-
-    // Filter the source lists for display
-    const displayEquipped = equippedItems.filter(isNotTreasure);
-    const displayCarried = carriedItems.filter(isNotTreasure);
-    const displayStashed = stashedItems; // Stashed items include treasure if stashed
-
-    // Treasure matches treasure items that are NOT stashed
-    // (If they are stashed, they go to Stashed section)
-    const treasureItems = [...equippedItems, ...carriedItems]
-        .filter(i => isTreasure(i) && !i.system?.stashed)
+    // Prepared inventory groups (ids) mapped to the raw items they describe.
+    const byId = new Map((actor.items || []).map((item: any) => [String(item.id ?? item._id), item]));
+    const viewOf = (id: string) => (actor.derived?.items ?? []).find((view: any) => view.id === id);
+    const group = (ids: string[] = []) => ids.map(id => byId.get(id)).filter((item: any) => item && item.type !== 'Gem')
         .sort((a: any, b: any) => a.name.localeCompare(b.name));
+    const equippedItems = group(actor.derived?.inventory?.equipped);
+    const carriedItems = group(actor.derived?.inventory?.carried);
+    const stashedItems = group(actor.derived?.inventory?.stashed);
+    const isTreasure = (i: any) => viewOf(String(i.id))?.treasure === true;
+    const displayEquipped = equippedItems.filter(i => !isTreasure(i));
+    const displayCarried = carriedItems.filter(i => !isTreasure(i));
+    const displayStashed = stashedItems;
+    const treasureItems = [...equippedItems, ...carriedItems].filter(isTreasure);
 
-    // Use pre-computed slot breakdown from the rules engine
-    const slotBreakdown = actor.computed?.slotBreakdown || {
-        gear: 0,
-        treasure: 0,
-        gems: 0,
-        coins: 0
-    };
-
+    const slotBreakdown = actor.derived?.slotBreakdown || { gear: 0, treasure: 0, gems: 0, coins: 0 };
     const gearSlots = slotBreakdown.gear;
     const treasureSlots = slotBreakdown.treasure;
     const gemSlots = slotBreakdown.gems;
     const coinSlots = slotBreakdown.coins;
+    const currentSlots = actor.derived?.slotsUsed ?? 0;
+    const maxSlots = actor.derived?.maxSlots ?? 0;
 
-    // Use backend computed value for the total to ensure consistency
-    const currentSlots = actor.computed?.slotsUsed ?? 0;
-    const maxSlots = actor.computed?.maxSlots ?? actor.system?.slots?.max ?? 0;
-
-    // Coin Logic moved to context/getDraftValue
-
-
-
-    const handleSellTreasure = async (item: any) => {
-        const cost = item.system?.cost || {};
-        const gp = Number(cost.gp) || 0;
-        const sp = Number(cost.sp) || 0;
-        const cp = Number(cost.cp) || 0;
-
-        // Add to actor's coins
-        const currentGp = Number(actor.system?.coins?.gp) || 0;
-        const currentSp = Number(actor.system?.coins?.sp) || 0;
-        const currentCp = Number(actor.system?.coins?.cp) || 0;
-
-        // Update coins via context
-        if (gp > 0) updateActor('system.coins.gp', currentGp + gp, { immediate: true });
-        if (sp > 0) updateActor('system.coins.sp', currentSp + sp, { immediate: true });
-        if (cp > 0) updateActor('system.coins.cp', currentCp + cp, { immediate: true });
-
-        // Delete the item via context
-        deleteItem(item.id);
+    /**
+     * Native sellAllItems order: remove the items, then credit their cost. Only
+     * items actually removed are credited; a failed coin write is reported
+     * with the exact amount so nothing is silently lost or duplicated.
+     */
+    const sellItems = async (items: any[]) => {
+        const sold: any[] = [];
+        for (const item of items) if (await deleteItem(String(item.id ?? item._id))) sold.push(item);
+        if (!sold.length) return;
+        const total = { gp: 0, sp: 0, cp: 0 };
+        for (const item of sold) for (const unit of ['gp', 'sp', 'cp'] as const) total[unit] += Number(item.system?.cost?.[unit]) || 0;
+        const coins = { ...(actor.system?.coins ?? {}) };
+        for (const unit of ['gp', 'sp', 'cp'] as const) coins[unit] = (Number(coins[unit]) || 0) + total[unit];
+        const credited = await updateActor('system.coins', coins, { immediate: true });
+        const amount = (['gp', 'sp', 'cp'] as const).filter(unit => total[unit]).map(unit => `${total[unit]} ${unit}`).join(' ') || 'nothing';
+        if (!credited) addNotification(`Sold ${sold.length} item(s) but could not add ${amount}; add the coins manually.`, 'error');
+        else if (sold.length < items.length) addNotification(`Sold ${sold.length} of ${items.length} items for ${amount}; the rest were not removed.`, 'error');
+        else addNotification(`Sold for ${amount}.`, 'success');
     };
+
+    const handleSellTreasure = (item: any) => sellItems([item]);
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pb-20">
@@ -129,7 +98,7 @@ export default function InventoryTab() {
                     <div className="bg-black text-white p-2 font-bold font-serif uppercase tracking-widest text-sm mb-1">
                         Equipped Gear
                     </div>
-                    <div className="grid grid-cols-12 text-xs font-bold uppercase tracking-widest text-neutral-500 border-b-2 border-black px-2 py-1">
+                    <div className="hidden sm:grid grid-cols-12 text-xs font-bold uppercase tracking-widest text-neutral-500 border-b-2 border-black px-2 py-1">
                         <div className="col-span-6">Gear</div>
                         <div className="col-span-2 text-center">Qty</div>
                         <div className="col-span-2 text-center">Slots</div>
@@ -137,7 +106,7 @@ export default function InventoryTab() {
                     </div>
                     <div className="divide-y divide-neutral-300">
                         {displayEquipped.map((item: any, idx: number) => (
-                            <ItemRow key={item.id || item._id || `equipped-${idx}`} item={item} expandedItems={expandedItems} toggleItem={toggleItem} />
+                            <ItemRow key={item.id || item._id || `equipped-${idx}`} item={item} expandedItems={expandedItems} toggleItem={toggleItem} onDelete={(it) => setItemToDelete(String(it.id))} />
                         ))}
                         {(displayEquipped.length === 0) && (
                             <div className="text-center text-neutral-400 italic p-4 text-xs">Nothing equipped.</div>
@@ -150,6 +119,8 @@ export default function InventoryTab() {
                     <div className="bg-black text-white p-2 font-bold font-serif uppercase tracking-widest text-sm mb-1 flex justify-between items-center">
                         <span>Carried Gear</span>
                         <button
+                            type="button"
+                            aria-label="Add gear"
                             onClick={() => setIsGearSelectionModalOpen(true)}
                             className="bg-white text-black text-[10px] px-2 py-0.5 rounded-sm flex items-center gap-1 hover:bg-neutral-200 transition-colors"
                         >
@@ -157,7 +128,7 @@ export default function InventoryTab() {
                             Add
                         </button>
                     </div>
-                    <div className="grid grid-cols-12 text-xs font-bold uppercase tracking-widest text-neutral-500 border-b-2 border-black px-2 py-1">
+                    <div className="hidden sm:grid grid-cols-12 text-xs font-bold uppercase tracking-widest text-neutral-500 border-b-2 border-black px-2 py-1">
                         <div className="col-span-6">Item</div>
                         <div className="col-span-2 text-center">Qty</div>
                         <div className="col-span-2 text-center">Slots</div>
@@ -165,7 +136,7 @@ export default function InventoryTab() {
                     </div>
                     <div className="divide-y divide-neutral-300">
                         {displayCarried.map((item: any, idx: number) => (
-                            <ItemRow key={item.id || item._id || `carried-${idx}`} item={item} expandedItems={expandedItems} toggleItem={toggleItem} />
+                            <ItemRow key={item.id || item._id || `carried-${idx}`} item={item} expandedItems={expandedItems} toggleItem={toggleItem} onDelete={(it) => setItemToDelete(String(it.id))} />
                         ))}
                         {(displayCarried.length === 0) && (
                             <div className="text-center text-neutral-400 italic p-4 text-xs">Nothing carried.</div>
@@ -178,6 +149,8 @@ export default function InventoryTab() {
                     <div className="bg-black text-white p-2 font-bold font-serif uppercase tracking-widest text-sm mb-1 flex justify-between items-center">
                         <span>Treasure</span>
                         <button
+                            type="button"
+                            aria-label="Add treasure"
                             onClick={() => setIsCreateTreasureModalOpen(true)}
                             className="bg-white text-black text-[10px] px-2 py-0.5 rounded-sm flex items-center gap-1 hover:bg-neutral-200 transition-colors"
                         >
@@ -185,7 +158,7 @@ export default function InventoryTab() {
                             Add
                         </button>
                     </div>
-                    <div className="grid grid-cols-12 text-xs font-bold uppercase tracking-widest text-neutral-500 border-b-2 border-black px-2 py-1">
+                    <div className="hidden sm:grid grid-cols-12 text-xs font-bold uppercase tracking-widest text-neutral-500 border-b-2 border-black px-2 py-1">
                         <div className="col-span-6">Item</div>
                         <div className="col-span-2 text-center">Value</div>
                         <div className="col-span-2 text-center">Slots</div>
@@ -193,7 +166,7 @@ export default function InventoryTab() {
                     </div>
                     <div className="divide-y divide-neutral-300">
                         {treasureItems.map((item: any, idx: number) => (
-                            <ItemRow key={item.id || item._id || `treasure-${idx}`} item={item} expandedItems={expandedItems} toggleItem={toggleItem} isTreasure={true} onSell={handleSellTreasure} />
+                            <ItemRow key={item.id || item._id || `treasure-${idx}`} item={item} expandedItems={expandedItems} toggleItem={toggleItem} isTreasure={true} onSell={handleSellTreasure} onDelete={(it) => setItemToDelete(String(it.id))} />
                         ))}
                         {(treasureItems.length === 0) && (
                             <div className="text-center text-neutral-400 italic p-4 text-xs">No treasure found.</div>
@@ -206,7 +179,7 @@ export default function InventoryTab() {
                     <div className="bg-black text-white p-2 font-bold font-serif uppercase tracking-widest text-sm mb-1">
                         Stashed Gear
                     </div>
-                    <div className="grid grid-cols-12 text-xs font-bold uppercase tracking-widest text-neutral-500 border-b-2 border-black px-2 py-1">
+                    <div className="hidden sm:grid grid-cols-12 text-xs font-bold uppercase tracking-widest text-neutral-500 border-b-2 border-black px-2 py-1">
                         <div className="col-span-6">Item</div>
                         <div className="col-span-2 text-center">Qty</div>
                         <div className="col-span-2 text-center">Slots</div>
@@ -214,7 +187,7 @@ export default function InventoryTab() {
                     </div>
                     <div className="divide-y divide-neutral-300">
                         {displayStashed.map((item: any, idx: number) => (
-                            <ItemRow key={item.id || item._id || `stashed-${idx}`} item={item} expandedItems={expandedItems} toggleItem={toggleItem} />
+                            <ItemRow key={item.id || item._id || `stashed-${idx}`} item={item} expandedItems={expandedItems} toggleItem={toggleItem} onDelete={(it) => setItemToDelete(String(it.id))} />
                         ))}
                         {(displayStashed.length === 0) && (
                             <div className="text-center text-neutral-400 italic p-4 text-xs">Nothing stashed.</div>
@@ -259,14 +232,14 @@ export default function InventoryTab() {
                 <div className="bg-white border-2 border-black p-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
                     <h3 className="font-serif font-bold text-lg border-b-2 border-black pb-1 mb-3 uppercase tracking-wide flex justify-between items-center">
                         Coins
-                        <span className="text-[10px] text-neutral-400 font-sans tracking-tight">100 coins = 1 slot (after first 100)</span>
+                        <span className="text-[10px] text-neutral-600 font-sans tracking-tight">100 coins = 1 slot (after first 100)</span>
                     </h3>
                     <div className="space-y-2">
                         <div className="flex justify-between items-center">
                             <label className="font-bold text-amber-600 font-serif">GP</label>
                             <input
                                 type="number"
-                                value={getDraftValue('system.coins.gp', actor.system?.coins?.gp || 0)}
+                                id="shadowdark-coins-gp" aria-label="GP" value={getDraftValue('system.coins.gp', actor.system?.coins?.gp || 0)}
                                 onChange={(e) => updateActor('system.coins.gp', parseInt(e.target.value) || 0)}
                                 className="w-20 text-right bg-neutral-100 border-b border-neutral-300 focus:border-black outline-none font-serif text-lg p-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             />
@@ -275,7 +248,7 @@ export default function InventoryTab() {
                             <label className="font-bold text-neutral-500 font-serif">SP</label>
                             <input
                                 type="number"
-                                value={getDraftValue('system.coins.sp', actor.system?.coins?.sp || 0)}
+                                id="shadowdark-coins-sp" aria-label="SP" value={getDraftValue('system.coins.sp', actor.system?.coins?.sp || 0)}
                                 onChange={(e) => updateActor('system.coins.sp', parseInt(e.target.value) || 0)}
                                 className="w-20 text-right bg-neutral-100 border-b border-neutral-300 focus:border-black outline-none font-serif text-lg p-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             />
@@ -284,7 +257,7 @@ export default function InventoryTab() {
                             <label className="font-bold text-orange-700 font-serif">CP</label>
                             <input
                                 type="number"
-                                value={getDraftValue('system.coins.cp', actor.system?.coins?.cp || 0)}
+                                id="shadowdark-coins-cp" aria-label="CP" value={getDraftValue('system.coins.cp', actor.system?.coins?.cp || 0)}
                                 onChange={(e) => updateActor('system.coins.cp', parseInt(e.target.value) || 0)}
                                 className="w-20 text-right bg-neutral-100 border-b border-neutral-300 focus:border-black outline-none font-serif text-lg p-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             />
@@ -330,10 +303,10 @@ export default function InventoryTab() {
                 isOpen={isGemModalOpen}
                 onClose={() => setIsGemModalOpen(false)}
                 actor={actor}
-                onUpdate={(path: string, value: any) => updateActor(path, value, { immediate: true })}
                 onCreateItem={createItem}
                 onUpdateItem={updateItem}
-                onDeleteItem={deleteItem}
+                onSell={sellItems}
+                onDeleteItem={(id: string) => setItemToDelete(id)}
             />
 
             {/* Create Treasure Modal */}
@@ -347,9 +320,9 @@ export default function InventoryTab() {
             <GearSelectionModal
                 isOpen={isGearSelectionModalOpen}
                 onClose={() => setIsGearSelectionModalOpen(false)}
-                onCreate={(data) => {
+                onCreate={async (data) => {
                     setIsGearSelectionModalOpen(false);
-                    return createItem(data);
+                    await createItem(data);
                 }}
             />
         </div>

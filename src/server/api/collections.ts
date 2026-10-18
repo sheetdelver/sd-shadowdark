@@ -1,33 +1,24 @@
 import { json, error, type ModuleServerRequest } from '@sheet-delver/sdk/server';
 import { shadowdarkAdapter } from '../ShadowdarkAdapter';
-import { getErrorMessage, logger } from '@sheet-delver/sdk';
+import { getErrorMessage, isSdkError, logger } from '@sheet-delver/sdk';
+import { callerOf, contextConflict, requestRevision } from '../access';
 
-/**
- * Generic handler to fetch a categorized collection from the warmed system projection.
- * Supports canonical names like 'ancestries', 'backgrounds', 'classes', etc.
- */
+/** Collections served from the declared-pack projection, filtered by the caller's pack capability (server/access.ts). */
+const KNOWN = new Set(['ancestries', 'backgrounds', 'classes', 'deities', 'patrons', 'languages', 'spells', 'talents',
+    'class-abilities', 'gear', 'magic-items', 'conditions', 'spell-effects', 'properties', 'tables', 'monsters']);
+
 export async function handleGetCollection(req: ModuleServerRequest, id: string) {
+    const revision = requestRevision(req.runtime);
     try {
+        if (!KNOWN.has(id)) return error('not_found', `Collection '${id}' not found`);
         const url = new URL(req.url, 'http://localhost');
         const summary = url.searchParams.get('summary') === 'true';
-
         logger.debug(`Shadowdark API | Fetching collection: ${id} (summary: ${summary})`);
-        
-        const collection = await shadowdarkAdapter.getCollection(id, { summary });
-        
-        if (!collection || collection.length === 0) {
-            // Check if it's a valid collection via the index
-            const index = await shadowdarkAdapter.getRegistryIndex();
-            const exists = Object.keys(index).some(uuid => uuid.includes(`.${id}.`));
-            
-            if (!exists && !['spells', 'gear', 'talents'].includes(id)) {
-                logger.warn(`Shadowdark API | Collection not found: ${id}`);
-                return error('not_found', `Collection '${id}' not found`);
-            }
-        }
-
-        return json(collection);
+        return json(await shadowdarkAdapter.getCollection(id, { summary, caller: callerOf(req) }));
     } catch (e: unknown) {
+        if (isSdkError(e)) return error(e.code, e.message);
+        const conflict = contextConflict(req.runtime, revision);
+        if (conflict) return conflict;
         logger.error(`Shadowdark API | Failed to get collection ${id}`, e);
         return error('internal', getErrorMessage(e));
     }

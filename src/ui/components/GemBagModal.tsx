@@ -19,19 +19,20 @@ interface GemBagModalProps {
     isOpen: boolean;
     onClose: () => void;
     actor: any;
-    onUpdate: (path: string, value: any) => void;
-    onCreateItem?: (data: any) => Promise<void>;
-    onUpdateItem?: (data: any) => Promise<void>;
-    onDeleteItem?: (itemId: string) => void;
+    onCreateItem?: (data: any) => Promise<unknown>;
+    onUpdateItem?: (itemId: string, patch: Record<string, unknown>) => Promise<unknown>;
+    /** Sells gems through the inventory's single sale routine. */
+    onSell: (items: any[]) => Promise<unknown>;
+    onDeleteItem?: (itemId: string) => unknown;
 }
 
 export default function GemBagModal({
     isOpen,
     onClose,
     actor,
-    onUpdate,
     onCreateItem,
     onUpdateItem,
+    onSell,
     onDeleteItem
 }: GemBagModalProps) {
     const [editingGem, setEditingGem] = useState<GemItem | null>(null);
@@ -72,77 +73,18 @@ export default function GemBagModal({
     const handleUpdate = async () => {
         if (!editingGem) return;
         if (onUpdateItem) {
-            await onUpdateItem({
-                _id: editingGem.id,
-                name: newName,
-                system: {
-                    cost: {
-                        gp: Number(newGp),
-                        sp: 0,
-                        cp: 0
-                    }
-                }
-            });
+            await onUpdateItem(editingGem.id, { name: newName, 'system.cost.gp': Number(newGp) });
             setEditingGem(null);
             setNewName('');
             setNewGp(0);
         }
     };
 
-    const handleSell = async (gem: any) => {
-        const cost = gem.system?.cost || {};
-        const gp = Number(cost.gp) || 0;
-        const sp = Number(cost.sp) || 0;
-        const cp = Number(cost.cp) || 0;
-
-        // Add to actor's coins
-        const currentGp = Number(actor.system?.coins?.gp) || 0;
-        const currentSp = Number(actor.system?.coins?.sp) || 0;
-        const currentCp = Number(actor.system?.coins?.cp) || 0;
-
-        const newGp = currentGp + gp;
-        const newSp = currentSp + sp;
-        const newCp = currentCp + cp;
-
-        // Perform updates (batching might be needed if onUpdate is slow, but usually okay)
-        if (gp > 0) onUpdate('system.coins.gp', newGp);
-        if (sp > 0) onUpdate('system.coins.sp', newSp);
-        if (cp > 0) onUpdate('system.coins.cp', newCp);
-
-        // Delete the item
-        if (onDeleteItem) onDeleteItem(gem.id);
-    };
+    const handleSell = async (gem: any) => { await onSell([gem]); };
 
     const handleSellAll = async () => {
         if (gems.length === 0) return;
-
-        // Sum all costs
-        let totalGp = 0;
-        let totalSp = 0;
-        let totalCp = 0;
-
-        gems.forEach((gem: any) => {
-            const cost = gem.system?.cost || {};
-            totalGp += Number(cost.gp) || 0;
-            totalSp += Number(cost.sp) || 0;
-            totalCp += Number(cost.cp) || 0;
-        });
-
-        // Add to actor's coins
-        const currentGp = Number(actor.system?.coins?.gp) || 0;
-        const currentSp = Number(actor.system?.coins?.sp) || 0;
-        const currentCp = Number(actor.system?.coins?.cp) || 0;
-
-        if (totalGp > 0) onUpdate('system.coins.gp', currentGp + totalGp);
-        if (totalSp > 0) onUpdate('system.coins.sp', currentSp + totalSp);
-        if (totalCp > 0) onUpdate('system.coins.cp', currentCp + totalCp);
-
-        // Delete all items
-        if (onDeleteItem) {
-            for (const gem of gems) {
-                onDeleteItem(gem.id);
-            }
-        }
+        await onSell(gems);
     };
 
     const startEdit = (gem: any) => {

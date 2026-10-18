@@ -1,8 +1,8 @@
 import { TALENT_HANDLERS } from '../logic/talent-handlers';
-import { SYSTEM_PREDEFINED_EFFECTS } from '../data/talent-effects';
 import { createEffect, sanitizeItem } from '../utils/Sanitizer';
 import { logger } from '@sheet-delver/sdk';
-import { applyMasteryChoice, masteryKind } from './talent-choices';
+import { applyChoice, pendingChoiceKind, resolvedChoice, type ChoiceCatalog } from './talent-choices';
+import { canonicalUuid } from './identity';
 
 export interface EnrichmentContext {
     addedSourceIds: Set<string>;
@@ -16,6 +16,7 @@ export interface EnrichmentContext {
     discoveredItems?: any[]; // Collects items linked via @UUID
     resolveDoc?: (uuid: string) => Promise<any>; // Function to resolve documents for linked items
     defaultTalentClass?: 'ancestry' | 'class' | 'level'; // Hint for talent categorization
+    choices?: ChoiceCatalog; // Native options from declared packs for REPLACEME choices
 }
 
 /**
@@ -27,24 +28,25 @@ export async function enrichItem(item: any, context: EnrichmentContext): Promise
     
     // 1. DEEP CLONE: Prevent cache poisoning of shared shard data or server cache
     let enriched = JSON.parse(JSON.stringify(item));
-    const choiceKind = masteryKind(enriched);
+    const choiceKind = pendingChoiceKind(enriched);
     let choice = context.bonusTo;
     if (choiceKind && !choice && context.bonuses && context.mapping?.bonus) {
-        const id = String(enriched.uuid || enriched._id || '').split('.').pop();
+        // Import bonuses select a template by exact mapped UUID, never an ID suffix.
+        const uuid = canonicalUuid(enriched.uuid);
         const matches = context.bonuses.filter(bonus => {
             const keys = [bonus.bonusName, bonus.name, `${bonus.bonusName}_${bonus.bonusTo}`, `${bonus.bonusTo}_${bonus.bonusName}`, bonus.bonusTo];
-            return keys.some(key => String(context.mapping.bonus[key] || '').split('.').pop() === id);
+            return !!uuid && keys.some(key => canonicalUuid(context.mapping.bonus[key]) === uuid);
         });
         if (matches.length === 1) choice = matches[0].bonusTo;
         // Multiple imported selections are handled individually in the later
         // bonus pass; don't create an unresolved fixed-class duplicate first.
         if (matches.length > 1) return null;
     }
-    if (choiceKind && choice) enriched = applyMasteryChoice(enriched, choice, choiceKind);
-    
+    if (choiceKind && choice) enriched = applyChoice(enriched, choice, choiceKind, context.choices ?? {});
+
     const sourceId = enriched.uuid || enriched.flags?.core?.sourceId || enriched._id;
-    const sourceKey = choiceKind && enriched.system?.bonuses?.[`${choiceKind}Mastery`]
-        ? `${sourceId}:${enriched.system.bonuses[`${choiceKind}Mastery`]}` : sourceId;
+    const selected = resolvedChoice(enriched);
+    const sourceKey = selected ? `${sourceId}:${selected}` : sourceId;
     const itemName = enriched.name || "Unnamed";
 
     // Standardize type ONLY if missing

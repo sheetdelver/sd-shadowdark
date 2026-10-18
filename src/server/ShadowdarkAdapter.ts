@@ -5,46 +5,48 @@ import type {
     FoundryActor,
     PreparedActorData,
 } from '@sheet-delver/sdk';
-import type { ModuleRuntime } from '@sheet-delver/sdk/server';
-import { ShadowdarkRegistry } from './Registry';
-import { ShadowdarkNormalizer, resolveDocumentName } from '../logic/normalization';
+import type { ModuleWorldSnapshot } from '@sheet-delver/sdk';
+import type { ModuleRuntime, ModuleRequestRuntime, ReadonlyDocumentStore } from '@sheet-delver/sdk/server';
+import { ShadowdarkRegistry, type PackFilter } from './Registry';
+import { canReadPack, compendiumDenied, readableRows, type Caller } from './access';
+import { ruleInputsFrom, UNAVAILABLE_RULE_INPUTS, type RuleInputs } from '../logic/world-settings';
+import { NATIVE_PREDEFINED_EFFECTS } from '../data/native-predefined-effects';
+import { BOON_TYPE_MAP, EFFECT_TRANSLATIONS_MAP } from '../data/talent-effects';
+import { ShadowdarkNormalizer, lookupsFromSystemData } from '../logic/normalization';
 import { getInitiativeFormula, isClassSpellcaster } from '../logic/rules';
-import { TALENT_GRANTED_SPELLS } from '../data/talent-effects';
-import { prepareWeaponAttack } from '../logic/weapon-rules';
+import { prepareActorCore } from '../logic/actor-preparation';
+import { actionFormula, prepareRequestedAction, type ActionRequest, type RollOverrides } from '../logic/actions';
+import { canonicalUuid, documentId, formatUuid, parseUuid, sourceRef } from '../logic/identity';
+import type { ViewLookups } from '../logic/prepared-view';
+import type { ChoiceCatalog } from '../logic/talent-choices';
 
-// SDK source/prepared bags are intentionally system-neutral. These module-owned
-// views describe only fields already consumed by Shadowdark's card/roll hooks.
-interface ShadowdarkHookSystem extends Record<string, unknown> {
-    level?: { value?: number };
-    abilities?: Record<string, { mod: number }>;
-    bonuses?: { attackBonus?: number; meleeAttackBonus?: number; rangedAttackBonus?: number };
-}
-interface ShadowdarkHookComputed {
-    resolvedNames?: { ancestry?: string; class?: string };
-    spellcastingAbility?: string;
-}
-interface ShadowdarkRollItemSystem {
-    ability?: string;
-    properties?: string[];
-    type?: string;
-    range?: string;
-    bonuses?: { attackBonus?: number };
-}
+/** Exact talent → granted spell pairs (native priest Turn Undead). */
+const GRANTED_SPELLS: Record<string, string> = {
+    'Compendium.shadowdark.talents.Item.LfHTnYW8I65x8Y31': 'Compendium.shadowdark.spells.Item.mByUvcHIVEPWscfH',
+};
 
 /**
  * ShadowdarkAdapter — the Shadowdark system adapter (ADR-0027 conformed).
  *
- * Extends BaseSystemAdapter; all system data flows through the runtime-backed
- * {@link ShadowdarkRegistry} (wired in `initialize`). A `globalThis` singleton bridges the
- * platform-instantiated adapter (which receives `initialize(runtime)`) and the
- * `shadowdarkAdapter` instance the module's route handlers import, so both share one
- * initialized registry.
+ * All system data flows through the runtime-backed {@link ShadowdarkRegistry}
+ * (declared compendium packs only). A `globalThis` singleton bridges the
+ * platform-instantiated adapter and the `shadowdarkAdapter` instance route
+ * handlers import, so both share one initialized registry. Caller-specific world
+ * documents are never read through it; see {@link resolveDocumentFor}.
  */
 export class ShadowdarkAdapter extends BaseSystemAdapter {
     systemId = 'shadowdark';
     private static instance: ShadowdarkAdapter;
     private readonly _registry = new ShadowdarkRegistry();
-
+    /**
+     * Incremented per platform runtime (world/epoch); request-scoped caches key on
+     * it. A world-context change or same-world recovery does not change it, so an
+     * evaluated action is replayed, never rerolled, across a context change.
+     */
+    runtimeGeneration = 0;
+    private world: ModuleRuntime['world'];
+    /** Rule inputs for the Actor being prepared (set only during prepareActorData). */
+    private preparationRules: RuleInputs | null = null;
 
     constructor() {
         super();
@@ -72,9 +74,11 @@ export class ShadowdarkAdapter extends BaseSystemAdapter {
 
     async initialize(runtime: ModuleRuntime): Promise<void> {
         await super.initialize(runtime);
+        this.runtimeGeneration++;
+        this.world = runtime.world;
+        // A new runtime (world/epoch) starts from an empty projection.
         this._registry.attach(runtime.compendium, runtime.documents);
         logger.info('[ShadowdarkAdapter] Service layer unified via runtime-backed Registry.');
-        // Warm the projection so the first sheet render has names resolved.
         try {
             await this._registry.getSystemData();
         } catch (e) {
@@ -82,22 +86,44 @@ export class ShadowdarkAdapter extends BaseSystemAdapter {
         }
     }
 
+    /** Current host rule inputs; unavailable without a live world context. */
+    currentRules(): RuleInputs {
+        try {
+            return ruleInputsFrom(this.world?.snapshot());
+        } catch {
+            return UNAVAILABLE_RULE_INPUTS;
+        }
+    }
+
+    /**
+     * Core world-context change (setting values, declared pack content, or a
+     * same-world recovery), called before Core rebuilds prepared Actors. Setting
+     * values reach preparation through `context.world`, so only pack-dependent
+     * projections need work: the registry is rebuilt from current packs before
+     * this returns. Bounded by one projection load; reads only; fenced by the
+     * registry generation. A failure rejects and Core holds the world unavailable.
+     */
+    async onWorldContextChanged(_next: Readonly<ModuleWorldSnapshot>, change: { keys: readonly string[]; recovery: boolean; packs?: readonly string[] }): Promise<void> {
+        if (change.recovery || (change.packs?.length ?? 0) > 0) await this._registry.refresh();
+    }
+
+    /** Preparation lookups over the hydrated declared-pack projection. */
+    lookups(): ViewLookups {
+        return lookupsFromSystemData(this._registry.getCachedSystemData(), uuid => this._registry.getCachedDocument(uuid));
+    }
+
     getInitiativeFormula(actor: PreparedActorData): string {
         return getInitiativeFormula(actor);
     }
 
     getActorCardData(actor: PreparedActorData): any {
-        const s = (actor.system || {}) as ShadowdarkHookSystem;
-        const names = (actor.computed as ShadowdarkHookComputed | undefined)?.resolvedNames || {};
-
-        const resolve = (val: any) => resolveDocumentName(val, this._registry.getCachedSystemData());
-
-        const ancestry = names.ancestry || resolve(s.ancestry);
-        const className = names.class || resolve(s.class);
-        const level = s.level?.value || 0;
-
+        const derived = (actor.derived ?? {}) as any;
+        const label = (entry: any) => entry?.label ?? entry?.value ?? '';
+        const ancestry = label(derived.identity?.ancestry);
+        const className = label(derived.identity?.class);
+        const level = Number(derived.level ?? (actor.system as any)?.level?.value ?? 0);
         return {
-            subtext: `${ancestry} • ${className === 'Level 0' ? 'Adventurer' : className} • Level ${level}`.trim(),
+            subtext: [ancestry, className || 'Adventurer', `Level ${level}`].filter(Boolean).join(' • '),
             ancestry,
             class: className,
             level
@@ -112,59 +138,137 @@ export class ShadowdarkAdapter extends BaseSystemAdapter {
         return actor.systemId === 'shadowdark' || (hasShadowdarkType && hasShadowdarkSystem);
     }
 
+    /**
+     * Preparation with the context Core supplies for this Actor revision: the
+     * world snapshot's settings become the rule inputs of every derived value
+     * (luck mode, action consequences). Preparation stays user-invariant.
+     */
     prepareActorData(
         actor: FoundryActor,
         context: Readonly<ActorPreparationContext>,
     ): PreparedActorData {
-        return super.prepareActorData(actor, context);
+        this.preparationRules = ruleInputsFrom(context.world);
+        try {
+            return super.prepareActorData(actor, context);
+        } finally {
+            this.preparationRules = null;
+        }
     }
 
+    /** Full-GM legacy projection (Core serves it to full GMs only). */
     async getSystemData(_options?: { minimal?: boolean }): Promise<any> {
         return this._registry.getSystemData();
     }
 
-    async getCollection(id: string, options: { summary?: boolean } = {}): Promise<any[]> {
-        return this._registry.getCollection(id, options);
+    /**
+     * Caller-safe system data for Core's `/api/system/data` and the module index
+     * route. Built from the caller's own compendium reads (Core filters them by
+     * the caller's effective pack capability), re-checked against `access` after
+     * the reads; the warmed system projection is not used. Contains only the
+     * caller-readable name index, class titles and native rule tables.
+     */
+    async getSystemDataForUser(context: Pick<ModuleRequestRuntime, 'compendium' | 'access' | 'world'> & { documents: ReadonlyDocumentStore }): Promise<any> {
+        const [items, tables, actors] = await Promise.all([
+            context.compendium.findAll('Item'), context.compendium.findAll('RollTable'), context.compendium.findAll('Actor'),
+        ]);
+        const caller: Caller = { runtime: { documents: context.documents as any, access: context.access }, isGM: false };
+        const { collections, nameIndex } = ShadowdarkRegistry.project(readableRows([...items, ...tables, ...actors] as any[], caller));
+        return {
+            titles: collections.titles ?? {},
+            nameIndex,
+            PREDEFINED_EFFECTS: { ...NATIVE_PREDEFINED_EFFECTS },
+            BOON_TYPES: { ...BOON_TYPE_MAP },
+            EFFECT_TRANSLATIONS: { ...EFFECT_TRANSLATIONS_MAP },
+        };
     }
 
-    async drawTable(uuidOrName: string, rollOverride?: number): Promise<any> {
-        return this._registry.draw(uuidOrName, rollOverride);
+    /** The caller's pack capability as a registry row filter (evaluated per row, after the load). */
+    private readable(caller: Caller): PackFilter {
+        return pack => canReadPack(caller, pack);
     }
 
-    async getSpellsBySource(className: string): Promise<any[]> {
-        return this._registry.getSpellsBySource(className);
+    /**
+     * A declared collection filtered to the caller's readable packs. A collection
+     * whose every row is in packs the caller cannot read is refused.
+     */
+    async getCollection(id: string, options: { summary?: boolean; caller: Caller }): Promise<any[]> {
+        const rows = await this._registry.getCollection(id, { summary: options.summary, readable: this.readable(options.caller) });
+        if (rows.length === 0 && await this._registry.collectionSize(id) > 0) throw compendiumDenied();
+        return rows;
     }
 
-    async findDocumentByName(name: string, type?: string): Promise<any | null> {
-        return this._registry.findByName(name, type);
+    async drawTable(uuid: string, caller: Caller, rollOverride?: number): Promise<any> {
+        return this._registry.draw(uuid, this.readable(caller), rollOverride);
     }
 
-    async getRegistryIndex(): Promise<Record<string, string>> {
-        return this._registry.getIndex();
+    async getSpellsForClass(classUuid: string, caller: Caller): Promise<any[]> {
+        return this._registry.getSpellsForClass(classUuid, this.readable(caller));
+    }
+
+    async findUniqueByName(name: string, types: string[], caller: Caller): Promise<{ doc: any | null; ambiguous: string[] }> {
+        return this._registry.findUniqueByName(name, types, this.readable(caller));
+    }
+
+    async getChoiceCatalog(caller: Caller): Promise<ChoiceCatalog> {
+        return this._registry.getChoiceCatalog(this.readable(caller));
     }
 
     normalizeActorData(actor: any): ActorSheetData {
-        if (actor && !actor._theme) actor._theme = this.theme;
-        return ShadowdarkNormalizer.normalizeActorData(actor, this._registry.getCachedSystemData());
+        return ShadowdarkNormalizer.normalizeActorData(actor, this._registry.getCachedSystemData(), this.lookups(), undefined,
+            this.preparationRules ?? this.currentRules());
     }
 
-    async resolveDocument(uuid: string): Promise<any> {
-        return this._registry.getDocument(uuid);
+    /** Like {@link resolveDocumentFor}, but content the caller cannot read is null instead of an error. */
+    async resolveReadable(uuid: string, caller: Caller): Promise<any | null> {
+        try {
+            return await this.resolveDocumentFor(uuid, caller);
+        } catch (e: any) {
+            if (e?.code === 'permission_denied') return null;
+            throw e;
+        }
     }
 
-    async getLevelUpData(actor: any, classUuidOverride?: string, patronUuidOverride?: string) {
+    /**
+     * Caller-bound resolution: declared compendium documents from the shared
+     * projection when the caller's pack capability allows it, checked before and
+     * again after the awaited read (restricted content throws
+     * `permission_denied`); world and embedded documents only through the
+     * caller's request runtime, which applies Core's visibility projection.
+     * Unsupported identities are null.
+     */
+    async resolveDocumentFor(uuid: string, caller: Caller): Promise<any | null> {
+        const ref = parseUuid(uuid);
+        if (!ref) return null;
+        if (ref.kind === 'compendium') {
+            if (!canReadPack(caller, ref.pack)) throw compendiumDenied(ref.pack);
+            const doc = await this._registry.getDocument(formatUuid(ref));
+            if (!canReadPack(caller, ref.pack)) throw compendiumDenied(ref.pack);
+            return doc;
+        }
+        if (ref.kind === 'world') {
+            return caller.runtime.documents.get(ref.documentType, ref.id);
+        }
+        if (ref.parentType !== 'Actor' || !['Item', 'ActiveEffect'].includes(ref.documentType)) return null;
+        const parent: any = await caller.runtime.documents.get('Actor', ref.parentId);
+        const children = ref.documentType === 'Item' ? parent?.items : parent?.effects;
+        const child = Array.isArray(children) ? children.find((entry: any) => documentId(entry) === ref.id) : null;
+        return child ? { ...child, uuid: formatUuid(ref) } : null;
+    }
+
+    async getLevelUpData(actor: any, classUuidOverride: string | undefined, patronUuidOverride: string | undefined, caller: Caller) {
         const currentLevel = actor?.system?.level?.value || 0;
         const targetLevel = currentLevel + 1;
         const currentXP = actor?.system?.level?.xp || 0;
         const classUuid = classUuidOverride || actor?.system?.class;
         const patronUuid = patronUuidOverride || actor?.system?.patron;
-        const conMod = actor?.system?.abilities?.con?.mod || 0;
+        const prepared = prepareActorCore(actor, this.lookups(), this.currentRules());
+        const conMod = prepared.abilities.con.mod;
+        const resolve = (uuid: string) => this.resolveDocumentFor(uuid, caller);
 
-        let classDoc = null;
-        let patronDoc = null;
-
-        if (classUuid) classDoc = await this.resolveDocument(classUuid);
-        if (patronUuid) patronDoc = await this.resolveDocument(patronUuid);
+        const classDoc = classUuid ? await resolve(classUuid) : null;
+        const patronDoc = patronUuid ? await resolve(patronUuid) : null;
+        const diagnostics: string[] = [];
+        if (classUuid && !classDoc) diagnostics.push(`Class ${classUuid} is unavailable.`);
 
         const talentGained = targetLevel % 2 !== 0;
         const isSpellcasterChar = classDoc ? isClassSpellcaster(classDoc) : false;
@@ -172,62 +276,27 @@ export class ShadowdarkAdapter extends BaseSystemAdapter {
         let availableSpells: any[] = [];
 
         if (isSpellcasterChar && classDoc) {
-            if (classDoc.system?.spellcasting?.spellsknown) {
-                const skTable = classDoc.system.spellcasting.spellsknown;
-                const currentSpells = skTable[String(currentLevel)] || skTable[currentLevel] || { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-                const targetSpells = skTable[String(targetLevel)] || skTable[targetLevel] || { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-
+            const skTable = classDoc.system?.spellcasting?.spellsknown;
+            if (skTable) {
+                const currentSpells = skTable[String(currentLevel)] || {};
+                const targetSpells = skTable[String(targetLevel)] || {};
                 for (let tier = 1; tier <= 5; tier++) {
-                    const targetVal = targetSpells[String(tier)] ?? targetSpells[tier] ?? 0;
-                    const currentVal = currentSpells[String(tier)] ?? currentSpells[tier] ?? 0;
-                    const diff = targetVal - currentVal;
+                    const diff = (Number(targetSpells[String(tier)]) || 0) - (Number(currentSpells[String(tier)]) || 0);
                     if (diff > 0) spellsToChoose[tier] = diff;
                 }
             }
-
-            if (classDoc.name) {
-                availableSpells = await this.getSpellsBySource(classDoc.name);
-
-                // Identify Innate Spells for this actor/class
-                const freeSpellUuids = new Set<string>();
-                const actorItems = actor?.items || [];
-
-                actorItems.forEach((i: any) => {
-                    if (['Talent', 'Boon', 'Feature', 'Class Ability'].includes(i.type)) {
-                        const sourceId = i.flags?.core?.sourceId || i.uuid || i._id;
-                        const name = (i.name || "").toLowerCase();
-
-                        Object.entries(TALENT_GRANTED_SPELLS).forEach(([talentId, spellId]) => {
-                            if (sourceId === talentId || (typeof sourceId === 'string' && sourceId.endsWith(talentId))) {
-                                freeSpellUuids.add(spellId);
-                            }
-                        });
-
-                        if (name === "turn undead") {
-                            freeSpellUuids.add(TALENT_GRANTED_SPELLS["LfHTnYW8I65x8Y31"]);
-                        }
-                    }
-                });
-
-                if (classDoc.name.toLowerCase() === 'priest') {
-                    freeSpellUuids.add(TALENT_GRANTED_SPELLS["LfHTnYW8I65x8Y31"]);
-                }
-
-                availableSpells.forEach(s => {
-                    const sourceId = s.flags?.core?.sourceId || s.uuid || s._id;
-                    const name = (s.name || "").toLowerCase();
-                    const matchesId = (id: string) => sourceId === id || (typeof sourceId === 'string' && sourceId.endsWith(id));
-
-                    const isFreeId = Array.from(freeSpellUuids).some(matchesId);
-                    const turnUndeadSpellId = TALENT_GRANTED_SPELLS["LfHTnYW8I65x8Y31"];
-                    const isTurnUndead = name === "turn undead" && (isFreeId || freeSpellUuids.has(turnUndeadSpellId));
-
-                    if (isFreeId || isTurnUndead) {
-                        s.isInnate = true;
-                    }
-                });
-            }
+            const classRef = canonicalUuid(classDoc.uuid);
+            if (classRef) {
+                availableSpells = await this.getSpellsForClass(classRef, caller);
+                const granted = new Set((actor?.items || []).map((item: any) => sourceRef(item)).filter(Boolean)
+                    .map((ref: any) => GRANTED_SPELLS[formatUuid(ref)]).filter(Boolean));
+                for (const spell of availableSpells) if (granted.has(canonicalUuid(spell.uuid))) spell.isInnate = true;
+            } else diagnostics.push('The class is not a declared compendium document, so its spell list is unavailable.');
         }
+
+        const tableRaw = classDoc?.system?.classTalentTable;
+        const talentTable = tableRaw ? canonicalUuid(tableRaw) : null;
+        if (tableRaw && !talentTable) diagnostics.push(`Class talent table ${tableRaw} is not a supported reference.`);
 
         return {
             success: true,
@@ -236,116 +305,74 @@ export class ShadowdarkAdapter extends BaseSystemAdapter {
             targetLevel,
             currentXP,
             talentGained,
-            classHitDie: classDoc?.system?.hitPoints || '1d4',
-            talentTable: await (async () => {
-                const tableRaw = classDoc?.system?.classTalentTable;
-                if (!tableRaw) return null;
-
-                if (tableRaw.includes('Compendium.')) return tableRaw;
-
-                const tableDoc = await this.resolveDocument(tableRaw);
-                if (tableDoc?.uuid) return tableDoc.uuid;
-
-                const foundByName = await this.findDocumentByName(tableRaw, 'RollTable');
-                if (foundByName?.uuid) return foundByName.uuid;
-
-                return tableRaw;
-            })(),
-            patronBoonTable: patronDoc?.system?.boonTable,
+            classHitDie: classDoc?.system?.hitPoints ?? null,
+            talentTable,
+            patronBoonTable: patronDoc?.system?.boonTable ? canonicalUuid(patronDoc.system.boonTable) : null,
             canRollBoons: classDoc?.system?.patron?.required || false,
             startingBoons: (targetLevel === 1 && classDoc?.system?.patron?.startingBoons) || 0,
             isSpellcaster: isSpellcasterChar,
             spellsToChoose,
             availableSpells,
             conMod,
-            classUuid: classDoc?.uuid || classUuid || null
+            classUuid: classDoc?.uuid || classUuid || null,
+            diagnostics,
         };
     }
 
+    /**
+     * Roll formula for Core's generic roll route. Checks and attacks come from the
+     * shared action preparer; explicit dialog fields replace individual
+     * components. Spells, Class Abilities and potions have native consequences and
+     * use the module action route instead, so they return null here.
+     */
     getRollData(actor: PreparedActorData, type: string, key: string, options: any = {}): { formula: string; type: string; label: string; flags?: any } | null {
-        const system = actor.system as ShadowdarkHookSystem;
-        const computed = actor.computed as ShadowdarkHookComputed | undefined;
+        const items: any[] = Array.isArray(actor.items) ? actor.items : [];
         if (options.manualValue !== undefined && options.manualValue !== null) {
             let label = 'Manual Roll';
             if (type === 'ability') label = `${key.toUpperCase().replace('ABILITY', '')} (Manual)`;
             if (type === 'item') {
-                const item = (actor.items || []).find((i: any) => i._id === key || i.id === key);
+                const item = items.find((i: any) => documentId(i) === key);
                 label = item ? `${item.name} (Manual)` : 'Item (Manual)';
             }
-
             const total = Number(options.manualValue);
-            const bonuses = [];
-            if (options.abilityBonus !== undefined) bonuses.push(Number(options.abilityBonus));
-            if (options.itemBonus !== undefined) bonuses.push(Number(options.itemBonus));
-            if (options.talentBonus !== undefined) bonuses.push(Number(options.talentBonus));
-
+            const bonuses = [options.abilityBonus, options.itemBonus, options.talentBonus].filter(value => value !== undefined).map(Number);
             const totalBonus = bonuses.reduce((acc, b) => acc + b, 0);
             const formula = totalBonus !== 0 ? `${total} + ${totalBonus}` : String(total);
-
             return { formula, type: 'manual', label, flags: { shadowdark: { isManual: true } } };
         }
 
-        const advMode = options.advantageMode || 'normal';
-        let dice = '1d20';
-        if (advMode === 'advantage') dice = '2d20kh';
-        if (advMode === 'disadvantage') dice = '2d20kl';
-
-        if (type === 'ability') {
-            let mod = 0;
-            if (options.abilityBonus !== undefined) {
-                mod = Number(options.abilityBonus);
-            } else {
-                const abilities = system.abilities || {};
-                if (abilities[key]) mod = abilities[key].mod;
-            }
-            if (options.talentBonus) mod += Number(options.talentBonus);
-
-            const sign = mod >= 0 ? '+' : '';
-            return {
-                formula: `${dice}${sign}${mod}`,
-                type: 'ability',
-                label: `${key.toUpperCase().replace('ABILITY', '')} Check`
-            };
-        }
-
+        const lookups = this.lookups();
+        let request: ActionRequest | null = null;
+        if (type === 'ability') request = { kind: 'check', stat: key.toLowerCase() as any, selected: options.selected };
         if (type === 'item') {
-            let item = (actor.items || []).find((i: any) => i._id === key || i.id === key);
-            if (!item && options.itemData) item = options.itemData;
-
-            if (item) {
-                const itemSystem = item.system as ShadowdarkRollItemSystem | undefined;
-                let totalBonus = 0;
-                let label = '';
-
-                if (item.type === 'Spell') {
-                    label = `Cast ${item.name}`;
-                    if (options.abilityBonus !== undefined) {
-                        totalBonus += Number(options.abilityBonus);
-                    } else {
-                        const statKey = itemSystem?.ability || computed?.spellcastingAbility?.toLowerCase() || 'int';
-                        totalBonus += system.abilities?.[statKey]?.mod || 0;
-                    }
-                } else if (item.type === 'Weapon' || item.type === 'NPC Attack') {
-                    label = `${item.name} Attack`;
-                    const attack = prepareWeaponAttack(actor, item, options);
-                    // Dialog fields replace individual defaults; absent fields
-                    // retain the exact same module-prepared attack components.
-                    totalBonus = Number(options.abilityBonus ?? attack.abilityBonus)
-                        + Number(options.itemBonus ?? attack.itemBonus)
-                        + Number(options.talentBonus ?? attack.talentBonus);
-                }
-
-                if (!['Weapon', 'NPC Attack'].includes(item.type) && options.talentBonus) totalBonus += Number(options.talentBonus);
-
-                const sign = totalBonus >= 0 ? '+' : '';
-                return {
-                    formula: `${dice}${sign}${totalBonus}`,
-                    type: item.type === 'Spell' ? 'spell' : 'attack',
-                    label: label
-                };
-            }
+            const item = items.find((i: any) => documentId(i) === key);
+            if (!item || !['Weapon', 'NPC Attack', 'NPC Special Attack'].includes(item.type)) return null;
+            request = { kind: 'attack', itemId: key, attackType: options.attackType, handedness: options.handedness, selected: options.selected };
         }
-        return null;
+        if (!request) return null;
+        // The prepared store's view already holds this revision's actions; reuse
+        // the matching one, and re-prepare only for option-dependent requests.
+        const prepared = ((actor.derived as any)?.actions ?? []).find((entry: any) => entry.kind === request!.kind
+            && (request!.kind === 'check' ? entry.request?.stat === request!.stat : entry.itemId === request!.itemId
+                && (!request!.attackType || entry.attack?.type === request!.attackType)
+                && (!request!.handedness || entry.attack?.handedness === request!.handedness))
+            && !(request!.selected?.length));
+        // Re-preparation uses the rule inputs this Actor revision was prepared with.
+        const rules = ((actor.derived as any)?.ruleInputs as RuleInputs | undefined) ?? UNAVAILABLE_RULE_INPUTS;
+        const action = prepared ?? prepareRequestedAction(prepareActorCore(actor, lookups, rules), actor, lookups, request);
+        if (!action || !action.available) return null;
+        const overrides: RollOverrides = {
+            abilityBonus: options.abilityBonus !== undefined ? Number(options.abilityBonus) : undefined,
+            itemBonus: options.itemBonus !== undefined ? Number(options.itemBonus) : undefined,
+            talentBonus: options.talentBonus !== undefined ? Number(options.talentBonus) : undefined,
+            advantageMode: options.advantageMode,
+        };
+        return {
+            formula: actionFormula(action, overrides),
+            type: action.kind === 'check' ? 'ability' : 'attack',
+            label: action.kind === 'check' ? `${key.toUpperCase()} Check` : action.label,
+            flags: { shadowdark: { actionId: action.id, critical: action.critical, damage: action.damage?.formula ?? null } },
+        };
     }
 }
 

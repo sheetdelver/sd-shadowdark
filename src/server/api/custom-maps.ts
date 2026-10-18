@@ -1,5 +1,6 @@
 import { json, error, type ModuleServerRequest } from '@sheet-delver/sdk/server';
-import { SYSTEM_PREDEFINED_EFFECTS, BOON_TYPE_MAP, EFFECT_TRANSLATIONS_MAP } from '../../data/talent-effects';
+import { BOON_TYPE_MAP, EFFECT_TRANSLATIONS_MAP } from '../../data/talent-effects';
+import { NATIVE_PREDEFINED_EFFECTS } from '../../data/native-predefined-effects';
 import { getErrorMessage, logger } from '@sheet-delver/sdk';
 
 /**
@@ -10,7 +11,7 @@ import { getErrorMessage, logger } from '@sheet-delver/sdk';
 export async function handleGetCustomMaps(_req: ModuleServerRequest) {
     try {
         const payload = {
-            PREDEFINED_EFFECTS: SYSTEM_PREDEFINED_EFFECTS,
+            PREDEFINED_EFFECTS: NATIVE_PREDEFINED_EFFECTS,
             BOON_TYPES: BOON_TYPE_MAP,
             EFFECT_TRANSLATIONS: EFFECT_TRANSLATIONS_MAP,
             generatedAt: new Date().toISOString()

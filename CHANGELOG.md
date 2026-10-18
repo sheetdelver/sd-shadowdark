@@ -1,6 +1,17 @@
 # Releases
 
-Historical entries are reconstructed from [published releases](https://github.com/sheetdelver/sd-shadowdark/releases), their tags, and merged changes. Version numbers follow the published tags; unreleased branch work is excluded.
+Historical entries are reconstructed from [published releases](https://github.com/sheetdelver/sd-shadowdark/releases), their tags, and merged changes. Version numbers follow the published tags; the Unreleased section collects notes for the next authorized release.
+
+## Unreleased
+
+- Native effects and combat rules
+- Correct HP and XP advancement
+- Lossless grants and effect editing
+- Spell, item and monster cards
+- Live settings and permission refresh
+- Admin-managed world effect migrations
+- Responsive dialogs and collection recovery
+- Requires Core 0.19.2
 
 ## 0.9.4
 - Corrected weapon preparation
