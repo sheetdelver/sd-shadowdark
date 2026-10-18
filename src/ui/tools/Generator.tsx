@@ -11,6 +11,8 @@ import { enrichItem, resolveSubItems, EnrichmentContext } from '../../logic/acto
 import { assertResolvedTalentChoices } from '../../logic/talent-choices';
 import { ownedCopy } from '../../logic/identity';
 import { presentDescription } from '../../logic/description';
+import { prepareActorCore } from '../../logic/actor-preparation';
+import { advancementHitPoints } from '../../logic/advancement';
 
 export default function Generator() {
     return (
@@ -801,6 +803,13 @@ function GeneratorContent() {
                 // Owned copies record their exact compendium source.
                 items: items.map(item => ownedCopy(item))
             };
+
+            if (!formData.level0) {
+                // Share advancement's native first-level rule, including CON
+                // effects in the assembled ancestry/talents and the minimum HP.
+                actorData.system.attributes.hp = advancementHitPoints(
+                    prepareActorCore(actorData), 1, extraData.hpRoll ?? formData.hp);
+            }
 
             // 3. Send to API
 

@@ -1,19 +1,23 @@
 # Shadowdark module architecture
 
-**Current status (October 18, Core 0.19.2 checkpoint):** the module contains
-G8 world settings, caller-safe projections, context refresh and required pure
-effect-key migration hooks using declared relations. Core 0.19.2 supplies the
-selected CG-5/7/9/10 corrections. The [checkpoint and resumption plan](adr/0001-native-alignment-and-resource-cards.md#core-0192-checkpoint-and-resumption--october-18-2026)
-defines remaining RV-12/13 release-floor/harness work and M5/native A01 acceptance.
-Prior sampled native v14 evidence and Core's focused v13/v14 evidence do not
-certify the complete module matrix. CG-4/6/8 retain their recorded scope.
+**Current status (October18, completed):** ADR-0001's selected native alignment,
+resource cards and G8 adoption are accepted on actual Foundry13.351/14.367 with
+native Shadowdark4.0.6 and Core0.19.2. The [final ADR closeout](adr/0001-native-alignment-and-resource-cards.md#final-native-v14-acceptance-and-closeout--october-18-2026)
+records evidence and retained qualifications. Explicit feature deferrals and
+CG-4/6/8 remain separately qualified; historical pending text is not a new queue.
 
-`info.json` is the compatibility authority. At this checkpoint its Core floor
-and all three workflow pins are still 0.19.1; RV-12 must align them to selected
-Core **0.19.2** before release acceptance. Module API `>=1.6.0 <2.0.0`, UI API
+The [adoption evidence](audits/2026-10-15-native-alignment.md#core-0192-adoption-implementation--october-18-2026)
+separates controlled results from the completed native acceptance. Resource dialogs
+clear floating tools at active layer160 and lower to90 while suspended beneath
+the shared SDK roller/confirmation. Phone footer actions remain reachable while
+the host retains its shared dialog focus/lifecycle.
+
+`info.json` is the compatibility authority. Its Core floor is **>=0.19.2**;
+the CI checkout, reusable release workflow and `core_ref` select **v0.19.2**.
+Module API `>=1.6.0 <2.0.0`, UI API
 `>=3.2.0 <4.0.0` and roll-engine API `>=1.0.0 <2.0.0` remain unchanged. Aggregate
-SDK 3.4.0 is informational and has no manifest field. Module version remains
-0.9.4 until separately authorized release preparation.
+SDK 3.4.0 is informational and has no manifest field. `info.json` owns the module release version; SDK/API versions do not change
+with a module point release.
 
 Initialization warms the runtime-backed registry. The adapter then prepares
 Actors deterministically for sheets, cards and rolls without writing derived
@@ -101,7 +105,7 @@ the importer. Rows are filtered after the awaited cache read and single document
 are checked before and again after it, so a revocation applies to warm caches at
 once and a GM's earlier read is never served to a player. There is no system-level
 serving path and no fallback: a runtime without `access` reads no pack content.
-A collection whose rows are all unreadable is refused (403). Core 0.19.1 applies
+A collection whose rows are all unreadable is refused (403). Core 0.19.2 applies
 native role ownership on both Foundry 13 and 14 (a Player reads packs that grant
 `PLAYER: OBSERVER`); the module adds nothing to Core's answer.
 
@@ -256,7 +260,18 @@ Mastery and other choices come from declared base weapons/armor/spells and the
 required choices block creation before any write. Fixed/rolled grants keep exact
 counts. Learning a spell validates a Spell source on the class list and copies
 the full document with `_stats.compendiumSource`. Level-up resolves grants on
-the server and ignores client-supplied class objects. The importer resolves
+the server and ignores client-supplied class objects. Finalization follows native
+4.0.6 `LevelUpSD._finalizeLevelUp`: advancement from level zero sets XP to zero;
+otherwise it subtracts the Actor's current level × 10 and preserves the remainder
+(level 1 with 25 XP becomes level 2 with 15 XP). This is the server's single XP
+write path for advancement; it does not repair previously discarded XP.
+`logic/advancement.ts` shares HP calculation between Generator and server:
+prepare the assembled grants first; level1 replaces HP with `max(hit die +
+prepared CON modifier, 1)`, while later levels add the die to prepared current
+and maximum HP, retaining wounds. Existing Actor HP is not retrospectively
+repaired. The level-up UI reads bare documents from the module's caller-safe
+`document/:uuid` route; missing required references block completion.
+The importer resolves
 references first and asks for confirmation before creating unresolved or custom
 items. Existing Actors are not repaired.
 
@@ -293,15 +308,14 @@ It is read-only: no spawn, encounter or sharing action.
 [Shadowdark ADR-0001](adr/0001-native-alignment-and-resource-cards.md) and the
 [native-alignment audit](audits/2026-10-15-native-alignment.md) record findings,
 dispositions and external dependencies. Offline tests and fixtures are not
-native/operator acceptance, which remains pending. Development-only 4.1 behavior
+native/operator acceptance, now completed for the selected scope above. Development-only 4.1 behavior
 is outside the supported baseline.
 
 ## Distribution and verification
 
 `info.json` declares the module version, API compatibility and world settings.
 CI checkout, the reusable release workflow and its `core_ref` all use the
-Core `v0.19.1` toolchain at this checkpoint; RV-12 aligns all three to
-`v0.19.2`. CI also runs on `migration.json` and
+Core `v0.19.2` toolchain. CI also runs on `migration.json` and
 `migrations/**` changes. Release assets include the package archive, checksum,
 catalog manifest and release history. A module release tag identifies the
 matching manifest version. With the root `migration.json`, packaging compiles
@@ -375,7 +389,7 @@ for proven world packs; metadata is not an override. Unavailable/malformed
 configuration and unresolved provenance still block. The strict module policy
 does not acquire an intentional-lock exclusion merely from this correction.
 
-Core 0.19.1 plans the complete inventory in its own workers with no global
+Core 0.19.2 plans the complete inventory in its own workers with no global
 deadline (each hook keeps Core's one-second bound). Because `dataReadVersion` is
 `>=4.0.0 <=4.0.6`, Core refuses to serve a world whose native system version is
 outside that range while this catalog is installed.

@@ -8,7 +8,7 @@
         "server": "module/server"
     },
     "compatibility": {
-        "coreVersion": ">=0.19.1",
+        "coreVersion": ">=0.19.2",
         "apiContracts": {
             "module-api": ">=1.6.0 <2.0.0",
             "ui-extension-api": ">=3.2.0 <4.0.0",

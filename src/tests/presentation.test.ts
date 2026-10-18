@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MockSDKProvider } from '@sheet-delver/sdk/testing';
@@ -8,8 +9,14 @@ import ShadowdarkImportPage from '../ui/tools/ShadowdarkImportPage';
 import Bestiary from '../ui/tools/Bestiary';
 
 assert.equal(manifest.componentStyles, theme, 'UI manifest must own shared styles');
-// Core v0.19.1 contracts (ADR-0001 G8): world context, caller pack capabilities, migration relations.
-assert.equal(manifest.info.compatibility?.coreVersion, '>=0.19.1');
+// Core v0.19.2 includes the selected lock, ownership-event, SDK error and shared UI corrections.
+assert.equal(manifest.info.compatibility?.coreVersion, '>=0.19.2');
+const moduleInfo = JSON.parse(fs.readFileSync(new URL('../../info.json', import.meta.url), 'utf8'));
+assert.equal(manifest.info.version, moduleInfo.version, 'published UI uses the authoritative module version');
+assert.match(fs.readFileSync(new URL('../../.github/workflows/ci-shadowdark.yaml', import.meta.url), 'utf8'), /ref: v0\.19\.2\b/);
+const releaseWorkflow = fs.readFileSync(new URL('../../.github/workflows/release-shadowdark.yaml', import.meta.url), 'utf8');
+assert.match(releaseWorkflow, /module-release\.yml@v0\.19\.2\b/);
+assert.match(releaseWorkflow, /core_ref: 'v0\.19\.2'/);
 assert.equal(manifest.info.compatibility?.apiContracts?.['ui-extension-api'], '>=3.2.0 <4.0.0');
 assert.equal(manifest.info.compatibility?.apiContracts?.['module-api'], '>=1.6.0 <2.0.0');
 assert.equal(manifest.info.compatibility?.apiContracts?.['roll-engine-api'], '>=1.0.0 <2.0.0');

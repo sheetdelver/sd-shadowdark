@@ -1,0 +1,11 @@
+import type { PreparedActorCore } from './actor-preparation';
+
+/** Native 4.0.6 LevelUpSD._finalizeLevelUp, after preparing the new grants. */
+export function advancementHitPoints(prepared: PreparedActorCore, targetLevel: number, hitDieTotal: number) {
+    if (!Number.isFinite(hitDieTotal) || hitDieTotal <= 0) throw new Error('A positive hit-point roll is required.');
+    if (targetLevel === 1) {
+        const hp = Math.max(1, hitDieTotal + prepared.abilities.con.mod);
+        return { value: hp, max: hp };
+    }
+    return { value: prepared.hp.value + hitDieTotal, max: prepared.hp.max + hitDieTotal };
+}

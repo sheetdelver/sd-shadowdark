@@ -8,6 +8,7 @@ import { canonicalUuid } from '../../logic/identity';
 import { callerOf, requestRules } from '../access';
 import { hitPointRollFormula } from '../../logic/actions';
 import { prepareActorCore } from '../../logic/actor-preparation';
+import { advancementHitPoints } from '../../logic/advancement';
 
 /**
  * Rolled talents/boons and chosen spells are re-read from their exact source.
@@ -397,14 +398,21 @@ export async function handleFinalizeLevelUp(actorId: string, req: ModuleServerRe
         const actorUpdates: any = {};
         if (actor && actorId !== 'new') {
             if (state.hpRoll !== undefined && state.hpRoll !== null) {
-                const currentMax = actor.system?.attributes?.hp?.max || 0;
-                const currentVal = actor.system?.attributes?.hp?.value || 0;
-                actorUpdates['system.attributes.hp.max'] = currentMax + state.hpRoll;
-                actorUpdates['system.attributes.hp.value'] = currentVal + state.hpRoll;
+                // Native adds grants before calculating HP. Prepare their effects
+                // without writing so an unresolved choice still cannot mutate data.
+                const prepared = prepareActorCore({ ...actor, items: [...(actor.items ?? []), ...finalItems] },
+                    shadowdarkAdapter.lookups(), requestRules(req.runtime));
+                const hp = advancementHitPoints(prepared, targetLevel, state.hpRoll);
+                actorUpdates['system.attributes.hp.max'] = hp.max;
+                actorUpdates['system.attributes.hp.value'] = hp.value;
             }
 
             actorUpdates['system.level.value'] = targetLevel;
-            actorUpdates['system.level.xp'] = 0;
+            // Native 4.0.6 LevelUpSD._finalizeLevelUp spends the current level's
+            // XP threshold and carries the remainder; level zero starts fresh.
+            actorUpdates['system.level.xp'] = actor.system.level.value > 0
+                ? actor.system.level.xp - actor.system.level.value * 10
+                : 0;
 
             if (gold !== undefined && gold !== null) {
                 const currentCoins = actor.system?.coins?.gp || 0;

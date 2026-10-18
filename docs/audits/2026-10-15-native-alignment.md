@@ -1,6 +1,6 @@
 # Shadowdark native alignment audit — October 15, 2026
 
-**Current independent verification (October 18, Core 0.19.2 checkpoint):** the selected Core fixes CG-5/7/9/10 are released. Module implementation remains preserved and open for RV-12/13 adoption and the full M5/A01 acceptance matrix. See the [checkpoint review](#core-0192-checkpoint-review--october-18-2026). Earlier dates and Core-unavailable statements below are historical, not instructions to repeat Core work.
+**Current disposition (October18, final v14 closeout): Completed.** ADR-0001 M4/M5 and A01-01–10 are accepted for the recorded supported scope on native13.351/14.367 with Shadowdark4.0.6 and Core0.19.2. See the [final evidence](#final-native-v14-acceptance-and-closeout--october-18-2026). Earlier pending and Core-blocker statements are historical; explicit qualifications/deferrals remain.
 
 **October 17 implementation (superseded where corrected below):** G8 adoption is implemented against released Core
 v0.19.1 (module-api 1.6 relations; root catalog active). RV-05, RV-06 and RV-08
@@ -2076,3 +2076,579 @@ All isolated harness services were stopped. The operator's Foundry on30000
 was neither contacted nor stopped. Core and sibling repositories were not edited;
 no native data, release versions, remote state or tags changed. The user-authorized
 module checkpoint commit preserves the reviewed accumulated source and docs.
+
+## Core 0.19.2 adoption implementation — October 18, 2026
+
+This supersedes RV-12/13's pending implementation status above, without rewriting
+the checkpoint or earlier native evidence. Work continues on
+`fix/adr-0001-native-alignment`, HEAD/preservation checkpoint
+`e0872466281d67cfd484b69a5335b405c20c8dc8`. No Git mutation or native connection
+was made. The ADR was saved byte-for-byte before edits, SHA-256
+`53848e0dbe1633d010047d6a98f1be3613b679cd00607ce6f0242d7bccf31270`.
+
+Released Core is0.19.2 / `b010f590e56d87e3fcd6fce42c7894028e5f0c3a`.
+Its public migration/authoring, maintenance, configuration and archive guides were
+read from that read-only checkout. SDK3.4.0, module-api1.6, UI3.2 and roll1.0
+are unchanged. Local Node24.21.0 verification does not claim execution of remote
+Node22 CI. Static native reference remains release-4.0.6 / `9677d16b`;
+generation-specific client sources provide the lock oracle, not native execution.
+
+### Separate corrections and before/after evidence
+
+| Finding | Before | Correction and after |
+| --- | --- | --- |
+| RV-12 | The new maintained presentation assertion fails on a physical copy of checkpoint metadata: actual `>=0.19.1`, expected `>=0.19.2`. CI and release refs also selected0.19.1. | `info.json` floor and all three workflow references now select0.19.2. Presentation checks floor/pins, module0.9.4, API ranges and absence of `sdkVersion`; PASS. Native read range remains `>=4.0.0 <=4.0.6`. |
+| RV-13 | The unchanged checkpoint harness was rerun on observed Core0.19.2: six checks pass, then the metadata-only lock case times out. Native config `{}` leaves that world pack eligible. Raw old results still label0.19.1 and are retained as historical output. | Actual `core.compendiumConfiguration` overrides, package provenance and observed Core/archive/native-source identities now drive maintained verification. Both complete shape runs PASS14/14 with no skipped cases. No migration production change was needed. |
+| Resource-card layering found during R19-D | Actual phone screenshots show floating tools covering card footer controls. The new actual-consumer regression fails against checkpoint `ModuleDialog`: tools intercept its click (26/27 overall). | Active module layer160; inert suspended layer90 below SDK dialogs. The same regression passes and the consumer suite is27/27. Installed production phone screenshots show both attack controls clear; nested SDK cancellation/focus is tested. Core/shared modal implementations are untouched. |
+
+### Maintenance completeness on the final archive
+
+The maintained `pack-maintenance.core.ts --run-isolated --locations
+--generation=13|14 --archive=<final.tgz> --out=<new-dir>` uses actual copied
+released Core, public bootstrap/admin routes and controlled upstream sources.
+It now maintains the former ignored comprehensive source oracle. No private
+host imports, operator credentials or caller repair are involved.
+
+Both generations pass14 checks. The main cycle approves22 exact effect-array
+updates, independently compares complete sources and public receipts, performs
+a genuine no-op restart, restores all legacy sources, rejects old approval409
+and approves22 fresh repairs. Receipts retain exactly the approved operations
+with confirmed outcomes/source hashes. Every other field, ordering, unknown
+change/effect data, ID, NPC exclusion, tombstone and null delta is compared.
+World Actor/Item, owned Item, delta Actor/Item, Actor-pack and Item-pack locations
+are all covered. Delta Items keep their own type; base Actor type is used only
+for a missing/null delta Actor type. Both stable step IDs, requiredness, declared
+relations and hook/catalog source are unchanged.
+
+Each run separately approves one null-lock and one false-lock fixture despite
+`metadata.locked:true` (two further bounded writes). Seven negative scenarios
+make **zero writes**: unresolved value, explicit Setting lock, unreadable pack,
+malformed config, unavailable Setting read, missing provenance even with a
+`world.` prefix, and insufficient service role. Unlocked system/module package
+fixtures remain unchanged. Admin source states are blocked/unavailable rather
+than Up to date, with real reason/remediation. Malformed config currently uses
+Core's generic “Required world pack is locked or unreadable”; unavailable
+Settings prevent world readiness with reconnect guidance. These are accurately
+reported, not more specific statuses invented by the module.
+
+A separate pack-only run proves legacy effects exclusively in an eligible pack
+require maintenance, exact approved repair, restart no-op and fresh restored-data
+review. The prior30×30 (930 effects) and60×40 (2,460 effects) evidence remains in
+`temp/rv09-rv11-corrections/`; it was not erased or relabeled as this archive.
+No hook/capacity behavior changed, so no new broad capacity claim is needed.
+
+### Installed consumers, workflow and connection qualifications
+
+`installed-consumers.core.ts` uses the public archive dry-run upload, maintenance
+enter, fresh authoritative review and backup-acknowledged exact approval. Its
+isolated unverified-artifact trust override does not change production policy.
+It runs the real login, SDK, sheets/cards and shared roller. Production uses
+`start-server.ts build` then `start` with its own dependency copy (Turbopack
+rejects an external node_modules symlink). Development uses the public `dev` path.
+
+The width/theme matrix covers320/390/820/1440, dark/light, paper, seven advanced
+tabs, spell/weapon/inventory/monster cards, shared roller, bestiary and HUD.
+Keyboard checks measure entry,20 forward and20 reverse Tabs, Escape and focus
+return. Nested card→shared roller cancellation is exercised at320/1440 in both
+themes. Phone screenshots were visually inspected; the resource-layer defect
+above was corrected. Static upstream image assets are not native media evidence.
+Both final-archive runs pass **18/18**, each with eight width/theme cells and
+four nested-card cases, no uncaught page errors. Complete results/screenshots
+are recorded in the accompanying evidence summary.
+
+Ownership-only changes refetch the same open gear picker and preserve search.
+Held successful privileged responses are released after a newer denial and
+cannot repopulate the picker; removing the override recovers it. Spells explains
+classes403, retries and recovers. Generator remains gated on partial required
+collection failure and recovers when the ownership override is removed. No
+unrelated Pulp toggle/reload drives those permission changes. Maintained consumer
+events explicitly carry `keys:[]`; scope/pending/unmount/empty/retry tests remain.
+Packaged normal-session OWNER effect writes succeed and are restored; OBSERVER403
+and legitimate LIMITED404 preserve source and dispatch no writes.
+
+Connection diagnostics are kept separate. A minimal public probe has successful
+OWNER writes before an explicit `socket.disconnect(true)` server kick, then
+same-cookie mutation500 after Core reports ready; a fresh login succeeds.
+No upstream mutation was dispatched by those failures. This is an explicit
+server-side session disconnect, not ordinary transport loss (the installed
+Socket.IO client's public disconnect documentation makes that distinction).
+The maintained `--probe-reconnect-write` instead interrupts the transport and
+**passes** same-session OWNER recovery on Core0.19.2. `--server-disconnect` retains
+the forced-kick reproduction; do not count its500 as a passed case, call it a
+native finding, reopen corrected CG-10, or add automatic login/privileged repair.
+The browser's ownership/read recovery additionally exercises the forced-kick path.
+
+### Package, validation and remaining acceptance
+
+Final candidate: `shadowdark-0.9.4.tgz`, SHA-256
+`cc0a611c02626240925ba066f536ce0ff95be1af217487356ead68c30fc93893`.
+Release-v2 catalog digest
+`sha256:d6243cf174a8b73d6dd73b3661a625087e1c0e9a4784e573c2322c314fd7dbe0`,
+two required steps. The preceding adoption archive `7597fb47…` and final archive
+have identical compiled hook/catalog bytes; packaging uses the same physical
+source layout. This does **not** resolve CG-8 across different build paths or
+authorize changing an applied step. Source hook/catalog diff against checkpoint
+is empty. Module/application release versions and supported native range stay put.
+
+All twelve maintained module suites, explicit module/UI/hook typing, isolated
+module checking/packaging and27 consumer cases pass. Final-archive migration
+runs pass14/14 for each shape. The final installed-browser aggregate and cleanup
+record are in `temp/r19-core0192/validation-summary.json`; the durable facts here
+do not require ignored files to understand the remaining gates.
+
+| Gate | Current evidence | Exact remaining acceptance |
+| --- | --- | --- |
+| M4 | **Met in isolated Core0.19.2:** required migration/context/settings/caller contracts, final-archive shape runs and mounted consumers verified. | Changes remain uncommitted for review; retained CG-4/6/8 qualifications apply to their own scope. |
+| M5 | Actual Core dev/production UI and public maintenance evidence; prior sampled native v14 retained. **OPEN.** | Operator-confirmed native worlds and all unexecuted cases below; simulated upstreams do not close this gate. |
+| A01-01 | Offline/native-pack oracle and prior native v14 STR9 mastery sample (+0 d8+1, disabled−1 d8). | Native v13 comparison; current-host repeat where affected, across required surfaces/effect toggles. |
+| A01-02 | Both effect serialization shapes, lossless migration and offline effect conformance; prior v14 samples. | Full native selector/property/this/phase/priority/formula/string/dice matrix on both generations; situational roll selection remains explicitly unsupported. |
+| A01-03 | Prepared Player/NPC suites and prior native v14 sampled ability/HP/AC/slots/attack parity. | Complete native armor/shield/custom attribute, GM override and combat cases on both generations. |
+| A01-04 | Maintained action/consequence/replay suites and prior v14 sampled manual spell outcomes. | Native NPC spells, multi-spell wand, scroll, Class Ability, potion and cancellation/retry/failure consequences; luck/rest/ammunition automation remains deferred. |
+| A01-05 | Offline exact creation choices/source preservation; native preview/import refusal only; installed Generator failure gates. | Full native generator/importer creation, level-up finalization, boon/effect edits and independent created-source/effect readback on both generations. |
+| A01-06 | Maintained canonical identities, missing/read failures and scope retirement; installed ownership recovery/reconnect. | Complete native duplicate/rename/missing-pack/world-switch/reconnect matrix. CG-4 arbitrary pack-content freshness across offline intervals remains qualified. |
+| A01-07 | Packaged OWNER200/OBSERVER403/LIMITED404 and unchanged denial source; prior native v14 partial privacy evidence. | Full native denied/limited/observer/owner/Assistant/GM, world/embedded/compendium/card and Secret/whisper/identification matrix. |
+| A01-08 | Real Core paper/seven tabs/cards/shared roller, eight width/theme cells per mode, both Tab directions and nested cancellation. | Native both sheet layouts including NPC and every card/action kind, safe areas/HUD, keyboard and responsive behavior on both generations. |
+| A01-09 | Maintained stale/replay/race tests; held privileged-response retirement and current permission events; transport mutation recovery. | Native rapid edits/Actor switch/deletion/partial writes, all live privacy/action races and failure reconciliation. Forced native user-kick behavior is separately qualified above. |
+| A01-10 | Final archive on real Core0.19.2 with v13/v14 controlled shapes and pinned native4.0.6 data; prior v14 native subset. | Operator-run native13.351 and14.367 acceptance for the claimed released range. Development4.1 creates no support claim. |
+
+CG-5/7/9/10 remain corrected by released Core0.19.2; this module adds no host
+replacement. CG-4/6/8 retain their earlier evidence/qualifications, not blanket
+closure. Excluding intentionally locked world packs while requiring all eligible
+unlocked targets still requires a separately selected host enumeration/exclusion
+policy; the current strict module policy intentionally blocks them. That is not
+an advisory-step workaround or permission to change Core.
+
+Local evidence root: `temp/r19-core0192/` (ADR backup, floor/lock/layer before and
+after logs, suite/type/build results, final package, hook-history proof, copied
+host/browser summaries/screenshots). Task process roots are `/tmp/sd-r19-*`.
+Native work still needs the handoff's actual disposable-world/generation
+confirmation and recorded fixture/account/write/cleanup scope. The existing
+backup-warning acknowledgement remains sufficient; no native endpoint was
+contacted on the strength of listener availability. Changes remain uncommitted.
+
+## Independent native review and RV-14 — October 18, 2026
+
+This review continues checkpoint `e0872466` on
+`fix/adr-0001-native-alignment`, preserving the uncommitted adoption work. Core
+remains read-only at released 0.19.2 / `b010f590e56d87e3fcd6fce42c7894028e5f0c3a`.
+The operator confirmed the active disposable instance; direct discovery verified
+Foundry14.367, Shadowdark4.0.6, world `shadowdark-test`, passwordless full-GM
+`Gamemaster`, port30000. Dedicated actors, users, scene, packs and chat outputs
+were ledgered for cleanup. Existing scoped authorization and backup acknowledgement
+were reused. No production settings or credentials configured the isolated host.
+
+### Independent adoption verification
+
+RV-12's Core floor and three workflow pins correctly select0.19.2. Module0.9.4,
+module-api1.6 range, UI/roll ranges and native read range are unchanged. RV-13's
+native Setting lock fixture, provenance checks, observed identities and complete
+source oracle were reviewed. Both required steps and source hook/catalog history
+are preserved. No additional module defect was confirmed in those corrections.
+
+Fresh offline checks passed all twelve suites, explicit module/UI/hook typing,
+consumer27/27, module checking and isolated packaging. The prior final-archive
+controlled migration14/14 per shape, installed dev18/18 and production18/18, and
+same-session transport-loss results were inspected as retained evidence. They
+were not all rerun here and do not become native results by association.
+
+### Fresh native v14 results
+
+| Area | Executed result and limits |
+| --- | --- |
+| Required migration | Public maintenance preview was read-only and proposed exactly eight fixture effects: world Actor, owned Item, world Item, ActorDelta, delta Item, world Actor-pack Actor and owned Item, and world Item-pack Item. Exact approval completed all eight with independent full-source comparison. World pack configuration had ownership entries but no explicit lock override, exercising the corrected native unlocked default. A real supervisor restart made no further source change. |
+| Restored source, corrected archive | Restart with absent lock overrides remained ready. Restoring one fixture's legacy effect required a new review. Old approval returned409; before approval source was unchanged. Fresh exact approval corrected one effect and matched the independent complete-source oracle. |
+| Prepared data and mastery | Actual native-prepared Prim, Binx and Goblin were compared with Core projections: six abilities/modifiers each, HP and AC matched; Player slots matched (NPC slots not asserted). Original STR9 mastery case produced +0 d8+1, versus −1 d8 when disabled. Multi-change disable/re-enable preserved effect source and applied once. This is sampled parity, not the full property/phase/formula matrix. |
+| Spell actions | Missing native casting data stayed unavailable. Exact native Magic Missile source was copied into a fixture. Manual success, identical request replay, changed-body409 and failed-cast loss of only that owned spell passed. Nonowner Actor identity was concealed404. NPC spell/wand/scroll/potion/Class Ability consequence matrices were not executed. |
+| Caller permissions | LIMITED Actor detail404/card200/write404; OBSERVER detail200/card200/write403; denial source unchanged. Successful OWNER actions and an Assistant creation path were exercised. A limited card's200 alone does not prove every hidden-field/privacy requirement. |
+| Live settings and collections | Native Pulp changes refreshed open paper/tabbed views; ammunition configuration reached authoritative rule inputs. Old-context mutation returned409. Open gear preserved search through context refresh, ownership-only revoke and restore; no unrelated setting toggle, Retry or reload drove permission recovery. Partial Generator collection denial gated Create, then automatically recovered after restoration. |
+| Creation | Native-backed generator preview resolved canonical sources; unresolved import requested confirmation without creating an Actor. One complete importer creation used native ancestry/background/class/gear through an Assistant session. Exact UUIDs, scores, HP, coins, quantity and effect arrays were checked and source packs remained unchanged. Full interactive generator creation and all choice combinations remain unexecuted. |
+| Level-up | Actual native and packaged module finalizers ran on separate matching fixture Actors. This exposed RV-14 below. The corrected archive repeats the same native comparison successfully; full grants/boon/effect-edit acceptance remains separate. |
+| Native-backed UI | Eight width/theme cells (320/390/820/1440 × dark/light) exercised paper, seven advanced tabs, resource cards, SDK roller, HUD and bestiary; no overflow or uncaught page errors. Dialog checks measured focus entry, six forward Tab movements, Escape and focus return. Initial paper screenshots could capture a loading overlay; a separate settled-content run verified all eight cells and d8+1, with visual contact-sheet review. This does not replace the retained controlled bidirectional20-Tab checks or establish every native card/action/NPC layout. |
+
+### RV-14: native XP carryover corrected
+
+Native release-4.0.6 (`9677d16b`) implements this behavior in
+`system/src/apps/LevelUpSD.mjs:351–357`, `_finalizeLevelUp`. At current level zero,
+the new XP value is zero. Otherwise it spends current Actor level × 10 and
+retains the remainder. The module's `src/server/api/level-up.ts` unconditionally
+assigned zero, discarding excess earned XP.
+
+| Comparison | Native handler | Module before | Module after |
+| --- | --- | --- | --- |
+| Current level1, XP25, target2, HP roll3 | Level2, XP15, HP11/11 | Level2, XP0, HP11/11 | Level2, XP15, HP11/11 |
+
+The user explicitly authorized aligning the module with this native rule.
+The server finalize route now subtracts the native threshold above level zero.
+No client calculation, clamp, guessed value or migration was added. Existing
+lost XP cannot be reconstructed by this change.
+
+Maintained `native-alignment.test.ts` calls the actual route with four literal
+cases: level0/XP7→level1/XP0; level1/XP10→level2/XP0;
+level1/XP25→level2/XP15; level2/XP35→level3/XP15. It also verifies the dispatched
+Actor patch and unchanged read source. Both excess-XP assertions fail before
+the fix (53/55 overall), then all55 pass. All twelve suites and explicit typing
+were repeated successfully after correction. The actual native handler and fixed
+packaged module comparison above passes independently of these mocks.
+
+### Artifact continuity, cleanup and gate disposition
+
+The earlier archive SHA-256
+`cc0a611c02626240925ba066f536ce0ff95be1af217487356ead68c30fc93893`
+was used for the initial native UI/migration/action checks and retained unchanged.
+The XP-corrected candidate is
+`16dc680ce93e3f28e06b3f52501c4ec53410f6435f0ecfb711abd5151c80ee03`.
+It passed module checking/packaging, native XP comparison and restored-source
+maintenance. Catalog, definition and six compiled hooks compare byte-for-byte
+equal; catalog digest stays
+`sha256:d6243cf174a8b73d6dd73b3661a625087e1c0e9a4784e573c2322c314fd7dbe0`.
+
+Packaging from a different working directory first changed generated source-path
+comments and hook digests. An incomplete isolated toolchain attempt failed module
+checking and produced no accepted candidate. Reusing the original isolated
+Core toolchain/source layout produced the verified candidate without editing
+hooks, generated bytes or applied history. This preserves continuity for this
+run; it does not fix CG-8. CG-4/6 remain qualified; no new Core work was selected.
+
+The corrected archive was installed into the stopped, disposable test host for
+the XP/recovery repeat; this step is not claimed as a public upgrade workflow
+test. Earlier public controlled install/upgrade evidence remains separately
+recorded above. Source/runtime/UI files otherwise match the reviewed candidate;
+no migration semantics, module version or compatibility changed for RV-14.
+
+Cleanup removed ledgered actors/items/scene, both test accounts, both world
+packs, fixture chat and client settings, and restored original world settings.
+Original membership and source comparison found **zero differences**:
+9 Actors,0 world Items,2 Scenes,4 Users. Original pack membership and chat IDs
+also matched. Source comparison omits volatile `_stats`; User comparison checks
+identity, name, role and assigned character. Task-owned Core/Next/browser processes stopped; operator Foundry
+remained running. Core and sibling repositories were not modified.
+
+M4 retains its verified contract scope. **M5 and this ADR remain open.** This
+round advances the A01 ledger with the exact native subsets above; it does not
+close any full matrix row. Remaining work is still the earlier table's complete
+effect/property/custom-attribute matrix, item/NPC consequences, interactive
+generation and grant/edit paths, world-switch/content freshness, full
+roles/privacy/identification and edit/action races, all native sheet/card kinds,
+and native13.351 acceptance. Native4.1 and deferred luck/rest/ammunition automation
+do not become requirements. The conditional permission to commit/push/release
+has not been exercised because required acceptance is unfinished.
+
+Evidence is retained under `temp/r19-independent-review-20261018/` (snapshot,
+offline and before/after logs, corrected package/identity and native summary),
+`temp/native-r19-v14/` (scoped probes), and private native run root
+`/tmp/sd-r19-native14-CWpC1W` (baseline, ledger, raw comparisons, screenshots and
+cleanup). Pre-edit ADR SHA-256:
+`83d1d77d82abacbd510aa46593ff27fc3652a2044ee966a935ce7ba3877fb0db`.
+These ignored paths support the durable facts above and are not required to
+understand the remaining work.
+
+## Native v13 review — October 18, 2026
+
+The operator confirmed v13 ready for review. Direct discovery verified
+Foundry13.351, native Shadowdark4.0.6, world `sd-adr61-v13`, and passwordless
+full-GM `Gamemaster` at127.0.0.1:30000. The initial world had0Actors,0Items,
+0Scenes,1User and no world packs. Existing scoped fixture/account/settings/
+write/cleanup authority and backup acknowledgement applied. The operator
+process was neither replaced nor stopped.
+
+The module remains on `fix/adr-0001-native-alignment` at checkpoint `e0872466`
+plus the accumulated uncommitted work. Core stayed clean/read-only at released
+0.19.2 / `b010f590`. The candidate remained module0.9.4, archive SHA-256
+`16dc680ce93e3f28e06b3f52501c4ec53410f6435f0ecfb711abd5151c80ee03`;
+there was no new build, hook/history rewrite or compatibility change. An isolated
+Core data directory and copied toolchain served that package against the approved
+native endpoint. No application source changed in this pass; the previous
+offline/type/package results remain evidence for the unchanged implementation.
+
+### Fixture provenance and independent oracle
+
+Because this world was empty, named, ledgered Player/NPC fixtures reused native
+4.0.6 Actor sources retained from the prior v14 baseline, converted to v13's
+top-level `changes`/numeric `mode` serialization. Native v13 instantiated and
+prepared them independently; they were not merely module-prepared fixtures.
+Additional spell, potion and Class Ability fixtures copied actual installed
+native pack documents. The packs contain no Wand or Scroll templates, so those
+two test types were constructed from the native `WandSD`/`ScrollSD` schema with
+exact existing spell UUIDs. Their properties and formulas were not introduced
+into production module code or source compendia.
+
+### Executed results
+
+| Area | Fresh v13 evidence |
+| --- | --- |
+| Required migrations | Exact preview identified eight legacy effects across world Actor/Item, owned Item, token ActorDelta and delta Item, world Actor-pack Actor and its Item, and world Item-pack Item. Preview made no source writes. Approved execution matched the independent full-source oracle; real supervisor restart changed no further sources. World pack locks used absent overrides, not fabricated metadata or auto-unlock. |
+| Restored-source recovery | Another restart retained readiness with absent world-pack lock overrides. Restoring one fixture's legacy effect produced a new review. Old approval409; source unchanged before fresh approval; one approved repair matched the full-source oracle. |
+| Preparation/mastery | Native-prepared Prim/Binx/Goblin and Core projections matched six ability modifiers each, HP and AC; Player capacity matched. The STR9 mastery case gives +0 d8+1, versus −1 d8 when disabled. Multi-change toggle applied once and preserved effect source. Full property/priority/custom-attribute/combat combinations remain outside this sample. |
+| Spell/replay | Authoritative native spell success, identical replay, changed-body409, owned spell loss on failure, and unavailable missing casting data passed. Nonowner Actor detail remained concealed404. |
+| Caller permissions | LIMITED detail404/card200/write404; OBSERVER detail200/card200/write403. Denied effects stayed unchanged. OWNER actions succeeded; Assistant import creation succeeded. These are not all hidden-field/Secret/whisper combinations. |
+| Live settings/collections | Eight checks passed: Pulp changes reached open paper/tabbed sheets, ammunition setting reached rule inputs, stale revision409, mounted gear refetch retained search, ownership-only revoke removed data, restore refetched without reload/Retry, partial Generator collection denial gated creation, and restoration recovered it. Temporary settings were restored. |
+| Creation/advancement | Native-backed generator preview and unresolved import refusal passed. One full import retained exact ancestry/background/class/gear UUIDs, stats, HP, coins, quantity and effect data; source packs stayed unchanged. Actual native and packaged module finalize both produced level2/XP15/HP11/11 from level1/XP25 and HP roll3. Interactive creation and full advancement grant/boon/edit choices remain separate. |
+| UI | Sequential actual-Core browser run passed8/8 cells at320/390/820/1440 in both themes, seven advanced tabs, paper, spell/weapon/inventory/monster cards, shared roller, HUD and bestiary; no horizontal overflow or uncaught page errors. Dialogs passed entry, six forward and six reverse Tabs, Escape and focus return. Separate settled paper8/8 verified content/d8+1. Phone screenshots and the settled contact sheet were visually reviewed. |
+
+### Additional native action comparisons
+
+The native oracle used a separate disposable account. Each case created paired
+Actors/items, executed the actual native model method on one, then the public
+packaged module action on the other, and compared the resulting consequence
+fields. Native rolls were evaluated with deterministic
+`CONFIG.Dice.randomUniform`, mapped according to Foundry13 `DiceTerm.mapRandomFace`,
+and native `skipPrompt`. Potion confirmation was accepted by the probe. This is
+actual native execution with controlled input, not random-distribution or full
+dialog-cancellation coverage.
+
+| Native case | Matched outcome; module replay unchanged |
+| --- | --- |
+| Scroll success | Scroll consumed. |
+| Scroll failure | Scroll consumed. |
+| Multi-spell wand failure | Only selected spell lost; other spell retained; wand unbroken. |
+| Wand critical failure | Selected spell lost and wand broken; other spell retained. |
+| Class Ability failure | Native ability marked lost. |
+| Limited-use Class Ability | Exactly one use spent, reaching zero. |
+| Potion | Item consumed after confirmation. |
+| NPC spell failure | Exact owned spell marked lost. |
+| Focus failure | Owned spell retained. |
+
+All9 comparisons and identical-request replays passed. Native authority:
+`system/src/models/PlayerSD.mjs` (`castSpell`, `useAbility`, `usePotion`),
+`NpcSD.mjs:castSpell`, `items/WandSD.mjs:setSpellLost`, and the native item schemas
+at release-4.0.6. Consequence fields and replay state were compared; this is not
+a complete source-preservation/partial-write oracle for every action combination.
+These nine cases were newly executed on v13, not retroactively claimed for v14.
+
+### Probe corrections and cleanup
+
+The initial copied native login used v14's `userId`; v13 requires `userid`.
+The prepared comparator also initially compared the HP object to a scalar.
+Both probe assumptions were corrected. Overlapping native/Core logins using
+the same fixture account interrupted the first UI attempt; that result was
+excluded and the entire UI matrix rerun sequentially. Native dice exports did
+not accept the attempted replacement, so the final probe used native prompt
+skipping and evaluated dice. A first uniform mapping produced opposite d20
+faces; observed native roll records and the v13 source corrected the mapping.
+Space-containing request IDs were correctly rejected400; final probes used
+unique valid IDs. None of these attempts establishes a module defect or a Core
+regression. No assertions were weakened to count the final comparisons as passes.
+
+Native-generated welcome/roll messages use `author`. Cleanup ledgered all29
+messages authored by the disposable accounts, including notices produced during
+native login before the action probe. The apparent chat baseline captured after
+that login was corrected to exclude those test-owned notices. No other author's
+messages were removed. All ledgered fixtures, three test accounts, both world
+packs, temporary world/client settings and test chat were removed. Final source/
+membership comparison found zero differences:0Actors,0Items,0Scenes,1User,
+original selected settings and pack membership, and no remaining test chat.
+As in v14, source comparison omits volatile `_stats`; User comparison covers
+identity/name/role/character. Test Core/Next/browser processes stopped; only
+operator Foundry30000/PID3462426 remained listening.
+
+### Gate disposition and next acceptance work
+
+No new module defect was confirmed. RV-14 XP parity now has independent actual
+native comparisons on both13.351 and14.367. The build-execution portion of
+A01-10 is evidenced for released native4.0.6 on both generations; it no longer
+has an entirely unexecuted v13 prerequisite. Full cross-row acceptance remains
+open. M4 retains its verified scope; M5/ADR are not closed by this sampled pass.
+
+Remaining work is concrete: complete effect/phase/selector/custom-attribute and
+combat combinations (A01-01–03); v14 counterparts of the nine new action cases,
+dialog cancellation and partial-failure reconciliation (A01-04); interactive
+generator creation, full grant/boon/effect-edit paths (A01-05); duplicate/rename/
+missing-pack/world-switch/content-freshness combinations (A01-06); complete
+role/Secret/whisper/identification projections (A01-07); remaining native NPC/
+card/large-list/role layouts (A01-08); rapid-edit/deletion/Actor-switch and live
+action/privacy races (A01-09). CG-4/6/8 retain their qualified scope. Native4.1,
+deferred automation and new Core features are not added to this work.
+
+Evidence: `temp/r19-native-v13-review/validation-summary.json`,
+`temp/native-r19-v13/` probes, and private root `/tmp/sd-r19-native13-ULHBDK`
+(baseline/ledger, raw comparisons, screenshots, recovery and cleanup). Pre-edit
+ADR SHA-256 `be1032276f1d3fad1cc1d889bee1e91bddcaa56973f2f27161bdcaf625e62048`.
+The tracked facts above stand without these ignored files. Changes remain
+uncommitted. Conditional release permission remains recorded; no release,
+version bump, Git write or remote operation was performed while M5 is open.
+
+## V13 completion and final v14 checklist — October 18, 2026
+
+### Authority, implementation and archive
+
+Fresh actual Foundry13.351 / Shadowdark4.0.6, world `sd-adr61-v13`, with a
+passwordless full-GM service account and existing scoped fixture-write/cleanup
+approval. Core0.19.2 (`b010f590e56d87e3fcd6fce42c7894028e5f0c3a`) was copied to
+an isolated test workspace. The working Core repository stayed clean. Module
+branch `fix/adr-0001-native-alignment`, checkpoint `e0872466`, module0.9.4,
+compatibility/API/native read ranges and required migration steps are unchanged.
+
+RV-15 follows native tag `release-4.0.6`, `system/src/apps/LevelUpSD.mjs`,
+`_finalizeLevelUp`: create grants, prepare the Actor, replace first-level HP with
+hit die plus prepared CON (minimum1); later levels add the die to prepared
+current/max HP. A real level-zero Actor with old HP8, CON12 and roll3 produced
+native4/4 versus old module11/11. Three first-level regression cases failed
+before correction. The shared helper now serves Generator and server; six
+regressions cover this behavior, including granted CON and existing wounds/HP
+bonuses. Native0→1 now matches4/4/XP0; native2→3 with resolved mastery matches
+11/11/XP15. Unresolved mastery is refused before writes. No old Actor repair
+or migration-history rewrite is included.
+
+RV-16 was reproduced through the installed archive: the level-up dialog called
+a bare-document endpoint but read `data.document`, so valid native Backstab,
+Thievery and Keen Senses references appeared unavailable. The hook now reads
+the bare result from the existing caller-safe module document route. The
+maintained React regression failed before the fix, then passed; a missing
+required grant still blocks. Interactive level-one Thief creation now completes
+with native fixed/rolled grants, no placeholders, and8/8 HP (d4 max4 + CON18
+modifier4). No Core contract change is required.
+
+Final candidate archive SHA-256:
+`a76f700a1a57e087a9b1fc05f648996c0d405f882ac4d61df70bb73b767f675d`.
+It was built with pinned Core0.19.2, installed into the stopped task-owned host
+and tested after restart. `migration.json`, the definition and all six compiled
+hooks match the previous RV-14/RV-15 same-layout archives byte-for-byte. Both
+migration steps remain required. CG-8's earlier different-layout build
+qualification is retained; this comparison does not erase it.
+
+### Fresh execution and retained evidence
+
+| Fresh v13 group | Result |
+| --- | --- |
+| Preparation | 18 native variants plus complete fixture source-preservation check pass. Bounded scores, slots, deterministic HP formula, explicit priority, string spell-class reference, all/property/`.this` selectors, disabled/stashed/unequipped/unidentified suppression, situational exclusion, die upgrade, dice ADD, native DEX armor/shield, initiative bonus/advantage, NPC explicit modifiers/AC. |
+| Privacy/identity | 10 checks pass: Secret projection at four ownership levels and full GM, private chat, duplicate names/repeated embedded IDs, rename, access-revoked action, deletion, undeclared pack and absent readable record. |
+| Advancement/grants | Four checks pass: native0→1, pre-write unresolved-choice refusal, native2→3, native resolved mastery grant. XP15 is retained above level zero. |
+| Level-zero creation/editor | Five checks pass: actual Generator creation; lossless custom boon rename; first-change-only effect edit; edit cancellation; shared delete cancellation. |
+| Level-one creation | Two checks pass: cancelling initial advancement creates nothing; complete actual UI creates correct native grants/HP. |
+| Cards/races | Eight checks pass: spell roller cancellation; unidentified potion privacy/consume cancellation; feature/60-row inventory on390px; rapid edits produce one final write; navigation cancels pending edit; NPC attack/prose; deleted open Item loses its action; revoked Actor access removes its sheet. No page errors in this probe. |
+
+Fresh migration setup also completed the eight fixture writes with exact source
+oracle, read-only preview and restart no-op. The earlier v13 restored-data/stale
+approval/fresh repair, settings/ownership/reconnect, source-preserving import,
+all nine actual native action comparisons and eight layout cells are retained,
+not claimed as rerun. The final RV-16 archive adds only a UI document-reader fix
+after the RV-15 native advancement checks; affected creation/card/race flows ran
+on that final archive. The earlier preparation/editor/privacy passes did not
+exercise changed HP/document-reader code and remain valid scoped evidence.
+
+All12 module suites pass after RV-15 (native-alignment61/61). After RV-16,
+maintained consumer tests29/29, explicit module/UI/hook typing, module checking,
+scoped CSS/boundary validation and isolated packaging pass. Partial-write replay,
+chat failure, late response and world/user/role invalidation coverage remains
+controlled regression evidence, not artificially relabelled native fault
+injection. The existing installed development/production and larger-inventory
+results remain retained. No unnecessary native process crashes were introduced.
+
+Visual review includes the native effect editor, unidentified phone card and
+NPC attack card. The first created-sheet capture caught its transient loading
+overlay and is not settled visual evidence; source readback and completed native
+UI creation establish that flow. A later optional capture was interrupted during
+owned-host shutdown and is excluded. The previously accepted settled layout
+matrix remains the layout evidence.
+
+### Probe corrections and cleanup
+
+Fixture assumptions were corrected without inventing game data: native slots
+are numeric; handedness is `1h`; armor's supported attribute is DEX; the actual
+Versatile property is read from native gear; incomplete old Light sources remain
+unavailable so the cancellation fixture copies native Magic Missile; Thief fixed
+grants are native Talents, not assumed Class Abilities; Goblin's Keen Senses is
+native prose rather than an embedded feature. Exact final assertions use these
+native shapes. Separate disposable accounts prevent native/Core login conflicts.
+Probes sharing a cleanup ledger run sequentially; task-prefixed identities were
+reconciled before cleanup. Harness selector/state-capture retries are not passes.
+
+All ledgered test Actors, Items, Scene, journals, accounts, two world packs,
+four test-account chat messages and temporary settings were removed. Baseline
+comparison passes with no differences:0Actors,0Items,0Scenes,1User,0JournalEntries,
+original selected settings and pack membership, no remaining test chat. Source
+comparison omits volatile `_stats`; User comparison covers ID/name/role/character.
+Task Core/Next/browser processes stopped; ports38733/36143 closed. Operator
+Foundry30000/PID3462426 remains running and was not stopped.
+
+### Current disposition
+
+The [ADR's current ledger and final checklist](../adr/0001-native-alignment-and-resource-cards.md#v13-completion-and-final-v14-checklist--october-18-2026)
+replace this audit's earlier broad remaining-work paragraph. V13 is complete for
+the selected scope; only the listed v14 counterparts and final review remain.
+M4 stays met; M5/ADR await those checks. CG-4/6/8 and explicit automation/native4.1
+and Core-integration deferrals remain qualified, not new blockers. This is
+representative supported-behavior acceptance, not an exhaustive permutation
+claim. There is no confirmed outstanding v13/module defect from this pass.
+
+Evidence roots: `temp/r19-native-gap-closeout/` (regressions, package identities,
+validation), `temp/native-r19-v13/` (probes), private `/tmp/sd-r19-native13-exn6kp`
+(raw native comparisons, ledger, screenshots, cleanup). These tracked facts are
+self-contained. Work is uncommitted; no Git, remote, version or release mutation
+occurred while final v14 acceptance is pending.
+
+## Final native v14 acceptance and closeout — October 18, 2026
+
+**Completed.** Actual Foundry14.367 / Shadowdark4.0.6, world `shadowdark-test`,
+full-GM Gamemaster on local30000; isolated released Core0.19.2 commit
+`b010f590e56d87e3fcd6fce42c7894028e5f0c3a`. The existing world baseline was read
+before any fixtures. All writes were scoped to recorded test data; the operator's
+Core configuration and repository were untouched. The pre-closeout ADR snapshot
+SHA-256 is `6d01499d5be5844fc06aacc1d9150cac62867bd74424e6ad363cb016a19562e6`.
+
+Final implementation archive0.9.4 SHA-256
+`a76f700a1a57e087a9b1fc05f648996c0d405f882ac4d61df70bb73b767f675d`
+was installed into the isolated host. Its packaged migration catalog, definition
+and six hook files retain the verified preceding same-layout byte identities.
+The forthcoming release0.9.5 changes release metadata; publication will record
+its own archive/manifest identities. Acceptance does not mislabel the candidate
+archive as the final published artifact.
+
+| Fresh native group | Passed evidence |
+| --- | --- |
+| Preparation21 | The18 v13 variant counterparts plus two explicit v14 initial/final phase cases and a complete stored-source preservation check. Native abilities, HP, AC, slots, classes, initiative, attack bonus, damage and advantage match the module. |
+| Advancement4 | Actual native0→1 HP4/4/XP0 and2→3 HP11/11/XP15; unresolved mastery refuses before writes; resolved grant preserves modern native changes. |
+| Mastery/actions6 | Exact original STR9 mastery+0/d8+1 versus disabled−1/d8; lossless toggle; incomplete native spell data remains unavailable; success/replay/conflict/failure consequences; nonowner refusal. |
+| Native item actions9 | Scroll success/failure consumes; selected wand spell loss retains the other spell; critical wand failure breaks it; Class Ability loss/limited uses; potion consumption; NPC spell failure; focus retains the spell. Real native handlers/evaluated dice match module consequence state; identical-request replay applies no second consequence. |
+| Privacy/identity10 | Secret at four ownership levels/full GM, private chat, duplicate names/embedded IDs, exact rename/deletion, action rejection after revocation, unavailable pack/record boundaries. |
+| Creation/editor5+2 | Interactive level0 creation, lossless boon rename, exact single-change edit, edit/delete cancellation; cancelling initial advancement creates nothing; complete level1Thief with native fixed/rolled grants writes HP8/8. |
+| Cards/races8 | Shared roller/consumption cancellation, unidentified content, feature/60-item inventory on390px, rapid-edit single write, confirmed unmount cancellation, native NPC attack/prose, live Item deletion, Actor access revocation. No page errors in this probe. |
+
+All65 final checks pass. The final native table result for creation was a real
++2DEX draw; the resulting Actor has DEX12, CON18, HP8/8, native Backstab/Thievery/
+Keen Senses and exact class/ancestry/language identities. Native action probes
+use `CONFIG.Dice.randomUniform`, actual inverse-face mapping and `skipPrompt`;
+potion confirmation is accepted by the probe. Shared-dialog cancellation is
+separately exercised in installed Core UI. These are deterministic native-rule
+comparisons, not random-distribution or native crash/fault injection claims.
+
+Fresh eight-location migration completes with a read-only exact preview, full
+source oracle and real supervisor restart/no-op. Existing Actors/Scenes were
+included in the comparison and unchanged. Retained v13/v14 restore/approval,
+settings/reconnect, import, full eight-cell layout matrices, installed production
+checks,930/2460-effect inventories and controlled failure regressions remain
+valid scoped evidence; they were not all rerun in this final pass. The twelve
+suites, explicit typing,29 consumer checks and isolated packaging from RV-15/16
+remain passing; CI/release validation is recorded separately on publication.
+
+Visual inspection covers the settled created sheet (HP8/8 and resolved grants),
+modern effect editor, unidentified phone card and NPC attack card. Controls are
+reachable and content matches the native source. The development-only Next
+indicator is excluded from application layout claims; no dependency/runtime
+change or native browser dependency was introduced.
+
+Two test assumptions were corrected before counting final passes: modern native
+change values retain number2, not the v13 string representation; an initial
+navigation test did not establish unmount before the800ms debounce. The final
+probe warms the destination, invokes the actual navigation control, verifies
+route completion in175ms, then confirms no request or source change. Earlier
+failed probe results are retained separately, not silently counted as passes.
+No new module/Core defect was confirmed in this final v14 pass.
+
+Cleanup restores9Actors,0Items,2Scenes,4Users,1JournalEntry, original selected
+settings, pack membership and45 original chat messages. All recorded test data,
+accounts, two packs and22 test-account messages were removed. Complete original
+Actor/Item/Scene source comparison has zero differences (volatile `_stats`
+excluded); User comparison covers ID/name/role/character, journal/chat membership
+is exact. Task Core33821/API35107/browser processes stopped. Operator Foundry
+30000/PID3644622 remains running.
+
+This closes M5 and the selected ADR scope after v13 acceptance. CG-4/6/8 and
+explicit future-feature exclusions retain their recorded qualifications; no
+new implementation or Core work is selected. Audit stays at its stable path as
+a completed historical record. Evidence summary/probes:
+`temp/r19-native-final-v14/validation-summary.json`,
+`temp/native-r19-v14-final/`, private `/tmp/sd-r19-final14-vR8b1e`.
+The tracked facts above stand without ignored artifacts. The user-authorized
+commit/push/release0.9.5 proceeds separately with unchanged SDK/API ranges and
+Core>=0.19.2.

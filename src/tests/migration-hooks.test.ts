@@ -289,7 +289,7 @@ async function catalog() {
         const info = JSON.parse(readFileSync(join(moduleRoot, 'info.json'), 'utf8'));
         assert.equal(info.migrations ?? info.migration, undefined, 'no migration maps in info.json');
         assert.equal(info.compatibility.apiContracts['module-api'], '>=1.6.0 <2.0.0');
-        assert.equal(info.compatibility.coreVersion, '>=0.19.1');
+        assert.equal(info.compatibility.coreVersion, '>=0.19.2');
     });
     const nativeRoot = process.env.SHADOWDARK_NATIVE_REF ?? join(process.cwd(), 'temp/shadowdark');
     const spells = join(nativeRoot, 'data/packs/spells.db');

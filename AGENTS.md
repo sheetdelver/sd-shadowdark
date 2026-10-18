@@ -57,6 +57,9 @@ second world cache/lifecycle or treat module-prepared data as native browser dat
 - Match tests to changed behavior. For confirmed defects, establish a meaningful
   failing case, then prove the fix with the same input and an independent oracle.
   Passing mocks/prepared fixtures do not establish native/operator acceptance.
+- Native browser comparisons and Core browser sessions use separate disposable
+  accounts. Serialize probes that change the same user's permissions/settings
+  or log that user out; session interference is not a product acceptance result.
 
 ## Documentation ownership
 
@@ -83,6 +86,12 @@ Keep Player and NPC schemas distinct, including NPC explicit ability modifiers
 and AC. Preserve independent fixed/rolled mastery grants, exact choice counts,
 multi-change effects and source templates; unresolved required choices must
 block the affected write before creation.
+Advancement follows native `LevelUpSD._finalizeLevelUp`, including XP carryover
+above level zero and first-level HP from the hit die plus prepared CON (minimum1).
+Generator and server share `logic/advancement.ts`; prepare grants before HP.
+Document consumers must use the route's actual bare-document response shape.
+Use native source and handler comparisons for these rules;
+successful writes alone do not establish parity.
 
 The native-alignment plan is [Shadowdark ADR-0001](docs/adr/0001-native-alignment-and-resource-cards.md),
 with evidence in the [native-alignment audit](docs/audits/2026-10-15-native-alignment.md).
@@ -147,8 +156,8 @@ Intentional-lock exclusions require a separately selected host policy, not
 Core 0.19.2 also fixes CG-10 (SDK error recognition across managed JS boundaries)
 and CG-5 (shared roller keyboard/layout behavior). Reuse public SDK error and
 modal components and test the installed archive; do not copy these fixes into
-the module. The ADR records the remaining RV-12/13 adoption steps and separates
-Core native evidence from the module's still-open full A01 matrix. CG-4/6/8
+the module. The ADR records RV-12/13 adoption evidence and separates
+Core native evidence from the module's completed, scoped A01 acceptance. CG-4/6/8
 retain their qualified status; no Core changes are authorized by module work.
 
 ## Verification commands
@@ -187,15 +196,32 @@ to that install's `index.mjs` and, if needed, `SHADOWDARK_CHROME` to a browser
 executable, then run `node <module>/src/tests/collection-consumers.browser.mjs <out>`.
 
 Maintained real-host checks: `src/tests/pack-maintenance.core.ts --run-isolated
---archive=<tgz> --out=<new-dir> --generation=13|14` via the pinned toolchain's
+--archive=<tgz> --out=<new-dir> --generation=13|14 --locations` via the pinned toolchain's
 `tsx`. `SHADOWDARK_CORE` selects a configured, read-only Core v0.19.2 checkout;
 `SHADOWDARK_NATIVE_REFERENCE` selects the static release-4.0.6 source checkout.
-The harness copies Core into its output, binds random loopback ports, uses the
+`SHADOWDARK_FOUNDRY_REFERENCE` optionally selects the static generation's native
+client source (otherwise `Core/temp/foundry-v13.mjs` or `foundry-v14.mjs`) for
+lock-contract provenance. The harness copies Core into its output, binds random loopback ports, uses the
 public bootstrap CLI/admin workflow and a controlled upstream, and stops its
 services. `--inventory=30,30 --inventory-only` (or `60,40`) repeats eligible
 pack completeness/oracle/restart/restore checks. Never point this harness at an
 existing data directory or Foundry service. This is simulated upstream evidence,
-not native acceptance. The checkpoint found a stale metadata-only lock fixture
-and hard-coded `v0.19.1` result identity (RV-13); correct these before treating
-the full host harness as acceptance on 0.19.2. The manifest/workflow pins still
-need the explicit RV-12 update; API ranges and module release version stay put.
+not native acceptance. Lock fixtures use `core.compendiumConfiguration`, with
+absent/null/false eligibility and explicit-lock/unreadable/malformed/provenance
+failures. Results record observed Core version/commit and archive/native-source
+hashes; omitted scopes are explicitly skipped. Both required hook identities
+and applied history must remain unchanged.
+
+`src/tests/installed-consumers.core.ts` accepts the same archive/output/generation
+arguments plus `--production` (public build/start) or `--focus-only` (explicitly
+omits the width/theme matrix). It uses public archive preview and maintenance
+entry/review/approval, real Core SDK/components and mounted module consumers.
+Set the same isolated Playwright/browser variables as above. Production copies
+dependencies inside its workspace for Turbopack confinement. Test-owned trust
+override/backup acknowledgement apply only to its disposable data directory.
+Never reuse operator settings or claim these controlled-upstream checks are native.
+`--probe-reconnect-write` reduces verification to a same-session OWNER write
+before/after transient transport loss. `--server-disconnect` selects an explicit
+native session kick instead; keep that diagnostic result separate from ordinary
+reconnect and never add automatic relogin to make it pass. Resource dialog tests
+also cover floating-tool clearance and yielding to shared SDK dialogs.

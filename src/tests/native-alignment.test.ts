@@ -6,6 +6,7 @@ import type { FoundryActor } from '@sheet-delver/sdk';
 import { ShadowdarkAdapter, shadowdarkAdapter } from '../server/ShadowdarkAdapter';
 import { ShadowdarkRegistry } from '../server/Registry';
 import { handleGetDocument } from '../server/api/document';
+import { handleFinalizeLevelUp } from '../server/api/level-up';
 import { applyMasteryChoice, assertResolvedTalentChoices, choiceCatalog } from '../logic/talent-choices';
 import { prepareWeaponAttack } from '../logic/weapon-rules';
 import { ShadowdarkUIProvider } from '../ui/context/ShadowdarkUIContext';
@@ -21,6 +22,7 @@ import { buildOwnedItemCard } from '../logic/resource-cards';
 import { prepareActorCore } from '../logic/actor-preparation';
 import { prepareRequestedAction } from '../logic/actions';
 import { itemControls } from '../logic/inventory-controls';
+import { advancementHitPoints } from '../logic/advancement';
 import { LuckControl } from '../ui/components/LuckControl';
 
 /**
@@ -406,6 +408,79 @@ async function spellCardFacts() {
     });
 }
 
+async function levelUpExperience() {
+    // Native 4.0.6 LevelUpSD._finalizeLevelUp carries excess XP after paying
+    // current level * 10; the first advancement from level zero starts at zero.
+    // Literal outcomes include the independently reproduced native 25 -> 15 case.
+    const catalog = shadowdarkAdapter.getChoiceCatalog;
+    shadowdarkAdapter.getChoiceCatalog = async () => choiceCatalog([]);
+    try {
+        for (const [currentLevel, xp, targetLevel, expectedXp] of [
+            [0, 7, 1, 0], [1, 10, 2, 0], [1, 25, 2, 15], [2, 35, 3, 15],
+        ]) {
+            await check('RV-14', `level ${currentLevel} / ${xp} XP advances to ${targetLevel} / ${expectedXp} XP`, async () => {
+                const actor: any = primLike();
+                actor.system.level = { value: currentLevel, xp };
+                const before = structuredClone(actor);
+                const patches: any[] = [];
+                const response = await handleFinalizeLevelUp(actor._id, {
+                    json: async () => ({ targetLevel, hpRoll: 3 }),
+                    runtime: { documents: {
+                        get: async () => actor,
+                        patch: async (type: string, id: string, updates: any) => { patches.push({ type, id, updates }); },
+                        items: { create: async () => { assert.fail('No item grants in this advancement case'); } },
+                    } },
+                } as any);
+                assert.equal(response.status, 200);
+                const body: any = await response.json();
+                assert.equal(body.updates['system.level.xp'], expectedXp);
+                assert.equal(body.updates['system.level.value'], targetLevel);
+                assert.deepEqual(patches, [{ type: 'Actor', id: actor._id, updates: body.updates }]);
+                assert.deepEqual(actor, before, 'advancement must not mutate its read source');
+            });
+        }
+    } finally { shadowdarkAdapter.getChoiceCatalog = catalog; }
+}
+
+async function levelUpHitPoints() {
+    // Literal native LevelUpSD outcomes: first level replaces the pool with
+    // hit die + prepared CON (minimum one); later levels add to prepared HP.
+    const catalog = shadowdarkAdapter.getChoiceCatalog;
+    shadowdarkAdapter.getChoiceCatalog = async () => choiceCatalog([]);
+    try {
+        for (const [level, con, roll, expected] of [[0, 12, 3, 4], [0, 6, 1, 1], [0, 18, 3, 7], [1, 12, 3, 11]]) {
+            await check('RV-15', `native HP at level ${level + 1}, CON ${con}, roll ${roll} is ${expected}`, async () => {
+                const actor: any = primLike(); actor.system.level = { value: level, xp: 20 };
+                actor.system.abilities.con = { value: con };
+                const before = structuredClone(actor);
+                const response = await handleFinalizeLevelUp(actor._id, {
+                    json: async () => ({ targetLevel: level + 1, hpRoll: roll }),
+                    runtime: { documents: { get: async () => actor, patch: async () => {}, items: { create: async () => {} } } },
+                } as any);
+                assert.equal(response.status, 200);
+                const body: any = await response.json();
+                assert.equal(body.updates['system.attributes.hp.max'], expected);
+                assert.equal(body.updates['system.attributes.hp.value'], expected);
+                assert.deepEqual(actor, before);
+            });
+        }
+    } finally { shadowdarkAdapter.getChoiceCatalog = catalog; }
+    await check('RV-15', 'generator and advancement prepare granted CON before first-level HP', () => {
+        const actor: any = primLike(); actor.system.abilities.con = { value: 8 };
+        actor.items.push({ _id: 'conGrant', name: '+2 Constitution', type: 'Talent', system: {}, effects: [{
+            _id: 'conEffect', changes: [{ key: 'system.abilities.con.value', mode: 2, value: '2' }],
+        }] });
+        const before = structuredClone(actor);
+        assert.deepEqual(advancementHitPoints(prepareActorCore(actor), 1, 3), { value: 3, max: 3 });
+        assert.deepEqual(actor, before);
+    });
+    await check('RV-15', 'later advancement retains wounds and native prepared HP bonuses', () => {
+        const actor: any = primLike(); actor.system.attributes.hp = { value: 4, max: 8 };
+        actor.effects = [{ _id: 'hpGrant', name: 'HP grant', changes: [{ key: 'system.attributes.hp.max', mode: 2, value: '2' }] }];
+        assert.deepEqual(advancementHitPoints(prepareActorCore(actor), 3, 3), { value: 7, max: 13 });
+    });
+}
+
 export async function run(options: { report?: boolean } = {}) {
     results.length = 0;
     await issue23();
@@ -415,6 +490,8 @@ export async function run(options: { report?: boolean } = {}) {
     await inventoryControls();
     await luck();
     await spellCardFacts();
+    await levelUpExperience();
+    await levelUpHitPoints();
     const failed = results.filter(result => !result.ok);
     if (options.report || failed.length) {
         for (const result of results) console.log(`${result.ok ? 'PASS' : 'FAIL'} ${result.id} ${result.name}${result.detail ? ` — ${result.detail}` : ''}`);

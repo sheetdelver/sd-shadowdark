@@ -1,11 +1,10 @@
 # Proposal: module data migrations and world data access (Core/SDK)
 
-**October 18 current disposition:** Core 0.19.2 is released and selected for
-module resumption. CG-5/7/9/10 have Core closeout evidence; this proposal remains
-historical. Follow the [module checkpoint and resumption](../adr/0001-native-alignment-and-resource-cards.md#core-0192-checkpoint-and-resumption--october-18-2026)
-for RV-12/13 and remaining acceptance, not this document's earlier API proposals
-or inactive-catalog statements. Core and SDK version metadata are read-only in
-this module task.
+**October18 current disposition: historical/superseded.** Core0.19.2 supplies the
+selected contracts and module G8 adoption/native acceptance is complete. Follow
+the [final module closeout](../adr/0001-native-alignment-and-resource-cards.md#final-native-v14-acceptance-and-closeout--october-18-2026)
+and released public guides. Earlier proposals, inactive-catalog statements and
+pending enforcement notes below are historical, not implementation instructions.
 
 **October 17 disposition:** historical proposal. Core0.19.1 is released with
 admin-owned complete maintenance and authoritative world/caller context. Module

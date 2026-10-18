@@ -20,13 +20,16 @@ export async function unusedPort() {
     return port;
 }
 
-export function prepareWorkspace(root: string) {
+export function prepareWorkspace(root: string, copyDependencies = false) {
     const workspace = path.join(root, 'workspace');
     fs.mkdirSync(workspace, { recursive: true });
     for (const file of ['src', 'public', 'patches', 'package.json', 'package-lock.json', 'tsconfig.json', 'next.config.ts', 'postcss.config.cjs']) {
         fs.cpSync(path.join(CORE, file), path.join(workspace, file), { recursive: true });
     }
-    fs.symlinkSync(path.join(CORE, 'node_modules'), path.join(workspace, 'node_modules'), 'dir');
+    // Next production Turbopack confines symlinks to its project root. Copy
+    // dependencies for that public build path; development can share reads.
+    if (copyDependencies) fs.cpSync(path.join(CORE, 'node_modules'), path.join(workspace, 'node_modules'), { recursive: true, verbatimSymlinks: true });
+    else fs.symlinkSync(path.join(CORE, 'node_modules'), path.join(workspace, 'node_modules'), 'dir');
     fs.mkdirSync(path.join(workspace, '.managed'));
     fs.copyFileSync(path.join(CORE, '.managed/tsconfig.paths.json'), path.join(workspace, '.managed/tsconfig.paths.json'));
     return workspace;
@@ -40,10 +43,10 @@ export function isolatedEnv(data: string): NodeJS.ProcessEnv {
 export class Manager {
     process: ChildProcess;
     log: number;
-    constructor(readonly workspace: string, readonly data: string, readonly logFile: string) {
+    constructor(readonly workspace: string, readonly data: string, readonly logFile: string, mode: 'dev' | 'start' = 'dev') {
         this.log = fs.openSync(logFile, 'a');
-        this.process = spawn(process.execPath, ['--import', 'tsx', 'src/scripts/start-server.ts', 'dev', `--data-dir=${data}`],
-            { cwd: workspace, env: isolatedEnv(data), stdio: ['ignore', this.log, this.log], detached: true });
+        this.process = spawn(process.execPath, ['--import', 'tsx', 'src/scripts/start-server.ts', mode, `--data-dir=${data}`],
+            { cwd: workspace, env: { ...isolatedEnv(data), NODE_ENV: mode === 'start' ? 'production' : 'development' }, stdio: ['ignore', this.log, this.log], detached: true });
     }
     text() { return fs.readFileSync(this.logFile, 'utf8'); }
     corePids() { return [...this.text().matchAll(/Core Service \| Started \(pid=(\d+)/g)].map(row => Number(row[1])); }

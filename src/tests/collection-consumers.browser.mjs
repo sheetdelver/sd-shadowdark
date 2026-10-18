@@ -21,6 +21,8 @@ import Generator from '${moduleRoot}/src/ui/tools/Generator';
 import Details from '${moduleRoot}/src/ui/DetailsTab';
 import SpellPicker from '${moduleRoot}/src/ui/components/SpellSelectionModal';
 import LanguagePicker from '${moduleRoot}/src/ui/components/LanguageSelectionModal';
+import {useLevelUp} from '${moduleRoot}/src/ui/components/levelup/useLevelUp';
+import ModuleDialog from '${moduleRoot}/src/ui/components/ModuleDialog';
 import {WeaponSelectionSection} from '${moduleRoot}/src/ui/components/levelup/sections/WeaponSelectionSection';
 import {ArmorSelectionSection} from '${moduleRoot}/src/ui/components/levelup/sections/ArmorSelectionSection';
 const listeners=new Set(); window.calls=[]; window.pending=[];
@@ -30,6 +32,8 @@ window.sdk={isConnected:true,worldId:'w',currentUser:{id:'p',role:1},foundryUrl:
  events:{on:(_,fn)=>{listeners.add(fn);return ()=>listeners.delete(fn)}},resolveImageUrl:x=>x||'',addNotification:()=>{},navigate:()=>{},
  fetchWithAuth:async (url,options={})=>{
   const key=url.split('/').at(-1);const call={key,signal:options.signal};window.calls.push(call);
+  const reference=url.includes('/document/')?decodeURIComponent(url.split('/document/')[1]):url.includes('uuid=')?decodeURIComponent(url.split('uuid=')[1]):null;
+  if(reference&&window.initial.documents)return Response.json(window.initial.documents[reference]||{error:'Not found'},{status:window.initial.documents[reference]?200:404});
   const p=window.policy[key]||{};
   if(p.hold)return new Promise(resolve=>window.pending.push({call,resolve}));
   if(p.network)throw new TypeError('Connection interrupted');
@@ -37,7 +41,12 @@ window.sdk={isConnected:true,worldId:'w',currentUser:{id:'p',role:1},foundryUrl:
  }};
 window.actorContext={actor:{id:'a',items:[],derived:{actions:[],items:[],spellcasting:{classes:[]}}},isActionBusy:()=>false,getDraftValue:(_,value)=>value};
 const root=createRoot(document.getElementById('root')); let mounted=true, show=true;
+const advancementClass={uuid:'Compendium.shadowdark.classes.Item.thief',name:'Thief',system:{hitPoints:'d4',patron:{required:false},talents:['Compendium.shadowdark.talents.Item.backstab']}};
+const advancementProps={actorId:'',currentLevel:0,targetLevel:1,classObj:advancementClass,classUuid:advancementClass.uuid,ancestry:null,abilities:{},spells:[],skipLanguageSelection:true,onComplete:()=>{},onCancel:()=>{}};
+function Advancement(){const {state,actions}=useLevelUp(advancementProps);window.completeAdvancement=()=>{actions.setHpRoll(4);actions.setGoldRoll(60);actions.setRolledTalents([{name:'Native rolled talent',type:'Talent',system:{},effects:[]}]);};return <><output>{state.error||'No error'}</output><button disabled={!actions.isComplete()}>Finish advancement</button></>;}
 function Consumer(){switch(window.initial.which){
+case 'advancement':return <Advancement/>;
+case 'dialog':return <><button style={{position:'fixed',bottom:0,left:0,width:'100%',height:80,zIndex:150}}>Host tools</button><ModuleDialog open title="Resource card" suspended={!!window.suspendDialog} onClose={()=>{}} footer={<button onClick={()=>window.cardClicked=true}>Use resource</button>}>Resource details</ModuleDialog>{window.suspendDialog&&<div style={{position:'fixed',inset:0,zIndex:100}}><button onClick={()=>window.hostClicked=true}>Shared host action</button></div>}</>;
 case 'gear':return <Gear isOpen onClose={()=>{}} onCreate={async()=>{}}/>;
 case 'spell-picker':return <SpellPicker isOpen onClose={()=>{}} onSave={()=>{}} title="Manage spells" tier={1} classUuid="Compendium.shadowdark.classes.Item.wizard" knownSpells={[]}/>;
 case 'languages':return <LanguagePicker isOpen onClose={()=>{}} onSelect={()=>{}} currentLanguages={[]} maxCommon={1} maxRare={1}/>;
@@ -46,7 +55,7 @@ case 'details':return <Details/>;
 default:return <Spells/>;}}
 function Delayed(){const [ready,setReady]=React.useState(!window.initial.delay);React.useEffect(()=>{const timer=setTimeout(()=>setReady(true),window.initial.delay||0);return ()=>clearTimeout(timer)},[]);return ready&&show?<Consumer/>:null;}
 window.render=()=>root.render(mounted?(window.initial.which==='generator'?<Generator/>:<ShadowdarkUIProvider><Delayed key={show?'open':'closed'}/></ShadowdarkUIProvider>):null);
-window.retire=()=>listeners.forEach(fn=>fn()); window.consumerUnmount=()=>{show=false;window.render()};window.unmount=()=>{mounted=false;window.render()};
+window.retire=()=>listeners.forEach(fn=>fn({keys:[],identity:{worldId:'w',contextRevision:2}})); window.consumerUnmount=()=>{show=false;window.render()};window.unmount=()=>{mounted=false;window.render()};
 window.change=values=>{window.sdk={...window.sdk,...values};window.render()};
 window.answer=(index,body,status=200)=>window.pending[index].resolve(Response.json(body,{status}));
 window.render();
@@ -73,7 +82,30 @@ const text = (p, value) => p.getByText(value, { exact: true }).waitFor({ timeout
 const count = (p, key) => p.evaluate(k => window.calls.filter(c => c.key === k).length, key);
 const settled = p => p.waitForTimeout(100);
 try {
-    await test('RV-10: loaded open gear refetches after invalidation and preserves search', { which: 'gear', delay: 50 }, async p => {
+    await test('RV-16: advancement consumes a bare document response and completes native fixed grants', {which:'advancement',documents:{'Compendium.shadowdark.talents.Item.backstab':{_id:'backstab',name:'Backstab',type:'Talent',system:{},effects:[]}}}, async p=>{
+        await p.waitForFunction(()=>typeof window.completeAdvancement==='function');
+        await p.evaluate(()=>window.completeAdvancement());
+        await p.waitForFunction(()=>!Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='Finish advancement').disabled);
+        assert.equal(await p.getByText('No error',{exact:true}).count(),1);
+    });
+    await test('RV-16: an unavailable required fixed grant still blocks advancement', {which:'advancement',documents:{}}, async p=>{
+        await p.waitForFunction(()=>typeof window.completeAdvancement==='function');await p.evaluate(()=>window.completeAdvancement());
+        await p.getByText(/Required class or ancestry talents are unavailable/).waitFor();
+        assert.equal(await p.getByRole('button',{name:'Finish advancement'}).isDisabled(),true);
+    });
+    await test('R19: resource footer clears host tools; suspension yields to shared host dialog', { which: 'dialog' }, async p => {
+        await p.setViewportSize({width:320,height:900});
+        await p.addStyleTag({content:'.fixed{position:fixed}.inset-0{inset:0}.flex{display:flex}.items-end{align-items:flex-end}.justify-center{justify-content:center}.relative{position:relative}.flex-col{flex-direction:column}.w-full{width:100%}'});
+        await p.getByRole('button',{name:'Use resource'}).click({timeout:1500});
+        assert.equal(await p.evaluate(()=>window.cardClicked),true);
+        await p.evaluate(()=>{window.suspendDialog=true;window.render()});
+        await p.getByRole('button',{name:'Shared host action'}).click({timeout:1500});
+        assert.equal(await p.evaluate(()=>window.hostClicked),true);
+        await p.evaluate(()=>{window.suspendDialog=false;window.cardClicked=false;window.render()});
+        await p.getByRole('button',{name:'Use resource'}).click({timeout:1500});
+        assert.equal(await p.evaluate(()=>window.cardClicked),true);
+    });
+    await test('RV-10/R19: empty-key context event refetches loaded open gear and preserves search', { which: 'gear', delay: 50 }, async p => {
         await text(p, 'Current Rope'); await p.getByPlaceholder('Search gear...').fill('Rope');
         await p.evaluate(() => window.retire()); await text(p, 'Current Rope'); await settled(p);
         assert.equal(await p.getByPlaceholder('Search gear...').inputValue(), 'Rope');

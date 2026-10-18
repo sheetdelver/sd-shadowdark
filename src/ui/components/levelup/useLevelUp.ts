@@ -208,10 +208,10 @@ export const useLevelUp = (props: LevelUpProps) => {
         try {
             const headers: any = {};
 
-            const res = await fetchWithAuth(`/api/foundry/document?uuid=${encodeURIComponent(uuid)}`, { headers });
+            const res = await fetchWithAuth(`/api/modules/shadowdark/document/${encodeURIComponent(uuid)}`, { headers });
             if (!res.ok) return null;
-            const data = await res.json();
-            return data.document;
+            // The caller-safe document route returns the document itself.
+            return await res.json();
         } catch (e) {
             logger.error(`[LevelUp] Failed to fetch document: ${uuid}`, e);
             return null;

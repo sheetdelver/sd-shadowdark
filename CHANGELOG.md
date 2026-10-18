@@ -3,40 +3,15 @@
 Historical entries are reconstructed from [published releases](https://github.com/sheetdelver/sd-shadowdark/releases), their tags, and merged changes. Version numbers follow the published tags; the Unreleased section collects notes for the next authorized release.
 
 ## Unreleased
-- Core 0.19.2 adoption checkpoints
-- Required world-pack migration completeness
-- Open pickers refresh after context changes
-- Collection failures with retry and mode readiness
-- Read Foundry 14 effects
-- Native ability, AC, slots
-- Caller-bound document reads
-- Exact compendium identities
-- Lossless multi-change effect editing
-- Native spell and item actions
-- Shared resource detail cards
-- Read-only module bestiary
-- Complete paper attack list
-- Labelled weapon attack modes
-- Compact resource cards
-- Inventory controls on item cards
-- Hidden unavailable attack modes
-- Standard luck token by default
-- Reported pre-4.0 effect keys
-- Effect-granted languages shown
-- HP roll advantage on level-up
-- Native effect conformance tests
-- Safer edits and rollback
-- Pack access from Core capabilities
-- Verified action request replays
-- World Pulp Mode and ammunition settings
-- Context-fenced luck, actions, rolls
-- Refresh on world rule changes
-- Caller-safe system data
-- Effect-key world migration
-- World-pack effect migration
-- Reliable system data refresh
-- Context conflicts answer 409
-- Requires Core 0.19.1
+
+- Native effects and combat rules
+- Correct HP and XP advancement
+- Lossless grants and effect editing
+- Spell, item and monster cards
+- Live settings and permission refresh
+- Admin-managed world effect migrations
+- Responsive dialogs and collection recovery
+- Requires Core 0.19.2
 
 ## 0.9.4
 - Corrected weapon preparation

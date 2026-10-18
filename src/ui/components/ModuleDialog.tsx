@@ -10,7 +10,9 @@ import { X } from 'lucide-react';
  * dialog). Provides dialog semantics and naming, focus containment, Escape and
  * backdrop dismissal, focus return to the opener, a scrollable body that respects
  * mobile safe areas, and a `suspended` state while a host dialog (SDK RollDialog
- * at layer 100, ConfirmationModal at 130) is stacked on top of it.
+ * at layer 100, ConfirmationModal at 130) is stacked on top of it. The active
+ * frame clears the floating host tools; suspension lowers the inert frame so
+ * those shared dialogs retain their own focus and presentation.
  */
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
@@ -35,7 +37,7 @@ export interface ModuleDialogProps {
 }
 
 export default function ModuleDialog({ open, title, subtitle, onClose, children, footer, suspended = false, size = 'md',
-    describedBy, closeLabel = 'Close', layer = 90 }: ModuleDialogProps) {
+    describedBy, closeLabel = 'Close', layer = 160 }: ModuleDialogProps) {
     const titleId = useId();
     const panel = useRef<HTMLDivElement>(null);
     const opener = useRef<Element | null>(null);
@@ -76,7 +78,7 @@ export default function ModuleDialog({ open, title, subtitle, onClose, children,
     const width = card ? 'sm:w-fit sm:min-w-[24rem] sm:max-w-[min(34rem,calc(100vw-2rem))] sm:min-h-[min(24rem,88dvh)]'
         : size === 'lg' ? 'sm:max-w-3xl' : 'sm:max-w-xl';
     return (
-        <div className="fixed inset-0 flex items-end sm:items-center justify-center p-0 sm:p-4" style={{ zIndex: layer }}
+        <div className="fixed inset-0 flex items-end sm:items-center justify-center p-0 sm:p-4" style={{ zIndex: suspended ? Math.min(layer, 90) : layer }}
             aria-hidden={suspended || undefined} inert={suspended}>
             <div className="absolute inset-0 bg-black/70 backdrop-blur-[2px]" onClick={() => !suspended && onClose()} />
             <div ref={panel} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={describedBy} tabIndex={-1}

@@ -53,8 +53,11 @@ export class ControlledUpstream {
     reads = 0;
     wireBytes = 0;
     unknownEvents = new Map<string, number>();
+    failures: Array<{ type: string; action: string; parentUuid?: string; message: string }> = [];
     /** Controlled upstream refusal, for the unreadable required-pack regression. */
     deniedPacks = new Set<string>();
+    /** Simulate an unavailable required Setting read, without caller repair. */
+    deniedTypes = new Set<string>();
     /** Optional hook: fail an update after it was applied (lost receipt). */
     failAfterWrite?: (record: WriteRecord) => string | null;
     /** Withhold the receipt of the first service ActiveEffect batch that reaches this many migration writes. */
@@ -78,6 +81,8 @@ export class ControlledUpstream {
     }
     async close() { this.io.close(); await new Promise<void>(resolve => this.wire.close(() => resolve())); }
     disconnectAll() { for (const socket of this.io.sockets.sockets.values()) socket.disconnect(true); }
+    /** Transient transport loss, distinct from an explicit native user kick. */
+    interruptTransport() { for (const socket of this.io.sockets.sockets.values()) socket.conn.close(); }
     userSockets() { return [...this.io.sockets.sockets.values()].filter(socket => socket.data.userId !== 'service'); }
     broadcast(payload: Doc, except?: Socket) {
         for (const socket of this.io.sockets.sockets.values()) if (socket !== except) socket.emit('modifyDocument', payload);
@@ -119,7 +124,10 @@ export class ControlledUpstream {
         socket.on('getWorldStatus', ack => ack?.(true));
         socket.on('modifyDocument', (request, ack) => {
             try { const response = this.modify(socket, request); if (response !== HOLD) ack?.(response); }
-            catch (error) { ack?.({ error: { message: (error as Error).message } }); }
+            catch (error) {
+                this.failures.push({type:request.type,action:request.action,parentUuid:request.operation?.parentUuid,message:(error as Error).message});
+                ack?.({ error: { message: (error as Error).message } });
+            }
         });
         socket.onAny((event: string) => {
             if (!['getJoinData', 'world', 'getWorldStatus', 'modifyDocument'].includes(event)) this.unknownEvents.set(event, (this.unknownEvents.get(event) ?? 0) + 1);
@@ -155,6 +163,7 @@ export class ControlledUpstream {
         let rows = this.collection(type, operation);
         const prefix = operation.parentUuid ? `${operation.parentUuid}.` : operation.pack ? `Compendium.${operation.pack}.` : '';
         if (action === 'get') {
+            if (this.deniedTypes.has(type)) throw new Error(`Permission denied reading ${type}; restore service-account access before retrying.`);
             if (this.deniedPacks.has(operation.pack)) throw new Error(`Permission denied reading ${operation.pack}; restore service-account access before retrying.`);
             this.reads++;
             if (operation.query?._id__in) rows = rows.filter(row => operation.query._id__in.includes(row._id));
