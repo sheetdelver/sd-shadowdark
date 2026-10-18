@@ -104,7 +104,7 @@ Array-setting contract can support it without inventing a settings transport.
 These statements describe observed current gaps. Proposed remedies, acceptance
 and historical-data qualifications are owned by ADR-0002 and its active audit.
 
-## Known action and language gaps in 0.9.5
+## Released0.9.5 action and language baseline
 
 The current executor spends limited uses after the result, despite native
 spend-before-roll/chat ordering. Potion use posts before identifying and updates
@@ -239,26 +239,30 @@ modes; the item card shows them disabled with the reason. The server only rolls
 modes the weapon has.
 
 Attacks roll through the existing item-roll hook. Spells, Class Abilities and
-potions go through `POST actors/[id]/actions`, which re-reads the Actor through
-the caller, requires owner access, refuses unavailable actions before rolling,
-rolls through `req.runtime.rolls` and then applies planned consequences: lost
-spell on failure, scroll consumed, wand spell lost and wand broken on a critical
-failure, limited uses and loss on failure, potion consumed after confirmation.
-This describes the current implementation, **not complete native sequence parity**:
-ability spending, Potion identification and NPC focus have the defects above.
-Consequence writes are sequential, not atomic;
-each outcome is reported and the response `state` is `complete` or `partial`.
+Potions use the owner-bound module action route and one common preparer.
+`planPrerequisites` runs before the result: a limited ability spends first; an
+unidentified Potion swaps active/alternate fields and activates every owned
+effect by exact parent/ID. The effect group follows native Promise.all semantics.
+Only successful prerequisites permit roll/no-check chat. Potion use then deletes
+the whole owned Item, independent of quantity. Partial source remains explicit.
 
-A `requestId` is bound to the adapter runtime (world/epoch), the user, the
-Actor and the request body, for ten minutes (process-local). Repeating it with
-the same body re-checks owner access, then returns the first result with
-`replayed: true` without rolling or consuming again; reusing it with a different
-body is a 409 conflict. A failure before a result exists (refusal, unavailable
-action, failed roll call) can be retried. Once a roll is evaluated it is final:
-a chat failure after that is returned in `warnings`, and a replay of a
-`partial` result re-reads the Actor and applies only the consequences it does
-not already show. The sheets send a new id per action, so this replay path
-serves client retries of the same request.
+An Actor operation queue serializes module action/management requests in this
+process. It is not a distributed CAS/transaction. Write-ahead operation receipts
+through SDK DataStore bind world, caller, Actor, request and body; they contain
+operation outcomes, not a second world store. Unknown spend/result calls stop;
+the same request never rolls/posts/spends again after an uncertain result. A
+known result can retry outstanding consequences after fresh source/ownership/
+dependency checks. Completed durable receipts replay without writes. Partial
+receipts without their process continuation need fresh review after restart or
+lease expiry. No automatic claim resolves a lost upstream acknowledgement.
+
+The Actor provider retains the exact request for explicit recovery. Its dialog
+suspends the resource card and distinguishes pending prerequisites, uncertain
+results and outstanding consequences. Actor/unmount changes retire UI results.
+Player owned-spell actions alone allow focus to exempt loss; NPC cards hide it
+and the server applies NPC loss even to a crafted focus request. Scroll/Wand
+rules remain distinct. Zero disables critical thresholds, missing thresholds
+retain native defaults, and manual totals establish no natural critical.
 
 World settings: `info.json.worldSettings` declares the two native settings the
 rules use, `shadowdark.usePulpMode` (default false) and

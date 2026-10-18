@@ -14,7 +14,7 @@ import { NATIVE_PREDEFINED_EFFECTS } from '../data/native-predefined-effects';
 import { BOON_TYPE_MAP, EFFECT_TRANSLATIONS_MAP } from '../data/talent-effects';
 import { ShadowdarkNormalizer, lookupsFromSystemData } from '../logic/normalization';
 import { getInitiativeFormula, isClassSpellcaster } from '../logic/rules';
-import { prepareActorCore } from '../logic/actor-preparation';
+import { actorKind, prepareActorCore } from '../logic/actor-preparation';
 import { actionFormula, prepareRequestedAction, type ActionRequest, type RollOverrides } from '../logic/actions';
 import { canonicalUuid, DECLARED_PACKS, documentId, formatUuid, parseUuid, sourceRef } from '../logic/identity';
 import type { ViewLookups } from '../logic/prepared-view';
@@ -273,10 +273,11 @@ export class ShadowdarkAdapter extends BaseSystemAdapter {
             }
         };
         const items: any[] = Array.isArray(actor?.items) ? actor.items : [];
-        await Promise.all([resolve(actor?.system?.class), ...items.flatMap(item => item.type === 'Scroll' ? [resolve(item.system?.spellUuid)]
+        const player = actorKind(actor) === 'Player';
+        await Promise.all([...(player ? [resolve(actor?.system?.class)] : []), ...items.flatMap(item => item.type === 'Scroll' ? [resolve(item.system?.spellUuid)]
             : item.type === 'Wand' ? (item.system?.spells ?? []).map((s: any) => resolve(s.uuid)) : [])]);
         const spells = [...items.filter(item => item.type === 'Spell'), ...[...documents.values()].filter(doc => doc.type === 'Spell')];
-        await Promise.all(spells.flatMap(spell => (Array.isArray(spell.system?.class) ? spell.system.class : []).map(resolve)));
+        if (player) await Promise.all(spells.flatMap(spell => (Array.isArray(spell.system?.class) ? spell.system.class : []).map(resolve)));
         await Promise.all([...documents.values()].filter(doc => doc.type === 'Class').map(doc => resolve(doc.system?.spellcasting?.class)));
         const read = (ref: any, type: string) => {
             const uuid = formatUuid(ref);
@@ -284,7 +285,7 @@ export class ShadowdarkAdapter extends BaseSystemAdapter {
             const doc = documents.get(uuid);
             return doc?.type === type ? doc : null;
         };
-        return { propertyName: base.propertyName,
+        return { propertyName: base.propertyName, dependencies: [...documents.keys()],
             classDocument: ref => read(ref, 'Class'), spellDocument: ref => read(ref, 'Spell'),
             label: ref => ref.kind === 'compendium' && !canReadPack(caller, ref.pack) ? null
                 : documents.get(formatUuid(ref))?.name ?? (ref.kind === 'compendium' ? base.label?.(ref) : null) ?? null };

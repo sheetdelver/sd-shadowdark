@@ -8,6 +8,8 @@ Historical entries are reconstructed from [published releases](https://github.co
 - Required advancement spell validation before writes
 - Explicit owned-spell changes, durable receipts and safe partial recovery
 - Caller spell catalogs, native source filters and accessible selection dialogs
+- Native ability spending and complete Potion identification before results
+- Safe action receipt recovery, NPC focus loss and disabled critical thresholds
 
 ## 0.9.5
 

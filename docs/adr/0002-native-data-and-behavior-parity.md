@@ -402,3 +402,40 @@ typing passes. The older suites retain their assertions, with caller/Class
 fixtures corrected to exercise the now-required preflight; native alignment is
 61/61, boundaries53/53 and world adoption13/13. Final floor/current installed
 archive checks and all A02 native acceptance remain pending.
+
+## D5a action phases and outcomes — October 18, 2026
+
+SD02-09: `planPrerequisites` spends limited uses before a roll or no-check chat.
+The Actor operation queue serializes distinct last-use requests. A refused or
+uncertain spend prevents the result. A result call has a write-ahead phase and
+is attempted once: failure/acknowledgement loss leaves the spend and an explicit
+uncertain result; replay never spends/posts/rolls again. Consequence retries
+reconcile the known outcome only. Durable SDK receipts survive an adapter epoch;
+partial records without their process continuation require fresh source review.
+This is not a distributed transaction or a guarantee that an unacknowledged
+upstream roll/chat did not happen. Real Core process-restart proof remains D6.
+
+SD02-10: Potion prerequisites swap active/alternate name and description, set
+identification, preserve unknown fields and activate exact owned effect IDs.
+Every activation is attempted as native's Promise.all group; any failure prevents
+chat/deletion. Empty alternate name follows native's English “Unidentified
+{type}” template; absent StringFields use their proven empty initial values.
+Use posts only after prerequisites and deletes the owned Item, regardless of
+quantity. A failed deletion leaves fully identified source; replay neither swaps
+again nor repeats chat. No missing effect identity is guessed.
+
+SD02-11: the prepared action declares Player owned-spell focus eligibility.
+NPC requests cannot use the Player exemption, and NPC cards hide that control.
+Scroll/Wand consumption/loss remain separate. SD02-13: zero disables critical
+thresholds; missing/custom values retain native meaning. A manual total provides
+no natural die and cannot establish a critical. Both effect shapes are covered.
+
+The original native-method failure inputs now match for all12 selected D5a
+checks (including six Potion failure/fallback boundaries), while the two language
+checks remain explicit D5b failures. The69/31/9/4/9 controls still match. The new
+maintained action-phase suite passes12/12 and actual card/Actor-provider browser
+cases pass4/4. A recovery dialog retries the identical recorded payload and
+suspends the resource card; uncertain results require review. Typing, native
+alignment61/61, boundaries53/53 and world adoption13/13 pass. Existing mocked
+runtimes now reflect confirmed source updates, so ordering checks no longer pass
+merely because a write was recorded. All native A02 cases remain open.

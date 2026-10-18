@@ -6,6 +6,7 @@ import { useSDK } from '@sheet-delver/sdk/react';
 import { useShadowdarkLevelUp } from '../hooks/useShadowdarkLevelUp';
 import type { PreparedAction, ActionRequest } from '../../logic/actions';
 import type { ItemControl } from '../../logic/inventory-controls';
+import ModuleDialog from '../components/ModuleDialog';
 
 /**
  * ShadowdarkActorContext — client state for one Actor sheet.
@@ -27,7 +28,9 @@ import type { ItemControl } from '../../logic/inventory-controls';
 export interface ActionResponse {
     success: boolean;
     outcome?: { total: number; natural: number | null; success: boolean | null; criticalSuccess: boolean; criticalFailure: boolean } | null;
-    consequences?: Array<{ description: string; status: 'applied' | 'failed'; error?: string }>;
+    consequences?: Array<{ description: string; status: 'applied' | 'failed' | 'uncertain' | 'started'; error?: string }>;
+    phase?: string;
+    retryable?: boolean;
     pending?: string[];
     /** `partial` when a consequence was not saved; a retry with the same request id applies only the rest. */
     state?: 'complete' | 'partial';
@@ -69,6 +72,7 @@ interface ShadowdarkActorState {
     triggerRollDialog: (type: string, key: string, options?: any) => void;
     closeRollDialog: () => void;
     isActionBusy: (actionId: string) => boolean;
+    actionRecovery: { label: string; phase: string; retryable: boolean } | null;
     /** Apply a native inventory control (equip/stash/light) and its side effects. */
     runItemControl: (control: ItemControl) => Promise<boolean>;
     pendingConfirmation: { title: string; message: string; onConfirm: () => void } | null;
@@ -132,6 +136,8 @@ export function ShadowdarkActorProvider({
     const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
     const actorIdRef = useRef(actorId);
     const mounted = useRef(true);
+    const recovery = useRef<{ action: PreparedAction; body: Record<string, unknown>; owner: string; onSettled?: (result: ActionResponse | null) => void } | null>(null);
+    const [actionRecovery, setActionRecovery] = useState<{ label: string; phase: string; retryable: boolean } | null>(null);
 
     useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
 
@@ -141,6 +147,7 @@ export function ShadowdarkActorProvider({
         setDrafts({ actorId, values: {} });
         setOptimisticDeletedIds(new Set());
         setCard(null);
+        recovery.current = null; setActionRecovery(null);
         setRollDialog(prev => ({ ...prev, open: false, callback: null }));
         const active = timers.current;
         return () => { for (const timer of Object.values(active)) clearTimeout(timer); timers.current = {}; };
@@ -263,15 +270,22 @@ export function ShadowdarkActorProvider({
     const runAction = useCallback(async (action: PreparedAction, body: Record<string, unknown>, onSettled?: (result: ActionResponse | null) => void) => {
         if (busyActions.has(action.id) || !onAction) { onSettled?.(null); return; }
         const owner = actorIdRef.current;
+        const payload = { requestId: requestId(), kind: action.kind, itemId: action.itemId,
+            spellIndex: action.spell?.index ?? undefined,
+            rollMode: typeof window !== 'undefined' ? window.localStorage.getItem('sheetdelver_roll_mode') || 'publicroll' : 'publicroll', ...body };
+        recovery.current = { action, body: payload, owner, onSettled };
+        setActionRecovery({ label: action.label, phase: 'Request pending', retryable: false });
         setBusyActions(prev => new Set(prev).add(action.id));
-        const result = await track(action.label, () => onAction({ requestId: requestId(), kind: action.kind, itemId: action.itemId,
-            spellIndex: action.spell?.index ?? undefined, ...body }));
+        const result = await track(action.label, () => onAction(payload));
         if (mounted.current) setBusyActions(prev => { const next = new Set(prev); next.delete(action.id); return next; });
-        if (!result.ok || actorIdRef.current !== owner) { onSettled?.(null); return; }
+        if (!mounted.current || actorIdRef.current !== owner) return;
+        if (!result.ok) { setActionRecovery({ label: action.label, phase: 'No confirmed response. Retry the same recorded request to reconcile its receipt.', retryable: true }); onSettled?.(null); return; }
         const response = result.value;
-        const failed = (response.consequences ?? []).filter(entry => entry.status === 'failed');
-        if (failed.length || response.pending?.length) {
-            addNotification(`${action.label}: rolled, but not every result was saved (${[...failed.map(entry => `${entry.description} ${entry.error ?? ''}`), ...(response.pending ?? [])].join('; ')}).`, 'error');
+        if (response.state === 'partial') setActionRecovery({ label: action.label, phase: response.phase ?? 'Partially applied', retryable: response.retryable !== false });
+        else { recovery.current = null; setActionRecovery(null); }
+        const failed = (response.consequences ?? []).filter(entry => entry.status !== 'applied');
+        if (response.state === 'partial' || failed.length || response.pending?.length) {
+            addNotification(`${action.label}: partially applied (${[...failed.map(entry => `${entry.description} ${entry.status}: ${entry.error ?? ''}`), ...(response.pending ?? []), ...(response.warnings ?? [])].join('; ')}).`, 'error');
         }
         if (response.warnings?.length) addNotification(`${action.label}: ${response.warnings.join(' ')}`, 'warning');
         onSettled?.(response);
@@ -289,6 +303,7 @@ export function ShadowdarkActorProvider({
     };
 
     const startAction = useCallback((action: PreparedAction, options: { focus?: boolean; onSettled?: (result: ActionResponse | null) => void } = {}) => {
+        if (recovery.current) { addNotification('Review or retry the recorded action before starting another.', 'warning'); return; }
         if (!action.available) {
             addNotification(action.reason ?? `${action.label} is unavailable.`, 'error');
             options.onSettled?.(null);
@@ -361,12 +376,24 @@ export function ShadowdarkActorProvider({
         getDraftValue, toggleEffect, deleteEffect, createEffect, updateEffect, refreshActor,
         triggerLevelUp, showLevelUpModal, levelUpData, closeLevelUp,
         rollDialog, startAction, triggerRollDialog, closeRollDialog, isActionBusy, runItemControl,
+        actionRecovery,
         pendingConfirmation, cancelConfirmation: () => setPendingConfirmation(null),
         card, openCard: setCard, closeCard: () => setCard(null),
     };
 
     return (
         <ShadowdarkActorContext.Provider value={value}>
+            <ModuleDialog open={!!actionRecovery} title={actionRecovery?.label ?? 'Action receipt'} layer={180}
+                onClose={() => { if (!pending) { recovery.current = null; setActionRecovery(null); void refreshActor(); } }}>
+            {actionRecovery && <div role="status" className="text-black space-y-2">
+                <p>{actionRecovery.phase}</p>
+                <p>Review actual Actor state after an uncertain result. A recorded retry does not authorize a new roll or spend.</p>
+                {actionRecovery.retryable && <button type="button" disabled={pending > 0} className="min-h-11 border-2 border-black px-3 mr-2" onClick={() => {
+                    const saved = recovery.current; if (saved && saved.owner === actorIdRef.current) void runAction(saved.action, saved.body, saved.onSettled);
+                }}>Retry recorded action</button>}
+                <button type="button" disabled={pending > 0} className="min-h-11 border-2 border-black px-3" onClick={async () => { await refreshActor(); recovery.current = null; setActionRecovery(null); }}>Review refreshed Actor and close</button>
+            </div>}
+            </ModuleDialog>
             {children}
         </ShadowdarkActorContext.Provider>
     );

@@ -197,6 +197,7 @@ npx tsx data/local/modules/shadowdark/src/tests/roll-feedback.test.ts
 npx tsx data/local/modules/shadowdark/src/tests/importer-mapping.test.ts
 npx tsx data/local/modules/shadowdark/src/tests/native-alignment.test.ts
 npx tsx data/local/modules/shadowdark/src/tests/boundaries.test.ts
+npx tsx data/local/modules/shadowdark/src/tests/action-phases.test.ts
 npx tsx data/local/modules/shadowdark/src/tests/effect-conformance.test.ts
 npx tsx data/local/modules/shadowdark/src/tests/world-adoption.test.ts
 npx tsx data/local/modules/shadowdark/src/tests/migration-hooks.test.ts
@@ -261,3 +262,10 @@ never derive deletion from catalog membership. The shared spell catalog exposes
 partial-source failures, and native sourceFilters affects browsing only. Durable
 operation receipts may reconcile confirmed IDs, never guessed names/origins;
 partial operations from another process need fresh review.
+
+Actions have prerequisite, one-result-attempt and consequence phases. Preserve
+confirmed spending/identification on later failure. Unknown roll/chat receipts
+never authorize another result call; partial durable records without a process
+continuation require fresh review. Potion effect activation is a complete native
+group with exact owned parent/IDs. Actor-specific focus and zero critical
+thresholds belong to the shared action model.

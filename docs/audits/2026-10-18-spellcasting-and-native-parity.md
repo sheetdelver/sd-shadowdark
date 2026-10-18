@@ -682,3 +682,30 @@ code passes5/5 and34/34 including the previous RV-10/11/RV-16 controls.
 `native-parity.test.ts` passes11/11 controlled cases. Explicit module/UI/hook
 typing passes on Core0.19.3; final packaged/public Core0.19.2 proof is pending.
 No actual native A02 case is marked passed by these results.
+
+## D5a correction evidence — October 18, 2026
+
+- SD02-09 failing-before event order `roll→spend→loss` becomes native
+  `spend→roll→loss`; a roll exception leaves0 uses, and spend failure makes no
+  result call. No-check chat, two concurrent last-use requests, lost spend/result
+  receipts, exact retry and adapter-epoch receipt restoration are maintained
+  regressions. Restored permission retries only a definitively refused spend.
+- SD02-10 the original deletion-failure fixture now retains the native known
+  name/description, reverse disguise and enabled effects. Six actual native
+  usePotion/toggleIdentified failure/fallback comparisons agree on state and
+  ordered operations. Additional route tests preserve unknown fields, quantity
+  and another Item's colliding effect ID, and activate other effects even when
+  one fails. No chat/deletion follows a failed activation group.
+- SD02-11 the same failed NPC focus input now loses the spell as native does;
+  actual Player/NPC resource cards expose/hide focus from the shared action policy.
+- SD02-13 disabled thresholds now yield no critical; custom/default thresholds,
+  unknown natural and prepared legacy/v14 override effects pass.
+
+D5a native-method checks12/12 and action-phase cases12/12 pass. The69-slot,
+31-weapon,9-armor,4-inventory and9-outcome independent controls remain intact.
+The action consumer browser run passes4/4 with real module cards/provider and
+a controlled SDK boundary; its simulated roller is not shared-Core/native UI
+acceptance. Durable receipt restart was tested with an adapter-epoch change and
+serialized datastore; final installed Core restart remains required. Source
+rechecks/ownership/dependency checks precede replay; no privileged receipt is
+served after access revocation. No new Core limitation is claimed here.

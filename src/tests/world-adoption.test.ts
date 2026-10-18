@@ -199,15 +199,22 @@ async function refresh() {
 
 function ownerRuntime(actor: any, snapshot: ReturnType<typeof worldSnapshot>) {
     const writes: any[] = [];
+    const state = structuredClone(actor);
     let rolls = 0;
     const runtime: any = {
         world: worldHandle(snapshot),
         access: packAccess(() => true),
         documents: {
-            get: async (type: string, id: string) => type === 'Actor' && id === actor._id ? structuredClone(actor) : null,
+            get: async (type: string, id: string) => type === 'Actor' && id === actor._id ? structuredClone(state) : null,
             patch: async (...args: any[]) => { writes.push(['patch', ...args]); return {}; },
             items: {
-                update: async (...args: any[]) => { writes.push(['item.update', ...args]); return {}; },
+                update: async (...args: any[]) => {
+                    writes.push(['item.update', ...args]);
+                    const item = state.items.find((row: any) => row._id === args[1]);
+                    for (const [path,value] of Object.entries(args[2])) { const keys = path.split('.'); const leaf = keys.pop()!;
+                        let target = item; for (const key of keys) target = target[key] ??= {}; target[leaf] = structuredClone(value); }
+                    return {};
+                },
                 delete: async (...args: any[]) => { writes.push(['item.delete', ...args]); },
             },
         },

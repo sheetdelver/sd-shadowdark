@@ -15,7 +15,7 @@ const source = path => import(pathToFileURL(`${moduleRoot}/src/${path}`));
 const native = path => import(pathToFileURL(`${nativeRoot}/system/src/${path}`));
 globalThis.foundry = { data: { fields: {} }, abstract: { TypeDataModel: class { prepareBaseData() {} }, DataModel: class {} }, dice: { Roll: class {} }, applications: { ux: { TextEditor: { implementation: {} } }, api: { DialogV2: { confirm: async () => true } } } };
 globalThis.CONFIG = { SHADOWDARK: { DEFAULTS: { GEMS_PER_SLOT: 10 }, ABILITY_KEYS: ['str', 'dex', 'con', 'int', 'wis', 'cha'] } };
-globalThis.game = { i18n: { localize: s => s, format: s => s } };
+globalThis.game = { i18n: { localize: s => s, format: (s, values) => s === 'SHADOWDARK.item.magic_item.unidentifiedName' ? `Unidentified ${values.type}` : s } };
 globalThis.ui = { notifications: { warn: s => { throw Error(s); }, error: s => { throw Error(s); } } };
 globalThis.Hooks = { call: async () => true };
 globalThis.shadowdark = { defaults: { FREE_COIN_CARRY: 100, BASE_ARMOR_CLASS: 10 }, dice: { createToolTip: () => '', setRollTarget: () => {}, rollDialog: async () => true }, chat: { renderRollMessage: async () => ({}) } };
@@ -98,10 +98,10 @@ function apply(target, patch) {
 let seq = 0;
 async function moduleAction(actor, body, fail = '') {
   const events = []; const state = clone(actor);
-  const runtime = { documents: { get: async () => clone(state), effects: { update: async (_parent, id, patch) => { events.push(['effect', clone(patch)]); if (fail === 'effect') throw Error('controlled effect failure'); for (const item of state.items) { const effect = item.effects?.find(e => e._id === id); if (effect) apply(effect, patch); } } }, items: {
-    update: async (_parent, id, patch) => { events.push(['update', clone(patch)]); if (fail === 'update') throw Error('controlled write failure'); apply(state.items.find(i => i._id === id), patch); },
+  const runtime = { documents: { get: async () => clone(state), effects: { update: async (_parent, id, patch) => { events.push(['effect', clone(patch)]); if (fail === 'effect' && id === 'effect') throw Error('controlled effect failure'); for (const item of state.items) { const effect = item.effects?.find(e => e._id === id); if (effect) apply(effect, patch); } } }, items: {
+    update: async (_parent, id, patch) => { events.push(['update', clone(patch)]); if (fail === 'update') throw Error('controlled write failure'); apply(state.items.find(i => i._id === id), patch); if (fail === 'update-after') throw Error('controlled lost field receipt'); },
     delete: async (_parent, id) => { events.push(['delete', id]); if (fail === 'delete') throw Error('controlled delete failure'); state.items = state.items.filter(i => i._id !== id); },
-  } }, rolls: { roll: async formula => { events.push(['roll']); if (fail === 'roll') throw Error('controlled roll failure'); return { formula, total: 5, terms: [{ faces: 20, results: [{ result: 5, active: true }] }] }; } }, chat: { send: async () => { events.push(['chat']); return {}; } } };
+  } }, rolls: { roll: async formula => { events.push(['roll']); if (fail === 'roll') throw Error('controlled roll failure'); return { formula, total: 5, terms: [{ faces: 20, results: [{ result: 5, active: true }] }] }; } }, chat: { send: async () => { events.push(['chat']); if (fail === 'chat') throw Error('controlled chat failure'); return {}; } } };
   const response = await handleActorAction(actor._id, { runtime, userSession: { userId: 'offline-audit' }, json: async () => ({ requestId: `broad-audit-${++seq}`, ...body }) });
   return { events, state, status: response.status, body: await response.json() };
 }
@@ -134,6 +134,25 @@ const modulePotion = await moduleAction(potionActor, { kind: 'potion', itemId: '
 const fields = i => ({ name: i.name, description: i.system.description, identification: i.system.identification, effectDisabled: i.effects[0].disabled });
 results.defects.potionDeleteFailure = { native: fields(nativePotion), module: fields(modulePotion.state.items[0]), nativeEvents, moduleEvents: modulePotion.events.map(e => e[0]), moduleState: modulePotion.body.state };
 assert.equal(nativePotion.name, 'Healing Potion');
+// Independently run the real usePotion/toggleIdentified handlers at each failure
+// boundary, including native Promise.all effect activation and empty-name fallback.
+results.defects.potionFailureMatrix = [];
+for (const failure of ['update', 'update-after', 'effect', 'chat', 'delete', 'empty-name']) {
+  const raw = clone(potion); raw.effects.push({_id:'tail',disabled:true});
+  if(failure==='empty-name')raw.system.identification.name='';
+  const doc=clone(raw), events=[];
+  doc.uuid='Actor.audit.Item.potion';
+  doc.update=async patch=>{events.push('update');if(failure==='update')throw Error('controlled fields');apply(doc,patch);if(failure==='update-after')throw Error('controlled lost field receipt');};
+  for(const effect of doc.effects)effect.update=async patch=>{events.push('effect');if(failure==='effect'&&effect._id==='effect')throw Error('controlled effect');apply(effect,patch);};
+  doc.system.parent=doc;Object.defineProperty(doc.system,'isIdentified',{get:()=>doc.system.identification.identified});
+  doc.system.toggleIdentified=()=>Physical.prototype.toggleIdentified.call(doc.system);
+  globalThis.ChatMessage={create:async()=>{events.push('chat');if(failure==='chat')throw Error('controlled chat');}};
+  try { await Player.prototype.usePotion.call({parent:{id:'audit',name:'Audit',items:new Map([['potion',doc]]),deleteEmbeddedDocuments:async()=>{events.push('delete');throw Error('controlled delete');}}},'potion'); }catch{}
+  // All cases retain the Item: empty-name reaches the independently failed delete.
+  const actor=actorBase();actor.items=[raw];const actual=await moduleAction(actor,{kind:'potion',itemId:'potion'},failure==='empty-name'?'delete':failure);
+  const project=item=>({name:item.name,description:item.system.description,identification:item.system.identification,effects:item.effects.map(effect=>({_id:effect._id,disabled:effect.disabled}))});
+  results.defects.potionFailureMatrix.push({failure,native:project(doc),module:project(actual.state.items[0]),nativeEvents:events,moduleEvents:actual.events.map(event=>event[0])});
+}
 const spell = { _id: 'spell', name: 'Controlled NPC spell', type: 'Spell', system: { tier: 1, lost: false, class: [], formula: '', damageType: 'none' }, effects: [] };
 const nativeSpell = clone(spell); nativeSpell.update = async patch => apply(nativeSpell, patch); globalThis.fromUuid = async () => nativeSpell;
 shadowdark.dice.rollFromConfig = async () => ({ success: false });
@@ -159,7 +178,9 @@ check('SD02-10 Potion delete failure survives identified', () => assert.deepEqua
 check('SD02-11 NPC focus cannot prevent loss', () => assert.equal(results.defects.npcFocus.moduleLost, results.defects.npcFocus.nativeLost));
 check('SD02-12 native rarity', () => assert.equal(index.languages[0].rarity, language.system.rarity));
 check('SD02-12 explicit zero selections', () => assert.equal(limits.maxCommon, 1));
+for(const row of results.defects.potionFailureMatrix)check(`SD02-10 Potion ${row.failure} native state/order`,()=>{assert.deepEqual(row.module,row.native);assert.deepEqual(row.moduleEvents,row.nativeEvents);});
 results.checks = checks;
 if (process.env.SHADOWDARK_EVIDENCE) writeFileSync(process.env.SHADOWDARK_EVIDENCE, JSON.stringify(results, null, 2));
-if (checks.some(row => !row.passed) && !process.argv.includes('--baseline')) process.exitCode = 1;
+const selected=process.argv.includes('--gate=D5a')?checks.filter(row=>!row.id.startsWith('SD02-12')):checks;
+if (selected.some(row => !row.passed) && !process.argv.includes('--baseline')) process.exitCode = 1;
 console.log(JSON.stringify(results, null, 2));

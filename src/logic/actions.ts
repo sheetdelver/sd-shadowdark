@@ -58,6 +58,8 @@ export interface PreparedAction {
     attack: { type: 'melee' | 'ranged'; handedness: '1h' | '2h' | null; ranges: string[]; count: number | null; special: string | null; mode: string; modes: number } | null;
     situational: SituationalOption[];
     consequences: ActionConsequence[];
+    /** Only native Player owned-spell focus checks exempt failure from loss. */
+    focusAllowed: boolean;
     diagnostics: string[];
     request: ActionRequest;
 }
@@ -76,7 +78,7 @@ function empty(kind: ActionKind, id: string, request: ActionRequest, label: stri
         id, kind, label, title: label, itemId, spell: null, available: true, reason: null, ability: null,
         abilityBonus: 0, itemBonus: 0, talentBonus: 0, bonus: 0, advantage: 0, dc: null,
         critical: { success: 20, failure: 1, multiplier: 2 }, damage: null, attack: null, situational: [],
-        consequences: [], diagnostics: [], request,
+        consequences: [], focusAllowed: false, diagnostics: [], request,
     };
 }
 
@@ -371,6 +373,7 @@ export function prepareSpellAction(core: PreparedActorCore, triggering: any, sou
     action.dc = tier !== null ? tier + 10 : null;
     if (action.dc === null) action.diagnostics.push('The spell has no tier, so its DC is unavailable.');
     const triggerType = triggering?.type;
+    action.focusAllowed = core.kind === 'Player' && triggerType === 'Spell';
     if (triggerType === 'Wand' && triggering?.system?.broken) return unavailable(action, 'The wand is broken.');
     if (spell.system?.lost === true || source.lost) unavailable(action, 'The spell is lost.');
     const rollData = buildRoll(core);
@@ -543,16 +546,37 @@ export function evaluateOutcome(action: PreparedAction, total: number, natural: 
     return {
         total, natural,
         success: action.dc === null ? null : total >= action.dc,
-        criticalSuccess: natural !== null && natural >= action.critical.success,
-        criticalFailure: natural !== null && natural <= action.critical.failure,
+        criticalSuccess: natural !== null && !!(action.critical.success ?? 20) && natural >= (action.critical.success ?? 20),
+        criticalFailure: natural !== null && !!(action.critical.failure ?? 1) && natural <= (action.critical.failure ?? 1),
     };
 }
 
 export interface ConsequenceWrite {
-    op: 'update' | 'delete';
+    op: 'update' | 'delete' | 'effect-update';
     itemId: string;
+    effectId?: string;
     updates?: Record<string, unknown>;
     description: string;
+}
+
+/** Native useAbility/usePotion prerequisite writes, before roll or chat. */
+export function planPrerequisites(action: PreparedAction, triggering: any): ConsequenceWrite[] {
+    if (!action.itemId) return [];
+    if (action.kind === 'ability' && triggering?.system?.limitedUses === true) return [{ op: 'update', itemId: action.itemId,
+        updates: { 'system.uses.available': Math.max(0, Number(triggering.system.uses.available) - 1) }, description: `${triggering.name}: spend one use before the result.` }];
+    if (action.kind !== 'potion' || triggering?.system?.identification?.identified !== false) return [];
+    const identification = triggering.system.identification;
+    const effects: any[] = triggering.effects ?? [];
+    if (effects.some(effect => !String(effect?._id ?? effect?.id ?? ''))) throw new Error('Potion identification cannot address an effect without its exact embedded ID.');
+    // _PhysicalItemSD.toggleIdentified; empty alternate name uses native's
+    // English i18n/en.yaml template SHADOWDARK.item.magic_item.unidentifiedName.
+    const alternateName = identification.name === undefined ? '' : identification.name;
+    const description = identification.description === undefined ? '' : identification.description; // native StringField initial ""
+    const name = alternateName === '' ? `Unidentified ${triggering.type}` : alternateName;
+    if (typeof name !== 'string' || typeof description !== 'string') throw new Error('Potion identification has unavailable alternate name/description fields; review the exact Item source.');
+    return [{ op: 'update', itemId: action.itemId, updates: { name, 'system.description': description,
+        'system.identification': { ...identification, identified: true, name: triggering.name, description: triggering.system.description ?? '' } }, description: `${triggering.name} is identified.` },
+        ...effects.map(effect => ({ op: 'effect-update' as const, itemId: action.itemId!, effectId: String(effect._id ?? effect.id), updates: { disabled: false }, description: `Enable identified Potion effect ${effect.name ?? effect._id ?? effect.id}.` }))];
 }
 
 /** Post-result writes for an action, following native castSpell/useAbility/usePotion. */
@@ -562,7 +586,7 @@ export function planConsequences(action: PreparedAction, triggering: any, outcom
     const writes: ConsequenceWrite[] = [];
     if (action.kind === 'spell') {
         if (triggering?.type === 'Spell') {
-            if (outcome?.success === false && !options.focus) writes.push({ op: 'update', itemId, updates: { 'system.lost': true }, description: `${action.spell?.name} is lost.` });
+            if (outcome?.success === false && !(options.focus && action.focusAllowed)) writes.push({ op: 'update', itemId, updates: { 'system.lost': true }, description: `${action.spell?.name} is lost.` });
         } else if (triggering?.type === 'Scroll') {
             writes.push({ op: 'delete', itemId, description: `${triggering.name} is consumed.` });
         } else if (triggering?.type === 'Wand' && outcome?.success === false) {
@@ -575,10 +599,6 @@ export function planConsequences(action: PreparedAction, triggering: any, outcom
     }
     if (action.kind === 'ability') {
         const system = triggering?.system ?? {};
-        if (system.limitedUses === true) {
-            const available = Math.max(0, (finiteNumber(system.uses?.available) ?? 0) - 1);
-            writes.push({ op: 'update', itemId, updates: { 'system.uses.available': available }, description: `${triggering.name}: ${available} uses remain.` });
-        }
         if (outcome?.success === false && (system.loseOnFailure ?? true) && system.ability) {
             writes.push({ op: 'update', itemId, updates: { 'system.lost': true }, description: `${triggering.name} is lost.` });
         }

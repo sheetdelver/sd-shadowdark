@@ -92,7 +92,7 @@ export function CardBody({ card, onLink, onRollCheck, onRollFormula }: {
 }
 
 export default function ResourceDetailModal() {
-    const { actor, card: target, openCard, closeCard, startAction, isActionBusy, rollDialog, pendingConfirmation, performRoll } = useShadowdarkActor();
+    const { actor, card: target, openCard, closeCard, startAction, isActionBusy, rollDialog, pendingConfirmation, performRoll, actionRecovery } = useShadowdarkActor();
     const { fetchWithAuth } = useSDK();
     const { systemData } = useShadowdarkUI();
     const [documentState, setDocumentState] = useState<Loaded>({ state: 'loading' });
@@ -157,7 +157,7 @@ export default function ResourceDetailModal() {
     const footer = loaded.state === 'ready' && (hasActions || hasControls) ? (
         <div className="space-y-2">
             {hasControls && <ItemStateControls itemId={ownedItemId!} />}
-            {loaded.card.kind === 'spell' && loaded.card.itemId && (
+            {loaded.card.kind === 'spell' && loaded.card.itemId && loaded.card.actions.some(entry => entry.action.focusAllowed) && (
                 <label className="flex items-center gap-2 text-sm min-h-11">
                     <input type="checkbox" className="w-5 h-5" checked={focus} onChange={event => setFocus(event.target.checked)} />
                     Focus check (a failed focus check does not lose the spell)
@@ -185,7 +185,7 @@ export default function ResourceDetailModal() {
 
     return (
         <ModuleDialog open title={title} subtitle={loaded.state === 'ready' ? loaded.card.subtitle : undefined}
-            onClose={close} suspended={rollDialog.open || !!pendingConfirmation} footer={footer} size="card">
+            onClose={close} suspended={rollDialog.open || !!pendingConfirmation || !!actionRecovery} footer={footer} size="card">
             {back && <button type="button" onClick={back} className="mb-3 text-xs font-bold uppercase tracking-widest underline min-h-11">← Back</button>}
             {loaded.state === 'loading' && <p role="status" className="italic">Loading…</p>}
             {loaded.state === 'error' && <p role="alert" className="text-red-800">{loaded.message}</p>}

@@ -53,6 +53,8 @@ export interface EffectView {
 export interface ViewLookups extends PreparationLookups {
     /** Exact declared-pack label for a reference; never a suffix or name match. */
     label?: (ref: DocumentRef) => string | null;
+    /** Exact documents actually read for a bounded caller operation. */
+    dependencies?: readonly string[];
 }
 
 const CATEGORY: Record<string, string> = {

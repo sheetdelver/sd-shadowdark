@@ -36,6 +36,8 @@ async function check(id: string, name: string, fn: () => unknown | Promise<unkno
 
 function fakeRuntime(actor: any, options: { owner?: boolean; rolls?: number[]; failWrites?: string[] } = {}) {
     const writes: any[] = [];
+    const state = structuredClone(actor);
+    const apply = (target: any, patch: any) => { for (const [path,value] of Object.entries(patch)) { const keys=path.split('.');const leaf=keys.pop()!;let owner=target;for(const key of keys)owner=owner[key]??={};owner[leaf]=structuredClone(value); } };
     const rolls = [...(options.rolls ?? [])];
     let rollCount = 0;
     const runtime: any = {
@@ -44,7 +46,7 @@ function fakeRuntime(actor: any, options: { owner?: boolean; rolls?: number[]; f
             get: async (type: string, id: string, opts?: any) => {
                 if (type !== 'Actor' || id !== (actor?._id)) return null;
                 if (opts?.minOwnership === 'owner' && options.owner === false) return null;
-                return structuredClone(actor);
+                return structuredClone(state);
             },
             list: async () => ({ rows: [], total: 0 }),
             fetchByUuid: async () => { throw new Error('fetchByUuid must not be used for caller reads'); },
@@ -58,11 +60,11 @@ function fakeRuntime(actor: any, options: { owner?: boolean; rolls?: number[]; f
                 create: async (parent: any, data: any) => { writes.push(['item.create', parent, data]); return { _id: 'created' }; },
                 update: async (parent: any, id: string, data: any) => {
                     if (options.failWrites?.includes(id)) throw new Error(`write to ${id} refused`);
-                    writes.push(['item.update', parent, id, data]); return {};
+                    writes.push(['item.update', parent, id, data]); const item=state.items?.find((row:any)=>row._id===id);if(item)apply(item,data);return {};
                 },
                 delete: async (parent: any, id: string) => {
                     if (options.failWrites?.includes(id)) throw new Error(`delete of ${id} refused`);
-                    writes.push(['item.delete', parent, id]);
+                    writes.push(['item.delete', parent, id]);state.items=state.items?.filter((row:any)=>row._id!==id);
                 },
             },
         },
@@ -232,8 +234,9 @@ async function actions() {
             assert.equal(result.body.consequences.every((entry: any) => entry.status === 'applied'), true);
             const failing = fakeRuntime(wizardActor(), { rolls: [2], failWrites: ['turn'] });
             const partial = await statusOf(await handleActorAction('w1', request(failing.runtime, { requestId: 'req-ability-2', kind: 'ability', itemId: 'turn' }) as any));
-            assert.equal(partial.body.consequences[0].status, 'failed');
-            assert.equal(partial.body.pending.length, 1, 'later consequences are reported as not applied');
+            assert.equal(partial.body.consequences[0].status, 'uncertain');
+            assert.equal(partial.body.phase, 'prerequisites'); assert.equal(failing.rolls(), 0, 'a failed spend must not request a result');
+            assert.equal(partial.body.outcome, null);
         });
         await check('C4', 'potion is consumed after a confirmation, without a roll', async () => {
             const { runtime, writes, rolls } = fakeRuntime(wizardActor());
@@ -503,9 +506,10 @@ async function reviewCorrections() {
             runtime.documents.get = async (type: string, id: string, opts?: any) => { reads++; return opts?.minOwnership === 'owner' && !owner ? null : get(type, id, opts); };
             const body = { requestId: 'rv03-revoke-01', kind: 'potion', itemId: 'potion' };
             assert.equal((await statusOf(await handleActorAction('a1', request(runtime, body) as any))).status, 200);
+            const beforeReplayReads = reads;
             owner = false;
             const replay = await statusOf(await handleActorAction('a1', request(runtime, body) as any));
-            assert.equal(replay.status, 403); assert.equal(reads, 2, 'the replay re-read the Actor');
+            assert.equal(replay.status, 403); assert.equal(reads, beforeReplayReads + 1, 'the replay re-read the Actor under current ownership');
             assert.doesNotMatch(JSON.stringify(replay.body), /Healing Potion/);
             assert.equal(writes.filter(write => write[0] === 'item.delete').length, 1);
         });
