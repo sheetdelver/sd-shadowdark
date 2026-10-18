@@ -10,6 +10,7 @@ Historical entries are reconstructed from [published releases](https://github.co
 - Caller spell catalogs, native source filters and accessible selection dialogs
 - Native ability spending and complete Potion identification before results
 - Safe action receipt recovery, NPC focus loss and disabled critical thresholds
+- Native language rarity and separate validated creation choices
 
 ## 0.9.5
 

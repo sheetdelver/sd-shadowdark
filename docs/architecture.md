@@ -104,6 +104,25 @@ Array-setting contract can support it without inventing a settings transport.
 These statements describe observed current gaps. Proposed remedies, acceptance
 and historical-data qualifications are owned by ADR-0002 and its active audit.
 
+## Native language inventory and creation choices
+
+`logic/languages.ts` projects stored rarity and validates exact fixed grants plus
+separate ancestry/class/common/rare pools. Unknown rarity is explicit. Counts
+come from native Class/Ancestry fields; there is no inferred Common/INT allowance
+or Background pool. A nonempty selectOptions array with select0 grants nothing.
+Native Number/Array initial values are0/[]; invalid/required unavailable inputs
+block creation instead of providing a guessed rule. Fixed/restricted refs resolve
+exactly through the caller, separate from browsing/discovery.
+
+The caller language-plan route supplies one bounded form plan and current readable
+rows. Generator and advancement use it with the shared generation lifecycle and
+accessible choice controls. The module creation route validates assignments before
+public SDK Actor creation; advancement validates before HP/XP/items and checks its
+Actor source/context again. Existing languages survive advancement.
+Details and the ordinary inventory picker impose no creation quota, classify by
+source field only, retain custom/unreadable entries and make unchanged saves a
+no-op. Actor identity exposes current caller-readable language rarity/labels.
+
 ## Released0.9.5 action and language baseline
 
 The current executor spends limited uses after the result, despite native

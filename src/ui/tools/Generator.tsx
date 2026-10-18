@@ -13,6 +13,10 @@ import { ownedCopy } from '../../logic/identity';
 import { presentDescription } from '../../logic/description';
 import { prepareActorCore } from '../../logic/actor-preparation';
 import { advancementHitPoints } from '../../logic/advancement';
+import { useLanguagePlan } from '../hooks/useLanguagePlan';
+import { LanguageChoices } from '../components/LanguageChoices';
+import ModuleDialog from '../components/ModuleDialog';
+import { validateLanguageSelections } from '../../logic/languages';
 
 export default function Generator() {
     return (
@@ -518,79 +522,23 @@ function GeneratorContent() {
         return () => { active = false; };
     }, [classDetails, formData.level0, fetchDocument]);
 
-    // Combined Language Effect
+    const languageData = useLanguagePlan({ ancestryUuid: formData.ancestry || undefined,
+        classUuid: !formData.level0 ? formData.class || undefined : undefined,
+        enabled: data.ready && !!ancestryDetails && (formData.level0 || !!classDetails) });
     useEffect(() => {
-        let active = true;
-        const loadLanguages = async () => {
-            let common = 0;
-            let rare = 0;
-            let fixedUuids: string[] = [];
-            const ancestryPool = { count: 0, options: [] as string[] };
-            const classPool = { count: 0, options: [] as string[] };
-
-            // 1. INT Mod Bonus
-            const intMod = formData.stats.INT?.mod || 0;
-            if (intMod > 0) {
-                common += intMod;
-            }
-
-            // 2. Ancestry
-            if (ancestryDetails?.system?.languages) {
-                const al = ancestryDetails.system.languages;
-                common += (al.common || 0);
-                rare += (al.rare || 0);
-                if (al.fixed) {
-                    fixedUuids.push(...al.fixed);
-                }
-
-                // Select / Restricted
-                if (al.select > 0) {
-                    ancestryPool.count = al.select;
-                    if (al.selectOptions?.length > 0) {
-                        ancestryPool.options = al.selectOptions;
-                    }
-                }
-            }
-
-            // 3. Class (only if not Level 0)
-            if (!formData.level0 && classDetails?.system?.languages) {
-                const cl = classDetails.system.languages;
-                common += (cl.common || 0);
-                rare += (cl.rare || 0);
-                if (cl.fixed) {
-                    fixedUuids.push(...cl.fixed);
-                }
-
-                if (cl.select > 0) {
-                    classPool.count = cl.select;
-                    if (cl.selectOptions?.length > 0) {
-                        classPool.options = cl.selectOptions;
-                    }
-                }
-            }
-
-            // Deduplicate Fixed
-            fixedUuids = [...new Set(fixedUuids)];
-
-            // Resolve Fixed Names
-            let fixedResolved: any[] = [];
-            if (fixedUuids.length > 0) {
-                const docs = await Promise.all(fixedUuids.map(u => fetchDocument(u)));
-                fixedResolved = docs.map((d, i) => d ? { uuid: fixedUuids[i], name: d.name } : null).filter(d => d);
-            }
-            if (!active) return;
-            setLanguageConfig({ common, rare, ancestry: ancestryPool, class: classPool, fixed: fixedUuids });
-
-            setKnownLanguages(prev => ({
-                ...prev,
-                fixed: fixedResolved
-            }));
-        };
-
-        void loadLanguages();
-        return () => { active = false; };
-    }, [ancestryDetails, classDetails, formData.level0, formData.stats.INT, fetchDocument]);
-
+        if (!languageData.ready || !languageData.plan) return;
+        const plan = languageData.plan;
+        const group = (id: string) => plan.groups.find(row => row.id === id)!;
+        setLanguageConfig({ fixed: plan.fixed, common: group('common').count, rare: group('rare').count,
+            ancestry: { count: group('ancestry').count, options: group('ancestry').options }, class: { count: group('class').count, options: group('class').options } });
+        setKnownLanguages(previous => {
+            const selected = { ...previous.selected };
+            const used = new Set(plan.fixed);
+            for (const row of plan.groups) { selected[row.id] = selected[row.id].filter(uuid => row.options.includes(uuid) && !used.has(uuid)).slice(0,row.count);selected[row.id].forEach(uuid => used.add(uuid)); }
+            return { fixed: [...plan.fixed], selected };
+        });
+    }, [languageData.plan, languageData.ready]);
+    const languageName = (value: any) => languageData.ready ? languageData.rows.find(row => row.uuid === (typeof value === 'string' ? value : value?.uuid))?.name ?? 'Unavailable language' : 'Language data unavailable';
 
     const [formErrors, setFormErrors] = useState<Record<string, boolean>>({});
     const [creationError, setCreationError] = useState<string | null>(null);
@@ -613,13 +561,8 @@ function GeneratorContent() {
             errors.ancestryTalents = true;
         }
 
-        // Validate the aggregate selections against the configured language pools.
-        const totalPoints = languageConfig.common + languageConfig.rare + languageConfig.ancestry.count + languageConfig.class.count;
-        const totalSelected = knownLanguages.selected.common.length + knownLanguages.selected.rare.length + knownLanguages.selected.ancestry.length + knownLanguages.selected.class.length;
-
-        if (totalSelected < totalPoints) {
-            errors.languages = true;
-        }
+        // Validate each separate native pool, not an aggregate count.
+        if (!languageData.ready || !languageData.plan || !validateLanguageSelections(languageData.plan, knownLanguages.selected).valid) errors.languages = true;
 
         // Patron Validation
         if (classDetails?.system?.patron?.required && !formData.patron) {
@@ -818,12 +761,13 @@ function GeneratorContent() {
             // Following the "Lean" strategy: The Registry now serves full data
             // to the Builder, so we can POST directly to Core.
             logger.info("[Generator] Transmitting unaltered character data to Core...");
-            const res = await fetchWithAuth('/api/actors', {
+            const res = await fetchWithAuth('/api/modules/shadowdark/characters/create', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    ...(typeof languageData.plan?.contextRevision === 'number' ? { 'X-SheetDelver-Context-Revision': String(languageData.plan.contextRevision) } : {})
                 },
-                body: JSON.stringify(actorData)
+                body: JSON.stringify({ actor: actorData, languageChoices: knownLanguages.selected })
             });
 
             const result = await res.json();
@@ -833,7 +777,7 @@ function GeneratorContent() {
                     navigate(`/actors/${result.id}`);
                 }, 500);
             } else {
-                setCreationError('Creation Failed: ' + result.error);
+                setCreationError('Creation Failed: ' + (result.error?.message ?? result.error));
                 setLoading(false);
             }
         } catch (e: any) {
@@ -1082,7 +1026,7 @@ function GeneratorContent() {
                             <h2 className={`text-black font-black font-serif text-xl border-b-2 mb-4 pb-1 flex justify-between items-center ${formErrors.class ? 'border-red-600 text-red-600' : 'border-black'}`}>
                                 <span>Class {formErrors.class && <span className="text-xs uppercase font-sans font-bold float-right mt-1">Required</span>}</span>
                             </h2>
-                            <select
+                            <select aria-label="Class"
                                 value={formData.class}
                                 onChange={(e) => setFormData(prev => ({ ...prev, class: e.target.value }))}
                                 className="w-full bg-transparent border-b-2 border-neutral-300 focus:border-black outline-none py-2 text-lg font-bold font-serif"
@@ -1101,7 +1045,7 @@ function GeneratorContent() {
                             <h2 className={`text-black font-black font-serif text-xl border-b-2 mb-4 pb-1 flex justify-between items-center ${formErrors.ancestry ? 'border-red-600 text-red-600' : 'border-black'}`}>
                                 <span>Ancestry {formErrors.ancestry && <span className="text-xs uppercase font-sans font-bold float-right mt-1">Required</span>}</span>
                             </h2>
-                            <select
+                            <select aria-label="Ancestry"
                                 className="w-full bg-transparent border-b-2 border-neutral-300 focus:border-black outline-none py-2 text-lg font-bold font-serif"
                                 value={formData.ancestry}
                                 onChange={(e) => {
@@ -1386,16 +1330,7 @@ function GeneratorContent() {
                                 Languages:
                                 {formErrors.languages && <span className="ml-2 text-xs uppercase font-bold text-red-600">Required</span>}
                             </span>
-                            <span>
-                                {[
-                                    ...knownLanguages.fixed.map((l: any) => l.name || resolveName(l, 'languages')).filter(Boolean),
-                                    ...([
-                                        ...knownLanguages.selected.common,
-                                        ...knownLanguages.selected.rare,
-                                        ...knownLanguages.selected.ancestry,
-                                        ...knownLanguages.selected.class
-                                    ].map(uuid => resolveName(uuid, 'languages')).filter(Boolean))
-                                ].join(", ") || "Common"}
+                            <span>{[...knownLanguages.fixed, ...Object.values(knownLanguages.selected).flat()].map(languageName).join(', ') || 'None selected'}
                             </span>
 
                             {(languageConfig.common > 0 || languageConfig.rare > 0 || languageConfig.ancestry.count > 0 || languageConfig.class.count > 0) && (() => {
@@ -1416,115 +1351,13 @@ function GeneratorContent() {
                             })()}
                         </div>
 
-                        {/* Language Selection Modal */}
-                        {showLanguageModal && (
-                            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
-                                <div className="absolute inset-0 bg-neutral-900/80 backdrop-blur-sm" onClick={() => setShowLanguageModal(false)}></div>
-                                <div className="relative w-full max-w-3xl bg-neutral-50 border-4 border-black shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
-                                    <div className="bg-black p-4 flex justify-between items-center">
-                                        <h3 className="text-xl font-black text-white uppercase tracking-wider font-serif">Select Languages</h3>
-                                        <button onClick={() => setShowLanguageModal(false)} className="text-neutral-400 hover:text-white transition-colors">
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
-                                            </svg>
-                                        </button>
-                                    </div>
-                                    <div className="p-6 overflow-y-auto space-y-6">
-                                        {[
-                                            { key: 'ancestry', label: 'Ancestry Languages', config: languageConfig.ancestry },
-                                            { key: 'class', label: 'Class Languages', config: languageConfig.class },
-                                            { key: 'common', label: 'Common Languages', config: { count: languageConfig.common, options: [] } },
-                                            { key: 'rare', label: 'Rare Languages', config: { count: languageConfig.rare, options: [] } }
-                                        ].map(section => {
-                                            if (section.config.count <= 0) return null;
-
-                                            const bucketKey = section.key as keyof typeof knownLanguages.selected;
-                                            const selectedIds = knownLanguages.selected[bucketKey] || [];
-
-                                            // Determine Options
-                                            let options: any[] = [];
-                                            if (section.key === 'common') {
-                                                // @ts-ignore
-                                                options = collections.languages?.filter((l: any) => !l.rarity || l.rarity === 'common') || [];
-                                            } else if (section.key === 'rare') {
-                                                // @ts-ignore
-                                                options = collections.languages?.filter((l: any) => l.rarity === 'rare') || [];
-                                            } else {
-                                                // @ts-ignore
-                                                const allowedIds = section.config.options;
-                                                if (allowedIds && allowedIds.length > 0) {
-                                                    // @ts-ignore
-                                                    options = allowedIds.map(uuid => collections.languages?.find((l: any) => l.uuid === uuid)).filter(Boolean);
-                                                } else {
-                                                    // @ts-ignore
-                                                    options = collections.languages || [];
-                                                }
-                                            }
-
-                                            options.sort((a, b) => a.name.localeCompare(b.name));
-
-                                            return (
-                                                <div key={section.key}>
-                                                    <h4 className="font-black font-serif text-sm uppercase tracking-widest text-black mb-3 border-b-2 border-black flex justify-between">
-                                                        <span>{section.label}</span>
-                                                        <span className="text-neutral-500 font-sans tracking-normal">{selectedIds.length} / {section.config.count}</span>
-                                                    </h4>
-                                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                                                        {options.map((l: any) => {
-                                                            const isFixed = knownLanguages.fixed.some(f => f.uuid === l.uuid) || languageConfig.fixed.includes(l.uuid);
-                                                            if (isFixed) return null;
-
-                                                            const isSelectedInBucket = selectedIds.includes(l.uuid);
-                                                            const isSelectedElsewhere = Object.entries(knownLanguages.selected).some(([k, ids]) => k !== section.key && ids.includes(l.uuid));
-                                                            const canSelect = isSelectedInBucket || (selectedIds.length < section.config.count && !isSelectedElsewhere);
-
-                                                            let validStyle = 'border-neutral-200 hover:border-black hover:bg-neutral-100';
-                                                            if (isSelectedInBucket) validStyle = 'border-black bg-indigo-50 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] font-bold';
-                                                            if (isSelectedElsewhere) validStyle = 'opacity-30 cursor-not-allowed border-neutral-100 grayscale';
-                                                            if (!canSelect && !isSelectedElsewhere && !isSelectedInBucket) validStyle = 'opacity-50 cursor-not-allowed border-neutral-100';
-
-                                                            return (
-                                                                <div
-                                                                    key={l.uuid}
-                                                                    onClick={() => {
-                                                                        if (isSelectedElsewhere) return;
-                                                                        if (isSelectedInBucket) {
-                                                                            setKnownLanguages(prev => ({
-                                                                                ...prev,
-                                                                                selected: { ...prev.selected, [bucketKey]: prev.selected[bucketKey].filter(id => id !== l.uuid) }
-                                                                            }));
-                                                                        } else if (canSelect) {
-                                                                            setKnownLanguages(prev => ({
-                                                                                ...prev,
-                                                                                selected: { ...prev.selected, [bucketKey]: [...prev.selected[bucketKey], l.uuid] }
-                                                                            }));
-                                                                        }
-                                                                    }}
-                                                                    className={`p-3 border-2 transition-all cursor-pointer text-xs uppercase font-bold tracking-wider ${validStyle}`}
-                                                                >
-                                                                    <div className="flex justify-between items-center">
-                                                                        <span>{l.name}</span>
-                                                                        {isSelectedInBucket && <span className="text-indigo-600 font-bold">✓</span>}
-                                                                    </div>
-                                                                </div>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                    <div className="p-4 border-t-4 border-black bg-neutral-100 flex justify-end">
-                                        <button
-                                            onClick={() => setShowLanguageModal(false)}
-                                            className="px-8 py-2 bg-black text-white font-black uppercase tracking-widest text-sm hover:bg-neutral-800 transition-colors shadow-[4px_4px_0px_0px_rgba(100,100,100,1)] active:translate-y-1 active:shadow-none"
-                                        >
-                                            Done
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
+                        <CollectionStatus state={languageData} label="Loading native language choices…" />
+                        <ModuleDialog open={showLanguageModal} title="Select Languages" onClose={() => setShowLanguageModal(false)} size="lg"
+                            footer={<button type="button" className="min-h-11 border-2 border-black bg-black text-white px-4" onClick={() => setShowLanguageModal(false)}>Done</button>}>
+                            <CollectionStatus state={languageData} label="Loading native language choices…" />
+                            {languageData.ready && languageData.plan && <LanguageChoices plan={languageData.plan} rows={languageData.rows} selected={knownLanguages.selected}
+                                onChange={selected => setKnownLanguages(previous => ({ ...previous, selected }))} />}
+                        </ModuleDialog>
 
                         {/* 6. Patron */}
                         {classDetails?.system?.patron?.required && (
@@ -1696,11 +1529,13 @@ function GeneratorContent() {
                         patron={formData.patron ? { uuid: formData.patron, system: collections.patrons?.find((p: any) => p.uuid === formData.patron) } : null}
                         abilities={formData.stats}
                         availableClasses={collections.classes || []}
-                        availableLanguages={collections.languages || []}
+                        availableLanguages={languageData.rows}
+                        languageChoices={knownLanguages.selected}
+                        contextRevision={languageData.plan?.contextRevision}
                         knownLanguages={[
-                            ...knownLanguages.fixed.map((l: any) => typeof l === 'string' ? { uuid: l, name: resolveName(l, 'languages') } : l),
+                            ...knownLanguages.fixed.map((l: any) => typeof l === 'string' ? { uuid: l, name: languageName(l) } : l),
                             ...[...knownLanguages.selected.common, ...knownLanguages.selected.rare, ...knownLanguages.selected.ancestry, ...knownLanguages.selected.class].map(uuid => {
-                                return { uuid, name: resolveName(uuid, 'languages') };
+                                return { uuid, name: languageName(uuid) };
                             })
                         ]}
                         skipLanguageSelection={true}

@@ -709,3 +709,33 @@ acceptance. Durable receipt restart was tested with an adapter-epoch change and
 serialized datastore; final installed Core restart remains required. Source
 rechecks/ownership/dependency checks precede replay; no privileged receipt is
 served after access revocation. No new Core limitation is claimed here.
+
+## SD02-12 implementation and corrected native count oracle — October 18, 2026
+
+The original rare-label fixture now projects `Star Tongue` as rare; `Draconic`
+with stored rarity common remains common, and an invalid rarity is unclassified.
+No English-name table or unknown→common fallback remains. Ordinary inventory
+editing retains unavailable/custom entries, ignores creation quotas and sends
+no update on unchanged save.
+
+Creation/advancement share exact fixed grants and four explicit assignment pools.
+Missing, duplicate, extra and wrong-pool requests fail before writes. Required
+denied language content is an error, not empty success; restored exact sources
+create the expected source with unknown fields preserved. Retired context returns
+409 before creation. Later advancement cannot smuggle in ordinary language edits.
+
+A direct native `_loadLanguages` oracle corrects the audit probe's implicit Common
+assumption: neither Common nor INT adds an unconfigured allowance in this native
+workflow. With select0 and a nonempty pool, all native counts are0. An INT+4 input
+still has0 when the fields give0. Positive ancestry/class/common/rare pools remain
+independent. Fixed Common comes from ancestry source, not a label lookup. The
+earlier probe remains historical evidence of module behavior; its inferred
+aggregate was not native authority.
+
+`languages.test.ts` passes9/9 rules/real-handler cases. Four actual picker/
+Generator browser cases are0/4 against `f5838a8`,4/4 current (including pending
+plan retirement and keyboard dialog). All consumers38/38, all fourteen maintained
+suites and explicit typing pass. Actual native-method comparisons16/16 and
+69/31/9/4/9 controls pass. These are controlled/source/browser results, not native
+A02 acceptance. The new Generator creation route uses public caller SDK writes;
+installed-host creation/permissions remain D6 proof, with no Core blocker claimed.

@@ -80,6 +80,7 @@ jobs:
           npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/native-alignment.test.ts"
           npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/boundaries.test.ts"
           npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/action-phases.test.ts"
+          npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/languages.test.ts"
           npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/effect-conformance.test.ts"
           npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/world-adoption.test.ts"
           npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/migration-hooks.test.ts"

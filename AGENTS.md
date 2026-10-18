@@ -198,6 +198,7 @@ npx tsx data/local/modules/shadowdark/src/tests/importer-mapping.test.ts
 npx tsx data/local/modules/shadowdark/src/tests/native-alignment.test.ts
 npx tsx data/local/modules/shadowdark/src/tests/boundaries.test.ts
 npx tsx data/local/modules/shadowdark/src/tests/action-phases.test.ts
+npx tsx data/local/modules/shadowdark/src/tests/languages.test.ts
 npx tsx data/local/modules/shadowdark/src/tests/effect-conformance.test.ts
 npx tsx data/local/modules/shadowdark/src/tests/world-adoption.test.ts
 npx tsx data/local/modules/shadowdark/src/tests/migration-hooks.test.ts
@@ -269,3 +270,9 @@ never authorize another result call; partial durable records without a process
 continuation require fresh review. Potion effect activation is a complete native
 group with exact owned parent/IDs. Actor-specific focus and zero critical
 thresholds belong to the shared action model.
+
+Language rarity comes only from system.rarity; unknown remains unclassified.
+Creation uses native Class/Ancestry fixed/common/rare/select fields with separate
+restricted pools and server validation. No implicit Common/INT or Background
+allowance is added. Ordinary inventory editing has no creation quota and retains
+custom/unreadable entries. Source filters constrain browsing, not fixed grants.

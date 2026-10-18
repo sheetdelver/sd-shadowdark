@@ -7,7 +7,7 @@ import CustomBoonModal from './components/CustomBoonModal';
 import CompendiumSelectModal from './components/CompendiumSelectModal';
 import LanguageSelectionModal from './components/LanguageSelectionModal';
 import { shadowdarkTheme } from './themes/shadowdark';
-import { isRareLanguage } from '../logic/rules';
+import { languageRarity } from '../logic/languages';
 import { useShadowdarkUI, useShadowdarkCollections } from './context/ShadowdarkUIContext';
 import { useShadowdarkActor } from './context/ShadowdarkActorContext';
 import { formatUuid } from '../logic/identity';
@@ -311,23 +311,15 @@ export default function DetailsTab({}: DetailsTabProps) {
                         <span className="font-serif font-bold text-lg uppercase">Languages</span>
                         <div className="flex items-center gap-2">
                             {(() => {
-                                const { maxCommon = 0, maxRare = 0 } = actor.computed?.languageLimits || {};
-                                // Split languages by rarity using the centralized helper
-                                const labels = languageEntries.map(entry => entry.label ?? entry.value ?? '');
-                                const currentRare = labels.filter(isRareLanguage).length;
-                                const currentCommon = labels.length - currentRare;
-
-                                const totalCurrent = currentCommon + currentRare;
-                                const totalMax = maxCommon + maxRare;
-
+                                const totalCurrent = languageEntries.length;
                                 return (
                                     <>
                                         <div className="flex items-center gap-1.5 mr-1">
                                             <div
-                                                title="Total Languages Limit"
+                                                title="Owned Languages"
                                                 className="bg-neutral-100 text-black text-[10px] px-1.5 py-0.5 border border-black font-bold uppercase tracking-tighter shadow-[1px_1px_0px_0px_rgba(255,255,255,0.3)]"
                                             >
-                                                {totalCurrent}/{totalMax}
+                                                {totalCurrent} known
                                             </div>
                                         </div>
                                         <button
@@ -343,7 +335,6 @@ export default function DetailsTab({}: DetailsTabProps) {
                     </div>
                     <div className="p-2 flex flex-wrap gap-2 bg-white">
                         {(() => {
-                            const RARE_LANGS = ['celestial', 'diabolic', 'draconic', 'primordial', 'abyssal', 'undercommon'];
                             // Effect-granted languages are listed but are not part of the editable selection.
                             const granted: any[] = (identity.grantedLanguages ?? []).map((entry: any) => ({ ...entry, granted: true }));
                             const resolvedLangs = [...languageEntries, ...granted].map((entry: any) => {
@@ -352,20 +343,21 @@ export default function DetailsTab({}: DetailsTabProps) {
                                 return {
                                     name: `${entry.label ?? entry.value ?? 'Unavailable language'}${entry.granted ? ' (from effect)' : ''}`,
                                     desc: match ? (match.system?.description || match.description || '') : 'Description unavailable.',
-                                    rarity: match?.rarity ?? (isRareLanguage(entry.label ?? '') ? 'rare' : 'common'),
+                                    rarity: match ? languageRarity(match) : entry.rarity ?? null,
                                 };
                             });
 
                             return resolvedLangs.sort((a: any, b: any) => a.name.localeCompare(b.name))
                                 .map((lang: any, i: number) => {
-                                    const isRare = isRareLanguage(lang.name) || lang.rarity?.toLowerCase() === 'rare';
-                                    const bgColor = isRare ? 'bg-black' : 'bg-[#78557e]';
+                                    const isRare = lang.rarity === 'rare';
+                                    const bgColor = isRare ? 'bg-black' : lang.rarity === 'common' ? 'bg-[#78557e]' : 'bg-neutral-600';
 
                                     // Scrub HTML tags for tooltip
                                     let tooltip = lang.desc && lang.desc !== '<p></p>'
                                         ? lang.desc.replace(/<[^>]*>?/gm, '').trim()
                                         : 'No description.';
 
+                                    if (!lang.rarity) tooltip += ' (Rarity unavailable)';
                                     if (lang.rarity && lang.rarity !== 'common') {
                                         tooltip += ` (${lang.rarity.charAt(0).toUpperCase() + lang.rarity.slice(1)})`;
                                     }
@@ -494,8 +486,7 @@ export default function DetailsTab({}: DetailsTabProps) {
                         updateActor('system.languages', langs, { immediate: true });
                     }}
                     currentLanguages={languageIds}
-                    maxCommon={actor.computed?.languageLimits?.maxCommon || 0}
-                    maxRare={actor.computed?.languageLimits?.maxRare || 0}
+                    currentLabels={Object.fromEntries(languageEntries.map(entry => [entry.ref ? formatUuid(entry.ref) : entry.value, entry.label ?? entry.value ?? 'Unavailable language']))}
                 />
             )}
 

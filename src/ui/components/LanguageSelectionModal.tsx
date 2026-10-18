@@ -1,203 +1,44 @@
-import { useState, useMemo } from 'react';
-import { X, Search } from 'lucide-react';
-import { isRareLanguage } from '../../logic/rules';
+'use client';
+import { useState, useEffect } from 'react';
+import { canonicalUuid } from '../../logic/identity';
+import { languageRarity } from '../../logic/languages';
 import { useShadowdarkCollections } from '../context/ShadowdarkUIContext';
 import { CollectionStatus } from './CollectionStatus';
+import ModuleDialog from './ModuleDialog';
 
-interface Language {
-    name: string;
-    uuid: string;
-    rarity?: 'common' | 'rare';
+interface Props {
+    isOpen: boolean; onClose: () => void; onSelect: (selected: string[]) => void;
+    currentLanguages: string[]; currentLabels?: Record<string, string>; availableLanguages?: any[];
+    /** Ordinary inventory editing has no creation quota. Retained for old callers only. */
+    maxCommon?: number; maxRare?: number;
 }
-
-interface LanguageSelectionModalProps {
-    isOpen: boolean;
-    onClose: () => void;
-    onSelect: (languages: string[]) => void;
-    availableLanguages?: Language[];
-    currentLanguages: string[]; // UUIDs or Names
-    maxCommon: number;
-    maxRare: number;
-}
-
-export default function LanguageSelectionModal({
-    isOpen,
-    onClose,
-    onSelect,
-    availableLanguages: propsAvailableLanguages,
-    currentLanguages,
-    maxCommon,
-    maxRare
-}: LanguageSelectionModalProps) {
+export default function LanguageSelectionModal({ isOpen, onClose, onSelect, currentLanguages, currentLabels = {}, availableLanguages }: Props) {
     const data = useShadowdarkCollections(['languages'], isOpen);
-    const { collections } = data;
     const [search, setSearch] = useState('');
-
-    const availableLanguages = useMemo(() => {
-        return data.ready ? collections.languages : [];
-    }, [data.ready, collections]);
-    const [selected, setSelected] = useState<string[]>(currentLanguages);
-
-    const filteredLanguages = useMemo(() => {
-        let langs = availableLanguages;
-        if (search) {
-            const lower = search.toLowerCase();
-            langs = availableLanguages.filter((l: any) => l.name.toLowerCase().includes(lower));
-        }
-        return [...langs].sort((a, b) => a.name.localeCompare(b.name));
-    }, [availableLanguages, search]);
-
-    const commonLanguages = filteredLanguages.filter((l: any) => !isRareLanguage(l.name));
-    const rareLanguages = filteredLanguages.filter((l: any) => isRareLanguage(l.name));
-
-    // Count currently selected by category
-    const selectedCommonCount = selected.filter(id => {
-        const lang = availableLanguages.find((l: any) => l.uuid === id || l.name === id);
-        return !isRareLanguage(lang?.name || (typeof id === 'string' && !id.startsWith('Compendium.') ? id : ''));
-    }).length;
-
-    const selectedRareCount = selected.filter(id => {
-        const lang = availableLanguages.find((l: any) => l.uuid === id || l.name === id);
-        return isRareLanguage(lang?.name || (typeof id === 'string' && !id.startsWith('Compendium.') ? id : ''));
-    }).length;
-
-    const toggleLanguage = (uuid: string) => {
-        const lang = availableLanguages.find((l: any) => l.uuid === uuid);
-        const name = lang?.name;
-        const isSelected = selected.includes(uuid) || (!!name && selected.includes(name));
-
-        if (!isSelected) {
-            const isRare = isRareLanguage(lang?.name || uuid);
-            if (isRare && selectedRareCount >= maxRare) return;
-            if (!isRare && selectedCommonCount >= maxCommon) return;
-        }
-
-        setSelected(prev => {
-            if (isSelected) {
-                return prev.filter(id => id !== uuid && id !== name);
-            } else {
-                return [...prev, uuid];
-            }
-        });
-    };
-
-    if (!isOpen) return null;
-
-    return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-neutral-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-            <div className="bg-white border-4 border-black w-full max-w-2xl max-h-[90vh] flex flex-col shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] animate-in zoom-in-95 duration-200 overflow-hidden text-neutral-900 rounded-none">
-
-                {/* Header */}
-                <div className="flex items-center justify-between p-6 bg-black text-white border-b-2 border-white">
-                    <h2 className="text-2xl font-black font-serif uppercase tracking-widest">Edit Languages</h2>
-                    <button onClick={onClose} className="text-white/50 hover:text-white transition-colors p-2">
-                        <X size={24} />
-                    </button>
-                </div>
-
-                {/* Search */}
-                <div className="p-4 border-b-2 border-dashed border-neutral-200 bg-neutral-50/50">
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 w-4 h-4" />
-                        <input
-                            type="text"
-                            placeholder="Search languages..."
-                            value={search}
-                            onChange={e => setSearch(e.target.value)}
-                            className="w-full bg-white text-black border-2 border-black px-4 py-2 pl-9 focus:bg-neutral-50 outline-none uppercase tracking-widest font-bold text-xs shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
-                            autoFocus
-                        />
-                    </div>
-                </div>
-
-                {/* Content */}
-                <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
-                    <CollectionStatus state={data} label="Loading languages…" />
-
-                    {/* Common Section */}
-                    {commonLanguages.length > 0 && (
-                        <div className="bg-white border-2 border-black p-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-                            <div className="bg-black text-white px-4 py-1 -mx-4 -mt-4 mb-4 font-serif font-bold flex justify-between items-center uppercase tracking-wider">
-                                <span>Common Languages</span>
-                                <span className={`text-[10px] px-2 border border-white/50 ${selectedCommonCount === maxCommon ? 'text-white' : 'text-white/50'}`}>
-                                    {selectedCommonCount} / {maxCommon}
-                                </span>
-                            </div>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                                {commonLanguages.map((lang, idx) => {
-                                    const isSelected = selected.includes(lang.uuid) || selected.includes(lang.name);
-                                    const disabled = !isSelected && selectedCommonCount >= maxCommon;
-                                    return (
-                                        <button
-                                            key={lang.uuid || `common-lang-${idx}`}
-                                            onClick={() => toggleLanguage(lang.uuid)}
-                                            disabled={disabled}
-                                            className={`px-3 py-2 text-left text-[10px] font-black uppercase transition-all border-2 ${isSelected
-                                                ? 'bg-black text-white border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]'
-                                                : 'bg-white text-black border-neutral-200 hover:border-black'
-                                                } ${disabled ? 'opacity-20 grayscale' : ''}`}
-                                        >
-                                            <span className="truncate">{lang.name}</span>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    )}
- 
-                    {/* Rare Section */}
-                    {rareLanguages.length > 0 && maxRare > 0 && (
-                        <div className="bg-white border-2 border-black p-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-                            <div className="bg-black text-white px-4 py-1 -mx-4 -mt-4 mb-4 font-serif font-bold flex justify-between items-center uppercase tracking-wider">
-                                <span>Rare Languages</span>
-                                <span className={`text-[10px] px-2 border border-white/50 ${selectedRareCount === maxRare ? 'text-white' : 'text-white/50'}`}>
-                                    {selectedRareCount} / {maxRare}
-                                </span>
-                            </div>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                                {rareLanguages.map((lang, idx) => {
-                                    const isSelected = selected.includes(lang.uuid) || selected.includes(lang.name);
-                                    const disabled = !isSelected && selectedRareCount >= maxRare;
-                                    return (
-                                        <button
-                                            key={lang.uuid || `rare-lang-${idx}`}
-                                            onClick={() => toggleLanguage(lang.uuid)}
-                                            disabled={disabled}
-                                            className={`px-3 py-2 text-left text-[10px] font-black uppercase transition-all border-2 ${isSelected
-                                                ? 'bg-black text-white border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]'
-                                                : 'bg-white text-black border-neutral-200 hover:border-black'
-                                                } ${disabled ? 'opacity-20 grayscale' : ''}`}
-                                        >
-                                            <span className="truncate">{lang.name}</span>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    )}
-
-                    {data.ready && filteredLanguages.length === 0 && (
-                        <div className="text-center py-10 text-neutral-400 font-bold uppercase tracking-widest text-xs italic">No languages matched.</div>
-                    )}
-                </div>
-
-                {/* Footer (Consistency with Language modal) */}
-                <div className="p-6 bg-neutral-100 border-t-4 border-black flex justify-between items-center">
-                    <button
-                        onClick={onClose}
-                        className="h-12 bg-neutral-200 text-black border-2 border-black px-8 font-black font-serif uppercase tracking-widest text-xs hover:bg-neutral-300 transition-all active:translate-x-[2px] active:translate-y-[2px] shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-none"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        onClick={() => { if (data.ready) onSelect(selected); }}
-                        disabled={!data.ready}
-                        className="h-12 bg-black text-white border-2 border-black px-10 font-black font-serif uppercase tracking-widest text-base hover:bg-neutral-800 transition-all active:translate-x-[2px] active:translate-y-[2px] shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-none"
-                    >
-                        Save Languages
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
+    const [selected, setSelected] = useState([...currentLanguages]);
+    const baseline = JSON.stringify(currentLanguages);
+    useEffect(() => { setSelected([...JSON.parse(baseline)]); }, [baseline, data.generation]);
+    const rows: any[] = data.ready ? availableLanguages ?? data.collections.languages : [];
+    const byUuid = new Map(rows.map(doc => [canonicalUuid(doc.uuid), doc]).filter(([uuid]) => !!uuid) as Array<[string, any]>);
+    const retained = selected.filter(uuid => !byUuid.has(uuid));
+    const toggle = (uuid: string) => setSelected(previous => previous.includes(uuid) ? previous.filter(value => value !== uuid) : [...previous, uuid]);
+    const save = () => { if (!data.ready) return; if (JSON.stringify(selected) !== baseline) onSelect(selected); onClose(); };
+    const choice = (uuid: string, name: string) => <button type="button" key={uuid} title={uuid} aria-pressed={selected.includes(uuid)} onClick={() => toggle(uuid)}
+        className={`min-h-11 border-2 border-black p-2 text-left ${selected.includes(uuid) ? 'bg-black text-white' : 'bg-white text-black'}`}>{name}</button>;
+    return <ModuleDialog open={isOpen} title="Edit Languages" onClose={onClose} size="lg" footer={<div className="flex flex-wrap justify-end gap-3">
+        <button type="button" className="min-h-11 border-2 border-black px-4" onClick={onClose}>Cancel</button>
+        <button type="button" className="min-h-11 border-2 border-black bg-black text-white px-4 disabled:opacity-50" disabled={!data.ready} onClick={save}>Save Languages</button>
+    </div>}>
+        <p className="text-sm mb-3">Edit the Actor’s language inventory. Creation choice counts do not limit ordinary editing. Existing custom or unavailable entries are preserved until explicitly removed.</p>
+        <label className="font-bold text-sm">Search languages<input data-autofocus placeholder="Search languages..." className="block w-full min-h-11 border-2 border-black p-2" value={search} onChange={event => setSearch(event.target.value)} /></label>
+        <CollectionStatus state={data} label="Loading languages…" />
+        {retained.length > 0 && <section className="mt-4" aria-label="Retained language entries"><h3 className="font-bold">Retained entries without a readable catalog row</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">{retained.map(uuid => choice(uuid, currentLabels[uuid] ?? (canonicalUuid(uuid) ? 'Unavailable language' : uuid)))}</div></section>}
+        {(['common','rare',null] as const).map(rarity => {
+            const options = [...byUuid].filter(([,doc]) => languageRarity(doc) === rarity && String(doc.name).toLowerCase().includes(search.toLowerCase()));
+            return options.length > 0 && <section key={rarity ?? 'unresolved'} className="mt-4" aria-label={`${rarity ?? 'Unclassified'} languages`}>
+                <h3 className="font-bold capitalize">{rarity ?? 'Rarity unavailable'}</h3><div className="grid grid-cols-1 sm:grid-cols-2 gap-2">{options.map(([uuid,doc]) => choice(uuid, doc.name))}</div></section>;
+        })}
+        {data.ready && ![...byUuid.values()].some(doc => String(doc.name).toLowerCase().includes(search.toLowerCase())) && <p className="mt-3 italic">No languages matched.</p>}
+    </ModuleDialog>;
 }

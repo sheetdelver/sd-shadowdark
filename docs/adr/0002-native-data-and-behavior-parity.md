@@ -439,3 +439,39 @@ suspends the resource card; uncertain results require review. Typing, native
 alignment61/61, boundaries53/53 and world adoption13/13 pass. Existing mocked
 runtimes now reflect confirmed source updates, so ordering checks no longer pass
 merely because a write was recorded. All native A02 cases remain open.
+
+## D5b native language fields and choice pools — October 18, 2026
+
+SD02-12 is implemented through `logic/languages.ts`. Rarity is the stored
+`system.rarity`; an unknown/missing value stays unclassified, regardless of name.
+Registry, caller-prepared identity, Details and inventory picker use that field.
+Ordinary language editing has no creation quota and preserves custom/unreadable
+entries until explicit removal; an unchanged save is a no-op.
+
+Creation uses independent ancestry, class, common and rare assignments, plus
+exact fixed grants. Zero never becomes an allowance because a pool is nonempty.
+The native Number/Array initial values are0/[]; invalid counts and required
+unreadable references fail with explanations. One UUID cannot fill two pools.
+Background has no native language-choice schema and contributes no invented pool.
+The shared caller-bound plan resolves required exact refs, retains failures and
+reads source filters through Core context. Generator and advancement render the
+same plan; pending/stale plans retire with the shared caller/world generation.
+Generator now creates through an SDK-backed module validation route, so incomplete
+or crafted language choices cannot write an Actor. Advancement validates before
+HP/XP/items, preserves existing extras and rechecks source/context before writes.
+
+**Oracle clarification:** the original audit's language-limit probe carried the
+module's implicit Common allowance into its expected aggregate. Direct execution
+of native4.0.6 `CharacterGeneratorSD._loadLanguages` shows neither implicit Common
+nor INT choices: all counts come from ancestry/class fields. The maintained oracle
+now executes that native method (zero, INT+4 and independent positive pools)
+instead of retaining that assumption. The original baseline output is preserved.
+Fixed Common is supplied by the actual ancestry data when present.
+
+Evidence:16/16 selected native-method checks pass, including the new direct
+Generator cases;69/31/9/4/9 controls remain unchanged. Language rules/routes pass9/9.
+The four mounted language cases fail against the checkpoint's actual picker,
+Generator and rule helper (0/4), and pass current code4/4; the complete consumer
+run passes38/38. All twelve required suites plus action-phase/language suites
+pass, and explicit module/UI/hook typing passes on Core0.19.3. Installed floor/
+current archive verification and every A02 native row remain open.

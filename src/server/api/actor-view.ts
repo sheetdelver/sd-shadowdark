@@ -13,7 +13,7 @@ export async function handleActorView(actorId: string, req: ModuleServerRequest)
         const actor = await req.runtime.documents.get('Actor', actorId, { minOwnership: 'observer' });
         if (!actor) return error('not_found', 'Actor not found or not visible');
         if (!baseline || spellReview(actor) !== baseline) return error('conflict', 'Character source changed; refresh before reviewing spells.');
-        const lookups = await shadowdarkAdapter.callerLookups(actor, callerOf(req));
+        const lookups = await shadowdarkAdapter.callerLookups(actor, callerOf(req), { languages: true });
         const latest = await req.runtime.documents.get('Actor', actorId, { minOwnership: 'observer' });
         if (!latest || spellReview(latest) !== baseline) return error('conflict', 'Character source changed while dependencies loaded; refresh.');
         const conflict = contextConflict(req.runtime, revision); if (conflict) return conflict;

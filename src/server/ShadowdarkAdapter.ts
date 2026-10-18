@@ -255,7 +255,7 @@ export class ShadowdarkAdapter extends BaseSystemAdapter {
     }
 
     /** Request-local bounded dependencies; never published to the shared registry. */
-    async callerLookups(actor: any, caller: Caller): Promise<ViewLookups> {
+    async callerLookups(actor: any, caller: Caller, options: { languages?: boolean } = {}): Promise<ViewLookups> {
         const base = this.lookups();
         const documents = new Map<string, any>();
         const visited = new Set<string>();
@@ -279,6 +279,10 @@ export class ShadowdarkAdapter extends BaseSystemAdapter {
         const spells = [...items.filter(item => item.type === 'Spell'), ...[...documents.values()].filter(doc => doc.type === 'Spell')];
         if (player) await Promise.all(spells.flatMap(spell => (Array.isArray(spell.system?.class) ? spell.system.class : []).map(resolve)));
         await Promise.all([...documents.values()].filter(doc => doc.type === 'Class').map(doc => resolve(doc.system?.spellcasting?.class)));
+        if (options.languages) {
+            const prepared = prepareActorCore(actor, base);
+            await Promise.all((Array.isArray(prepared.effective.languages) ? prepared.effective.languages : []).map(resolve));
+        }
         const read = (ref: any, type: string) => {
             const uuid = formatUuid(ref);
             if (ref.kind === 'compendium' && !canReadPack(caller, ref.pack)) return null;
@@ -286,7 +290,7 @@ export class ShadowdarkAdapter extends BaseSystemAdapter {
             return doc?.type === type ? doc : null;
         };
         return { propertyName: base.propertyName, dependencies: [...documents.keys()],
-            classDocument: ref => read(ref, 'Class'), spellDocument: ref => read(ref, 'Spell'),
+            classDocument: ref => read(ref, 'Class'), spellDocument: ref => read(ref, 'Spell'), languageDocument: ref => read(ref, 'Language'),
             label: ref => ref.kind === 'compendium' && !canReadPack(caller, ref.pack) ? null
                 : documents.get(formatUuid(ref))?.name ?? (ref.kind === 'compendium' ? base.label?.(ref) : null) ?? null };
     }

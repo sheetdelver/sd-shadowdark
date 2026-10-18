@@ -1,6 +1,5 @@
 import type { ActorSheetData } from '@sheet-delver/sdk';
 import { prepareShadowdarkView, type ViewLookups } from './prepared-view';
-import { getLanguageLimits } from './rules';
 import { canonicalUuid, documentId, formatUuid } from './identity';
 import { UNAVAILABLE_RULE_INPUTS, type RuleInputs } from './world-settings';
 
@@ -30,6 +29,10 @@ export function lookupsFromSystemData(cachedSystemData: any, documents?: (uuid: 
         spellDocument: ref => {
             const doc = documents?.(formatUuid(ref)) ?? null;
             return doc?.type === 'Spell' ? doc : null;
+        },
+        languageDocument: ref => {
+            const doc = documents?.(formatUuid(ref)) ?? null;
+            return doc?.type === 'Language' ? doc : null;
         },
     };
 }
@@ -69,7 +72,6 @@ export class ShadowdarkNormalizer {
             },
             title: classTitle(actor, view, lookups),
         };
-        derived.languageLimits = getLanguageLimits({ ...actor, derived }, cachedSystemData, collections);
 
         return {
             id: documentId(actor),

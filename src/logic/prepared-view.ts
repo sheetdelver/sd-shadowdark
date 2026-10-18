@@ -5,6 +5,7 @@ import type { CanonicalEffect } from './effects';
 import { documentId, formatUuid, parseUuid, type DocumentRef } from './identity';
 import { slugify } from './foundry';
 import { grantedSpellSources, prepareSpellModel } from './spell-model';
+import { languageRarity } from './languages';
 
 /**
  * The single module-prepared Shadowdark view, published as `derived` (with
@@ -55,6 +56,7 @@ export interface ViewLookups extends PreparationLookups {
     label?: (ref: DocumentRef) => string | null;
     /** Exact documents actually read for a bounded caller operation. */
     dependencies?: readonly string[];
+    languageDocument?: (ref: DocumentRef) => any | null;
 }
 
 const CATEGORY: Record<string, string> = {
@@ -152,17 +154,21 @@ export function prepareShadowdarkView(source: any, lookups: ViewLookups = {}, ru
 
     const system = source?.system ?? {};
     const ownedOf = (type: string) => items.find(item => item?.type === type);
+    const languageRef = (value: unknown) => {
+        const entry = labelled(value, lookups);
+        return { ...entry, rarity: entry.ref ? languageRarity(lookups.languageDocument?.(entry.ref)) : null };
+    };
     const identity = {
         class: labelled(system.class, lookups, ownedOf('Class')),
         ancestry: labelled(system.ancestry, lookups, ownedOf('Ancestry')),
         background: labelled(system.background, lookups, ownedOf('Background')),
         deity: labelled(system.deity, lookups, ownedOf('Deity')),
         patron: labelled(system.patron, lookups, ownedOf('Patron')),
-        languages: (Array.isArray(system.languages) ? system.languages : []).map((value: unknown) => labelled(value, lookups)),
+        languages: (Array.isArray(system.languages) ? system.languages : []).map(languageRef),
         // Languages added by effects (e.g. "Speak Goblin"): shown, never written back.
         grantedLanguages: (Array.isArray(core.effective?.languages) ? core.effective.languages : [])
             .filter((value: unknown) => !(Array.isArray(system.languages) && system.languages.includes(value)))
-            .map((value: unknown) => labelled(value, lookups)),
+            .map(languageRef),
     };
 
     const isSpellcaster = core.kind === 'Player'

@@ -5,11 +5,15 @@ import { assembleFinalItems } from './level-up-engine';
 import * as levelUpEngine from './level-up-engine';
 import { TALENT_HANDLERS } from '../../logic/talent-handlers';
 import { canonicalUuid } from '../../logic/identity';
-import { callerOf, requestRules } from '../access';
+import { callerOf, requestRules, requestRevision, contextConflict } from '../access';
 import { hitPointRollFormula } from '../../logic/actions';
 import { prepareActorCore } from '../../logic/actor-preparation';
 import { advancementHitPoints } from '../../logic/advancement';
 import { advancementSpellChoices, grantedSpellSources, prepareSpellModel, spellListIdentity } from '../../logic/spell-model';
+import { callerLanguagePlan } from '../languages';
+import { validateLanguageSelections } from '../../logic/languages';
+import { spellReview } from '../../logic/spell-review';
+import { withActorLock } from '../operation-lock';
 
 /**
  * Rolled talents/boons and chosen spells are re-read from their exact source.
@@ -351,6 +355,11 @@ export async function handleRollBoon(actorId: string | undefined, req: ModuleSer
  * Finalize level-up and apply changes.
  */
 export async function handleFinalizeLevelUp(actorId: string, req: ModuleServerRequest) {
+    const world = req.runtime.world?.snapshot().identity;
+    return withActorLock(world ? `${world.instanceId}:${world.worldId}:${actorId}` : `${shadowdarkAdapter.runtimeGeneration}:${actorId}`, () => finalizeLevelUp(actorId, req));
+}
+async function finalizeLevelUp(actorId: string, req: ModuleServerRequest) {
+    const revision = requestRevision(req.runtime);
     try {
         const body = await req.json<any>();
         const { gold } = body;
@@ -368,7 +377,7 @@ export async function handleFinalizeLevelUp(actorId: string, req: ModuleServerRe
         const resolveTyped = async (uuid: unknown, type: string) => {
             if (uuid === undefined || uuid === null || uuid === '') return null;
             const doc = await shadowdarkAdapter.resolveDocumentFor(String(uuid), callerOf(req));
-            if (!doc || doc.type !== type) throw new Error(`${type} ${String(uuid)} is not available.`);
+            if (!doc || doc.type !== type) throw new SdkError('validation', `${type} ${String(uuid)} is not available.`);
             return { ...doc, uuid: canonicalUuid(uuid) ?? doc.uuid };
         };
         const classObj = await resolveTyped(body.classUuid ?? actor?.system?.class, 'Class');
@@ -421,6 +430,26 @@ export async function handleFinalizeLevelUp(actorId: string, req: ModuleServerRe
         for (let tier = 1; tier <= 5; tier++) {
             const count = selected.filter((spell: any) => spell.system.tier === tier).length;
             if (count !== (choices.required[tier] ?? 0)) return error('validation', `Tier ${tier} requires exactly ${choices.required[tier] ?? 0} new spell(s); received ${count}.`);
+        }
+        if (targetLevel === 1) {
+            // Existing level-zero ancestry languages are inventory, not another
+            // ancestry choice. A new Generator request supplies both pools.
+            const existing = Array.isArray(actor?.system?.languages) ? actor.system.languages : [];
+            const plan = await callerLanguagePlan(callerOf(req), actor ? null : ancestry, classObj, existing);
+            const languages = validateLanguageSelections(plan, body.languageChoices, existing);
+            if (!languages.valid) return error('validation', languages.errors.join(' '));
+            if (!Array.isArray(state.selectedLanguages) || state.selectedLanguages.some((uuid: string) => !languages.languages.includes(uuid)))
+                return error('validation', 'Language additions must come from the reviewed native choice pools.');
+            state.selectedLanguages = languages.languages;
+        } else {
+            const existing = Array.isArray(actor?.system?.languages) ? actor.system.languages : [];
+            if (state.selectedLanguages.some((uuid: string) => !existing.includes(uuid))) return error('validation', 'This advancement grants no language choices. Edit ordinary inventory separately.');
+            state.selectedLanguages = existing;
+        }
+        const conflict = contextConflict(req.runtime, revision); if (conflict) return conflict;
+        if (actor) {
+            const fresh = await req.runtime.documents.get('Actor', actorId, { minOwnership: 'owner' });
+            if (!fresh || spellReview(fresh) !== spellReview(actor)) return error('conflict', 'Actor source changed during advancement review. Refresh before applying any writes.');
         }
 
         const actorUpdates: any = {};
@@ -484,10 +513,12 @@ export async function handleFinalizeLevelUp(actorId: string, req: ModuleServerRe
             items: finalItems,
             updates: actorUpdates,
             hpRoll: state.hpRoll,
-            goldRoll: gold
+            goldRoll: gold,
+            languages: state.selectedLanguages
         });
 
     } catch (e: unknown) {
+        const conflict = contextConflict(req.runtime, revision); if (conflict) return conflict;
         if (isSdkError(e)) return error(e.code, e.message);
         logger.error('[API] Finalize Level-Up Error:', e);
         return error('internal', getErrorMessage(e) || 'Failed to finalize level-up');

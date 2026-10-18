@@ -58,12 +58,14 @@ export function useShadowdarkLevelUp(
 
         const data = {
             currentLevel,
+            contextRevision: actor.worldContextRevision ?? actor.derived?.ruleInputs?.contextRevision,
             targetLevel,
             classObj: actor.items?.find((item: any) => item.type === 'Class') ?? null,
             ancestry: actor.items?.find((item: any) => item.type === 'Ancestry') ?? null,
             patron: actor.items?.find((item: any) => item.type === 'Patron') ?? null,
             abilities: actor.derived?.abilities,
             spells: actor.items?.filter((i: any) => i.type === 'Spell') || [],
+            knownLanguages: (actor.derived?.identity?.languages ?? []).map((entry: any) => ({ uuid: entry.ref ? formatUuid(entry.ref) : entry.value, name: entry.label ?? entry.value ?? 'Unavailable language' })),
             // Exact references come from the prepared view; the host projection
             // turns raw compendium UUIDs into names (SD01-05), which are never
             // mapped back by name. Level 0 prompts for a class.

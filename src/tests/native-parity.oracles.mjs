@@ -13,7 +13,7 @@ const nativeCommit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: nativeRoo
 assert.equal(nativeCommit, '9677d16b3903b3b640f00d4efd48249142ac8334');
 const source = path => import(pathToFileURL(`${moduleRoot}/src/${path}`));
 const native = path => import(pathToFileURL(`${nativeRoot}/system/src/${path}`));
-globalThis.foundry = { data: { fields: {} }, abstract: { TypeDataModel: class { prepareBaseData() {} }, DataModel: class {} }, dice: { Roll: class {} }, applications: { ux: { TextEditor: { implementation: {} } }, api: { DialogV2: { confirm: async () => true } } } };
+globalThis.foundry = { data: { fields: {} }, appv1: { api: { FormApplication: class {} } }, abstract: { TypeDataModel: class { prepareBaseData() {} }, DataModel: class {} }, dice: { Roll: class {} }, applications: { ux: { TextEditor: { implementation: {} } }, api: { DialogV2: { confirm: async () => true } } } };
 globalThis.CONFIG = { SHADOWDARK: { DEFAULTS: { GEMS_PER_SLOT: 10 }, ABILITY_KEYS: ['str', 'dex', 'con', 'int', 'wis', 'cha'] } };
 globalThis.game = { i18n: { localize: s => s, format: (s, values) => s === 'SHADOWDARK.item.magic_item.unidentifiedName' ? `Unidentified ${values.type}` : s } };
 globalThis.ui = { notifications: { warn: s => { throw Error(s); }, error: s => { throw Error(s); } } };
@@ -30,7 +30,8 @@ const { prepareActorCore, prepareItemBasics } = await source('logic/actor-prepar
 const { weaponBase, prepareRequestedAction, planConsequences, evaluateOutcome } = await source('logic/actions.ts');
 const { handleActorAction } = await source('server/api/actions.ts');
 const { ShadowdarkRegistry } = await source('server/Registry.ts');
-const { getLanguageLimits } = await source('logic/rules.ts');
+const { languagePlan, validateLanguageSelections } = await source('logic/languages.ts');
+const { default: NativeGenerator } = await native('apps/CharacterGeneratorSD.mjs');
 const { primLike } = await source('tests/fixtures/native-406.ts');
 const results = { method: 'Actual native methods and current module functions, controlled in-memory dependencies; not native Foundry acceptance', nativeCommit, parity: {}, defects: {} };
 const clone = structuredClone;
@@ -163,10 +164,22 @@ results.defects.npcFocus = { nativeLost: nativeSpell.system.lost, moduleLost: mo
 assert.equal(nativeSpell.system.lost, true);
 const language = { _id: 'rare', name: 'Star Tongue', type: 'Language', uuid: 'Item.rare', system: { rarity: 'rare' } };
 const index = { languages: [] }; ShadowdarkRegistry.categorize('shadowdark.languages', clone(language), index);
-const actor = actorBase(); actor.system.class = 'Item.class'; actor.derived = { abilities: { int: { mod: 0 } } };
-const limits = getLanguageLimits(actor, {}, { classes: [{ uuid: 'Item.class', system: { languages: { common: 0, rare: 0, select: 0, selectOptions: ['Item.rare'], fixed: [] } } }], languages: [language] });
-results.defects.languages = { nativeRarity: language.system.rarity, moduleRarity: index.languages[0].rarity, explicitSelectCount: 0, moduleLimits: limits };
-
+const languageRows=[language,{_id:'ca',uuid:'Item.ca',name:'Draconic',type:'Language',system:{rarity:'common'}},{_id:'cb',uuid:'Item.cb',name:'Second common',type:'Language',system:{rarity:'common'}},{_id:'rb',uuid:'Item.rb',name:'Second rare',type:'Language',system:{rarity:'rare'}}];
+const zero={system:{languages:{common:0,rare:0,select:0,selectOptions:['Item.rare'],fixed:[]}}};
+results.defects.languages={nativeRarity:language.system.rarity,moduleRarity:index.languages[0].rarity,cases:[]};
+for(const [name,ancestry,classDoc,intMod] of [
+ ['explicit-zero',null,clone(zero),0],
+ ['no-implicit-int-common',null,clone(zero),4],
+ ['separate-pools',{system:{languages:{common:1,rare:0,select:1,selectOptions:['Item.cb'],fixed:[]}}},{system:{languages:{common:0,rare:1,select:1,selectOptions:['Item.rare'],fixed:[]}}},4],
+]){
+ const nativeThis={ancestry:clone(ancestry),class:clone(classDoc),formData:{actor:{system:{languages:[],abilities:{int:{mod:intMod}}}},commonLanguages:['Item.ca','Item.cb'],rareLanguages:['Item.rare','Item.rb']},_getRandom:()=>0,
+ _updateLangData:NativeGenerator.prototype._updateLangData,_setRandomLanguage:NativeGenerator.prototype._setRandomLanguage};
+ await NativeGenerator.prototype._loadLanguages.call(nativeThis);
+ const plan=languagePlan(ancestry,classDoc,languageRows);
+ const expected=Object.fromEntries(['ancestry','class','common','rare'].map(id=>[id,nativeThis.formData.langData[id].select]));
+ const selected=Object.fromEntries(['ancestry','class','common','rare'].map(id=>[id,nativeThis.formData.langData[id].selected]));
+ results.defects.languages.cases.push({name,nativeCounts:expected,moduleCounts:Object.fromEntries(plan.groups.map(group=>[group.id,group.count])),nativeSelected:selected,moduleValid:validateLanguageSelections(plan,selected).valid});
+}
 const checks = [];
 function check(id, fn) { try { fn(); checks.push({ id, passed: true }); } catch (error) { checks.push({ id, passed: false, error: error.message }); } }
 check('SD02-13 disabled critical thresholds', () => assert.equal(moduleNoCritical.criticalSuccess, noCritical.criticalSuccess));
@@ -177,7 +190,7 @@ for (const row of results.defects.abilityOrder) check(`SD02-09 ability ${row.fai
 check('SD02-10 Potion delete failure survives identified', () => assert.deepEqual(results.defects.potionDeleteFailure.module, results.defects.potionDeleteFailure.native));
 check('SD02-11 NPC focus cannot prevent loss', () => assert.equal(results.defects.npcFocus.moduleLost, results.defects.npcFocus.nativeLost));
 check('SD02-12 native rarity', () => assert.equal(index.languages[0].rarity, language.system.rarity));
-check('SD02-12 explicit zero selections', () => assert.equal(limits.maxCommon, 1));
+for(const row of results.defects.languages.cases)check(`SD02-12 ${row.name} actual native generator`,()=>{assert.deepEqual(row.moduleCounts,row.nativeCounts);assert.equal(row.moduleValid,true);});
 for(const row of results.defects.potionFailureMatrix)check(`SD02-10 Potion ${row.failure} native state/order`,()=>{assert.deepEqual(row.module,row.native);assert.deepEqual(row.moduleEvents,row.nativeEvents);});
 results.checks = checks;
 if (process.env.SHADOWDARK_EVIDENCE) writeFileSync(process.env.SHADOWDARK_EVIDENCE, JSON.stringify(results, null, 2));

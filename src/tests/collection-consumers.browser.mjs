@@ -11,6 +11,7 @@ import { build } from 'esbuild';
 import { execFileSync } from 'node:child_process';
 const parityOnly = process.argv.includes('--parity-only');
 const baseline = process.argv.find(arg => arg.startsWith('--baseline='))?.slice(11);
+const languageBaseline = process.argv.find(arg => arg.startsWith('--language-baseline='))?.split('=')[1];
 const { chromium } = await import(process.env.SHADOWDARK_PLAYWRIGHT_MODULE || 'playwright');
 const moduleRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const out = path.resolve(process.argv[2] || path.join(moduleRoot, 'temp/collection-consumers'));
@@ -34,7 +35,7 @@ const rope={_id:'rope',uuid:'Compendium.shadowdark.gear.Item.rope',name:'Current
 window.sdk={isConnected:true,worldId:'w',currentUser:{id:'p',role:1},foundryUrl:'',
  events:{on:(_,fn)=>{listeners.add(fn);return ()=>listeners.delete(fn)}},resolveImageUrl:x=>x||'',addNotification:()=>{},navigate:()=>{},
  fetchWithAuth:async (url,options={})=>{
-  const key=url.split('/').at(-1).split('?')[0];const call={key,signal:options.signal};window.calls.push(call);
+  const key=url.split('/').at(-1).split('?')[0];const call={key,signal:options.signal,body:options.body};window.calls.push(call);
   const reference=url.includes('/document/')?decodeURIComponent(url.split('/document/')[1]):url.includes('uuid=')?decodeURIComponent(url.split('uuid=')[1]):null;
   if(reference&&window.initial.documents)return Response.json(window.initial.documents[reference]||{error:'Not found'},{status:window.initial.documents[reference]?200:404});
   const p=window.policy[key]||{};
@@ -54,6 +55,7 @@ case 'advancement':return <Advancement/>;
 case 'dialog':return <><button style={{position:'fixed',bottom:0,left:0,width:'100%',height:80,zIndex:150}}>Host tools</button><ModuleDialog open title="Resource card" suspended={!!window.suspendDialog} onClose={()=>{}} footer={<button onClick={()=>window.cardClicked=true}>Use resource</button>}>Resource details</ModuleDialog>{window.suspendDialog&&<div style={{position:'fixed',inset:0,zIndex:100}}><button onClick={()=>window.hostClicked=true}>Shared host action</button></div>}</>;
 case 'gear':return <Gear isOpen onClose={()=>{}} onCreate={async()=>{}}/>;
 case 'spell-picker':return <SpellPicker isOpen onClose={()=>{}} onSave={()=>{}} title="Manage spells" tier={1} classUuid="Compendium.shadowdark.classes.Item.wizard" knownSpells={[]}/>;
+case 'native-language-edit':return <LanguagePicker isOpen onClose={()=>{}} onSelect={selected=>window.savedLanguages=selected} currentLanguages={window.initial.current||[]} maxCommon={0} maxRare={0}/>;
 case 'languages':return <LanguagePicker isOpen onClose={()=>{}} onSelect={()=>{}} currentLanguages={[]} maxCommon={1} maxRare={1}/>;
 case 'mastery':return <><WeaponSelectionSection required={1} selected={[]} onSelectionChange={()=>{}}/><ArmorSelectionSection required={1} selected={[]} onSelectionChange={()=>{}}/></>;
 case 'details':return <Details/>;
@@ -65,6 +67,7 @@ window.change=values=>{window.sdk={...window.sdk,...values};window.render()};
 window.answer=(index,body,status=200)=>window.pending[index].resolve(Response.json(body,{status}));
 window.render();
 `, resolveDir: moduleRoot, loader: 'tsx' }, bundle: true, write: false, format: 'iife', platform: 'browser', jsx: 'automatic', plugins: [{ name: 'sdk-test-boundary', setup(b) {
+    if(languageBaseline)b.onLoad({filter:/(?:LanguageSelectionModal\.tsx|Generator\.tsx|logic\/rules\.ts)$/},a=>({loader:a.path.endsWith('.tsx')?'tsx':'ts',resolveDir:path.dirname(a.path),contents:execFileSync('git',['show',languageBaseline+':'+path.relative(moduleRoot,a.path)],{cwd:moduleRoot,encoding:'utf8'})}));
     if(baseline)b.onLoad({filter:/SpellSelectionModal\.tsx$/},a=>({loader:'tsx',resolveDir:path.dirname(a.path),contents:execFileSync('git',['show',baseline+':src/ui/components/SpellSelectionModal.tsx'],{cwd:moduleRoot,encoding:'utf8'})}));
     b.onResolve({ filter: /^@sheet-delver\/sdk(?:\/react)?$/ }, a => ({ path: a.path, namespace: 'stub' }));
     b.onResolve({ filter: /ShadowdarkActorContext$/ }, () => ({ path: 'actor', namespace: 'stub' }));
@@ -73,7 +76,9 @@ window.render();
 const browser = await chromium.launch({ ...(process.env.SHADOWDARK_CHROME ? { executablePath: process.env.SHADOWDARK_CHROME } : {}), headless: true, args: ['--no-sandbox', '--disable-background-networking'] });
 const results = [];
 async function test(name, initial, run) {
+    if((languageBaseline||process.argv.includes('--language-only'))&&!name.startsWith('SD02-12'))return;
     if(parityOnly&&!name.startsWith('SD02'))return;
+    if(baseline&&name.startsWith('SD02-12'))return;
     const page = await browser.newPage(); const errors = []; page.setDefaultTimeout(3000);
     page.on('pageerror', e => errors.push(e.message)); await page.route('**/*', r => r.abort());
     try {
@@ -257,6 +262,37 @@ try {
         assert.equal(await p.getByRole('button',{name:'Add Light',exact:true}).count(),0);
         await p.getByRole('button',{name:'Remove owned Source-less spell (customA)',exact:true}).waitFor();
         await p.getByRole('button',{name:'SAVE CHANGES',exact:true}).click();assert.deepEqual(await p.evaluate(()=>window.saved),{additions:[],removals:[]});
+    });
+    const rare={_id:'r',uuid:'Compendium.shadowdark.languages.Item.r',name:'Star Tongue',type:'Language',system:{rarity:'rare'}};
+    const common={_id:'c',uuid:'Compendium.shadowdark.languages.Item.c',name:'Draconic',type:'Language',system:{rarity:'common'}};
+    const unknown={_id:'u',uuid:'Compendium.shadowdark.languages.Item.u',name:'Celestial',type:'Language',system:{rarity:'invalid'}};
+    await test('SD02-12 ordinary picker uses source rarity and retains unavailable/custom extras without creation quotas',{which:'native-language-edit',current:['Item.unreadable','Old custom tongue'],policy:{languages:{body:[rare,common,unknown]}}},async p=>{
+        await p.getByRole('region',{name:'rare languages',exact:true}).getByRole('button',{name:'Star Tongue',exact:true}).waitFor();
+        await p.getByRole('region',{name:'common languages',exact:true}).getByRole('button',{name:'Draconic',exact:true}).waitFor();
+        await p.getByRole('region',{name:'Unclassified languages',exact:true}).getByRole('button',{name:'Celestial',exact:true}).waitFor();
+        await p.getByRole('button',{name:'Star Tongue',exact:true}).click();await p.getByRole('button',{name:'Save Languages',exact:true}).click();
+        assert.deepEqual(await p.evaluate(()=>window.savedLanguages),['Item.unreadable','Old custom tongue',rare.uuid]);
+    });
+    await test('SD02-12 unchanged language inventory save is a genuine no-op',{which:'native-language-edit',current:['Item.unreadable','Old custom tongue'],policy:{languages:{body:[]}}},async p=>{
+        await p.getByRole('button',{name:'Save Languages',exact:true}).waitFor();await p.waitForFunction(()=>!document.querySelector('button:last-child')?.disabled);
+        await p.getByRole('button',{name:'Save Languages',exact:true}).click();assert.equal(await p.evaluate(()=>window.savedLanguages),undefined);
+    });
+    const ancestry={_id:'ancestry',uuid:'Compendium.shadowdark.ancestries.Item.ancestry',type:'Ancestry',name:'Controlled ancestry',system:{languages:{common:0,rare:0,select:1,selectOptions:[rare.uuid],fixed:[]},talents:[],talentChoiceCount:0}};
+    const groups=[{id:'ancestry',label:'Ancestry Languages',count:1,options:[rare.uuid]},{id:'class',label:'Class Languages',count:0,options:[]},{id:'common',label:'Common Languages',count:0,options:[]},{id:'rare',label:'Rare Languages',count:0,options:[]}];
+    const plan={fixed:[],groups,errors:[],rows:[rare],contextRevision:1};
+    await test('SD02-12 actual Generator uses an explicit restricted pool and shared keyboard dialog',{which:'generator',policy:{ancestries:{body:[ancestry]},languages:{body:[rare,common,unknown]},plan:{body:plan}}},async p=>{
+        await p.locator('select').filter({has:p.locator('option').filter({hasText:'Select Ancestry...'})}).selectOption(ancestry.uuid);
+        await p.getByRole('button',{name:'Select (0/1)',exact:true}).click();await p.getByRole('dialog',{name:'Select Languages',exact:true}).waitFor();
+        const choice=p.getByRole('button',{name:'Ancestry Languages: Star Tongue',exact:true});await choice.focus();await p.keyboard.press('Space');assert.equal(await choice.getAttribute('aria-pressed'),'true');
+        assert.equal(await p.getByRole('region',{name:'Common Languages',exact:true}).count(),0);await p.keyboard.press('Escape');await p.getByRole('dialog',{name:'Select Languages'}).waitFor({state:'hidden'});
+        assert.equal(await p.getByRole('button',{name:'Edit Languages',exact:true}).evaluate(el=>el===document.activeElement),true);
+    });
+    await test('SD02-12 actual Generator retires an initial pending plan after context replacement',{which:'generator',policy:{ancestries:{body:[ancestry]},languages:{body:[rare]},plan:{hold:true}}},async p=>{
+        await p.locator('select').filter({has:p.locator('option').filter({hasText:'Select Ancestry...'})}).selectOption(ancestry.uuid);await p.waitForFunction(()=>window.pending.some(row=>row.call.key==='plan'));
+        await p.evaluate(({ancestry,plan})=>{window.policy={ancestries:{body:[{...ancestry,system:{...ancestry.system,languages:{...ancestry.system.languages,select:0}}}]},languages:{body:[]},plan:{body:{...plan,groups:plan.groups.map(group=>({...group,count:0})),rows:[]}}};window.retire();},{ancestry,plan});
+        await p.getByRole('combobox',{name:'Ancestry',exact:true}).waitFor();await p.waitForFunction(()=>window.calls.filter(row=>row.key==='plan').length>=2);
+        const index=await p.evaluate(()=>window.pending.findIndex(row=>row.call.key==='plan'));await p.evaluate(({index,plan})=>window.answer(index,plan),{index,plan});await settled(p);
+        assert.equal(await p.getByRole('button',{name:'Select (0/1)',exact:true}).count(),0);assert.equal(await p.getByText('Loading native language choices…',{exact:true}).count(),0);
     });
 } finally { await browser.close(); fs.writeFileSync(path.join(out, 'results.json'), JSON.stringify(results, null, 2)); }
 console.log(`${results.filter(r => r.ok).length}/${results.length} passed`);

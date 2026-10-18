@@ -8,6 +8,8 @@ import { canonicalUuid } from '../../../logic/identity';
 import { useChoiceCatalog } from '../../hooks/useChoiceCatalog';
 import { fixedTalentReferences, masteryKind } from '../../../logic/talent-choices';
 import { slugify } from '../../../logic/foundry';
+import { useLanguagePlan } from '../../hooks/useLanguagePlan';
+import { emptyLanguageSelections, validateLanguageSelections, type LanguageSelections } from '../../../logic/languages';
 
 export interface LevelUpProps {
     actorId: string;
@@ -22,6 +24,8 @@ export interface LevelUpProps {
     availableClasses?: any[];
     availablePatrons?: any[];
     availableLanguages?: any[];
+    languageChoices?: LanguageSelections;
+    contextRevision?: number;
     knownLanguages?: any[]; // Passed for new characters (pre-gen selections)
     skipLanguageSelection?: boolean; // For when languages are handled externally (Generator)
     onComplete: (data: { items: any[], hpRoll: number, gold?: number, languages?: string[], patronUuid?: string }) => void;
@@ -147,10 +151,17 @@ export const useLevelUp = (props: LevelUpProps) => {
     }, [propsAvailablePatrons, collections.patrons]);
 
 
-    const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
+    const [selectedLanguageGroups, setSelectedLanguageGroups] = useState<LanguageSelections>(emptyLanguageSelections);
     const [fixedLanguages, setFixedLanguages] = useState<string[]>([]);
     const [knownLanguages, setKnownLanguages] = useState<any[]>(initialKnownLanguages);
-    const [languageGroups, setLanguageGroups] = useState<any[]>([]);
+    const languageData = useLanguagePlan({
+        ancestryUuid: !actorId || actorId === 'new' ? ancestry?.uuid : undefined,
+        classUuid: activeClassObj?.uuid ?? targetClassUuid,
+        actorId: actorId && actorId !== 'new' ? actorId : undefined,
+        enabled: !skipLanguageSelection && targetLevel === 1 && !!activeClassObj,
+    });
+    const languageGroups = languageData.plan?.groups ?? [];
+    const selectedLanguages = [...new Set([...fixedLanguages, ...Object.values(selectedLanguageGroups).flat()])];
 
     const [talentTable, setTalentTable] = useState<any>(null);
     const [boonTable, setBoonTable] = useState<any>(null);
@@ -798,6 +809,8 @@ export const useLevelUp = (props: LevelUpProps) => {
         setStatuses(prev => ({ ...prev, class: 'LOADING' }));
         try {
             const headers: any = { 'Content-Type': 'application/json' };
+            const revision = props.contextRevision ?? languageData.plan?.contextRevision;
+            if (typeof revision === 'number') headers['X-SheetDelver-Context-Revision'] = String(revision);
 
             const res = await fetchWithAuth(`/api/modules/shadowdark/actors/${actorId || 'new'}/level-up/finalize`, {
                 method: 'POST',
@@ -813,6 +826,7 @@ export const useLevelUp = (props: LevelUpProps) => {
                     hpRoll,
                     gold: goldRoll,
                     languages: selectedLanguages,
+                    languageChoices: props.languageChoices ?? selectedLanguageGroups,
                     statSelection,
                     statPool,
                     weaponMasterySelection,
@@ -830,7 +844,7 @@ export const useLevelUp = (props: LevelUpProps) => {
                 items: json.items || [],
                 hpRoll: json.hpRoll ?? hpRoll ?? 0,
                 gold: json.goldRoll ?? goldRoll ?? 0,
-                languages: selectedLanguages,
+                languages: json.languages ?? selectedLanguages,
                 patronUuid: selectedPatronUuid
             });
 
@@ -1102,32 +1116,15 @@ export const useLevelUp = (props: LevelUpProps) => {
     }, [classObj, actorId, targetLevel, targetClassUuid, selectedPatronUuid, patronUuid, availableClasses, availablePatrons, collections, classUuid, currentLevel, fetchDocument, fetchLevelUpData, activeClassObj, statuses.class]);
 
     useEffect(() => {
-        if (activeClassObj) {
-            // Check skip first
-            if (skipLanguageSelection) {
-                setLanguageGroups([]);
-                setFixedLanguages([]);
-                return;
-            }
-
-
-            // Only allow language selection at Level 1 (or 0 -> 1)
-            if (targetLevel === 1 || currentLevel === 0) {
-                const langData = activeClassObj.system?.languages || { common: 0, fixed: [], rare: 0, select: 0 };
-                const groups = [];
-                setFixedLanguages(langData.fixed || []);
-                setSelectedLanguages(prev => Array.from(new Set([...prev, ...(langData.fixed || [])])));
-
-                if (langData.select > 0) groups.push({ id: 'select', label: 'Class Selection', count: langData.select, options: langData.selectOptions });
-                if (langData.common > 0) groups.push({ id: 'common', label: 'Common Languages', count: langData.common });
-                if (langData.rare > 0) groups.push({ id: 'rare', label: 'Rare Languages', count: langData.rare });
-                setLanguageGroups(groups);
-            } else {
-                setLanguageGroups([]);
-                setFixedLanguages([]);
-            }
-        }
-    }, [activeClassObj, targetLevel, currentLevel, skipLanguageSelection]);
+        if (!languageData.ready || !languageData.plan) return;
+        const plan = languageData.plan;
+        setFixedLanguages(plan.fixed);
+        setSelectedLanguageGroups(previous => {
+            const next = { ...previous }, used = new Set(plan.fixed);
+            for (const group of plan.groups) { next[group.id] = previous[group.id].filter(uuid => group.options.includes(uuid) && !used.has(uuid)).slice(0,group.count);next[group.id].forEach(uuid => used.add(uuid)); }
+            return next;
+        });
+    }, [languageData.plan, languageData.ready]);
 
     // Clear LOADING status when selections update
     useEffect(() => {
@@ -1323,24 +1320,7 @@ export const useLevelUp = (props: LevelUpProps) => {
         }
 
         // 7. Languages
-        for (const group of languageGroups) {
-            const groupOptions = availableLanguages?.filter((l: any) => {
-                const id = l.uuid || l._id;
-                if (fixedLanguages.includes(id)) return false;
-                if (group.id === 'select') return group.options?.includes(id);
-                if (group.id === 'common') return !l.rarity || l.rarity === 'common';
-                if (group.id === 'rare') return l.rarity === 'rare';
-                return false;
-            }) || [];
-
-            const groupSelections = selectedLanguages.filter(lid => {
-                const opt = groupOptions.find((o: any) => (o.uuid || o._id) === lid);
-                if (!opt) return false;
-                return !knownLanguages.some(kl => kl.name?.toLowerCase() === opt.name?.toLowerCase());
-            });
-
-            if (groupSelections.length < group.count) return false;
-        }
+        if (!skipLanguageSelection && targetLevel === 1 && (!languageData.ready || !languageData.plan || !validateLanguageSelections(languageData.plan, selectedLanguageGroups).valid)) return false;
 
         // 8. Spells
         if (isSpellcaster && spellsToChooseTotal > 0) {
@@ -1371,7 +1351,7 @@ export const useLevelUp = (props: LevelUpProps) => {
         rolledTalents, requiredTalents, targetLevel, existingItems, statSelection, statPool, weaponMasterySelection, armorMasterySelection, activeClassObj, fixedChoices, fixedChoiceKey, levelData, authorityKey,
         rolledBoons, choiceRolls,
         extraSpellSelection, extraSpellData.ready, extraSpellsList, needsMastery, masteryData.ready, masteryData.catalog,
-        languageGroups, availableLanguages, fixedLanguages, selectedLanguages, knownLanguages,
+        languageGroups, availableLanguages, fixedLanguages, selectedLanguages, knownLanguages, languageData, selectedLanguageGroups, skipLanguageSelection,
         isSpellcaster, spellsToChooseTotal, availableSpells, selectedSpells, spellsToChoose,
         pendingChoices,
         hpRoll, goldRoll, totalRequiredBoons
@@ -1428,6 +1408,8 @@ export const useLevelUp = (props: LevelUpProps) => {
             fixedLanguages,
             knownLanguages,
             languageGroups,
+            languageData,
+            selectedLanguageGroups,
             boonTable,
             availableSpells,
             selectedSpells,
@@ -1470,7 +1452,7 @@ export const useLevelUp = (props: LevelUpProps) => {
             handleRollBoon,
             handleRemoveTalent,
             handleRemoveBoon,
-            setSelectedLanguages,
+            setSelectedLanguageGroups,
             handleStatPoolChange,
             handleResetTalents,
             handleResetBoons,
