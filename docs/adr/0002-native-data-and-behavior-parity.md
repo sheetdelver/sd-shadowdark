@@ -4,7 +4,7 @@
 
 **Date:** October 18, 2026
 
-**Scope:** Shadowdark module only; documentation and planning authorized now.
+**Scope:** Shadowdark module only; implementation and local checkpoint commits authorized.
 
 **Audit:** [Post-release native parity](../audits/2026-10-18-spellcasting-and-native-parity.md)
 
@@ -319,3 +319,22 @@ The initial audit made no Git or remote changes. The user subsequently authorize
 a documentation checkpoint and preparation for remediation; the module handoff
 records its branch/commit and execution order. Implementation and all A02
 acceptance remain pending. F01–F06 retain their separate scope decisions.
+
+## Implementation checkpoint D0 — October 18, 2026
+
+The implementation starts at documentation checkpoint `f5838a8` on
+`fix/adr-0002-native-parity`, with a clean tree. A byte-for-byte pre-edit ADR
+snapshot has SHA-256
+`7617ae3d29dae71e4082440f05aa31b624e93f3ab2f0951eaf95b6c8f88bb348`.
+Native authority was verified clean at release-4.0.6, commit
+`9677d16b3903b3b640f00d4efd48249142ac8334`. Core remains read-only.
+
+Maintained regressions now exercise actual module routes and native methods,
+using sanitized fixtures. `native-parity.test.ts --baseline` reproduces the
+Knight's empty alternate catalog (0 rather than 46) and an invalid advancement
+writing HP/XP despite a missing required spell. `native-parity.oracles.mjs
+--baseline` reproduces SD02-09–13 and retains the independent native controls
+(69 physical slots, 31 weapons, nine armor combinations, four inventories, nine
+roll outcomes). Baseline mode reports failures explicitly; ordinary invocation
+returns failure until corrected. This is controlled upstream evidence, not
+Foundry acceptance. D1–D7 and A02-01–15 remain open.

@@ -1,0 +1,165 @@
+// ADR-0002 maintained native-method oracles. In-memory collaborators only.
+// Run with node --import tsx; SHADOWDARK_NATIVE selects the read-only 4.0.6 reference.
+// --baseline records known failures without pretending they pass. Never native acceptance.
+import assert from 'node:assert/strict';
+import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { pathToFileURL, fileURLToPath } from 'node:url';
+import path from 'node:path';
+import { execFileSync } from 'node:child_process';
+const moduleRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const nativeRoot = process.env.SHADOWDARK_NATIVE ?? path.resolve(moduleRoot, '../../../../temp/shadowdark');
+assert.equal(JSON.parse(readFileSync(`${nativeRoot}/system/system.json`, 'utf8')).version, '4.0.6');
+const nativeCommit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: nativeRoot, encoding: 'utf8' }).trim();
+assert.equal(nativeCommit, '9677d16b3903b3b640f00d4efd48249142ac8334');
+const source = path => import(pathToFileURL(`${moduleRoot}/src/${path}`));
+const native = path => import(pathToFileURL(`${nativeRoot}/system/src/${path}`));
+globalThis.foundry = { data: { fields: {} }, abstract: { TypeDataModel: class { prepareBaseData() {} }, DataModel: class {} }, dice: { Roll: class {} }, applications: { ux: { TextEditor: { implementation: {} } }, api: { DialogV2: { confirm: async () => true } } } };
+globalThis.CONFIG = { SHADOWDARK: { DEFAULTS: { GEMS_PER_SLOT: 10 }, ABILITY_KEYS: ['str', 'dex', 'con', 'int', 'wis', 'cha'] } };
+globalThis.game = { i18n: { localize: s => s, format: s => s } };
+globalThis.ui = { notifications: { warn: s => { throw Error(s); }, error: s => { throw Error(s); } } };
+globalThis.Hooks = { call: async () => true };
+globalThis.shadowdark = { defaults: { FREE_COIN_CARRY: 100, BASE_ARMOR_CLASS: 10 }, dice: { createToolTip: () => '', setRollTarget: () => {}, rollDialog: async () => true }, chat: { renderRollMessage: async () => ({}) } };
+String.prototype.slugify ??= function () { return this.toLowerCase().replace(/\s+/g, '-'); };
+const { default: Player } = await native('models/PlayerSD.mjs');
+const { default: Npc } = await native('models/NpcSD.mjs');
+const { ActorBaseSD: Base } = await native('models/_ActorBaseSD.mjs');
+const { PhysicalItemSD: Physical } = await native('models/items/_PhysicalItemSD.mjs');
+const { default: Weapon } = await native('models/items/WeaponSD.mjs');
+const { default: RollSD } = await native('dice/RollSD.mjs');
+const { prepareActorCore, prepareItemBasics } = await source('logic/actor-preparation.ts');
+const { weaponBase, prepareRequestedAction, planConsequences, evaluateOutcome } = await source('logic/actions.ts');
+const { handleActorAction } = await source('server/api/actions.ts');
+const { ShadowdarkRegistry } = await source('server/Registry.ts');
+const { getLanguageLimits } = await source('logic/rules.ts');
+const { primLike } = await source('tests/fixtures/native-406.ts');
+const results = { method: 'Actual native methods and current module functions, controlled in-memory dependencies; not native Foundry acceptance', nativeCommit, parity: {}, defects: {} };
+const clone = structuredClone;
+const pack = name => readdirSync(`${nativeRoot}/data/packs/${name}.db`).filter(n => n.endsWith('.json')).map(n => JSON.parse(readFileSync(`${nativeRoot}/data/packs/${name}.db/${n}`, 'utf8'))).filter(d => /^!items![^!]+$/.test(d._key));
+const properties = new Map(pack('properties').map(d => [`Compendium.shadowdark.properties.Item.${d._id}`, d.name]));
+const lookups = { propertyName: uuid => properties.get(uuid) ?? null };
+const physicalGetter = Object.getOwnPropertyDescriptor(Physical.prototype, 'slotsUsed').get;
+const nativeItem = doc => { const item = clone(doc); Object.assign(item.system, { isPhysical: ['Armor','Basic','Gem','Potion','Scroll','Wand','Weapon'].includes(item.type), isArmor: item.type === 'Armor', isGem: item.type === 'Gem' }); if (item.system.isPhysical) item.system.slotsUsed = physicalGetter.call(item.system); return item; };
+const gear = pack('gear');
+let count = 0;
+for (const item of gear.filter(d => d.system.slots)) {
+  assert.equal(prepareItemBasics(item, lookups).slotsUsed, physicalGetter.call(item.system)); count++;
+}
+results.parity.physicalItemSlots = count;
+count = 0;
+for (const item of gear.filter(d => d.type === 'Weapon')) {
+  const model = Object.assign(Object.create(Weapon.prototype), clone(item.system));
+  model.hasProperty = name => (model.properties ?? []).some(ref => properties.get(ref)?.toLowerCase() === name);
+  model.prepareBaseData();
+  const basics = prepareItemBasics(item, lookups);
+  const actual = weaponBase(item, basics);
+  assert.equal(actual.handedness, model.handedness, item.name);
+  assert.equal(actual.damage, model.getDamageFormula() || null, item.name); count++;
+}
+results.parity.nativeWeaponDefaultHandAndDie = count;
+const actorBase = () => { const a = primLike(); a.items = []; a.effects = []; a.system.abilities.dex.value = 14; return a; };
+const armors = gear.filter(d => d.type === 'Armor');
+count = 0;
+for (const group of [[], ...armors.map(i => [i]), armors]) {
+  const actor = actorBase(); actor.items = group.map(i => ({ ...clone(i), system: { ...clone(i.system), equipped: true } }));
+  const prepared = prepareActorCore(actor, lookups);
+  const nativeThis = { abilities: prepared.abilities, parent: { items: actor.items.map(nativeItem) }, _getActiveEffectKeys: (_key, value) => ({ value, tooltips: '' }) };
+  assert.equal(prepared.ac, Player.prototype._calcArmorClass.call(nativeThis).value); count++;
+}
+results.parity.noEffectArmorConfigurations = count;
+count = 0;
+for (const coins of [0, 100, 101, 201]) {
+  const actor = actorBase(); actor.system.coins.gp = coins;
+  actor.items = gear.filter(d => d.system.slots).map(nativeItem);
+  actor.items.push({ ...clone(actor.items[0]), _id: 'repeat', sort: -1 });
+  actor.items[1].system.stashed = true;
+  const prepared = prepareActorCore(actor, lookups);
+  const model = { coins: actor.system.coins, parent: { items: actor.items }, _sortByUserOrder: Base.prototype._sortByUserOrder, getPhysicalItems: Base.prototype.getPhysicalItems };
+  assert.deepEqual(prepared.slotUsage, Base.prototype.getSlotUsage.call(model)); count++;
+}
+results.parity.coinBoundaryAndInventoryConfigurations = count;
+count = 0;
+for (const natural of [1, 10, 20]) for (const total of [5, 15, 25]) {
+  const nativeRoll = Object.assign(Object.create(RollSD.prototype), { _evaluated: true, total, dice: [{ total: natural, faces: 20 }], options: { dc: 15, canCritical: true } });
+  const outcome = evaluateOutcome({ dc: 15, critical: { success: 20, failure: 1 } }, total, natural);
+  assert.deepEqual([outcome.success, outcome.criticalSuccess, outcome.criticalFailure], [nativeRoll.success, nativeRoll.criticalSuccess, nativeRoll.criticalFailure]); count++;
+}
+results.parity.rollSuccessAndCriticalConfigurations = count;
+const noCritical = Object.assign(Object.create(RollSD.prototype), { _evaluated: true, total: 15, dice: [{ total: 15, faces: 20 }], options: { dc: 10, canCritical: true, criticalSuccessAt: 0, criticalFailureAt: 0 } });
+const moduleNoCritical = evaluateOutcome({ dc: 10, critical: { success: 0, failure: 0 } }, 15, 15);
+results.defects.disabledCritical = { nativeCriticalSuccess: noCritical.criticalSuccess, moduleCriticalSuccess: moduleNoCritical.criticalSuccess };
+assert.equal(noCritical.criticalSuccess, false);
+function apply(target, patch) {
+  for (const [key, value] of Object.entries(patch)) {
+    if (key.includes('.')) { const parts = key.split('.'); const leaf = parts.pop(); let p = target; for (const part of parts) p = p[part] ??= {}; p[leaf] = clone(value); }
+    else if (value && typeof value === 'object' && !Array.isArray(value)) apply(target[key] ??= {}, value);
+    else target[key] = clone(value);
+  }
+}
+let seq = 0;
+async function moduleAction(actor, body, fail = '') {
+  const events = []; const state = clone(actor);
+  const runtime = { documents: { get: async () => clone(state), effects: { update: async (_parent, id, patch) => { events.push(['effect', clone(patch)]); if (fail === 'effect') throw Error('controlled effect failure'); for (const item of state.items) { const effect = item.effects?.find(e => e._id === id); if (effect) apply(effect, patch); } } }, items: {
+    update: async (_parent, id, patch) => { events.push(['update', clone(patch)]); if (fail === 'update') throw Error('controlled write failure'); apply(state.items.find(i => i._id === id), patch); },
+    delete: async (_parent, id) => { events.push(['delete', id]); if (fail === 'delete') throw Error('controlled delete failure'); state.items = state.items.filter(i => i._id !== id); },
+  } }, rolls: { roll: async formula => { events.push(['roll']); if (fail === 'roll') throw Error('controlled roll failure'); return { formula, total: 5, terms: [{ faces: 20, results: [{ result: 5, active: true }] }] }; } }, chat: { send: async () => { events.push(['chat']); return {}; } } };
+  const response = await handleActorAction(actor._id, { runtime, userSession: { userId: 'offline-audit' }, json: async () => ({ requestId: `broad-audit-${++seq}`, ...body }) });
+  return { events, state, status: response.status, body: await response.json() };
+}
+const ability = { _id: 'ability', name: 'Controlled limited ability', type: 'Class Ability', system: { ability: 'wis', dc: 10, limitedUses: true, loseOnFailure: true, lost: false, uses: { available: 1, max: 1 } }, effects: [] };
+results.defects.abilityOrder = [];
+for (const failure of ['', 'roll', 'update']) {
+  const actor = actorBase(); actor.items = [clone(ability)]; const events = []; const nativeAbility = clone(ability);
+  nativeAbility.update = async patch => { events.push(['update', clone(patch)]); if (failure === 'update') throw Error('controlled write failure'); apply(nativeAbility, patch); };
+  globalThis.fromUuid = async () => nativeAbility;
+  shadowdark.dice.rollFromConfig = async () => { events.push(['roll']); if (failure === 'roll') throw Error('controlled roll failure'); return { success: false }; };
+  try { await Player.prototype.useAbility.call({ parent: { uuid: 'Actor.audit' }, rollConfigGenerators: { ability: async config => { config.mainRoll = {}; } } }, 'Actor.audit.Item.ability'); } catch {}
+  const actual = await moduleAction(actor, { kind: 'ability', itemId: 'ability' }, failure);
+  results.defects.abilityOrder.push({ failure: failure || 'normal', nativeEvents: events, moduleEvents: actual.events, nativeUses: nativeAbility.system.uses.available, moduleUses: actual.state.items[0].system.uses.available, moduleStatus: actual.status });
+}
+assert.equal(results.defects.abilityOrder[1].nativeUses, 0);
+
+
+const potion = { _id: 'potion', name: 'Cloudy vial', type: 'Potion', system: { description: 'Cloudy liquid', identification: { identified: false, name: 'Healing Potion', description: 'Known healing effect' } }, effects: [{ _id: 'effect', disabled: true }] };
+const nativePotion = clone(potion), nativeEvents = [];
+nativePotion.uuid = 'Actor.audit.Item.potion';
+nativePotion.update = async patch => { nativeEvents.push('identify'); apply(nativePotion, patch); };
+nativePotion.effects[0].update = async patch => { nativeEvents.push('effect'); apply(nativePotion.effects[0], patch); };
+nativePotion.system.parent = nativePotion;
+Object.defineProperty(nativePotion.system, 'isIdentified', { get: () => nativePotion.system.identification.identified });
+nativePotion.system.toggleIdentified = () => Physical.prototype.toggleIdentified.call(nativePotion.system);
+globalThis.ChatMessage = { create: async () => { nativeEvents.push('chat'); } };
+try { await Player.prototype.usePotion.call({ parent: { id: 'audit', name: 'Audit', items: new Map([['potion', nativePotion]]), deleteEmbeddedDocuments: async () => { nativeEvents.push('delete'); throw Error('controlled delete failure'); } } }, 'potion'); } catch {}
+const potionActor = actorBase(); potionActor.items = [potion];
+const modulePotion = await moduleAction(potionActor, { kind: 'potion', itemId: 'potion' }, 'delete');
+const fields = i => ({ name: i.name, description: i.system.description, identification: i.system.identification, effectDisabled: i.effects[0].disabled });
+results.defects.potionDeleteFailure = { native: fields(nativePotion), module: fields(modulePotion.state.items[0]), nativeEvents, moduleEvents: modulePotion.events.map(e => e[0]), moduleState: modulePotion.body.state };
+assert.equal(nativePotion.name, 'Healing Potion');
+const spell = { _id: 'spell', name: 'Controlled NPC spell', type: 'Spell', system: { tier: 1, lost: false, class: [], formula: '', damageType: 'none' }, effects: [] };
+const nativeSpell = clone(spell); nativeSpell.update = async patch => apply(nativeSpell, patch); globalThis.fromUuid = async () => nativeSpell;
+shadowdark.dice.rollFromConfig = async () => ({ success: false });
+await Npc.prototype.castSpell.call({ parent: { uuid: 'Actor.npc' }, rollConfigGenerators: { spell: async () => {} } }, 'Actor.npc.Item.spell', { cast: { focus: true } });
+const npc = { _id: 'npc', type: 'NPC', name: 'Controlled NPC', system: { abilities: Object.fromEntries(CONFIG.SHADOWDARK.ABILITY_KEYS.map(k => [k, { mod: 0 }])), spellcasting: { ability: 'int', bonus: 2, attacks: 1 }, attributes: { ac: { value: 12 }, hp: { value: 5, max: 5 } } }, items: [spell], effects: [] };
+const moduleNpc = await moduleAction(npc, { kind: 'spell', itemId: 'spell', focus: true });
+results.defects.npcFocus = { nativeLost: nativeSpell.system.lost, moduleLost: moduleNpc.state.items[0].system.lost, moduleStatus: moduleNpc.status };
+assert.equal(nativeSpell.system.lost, true);
+const language = { _id: 'rare', name: 'Star Tongue', type: 'Language', uuid: 'Item.rare', system: { rarity: 'rare' } };
+const index = { languages: [] }; ShadowdarkRegistry.categorize('shadowdark.languages', clone(language), index);
+const actor = actorBase(); actor.system.class = 'Item.class'; actor.derived = { abilities: { int: { mod: 0 } } };
+const limits = getLanguageLimits(actor, {}, { classes: [{ uuid: 'Item.class', system: { languages: { common: 0, rare: 0, select: 0, selectOptions: ['Item.rare'], fixed: [] } } }], languages: [language] });
+results.defects.languages = { nativeRarity: language.system.rarity, moduleRarity: index.languages[0].rarity, explicitSelectCount: 0, moduleLimits: limits };
+
+const checks = [];
+function check(id, fn) { try { fn(); checks.push({ id, passed: true }); } catch (error) { checks.push({ id, passed: false, error: error.message }); } }
+check('SD02-13 disabled critical thresholds', () => assert.equal(moduleNoCritical.criticalSuccess, noCritical.criticalSuccess));
+for (const row of results.defects.abilityOrder) check(`SD02-09 ability ${row.failure}`, () => {
+  assert.deepEqual(row.moduleEvents.map(e => e[0]), row.nativeEvents.map(e => e[0]));
+  assert.equal(row.moduleUses, row.nativeUses);
+});
+check('SD02-10 Potion delete failure survives identified', () => assert.deepEqual(results.defects.potionDeleteFailure.module, results.defects.potionDeleteFailure.native));
+check('SD02-11 NPC focus cannot prevent loss', () => assert.equal(results.defects.npcFocus.moduleLost, results.defects.npcFocus.nativeLost));
+check('SD02-12 native rarity', () => assert.equal(index.languages[0].rarity, language.system.rarity));
+check('SD02-12 explicit zero selections', () => assert.equal(limits.maxCommon, 1));
+results.checks = checks;
+if (process.env.SHADOWDARK_EVIDENCE) writeFileSync(process.env.SHADOWDARK_EVIDENCE, JSON.stringify(results, null, 2));
+if (checks.some(row => !row.passed) && !process.argv.includes('--baseline')) process.exitCode = 1;
+console.log(JSON.stringify(results, null, 2));

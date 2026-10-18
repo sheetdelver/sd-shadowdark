@@ -621,3 +621,20 @@ are the implementation queue. Record each finding as fixed, awaiting evidence,
 or explicitly scoped/deferred with a reason. Do not close data integrity cases
 because unit fixtures pass; do not describe source inspection as rendered or
 native acceptance. ADR-0001 remains Completed within its original selected scope.
+
+## D0 implementation baseline — October 18, 2026
+
+The maintained `src/tests/native-parity.test.ts` reproduces SD02-03 and SD02-07:
+Knight level 2→3 needs one tier-1 spell but offers zero of the native Witch
+list's 46; a crafted request choosing none writes the Actor once. The
+`native-parity.oracles.mjs` harness calls the actual released native methods
+with in-memory collaborators and finds eight failing checks: disabled critical
+threshold, three ability order/failure cases, Potion deletion-failure state,
+NPC focus loss, language rarity and explicit zero language choices. Its
+69/31/9/4/9 independent parity controls pass. No operator documents were used.
+Use `--baseline` only to record the failures; default execution is strict.
+
+Core public SDK documentation establishes synchronous, user-invariant Actor
+preparation and caller-bound asynchronous exact document reads as distinct
+contracts. Caller dependency delivery and installed-host proof are D1 work; no
+Core blocker is claimed from the current module's declared-pack restriction.
