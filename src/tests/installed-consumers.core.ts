@@ -121,7 +121,7 @@ async function main() {
         assert.equal((await admin.request('/admin/module-maintenance/approve',{planId:review.preview.id,backupAcknowledged:true})).status,202);
         evidence.installation = 'public HTTP archive preview + maintenance enter/review/approve; explicit isolated trust override';
         await until('serving with the candidate module', async () => (await (await admin.request('/api/status')).json()).initialized === true || false, manager, 600_000);
-        pass('candidate v2 module serves a native-pregen world on real Core 0.19.2 (bootstrap migration check is a no-op)');
+        pass(`candidate v2 module serves a native-pregen world on real Core ${core.version} (bootstrap migration check is a no-op)`);
 
         // Real login through Core's login view.
         const loginContext = await browser.newContext({ viewport: { width: 1440, height: 900 } });
@@ -134,6 +134,16 @@ async function main() {
         await loginContext.close();
         pass('player logged in through Core\'s real login view');
 
+        if (args.has('contracts-only')) {
+            evidence.skipped = ['width/theme and legacy UI matrix (--contracts-only)'];
+            const context = await browser.newContext({storageState:storage});
+            await proveParityContracts({context,api,origin,state,upstream,pass,
+                wait:(label,operation)=>until(label,operation,manager,120000), restart:async()=>{
+                    await manager.stop(); manager=new Manager(workspace,data,path.join(root,'manager-restarted.log'),production?'start':'dev');
+                    await until('restarted public runtime ready',async()=>(await(await admin.request('/api/status')).json()).initialized===true||false,manager,300000);
+                }});
+            await context.close(); return;
+        }
         if (args.has('probe-reconnect-write')) {
             // Minimal public-contract reproduction, independent of sheet/card
             // UI or ownership edits. A failed post is attempted exactly once.
@@ -448,7 +458,7 @@ async function main() {
         pass('packaged managed-JS OBSERVER 403 and LIMITED concealment 404 preserve source; OWNER succeeds and source is restored');
         // Reconnect after an ownership-only change. This tests permissions, not
         // arbitrary disconnected pack-content freshness (the separate CG-4).
-        upstream.unavailable = true; upstream.disconnectAll();
+        upstream.unavailable = true; upstream.interruptTransport();
         await page.getByRole('button',{name:'Create Character',exact:true}).waitFor({state:'hidden',timeout:60000});
         upstream.setSetting('core.compendiumConfiguration', {'shadowdark.classes':{ownership:{}}});
         upstream.unavailable = false;

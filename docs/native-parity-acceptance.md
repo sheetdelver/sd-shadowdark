@@ -1,0 +1,44 @@
+# ADR-0002 native acceptance run sheet
+
+All A02 rows remain **open for actual Foundry**. Controlled native methods,
+isolated Core and browser tests are separate evidence. This run sheet is ready
+for scoped operator authorization; it does not grant that authority.
+
+Before connecting, the operator must confirm the disposable world's exact ID,
+title, URL, native generation/build and Shadowdark version, and authorize the
+named fixture namespace, test accounts, permission/setting changes, backup and
+cleanup. A running endpoint or earlier operator-world access proves none of
+these. Use separate native-browser and Core accounts, and serialize permission,
+setting and logout probes. Do not copy session secrets into reports.
+
+Install the final archive identified in ADR-0002's validation record. Record its
+SHA-256, module/Core/native versions and commits, then independently export source
+before mutation. Fixtures must use prefix `SD02-` and exact selected native UUIDs;
+never identify a rule document by display name or terminal ID. Complete every
+selected row on the first confirmed native generation before requesting a switch.
+For the second generation, record its actual serialized effects independently.
+
+| Row | Fixture and procedure | Independent receipt/oracle and pass condition |
+| --- | --- | --- |
+| A02-01 | Disposable copies of sanitized L01 missing grant, L02 empty Spell Class refs, L04 altered Knight grant, plus complete source-less Priest. Apply only the reviewed exact-source edits in the remediation guide. | Export `_source`, inspect actual native prepared classes/ability and module diagnostics. Each minimal repair restores native eligibility while every unrelated/custom field is unchanged. Never repair the operator original. |
+| A02-02 | Copy stock Wizard/Priest/Witch/Seer/Knight; add separately reviewed no-caster, item-only, multiple-grant and NPC fixtures. Toggle only owned fixture effect states/suppression. | Compare native prepared eligibility and the shared sheet/card/action facts, both serialization shapes. Additional grant progression remains unavailable unless an exact progression owner exists. No copied origin fills a denied Class read. |
+| A02-03 | Knight exact Class `Compendium.shadowdark.classes.Item.0uVUOXKuX9xfJ600`, fixed Talent `Compendium.shadowdark.talents.Item.XRW3jhpTni15hwFc`; level2→3 with35XP and a recorded HP roll. Create/import a representative caster using exact native templates. | One Witch tier1 selection, Witch list UUID `Compendium.shadowdark.classes.Item.KGnBAFiTiLHZJUND`, Knight progression and native HP/XP result. Compare every created Spell's Class refs/effects/source. Empty/failed required catalog blocks writes. |
+| A02-04 | Copy owned spells into separate embedded IDs: duplicate origin, same name/different exact source, renamed, source-less/custom, missing source, lost and granted. Open both layouts/cards; cancel and unchanged-save. | Count actual Actor+Item IDs and explicit intent, independently export before/after. Zero writes for unchanged/cancel; no catalog-derived deletion or hidden owned rows. |
+| A02-05 | Native zero/positive/unknown table cases, existing excess, too few/many/duplicate/wrong-tier/wrong-list requests; unsupported extra-spell intent. | Inspect request result and source/receipt log: invalid submissions change no level, XP, HP, language or Item. A valid required choice completes once. |
+| A02-06 | While picker/page is loaded and while reads are pending: filter/remove/deny sources, change caller/role, send ownership-only context update with empty keys, interrupt transport, restore access. | No stale privileged row/label returns. Retire unsafe intent and hide retired Actor data; preserve search/tab where still authorized. Failure is explicit; retry restores current data without reload/spinner. Record explicit session-kick recovery separately. |
+| A02-07 | Disposable replacements with refused add, refused removal, response loss, duplicate request, concurrent edit and Core restart during uncertainty. | Compare independent source and per-operation receipts. Confirmed additions never repeat; unsuccessful/uncertain addition never removes old spells. Unknown create/result requires fresh review, never a name guess. No distributed-atomicity claim. |
+| A02-08 | Exact readable world Class/Spell and Actor-embedded Class refs, declared known compendium UUIDs, absent/denied sources and duplicate names; distinct GM/OWNER/OBSERVER/LIMITED/NONE accounts. | Native source/permissions and caller view/action agree. OBSERVER read succeeds but write403; concealed LIMITED/NONE404. No labels/content leak from warmed privileged registry; no undeclared live-compendium fallback. |
+| A02-09 | Actual installed picker/resource card/shared Core roller at360,768,1024,1440, both themes, both layouts. | Screenshot plus accessible roles/names, Tab/Shift-Tab containment, Escape, focus return, nested cleanup, scroll/reachable footer and no horizontal clipping. Compare native duration/range facts. |
+| A02-10 | Final archive on first generation, then separately confirmed second: creation/import/management/casting/focus/Scroll/Wand and existing migration hooks. | Native `_source` vs module source and per-operation receipts. Required migrations verify independently, restart no-op, restored legacy data needs new approval. Record actual generation, not a modeled effect conversion. |
+| A02-11 | Native checked/no-check limited-use ability copies (e.g. exact Berserk `Compendium.shadowdark.class-abilities.Item.so8ytbZuqmNvppI7`), zero/last use, cancellation, independently refused spend/result/loss and replay. | Ordered source/roll/chat trace: spend first; refused/uncertain spend has no result; failed result retains spend; outstanding known consequences alone retry. Two distinct last-use requests produce one result. |
+| A02-12 | Exact identified/unidentified Potion copies with distinct active/alternate text, disabled effects and empty alternate name; refuse each prerequisite/delete independently. | Native identification swap and effect group precede chat/delete. Unknown fields survive; partial failure has the native surviving state. No repeated swap/chat on replay. Use removes the owned Item regardless of stack quantity. |
+| A02-13 | Player owned Spell versus NPC focus submission; Scroll/Wand cases; native custom/zero/default critical thresholds and manual total. | Player-only focus exemption, NPC failure loss, item-specific consequences, zero disables thresholds, unknown natural die never implies critical. UI/server outcome agrees with actual native. |
+| A02-14 | Custom/localized names with native rarity, explicit select0/populated pool, independent ancestry/class/common/rare counts, fixed grants, denied refs and existing custom extras. | Compare actual native Generator and ordinary editor separately. One UUID cannot fill two required pools; invalid create/advance makes zero writes. Ordinary editing has no creation quota; cancel/unchanged leaves exact inventory. |
+| A02-15 | Repeat the maintained native69-slot/31-weapon/9-armor/4-inventory/9-outcome controls, recording actual native method/prepared results. | Preserve independent oracle and unsupported-scope labels. F01–F06 remain separately scoped; selected passes do not establish whole-system parity. |
+
+Keep before/after source receipts and operation logs free of credentials/private
+operator data. Cleanup only fixtures/accounts/settings explicitly authorized for
+this run, restore permission/setting snapshots, and verify source restoration.
+Stop task-owned services only; retain operator services. Mark each row per native
+generation with executed/pass/fail/blocked, exact artifact and limitations. Leave
+ADR-0002 open while any required native evidence is unproven.

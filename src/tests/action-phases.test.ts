@@ -69,5 +69,10 @@ await check('SD02-13 zero/custom/default thresholds and unknown natural are dist
     for(const [success,failure,natural,expected] of [[0,0,20,[false,false]],[19,2,19,[true,false]],[19,2,2,[false,true]],[undefined,undefined,20,[true,false]],[20,1,null,[false,false]]] as any[]){const out=evaluateOutcome({dc:10,critical:{success,failure}} as any,15,natural);assert.deepEqual([out.criticalSuccess,out.criticalFailure],expected);}
     for(const v14 of [false,true]){const a:any=primLike();const changes=[{key:'system.roll.attack.critical-success.all',value:'0',...(v14?{type:'override',phase:'initial'}:{mode:5})},{key:'system.roll.attack.critical-failure.all',value:'0',...(v14?{type:'override',phase:'initial'}:{mode:5})}];a.effects=[{_id:'crit',...(v14?{system:{changes}}:{changes})}];const core=prepareActorCore(a);const action=prepareRequestedAction(core,a,{}, {kind:'attack',itemId:'primLongsword'})!;assert.equal(action.critical.success,0);assert.equal(action.critical.failure,0);assert.equal(evaluateOutcome(action,20,20).criticalSuccess,false);}
 });
+await check('SD02-08 concealed/absent Actors return404 without exposing an action receipt; observer SDK denial remains403',async()=>{
+ const t=fixture(); await t.send(); const before=[...t.events];
+ t.runtime.documents.get=async()=>null; assert.equal((await t.send()).status,404); assert.deepEqual(t.events,before);
+ t.runtime.documents.get=async()=>{throw new SdkError('permission_denied','Observer lacks owner access')}; assert.equal((await t.send()).status,403); assert.deepEqual(t.events,before);
+});
 console.log(JSON.stringify({method:'Actual module operations over controlled source/receipts; not native Foundry acceptance',checks},null,2));
 if(checks.some(row=>!row.passed))process.exitCode=1;

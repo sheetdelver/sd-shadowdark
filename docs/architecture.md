@@ -583,3 +583,9 @@ changes retire visibility/interactions while mounted UI state awaits current
 authority. Fetch callback identity is not a world scope. Class collection browsing
 is not a prerequisite for an already resolved world Class. Catalog world pages
 follow the SDK's zero-based contract.
+
+Identity labels follow the exact reference. An owned copy is a label source only
+when the reference itself addresses that Actor+embedded Item. Caller identity
+lookups remain bounded and permission-checked. Hidden/absent action Actors return
+404; explicit owner denials retain403, including durable receipt replays. Explicit
+native session kicks and ordinary transport loss have separate recovery evidence.

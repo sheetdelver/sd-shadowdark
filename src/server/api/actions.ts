@@ -64,7 +64,7 @@ function applyLocal(actor: any, write: ConsequenceWrite) {
 }
 async function ownerActor(actorId: string, req: ModuleServerRequest): Promise<any> {
     const actor = await req.runtime.documents.get('Actor', actorId, { minOwnership: 'owner' });
-    if (!actor) throw new ActionError('permission_denied', 'The Actor is not available to you as an owner.');
+    if (!actor) throw new ActionError('not_found', 'Actor not found or not visible.');
     return structuredClone(actor);
 }
 /** Confirmed source projections can reconcile idempotent post-result patches;

@@ -207,6 +207,7 @@ await check('SD02-02 copied Class provenance cannot satisfy a denied exact refer
     const model = prepareShadowdarkView(actor);
     assert.equal(model.actions.find(row => row.kind === 'spell')!.available, false);
     assert.equal(model.spellModel.sources.length, 0);
+    assert.equal(model.identity.class.label,null,'An unrelated/copied Class title cannot label an unresolved exact reference.');
     assert.equal(model.spellModel.owned[0].classification, 'unresolved');
     const exact = prepareShadowdarkView(actor, { classDocument: () => byUuid.get(WIZARD) });
     assert.equal(exact.actions.find(row => row.kind === 'spell')!.available, true);

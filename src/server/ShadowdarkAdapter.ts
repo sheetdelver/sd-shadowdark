@@ -255,7 +255,7 @@ export class ShadowdarkAdapter extends BaseSystemAdapter {
     }
 
     /** Request-local bounded dependencies; never published to the shared registry. */
-    async callerLookups(actor: any, caller: Caller, options: { languages?: boolean } = {}): Promise<ViewLookups> {
+    async callerLookups(actor: any, caller: Caller, options: { languages?: boolean; identities?: boolean } = {}): Promise<ViewLookups> {
         const base = this.lookups();
         const documents = new Map<string, any>();
         const visited = new Set<string>();
@@ -279,6 +279,7 @@ export class ShadowdarkAdapter extends BaseSystemAdapter {
         const spells = [...items.filter(item => item.type === 'Spell'), ...[...documents.values()].filter(doc => doc.type === 'Spell')];
         if (player) await Promise.all(spells.flatMap(spell => (Array.isArray(spell.system?.class) ? spell.system.class : []).map(resolve)));
         await Promise.all([...documents.values()].filter(doc => doc.type === 'Class').map(doc => resolve(doc.system?.spellcasting?.class)));
+        if (options.identities) await Promise.all(['ancestry','background','deity','patron'].map(key => resolve(actor?.system?.[key])));
         if (options.languages) {
             const prepared = prepareActorCore(actor, base);
             await Promise.all((Array.isArray(prepared.effective.languages) ? prepared.effective.languages : []).map(resolve));

@@ -194,10 +194,10 @@ async function actions() {
             const { status } = await statusOf(await handleActorAction('w1', request(runtime, { requestId: 'req-lost-0001', kind: 'spell', itemId: 'lost' }) as any));
             assert.equal(status, 409); assert.equal(rolls(), 0); assert.equal(writes.length, 0);
         });
-        await check('C4', 'non-owners cannot run actions (no roll)', async () => {
+        await check('C4', 'concealed non-owners cannot run actions (404, no roll)', async () => {
             const { runtime, rolls } = fakeRuntime(wizardActor(), { owner: false });
             const { status } = await statusOf(await handleActorAction('w1', request(runtime, { requestId: 'req-owner-001', kind: 'spell', itemId: 'mm' }) as any));
-            assert.equal(status, 403); assert.equal(rolls(), 0);
+            assert.equal(status, 404); assert.equal(rolls(), 0);
         });
         await check('C4', 'failed spell is lost; a focus check is not', async () => {
             const failed = fakeRuntime(wizardActor(), { rolls: [3] });
@@ -509,7 +509,7 @@ async function reviewCorrections() {
             const beforeReplayReads = reads;
             owner = false;
             const replay = await statusOf(await handleActorAction('a1', request(runtime, body) as any));
-            assert.equal(replay.status, 403); assert.equal(reads, beforeReplayReads + 1, 'the replay re-read the Actor under current ownership');
+            assert.equal(replay.status, 404); assert.equal(reads, beforeReplayReads + 1, 'the replay re-read the Actor under current ownership');
             assert.doesNotMatch(JSON.stringify(replay.body), /Healing Potion/);
             assert.equal(writes.filter(write => write[0] === 'item.delete').length, 1);
         });

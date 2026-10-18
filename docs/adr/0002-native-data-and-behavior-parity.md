@@ -536,3 +536,37 @@ choices make zero advancement writes. Extra choices need a verified native Talen
 Creation refuses missing casting grants/unresolved Spell Class dependencies;
 required selected sources cannot silently disappear. Floor/current typing passes.
 All A02 native acceptance remains unexecuted.
+
+## D6b installed public contracts and concealment — October 18, 2026
+
+Healthy installed0.19.3 public SDK checks proved world/embedded Class reads,
+source-preserving replacement, Array source-filter refresh and genuine process
+restart: completed management/action receipts replay without writes and uncertain
+spending does not request another result. Installed creation validates separate
+language choices before its caller-bound SDK write; fixed source fields/effects
+survive. Final combined runs remain in progress.
+
+Two additional source boundaries were reproduced and corrected. The action route
+now preserves Core's concealment contract: a null/hidden Actor is404, while an
+explicit SDK owner denial remains403. The new maintained case fails before and
+passes after, including receipt replay without disclosure/writes. Identity labels
+also used the first owned Class even for a different/unavailable exact reference.
+The shared identity projection now uses an owned label only for that exact Actor+
+embedded Item reference; caller views resolve bounded identity refs explicitly.
+The copied-Class label regression fails before and passes after. Readable owned
+copies remain inventory; they cannot stand in for a referenced source.
+
+Explicit upstream session termination is a separate observed host limitation:
+after `socket.disconnect(true)`, reads recovered but the same caller's mutation
+reported “user socket is not connected” on0.19.2 and0.19.3. No upstream Item write
+occurred; the module retained the old Spell and returned an uncertain addition
+receipt. The isolated installed harness contains `--probe-reconnect-write
+--server-disconnect` for the minimal public reproduction. Ordinary transient
+transport loss is tested separately with `interruptTransport`; no module relogin,
+privileged fallback or Core edit is introduced. This is not CG-6's separately
+qualified context-error typing issue, nor evidence of native acceptance.
+
+The full native A02-01–15 procedure, exact fixture/source choices, before/after
+oracles, account/permission scope and cleanup requirements are prepared in
+[native acceptance run sheet](../native-parity-acceptance.md). Every actual native
+row remains open until scoped operator authorization and execution.

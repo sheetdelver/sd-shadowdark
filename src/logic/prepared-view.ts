@@ -153,17 +153,21 @@ export function prepareShadowdarkView(source: any, lookups: ViewLookups = {}, ru
     }));
 
     const system = source?.system ?? {};
-    const ownedOf = (type: string) => items.find(item => item?.type === type);
+    const ownedOf = (type: string, value: unknown) => {
+        const ref = parseUuid(value);
+        return ref?.kind === 'embedded' && ref.parentType === 'Actor' && ref.parentId === documentId(source)
+            ? items.find(item => item?.type === type && documentId(item) === ref.id) : undefined;
+    };
     const languageRef = (value: unknown) => {
         const entry = labelled(value, lookups);
         return { ...entry, rarity: entry.ref ? languageRarity(lookups.languageDocument?.(entry.ref)) : null };
     };
     const identity = {
-        class: labelled(system.class, lookups, ownedOf('Class')),
-        ancestry: labelled(system.ancestry, lookups, ownedOf('Ancestry')),
-        background: labelled(system.background, lookups, ownedOf('Background')),
-        deity: labelled(system.deity, lookups, ownedOf('Deity')),
-        patron: labelled(system.patron, lookups, ownedOf('Patron')),
+        class: labelled(system.class, lookups, ownedOf('Class', system.class)),
+        ancestry: labelled(system.ancestry, lookups, ownedOf('Ancestry', system.ancestry)),
+        background: labelled(system.background, lookups, ownedOf('Background', system.background)),
+        deity: labelled(system.deity, lookups, ownedOf('Deity', system.deity)),
+        patron: labelled(system.patron, lookups, ownedOf('Patron', system.patron)),
         languages: (Array.isArray(system.languages) ? system.languages : []).map(languageRef),
         // Languages added by effects (e.g. "Speak Goblin"): shown, never written back.
         grantedLanguages: (Array.isArray(core.effective?.languages) ? core.effective.languages : [])
