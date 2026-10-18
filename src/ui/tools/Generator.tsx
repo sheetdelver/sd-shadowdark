@@ -603,7 +603,7 @@ function GeneratorContent() {
 
             const addItem = async (uuid: string, talentClass?: 'ancestry' | 'class' | 'level') => {
                 const doc = await fetchDocument(uuid);
-                if (!doc) return null;
+                if (!doc) throw new Error(`Required creation source ${uuid} is unavailable; no character was created.`);
                 const enriched = await enrichItem(doc, { 
                     ...enrichmentContext,
                     defaultTalentClass: talentClass
@@ -757,9 +757,7 @@ function GeneratorContent() {
             // 3. Send to API
 
 
-            // --- DIRECT PERSISTENCE ---
-            // Following the "Lean" strategy: The Registry now serves full data
-            // to the Builder, so we can POST directly to Core.
+            // Server validates the current caller’s native choices before the SDK write.
             logger.info("[Generator] Transmitting unaltered character data to Core...");
             const res = await fetchWithAuth('/api/modules/shadowdark/characters/create', {
                 method: 'POST',

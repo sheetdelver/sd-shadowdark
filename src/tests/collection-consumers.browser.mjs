@@ -43,7 +43,7 @@ window.sdk={isConnected:true,worldId:'w',currentUser:{id:'p',role:1},foundryUrl:
   if(p.network)throw new TypeError('Connection interrupted');
   return Response.json(p.body??(key==='index'?{nameIndex:{}}:key==='data'?{success:true,data:{isSpellcaster:false,spellsToChoose:{},availableSpells:[],progressionReady:true}}:key==='gear'?[rope]:[]),{status:p.status||200});
  }};
-window.actorContext={actor:{id:'a',items:[],derived:{actions:[],items:[],spellcasting:{classes:[]}}},isActionBusy:()=>false,getDraftValue:(_,value)=>value};
+window.actorContext={actor:window.initial.actor||{id:'a',items:[],derived:{actions:[],items:[],spellcasting:{classes:[]}}},isActionBusy:()=>false,getDraftValue:(_,value)=>value};
 const root=createRoot(document.getElementById('root')); let mounted=true, show=true;
 const advancementClass={uuid:'Compendium.shadowdark.classes.Item.thief',name:'Thief',system:{hitPoints:'d4',patron:{required:false},talents:['Compendium.shadowdark.talents.Item.backstab']}};
 const advancementProps={actorId:'',currentLevel:0,targetLevel:1,classObj:advancementClass,classUuid:advancementClass.uuid,ancestry:null,abilities:{},spells:[],skipLanguageSelection:true,onComplete:()=>{},onCancel:()=>{}};
@@ -168,11 +168,11 @@ try {
         assert.equal(await count(p, 'magic-items'), 2); assert.equal(await count(p, 'gear'), 1);
     });
     for (const policy of [{ status: 403 }, { status: 503 }, { status: 404 }, { network: true }, { body: {} }]) {
-        await test(`RV-11: Spells classes failure ${JSON.stringify(policy)} is explicit and recovers to valid empty`, { which: 'spells', delay: 50, policy: { classes: policy } }, async p => {
+        await test(`RV-11: Generator classes failure ${JSON.stringify(policy)} is explicit and recovers to valid empty`, { which: 'generator', delay: 50, policy: { classes: policy } }, async p => {
             await p.getByRole('alert').waitFor(); assert.match(await p.getByRole('alert').innerText(), /classes/i);
             assert.equal(await p.getByText('Loading classes…', { exact: true }).count(), 0);
             await p.evaluate(() => window.policy = {}); await p.getByRole('button', { name: 'Retry', exact: true }).click();
-            await p.getByText(/No spellcasting class/).waitFor(); assert.equal(await p.getByRole('alert').count(), 0); assert.equal(await count(p, 'classes'), 2);
+            await p.getByRole('button',{name:'Create Character',exact:true}).waitFor(); assert.equal(await p.getByRole('alert').count(), 0); assert.equal(await count(p, 'classes'), 2);
         });
     }
     await test('RV-11: valid empty gear is ready and explains the empty result', { which: 'gear', delay: 50, policy: { gear: { body: [] } } }, async p => {
@@ -218,6 +218,11 @@ try {
         await p.getByRole('button', { name: 'Retry', exact: true }).click(); await p.getByRole('button', { name: 'Sailor', exact: true }).waitFor();
         await p.getByPlaceholder('Search Background...').fill('Sailor'); await p.evaluate(() => window.retire());
         await p.getByRole('button', { name: 'Sailor', exact: true }).waitFor(); assert.equal(await p.getByPlaceholder('Search Background...').inputValue(), 'Sailor'); assert.equal(await count(p, 'backgrounds'), 3);
+    });
+    await test('SD02-02 Spells uses its exact caller-derived world Class without unrelated catalog demand', {which:'spells',actor:{id:'a',items:[],derived:{actions:[],items:[],spellModel:{owned:[],sources:[{classUuid:'Item.worldClass',listUuid:'Item.worldClass',name:'Exact world Class',grant:'wizard',limits:{1:{status:'known',value:1}}}]}}},policy:{classes:{status:403}}},async p=>{
+        await p.getByRole('button',{name:/TIER 1/}).waitFor(); assert.equal(await count(p,'classes'),0);
+        await p.evaluate(()=>window.retire()); await p.getByRole('button',{name:/TIER 1/}).waitFor();
+        assert.equal(await p.getByText('Loading classes…',{exact:true}).count(),0);
     });
     const spell = {type:'Spell', uuid:'Compendium.shadowdark.spells.Item.light',name:'Light',system:{tier:1,class:['Compendium.shadowdark.classes.Item.wizard'],duration:{type:'rounds',value:2}}};
     const owned = [{itemId:'customA',name:'Source-less spell',tier:1,uuid:null},{itemId:'customB',name:'Source-less spell',tier:1,uuid:null}];

@@ -3,7 +3,7 @@ import { getErrorMessage, isSdkError, logger, SdkError } from '@sheet-delver/sdk
 import { shadowdarkAdapter } from '../../server/ShadowdarkAdapter';
 import { assembleFinalItems } from './level-up-engine';
 import * as levelUpEngine from './level-up-engine';
-import { TALENT_HANDLERS } from '../../logic/talent-handlers';
+import { TALENT_HANDLERS, extraSpellClassName } from '../../logic/talent-handlers';
 import { canonicalUuid } from '../../logic/identity';
 import { callerOf, requestRules, requestRevision, contextConflict } from '../access';
 import { hitPointRollFormula } from '../../logic/actions';
@@ -31,6 +31,7 @@ async function verifyGrants(body: any, classObj: any, req: ModuleServerRequest) 
             return { ...doc, uuid, system: { ...(doc.system ?? {}), ...(entry?.system?.level !== undefined ? { level: entry.system.level } : {}),
                 ...(entry?.system?.talentClass ? { talentClass: entry.system.talentClass } : {}) } };
         }
+        if (TALENT_HANDLERS.some(handler => handler.action === 'extra-spell' && handler.matches(entry))) throw new SdkError('validation', 'An extra spell choice requires its exact native granting Talent source.');
         // Module table markers ("Patron Boon", "Choose One") are instructions, not grants.
         if (['PatronBoon', 'PatronBoonTwice', 'synthetic'].includes(entry?.type)
             && !TALENT_HANDLERS.some(handler => handler.action && handler.matches(entry))) return null;
@@ -408,6 +409,21 @@ async function finalizeLevelUp(actorId: string, req: ModuleServerRequest) {
 
         // Assembly: compendium sources are limited to the caller's readable packs.
         const finalItems = await assembleFinalItems(state, targetLevel, classObj, ancestry, background, patron, callerOf(req), actor);
+
+        const extraGrants = finalItems.filter(item => item.type === 'Talent' && TALENT_HANDLERS.some(handler => handler.action === 'extra-spell' && handler.matches(item)));
+        if (verified.extraSpells.length !== extraGrants.length) return error('validation', `Native granting talents require exactly ${extraGrants.length} extra spell choice(s).`);
+        if (new Set(verified.extraSpells.map((spell: any) => spell.uuid)).size !== verified.extraSpells.length) return error('validation', 'Extra spell choices must identify distinct exact sources.');
+        for (const [index, spell] of verified.extraSpells.entries()) {
+            const namedClass = extraSpellClassName(extraGrants[index]);
+            if (namedClass) {
+                let matches = false;
+                for (const reference of spell.system?.class ?? []) {
+                    const doc = await resolveTyped(reference, 'Class');
+                    if (doc && String(doc.name).toLowerCase() === namedClass) matches = true;
+                }
+                if (!matches) return error('validation', 'An extra spell does not match its native granting talent’s Class.');
+            }
+        }
 
         // Evaluate actual/planned native grants, then validate every tier before
         // HP, XP, language or embedded Item writes. Empty catalogs cannot waive it.

@@ -576,3 +576,10 @@ Class dependencies are authoritative; copied origins cannot fill a missing read.
 Secondary grants retain owned inventory with unknown progression. Historical
 missing grants/refs require the reviewed exact-source remediation guide; published
 migration history is unchanged.
+
+The module Actor view is a bounded caller SDK read, dependency resolution and
+independent source re-read, normalized once with a compact review token. Context
+changes retire visibility/interactions while mounted UI state awaits current
+authority. Fetch callback identity is not a world scope. Class collection browsing
+is not a prerequisite for an already resolved world Class. Catalog world pages
+follow the SDK's zero-based contract.

@@ -35,3 +35,9 @@ are not yet implemented.
 ## Third-party license
 
 This product is an independent product published under the Shadowdark RPG Third-Party License and is not affiliated with The Arcane Library, LLC. Shadowdark RPG © 2023 The Arcane Library, LLC.
+
+ADR-0002 implements exact caller-bound spell dependencies, explicit owned-spell
+management with partial-operation receipts, native action phases and separate
+language choices. Historical omissions require [exact-source GM review](docs/native-source-remediation.md).
+Native A02 acceptance remains open; controlled-upstream checks are not Foundry
+acceptance. Compatibility and module version remain unchanged.

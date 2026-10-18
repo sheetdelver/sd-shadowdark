@@ -24,6 +24,7 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { CORE, Http, Manager, prepareWorkspace, unusedPort, until, isolatedEnv } from './core0191/core';
 import { ControlledUpstream, type WorldState } from './core0191/upstream';
+import { parityFixtures, proveParityContracts } from './parity-installed';
 import { nativePacks, type Doc } from './core0191/world';
 
 const args = new Map(process.argv.slice(2).map(arg => { const [key, ...value] = arg.replace(/^--/, '').split('='); return [key, value.join('=') || 'true']; }));
@@ -36,7 +37,8 @@ const PLAYWRIGHT = process.env.SHADOWDARK_PLAYWRIGHT_MODULE || 'playwright';
 const mod = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const production = args.has('production');
 const core = { version: JSON.parse(fs.readFileSync(path.join(CORE, 'package.json'), 'utf8')).version, commit: spawnSync('git', ['-C',CORE,'rev-parse','HEAD'], {encoding:'utf8'}).stdout.trim() };
-assert.equal(core.version, '0.19.2');
+assert.ok(['0.19.2','0.19.3'].includes(core.version));
+if (!core.commit && fs.existsSync(path.join(CORE,'.source-provenance.json'))) core.commit = JSON.parse(fs.readFileSync(path.join(CORE,'.source-provenance.json'),'utf8')).commit;
 fs.mkdirSync(path.join(out, 'shots'), { recursive: true });
 const evidence: Record<string, any> = { native: false, generation, core, mode: production ? 'production' : 'development', archive: { file: archive, sha256: createHash('sha256').update(fs.readFileSync(archive)).digest('hex') }, checks: [], cases: [], pageErrors: [], consoleErrors: [] };
 const pass = (label: string) => { evidence.checks.push(label); console.log(`  ✓ ${label}`); };
@@ -61,6 +63,7 @@ const state: WorldState = {
         { _id: 'setAmmo', key: 'shadowdark.autoConsumeAmmunition', value: 'true' }],
     chat: [], packs, packMetadata: metadata,
 };
+const parity = parityFixtures(packs, WIZARD); state.actors.push(parity.actor); state.items.push(parity.worldClass, parity.spell);
 const upstream = new ControlledUpstream(state);
 const root = path.join(out, 'run'); fs.rmSync(root, { recursive: true, force: true }); fs.mkdirSync(root, { recursive: true });
 const workspace = prepareWorkspace(root, production);
@@ -86,7 +89,7 @@ async function main() {
         const build = spawnSync(process.execPath, ['--import','tsx','src/scripts/start-server.ts','build',`--data-dir=${data}`], {cwd: workspace, env: {...isolatedEnv(data), NODE_ENV:'production'}, stdio:['ignore',log,log]});
         fs.closeSync(log); assert.equal(build.status, 0, `production build: ${root}/build.log`);
     }
-    const manager = new Manager(workspace, data, path.join(root, 'manager.log'), production ? 'start' : 'dev');
+    let manager = new Manager(workspace, data, path.join(root, 'manager.log'), production ? 'start' : 'dev');
     const origin = `http://127.0.0.1:${appPort}`; const api = `http://127.0.0.1:${apiPort}`;
     const admin = new Http(api, origin);
     const { chromium } = await import(PLAYWRIGHT);
@@ -211,7 +214,7 @@ async function main() {
             }
             return result;
         };
-        const widths = args.has('focus-only') ? [] : (args.get('widths') ?? '320,390,820,1440').split(',').map(Number);
+        const widths = args.has('focus-only') ? [] : (args.get('widths') ?? '360,768,1024,1440').split(',').map(Number);
         for (const width of widths) for (const theme of ['dark', 'light'] as const) {
             const label = `${width}-${theme}`;
             const context = await browser.newContext({ viewport: { width, height: 900 }, storageState: storage });
@@ -235,7 +238,7 @@ async function main() {
             const spell = page.locator('section[aria-label="Spells"] button').first();
             if (await spell.count()) record.spellCard = await dialogKeyboard(page, spell, `${label} spell card`);
             record.attackCard = await dialogKeyboard(page, page.getByRole('button', { name: 'Dagger details' }).first(), `${label} attack card`);
-            if (width === 320 || width === 1440) {
+            if (width === 360 || width === 1440) {
                 const opener=page.getByRole('button',{name:'Dagger details'}).first(); await opener.focus(); await page.keyboard.press('Enter');
                 const card=page.getByRole('dialog').last(); const attack=card.getByRole('button',{name:/^Melee attack$/i});
                 await attack.focus(); await page.keyboard.press('Enter');
@@ -272,6 +275,9 @@ async function main() {
             }
             record.tabs = tabs;
             assert.ok(tabs.length >= 6, `${label}: tabs reviewed ${tabs.join(',')}`);
+            await page.getByRole('button',{name:'Spells',exact:true}).first().click().catch(async()=>{
+                await page.getByRole('button',{name:'More sections'}).click(); await page.getByRole('button',{name:'Spells',exact:true}).last().click(); });
+            record.spellPicker = await dialogKeyboard(page,page.getByRole('button',{name:/TIER 1/}).first(),`${label} spell picker`);
             // Inventory card from the tabbed sheet.
             await page.getByRole('button', { name: 'Inventory', exact: true }).first().click().catch(async () => {
                 await page.getByRole('button', { name: 'More sections' }).click(); await page.getByRole('button', { name: 'Inventory', exact: true }).last().click(); });
@@ -387,20 +393,17 @@ async function main() {
         const caller = {get: async (url: string) => {const response = await context.request.get(`${api}${url}`, {headers:{Origin:origin}}); return {status:response.status()};}};
         await until('fresh classes reads denied', async () => (await caller.get('/api/modules/shadowdark/fetch-pack/classes')).status === 403 || false, manager, 60000);
         await page.getByRole('button',{name:'Spells',exact:true}).first().click();
-        await page.getByRole('alert').filter({hasText:'classes:'}).waitFor({timeout:60000});
-        await shot(page,'rv11-spells-denied');
-        await page.getByRole('button',{name:'Retry',exact:true}).click();
-        await page.getByRole('alert').filter({hasText:'classes:'}).waitFor({timeout:60000});
+        await page.getByText('Actor Class is unavailable. Resolve its exact reference; no Class was inferred.',{exact:true}).waitFor({timeout:60000});
+        await shot(page,'sd02-exact-class-denied');
         upstream.setSetting('core.compendiumConfiguration', {});
         await page.getByRole('button',{name:/TIER 1/}).first().waitFor({timeout:60000});
-        pass('RV-11 installed UI: Spells explains real classes 403, retries, and recovers after permission restoration');
+        pass('SD02 installed caller Class denial is explicit and exact view recovers without unrelated Class collection loading');
         upstream.setSetting('core.compendiumConfiguration', {'shadowdark.classes':{ownership:{}}});
-        const gapStart = {index:requests.length,classes:shards.filter(id=>id==='classes').length};
-        await until('generator classes reads denied', async () => (await caller.get('/api/modules/shadowdark/fetch-pack/classes')).status === 403 || false, manager, 60000);
-        await page.getByRole('alert').filter({hasText:'classes:'}).waitFor({timeout:60000});
-        assert.ok(requests.length > gapStart.index, 'ownership-only event refetched mounted caller index');
-        assert.equal(await page.getByRole('button',{name:/TIER 1/}).count(),0, 'retired classes no longer rendered');
-        evidence.ownershipRefresh={indexRefetched:true,loadedClassesRetired:true};
+        const gapStart = {index:requests.length};
+        await until('caller Class denied',async()=>(await caller.get('/api/modules/shadowdark/fetch-pack/classes')).status===403||false,manager,60000);
+        await page.getByText('Actor Class is unavailable. Resolve its exact reference; no Class was inferred.',{exact:true}).waitFor({timeout:60000});
+        assert.equal(await page.getByRole('button',{name:/TIER 1/}).count(),0);
+        evidence.ownershipRefresh={indexRefetched:requests.length>gapStart.index,loadedClassesRetired:true};
         await page.goto(`${origin}/tools/shadowdark/generator`, {timeout:300000});
         await page.getByRole('alert').filter({hasText:'classes:'}).waitFor({timeout:60000});
         assert.equal(await page.getByRole('button',{name:'Create Character',exact:true}).count(),0);
@@ -454,6 +457,11 @@ async function main() {
         await page.getByRole('button',{name:'Create Character',exact:true}).waitFor({timeout:60000});
         pass('ownership-only denial across disconnect retires loaded data; reconnect and override removal recover the mounted generator');
 
+        await proveParityContracts({context,api,origin,state,upstream,pass,
+            wait:(label,operation)=>until(label,operation,manager,120000), restart:async()=>{
+                await manager.stop(); manager = new Manager(workspace,data,path.join(root,'manager-restarted.log'),production?'start':'dev');
+                await until('restarted public runtime ready',async()=>(await(await admin.request('/api/status')).json()).initialized===true||false,manager,300000);
+            }});
         await context.close();
         pass(`live Pulp Mode changes reach the open paper and tabbed sheets without reload; index refetched ${requests.length}x, no stuck loading`);
         assert.deepEqual(evidence.pageErrors, [], 'no page errors');

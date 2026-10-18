@@ -153,7 +153,7 @@ const wizardActor = (extra: any = {}) => ({
         { _id: 'talent', name: 'Spellcasting (Wizard)', type: 'Talent', system: {}, effects: [{ _id: 'e', name: 'Spell Class', system: { changes: [{ key: 'system.spellcasting.classes', type: 'add', value: 'wizard', phase: 'initial' }] } }] },
         { _id: 'mm', name: 'Magic Missile', type: 'Spell', system: { tier: 1, class: ['Compendium.shadowdark.classes.Item.wiz'], lost: false, range: 'far', duration: { type: 'instant', value: '-1' } }, effects: [] },
         { _id: 'lost', name: 'Sleep', type: 'Spell', system: { tier: 1, class: ['Compendium.shadowdark.classes.Item.wiz'], lost: true }, effects: [] },
-        { _id: 'scroll', name: 'Scroll', type: 'Scroll', system: { spellUuid: 'Compendium.shadowdark.spells.Item.light' }, effects: [] },
+        { _id: 'scroll', name: 'Scroll', type: 'Scroll', system: { intent: 'inventory', spellUuid: 'Compendium.shadowdark.spells.Item.light' }, effects: [] },
         { _id: 'wand', name: 'Wand', type: 'Wand', system: { broken: false, spells: [{ uuid: 'Compendium.shadowdark.spells.Item.light', lost: false }, { uuid: 'Compendium.shadowdark.spells.Item.missing', lost: false }] }, effects: [] },
         { _id: 'turn', name: 'Turn', type: 'Class Ability', system: { ability: 'cha', dc: 12, limitedUses: true, uses: { available: 1, max: 1 }, loseOnFailure: true }, effects: [] },
         { _id: 'potion', name: 'Draught', type: 'Potion', system: { identification: { identified: false, name: 'Healing Potion' } }, effects: [] },
@@ -382,8 +382,8 @@ async function registryAndRoutes() {
             : { _id: 'sp', name: 'Light', type: 'Spell', img: 'x.webp', system: { tier: 1, class: ['c'] }, effects: [{ name: 'E' }], flags: { keep: true } };
         try {
             const { runtime, writes } = fakeRuntime(actor);
-            assert.equal((await statusOf(await handleLearnSpell('a1', request(runtime, { spellUuid: 'Compendium.shadowdark.spells.Item.notspell' }) as any))).status, 400);
-            await handleLearnSpell('a1', request(runtime, { spellUuid: 'Compendium.shadowdark.spells.Item.sp' }) as any);
+            assert.equal((await statusOf(await handleLearnSpell('a1', request(runtime, { intent: 'inventory', spellUuid: 'Compendium.shadowdark.spells.Item.notspell' }) as any))).status, 400);
+            await handleLearnSpell('a1', request(runtime, { intent: 'inventory', spellUuid: 'Compendium.shadowdark.spells.Item.sp' }) as any);
             const created = writes.find(write => write[0] === 'item.create')[2];
             assert.deepEqual(created.effects, [{ name: 'E' }]); assert.deepEqual(created.flags, { keep: true });
             assert.equal(created._stats.compendiumSource, 'Compendium.shadowdark.spells.Item.sp');
@@ -482,7 +482,7 @@ async function reviewCorrections() {
         });
         await check('RV-01', 'every caller-bound document path applies the same policy (spell learning)', async () => {
             const { runtime: owned, writes } = fakeRuntime({ _id: 'a1', type: 'Player', system: {}, items: [] });
-            const learn = await statusOf(await handleLearnSpell('a1', { ...caller(false), runtime: { ...owned, access: packAccess(() => false) }, json: async () => ({ spellUuid: monsterUuid }) } as any));
+            const learn = await statusOf(await handleLearnSpell('a1', { ...caller(false), runtime: { ...owned, access: packAccess(() => false) }, json: async () => ({ intent: 'inventory', spellUuid: monsterUuid }) } as any));
             assert.equal(learn.status, 403); assert.equal(writes.length, 0);
             assert.doesNotMatch(JSON.stringify(learn.body), /Synthetic Ogre/);
         });

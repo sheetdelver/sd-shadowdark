@@ -506,3 +506,33 @@ IDs or construct guessed pack UUIDs. New writer/copied-Class cases fail before
 and pass after; the maintained parity suite is14/14. All fourteen existing suites
 pass after correcting one fake resolver to expose its exact native fixture through
 the public lookup path; explicit module/UI/hook typing passes.
+
+## D6a caller lifecycle and integration hardening — October 18, 2026
+
+The sheet now reads a bounded caller-authorized view with the same normalizer as
+Core preparation, retaining title/resolved labels. A compact SHA-256 review token
+replaces the full Actor POST baseline; source is re-read after dependencies.
+No privileged projection or additional world store is introduced. Spells uses its
+exact caller-derived Class model, without requiring unrelated Class browsing.
+Denied dependencies remain explicit; unavailable/absent Actor data offers recovery
+without asserting deletion. Ordinary source-copy requests require explicit
+inventory intent and are distinct from rules-guided management/advancement.
+
+Empty-key context events immediately hide and disable the old view while keeping
+mounted manual state until authorization completes. Caller/world/role changes
+retire the source; disconnect hides it and reconnect revalidates. Host callback
+identity alone does not remount the sheet. Five actual ActorPage lifecycle cases
+pass, including late responses, denial/retry, reconnect and callback replacement;
+the original page fails the visibility/denial cases. Shared collection consumers
+pass39/39, including world-Class management without declared Class demand.
+
+The initial installed0.19.2 archive passed all eight360/768/1024/1440 theme cases
+but exposed a sheet remount on live setting change and world Item pagination
+starting at1. Both were corrected; final archive verification is ongoing and the
+initial run is not recorded as passing overall. The public SDK uses zero-based
+pages; a maintained route regression now requires page0 and complete world rows.
+Crafted too-many, duplicate, wrong-list, wrong-tier and unauthorized extra spell
+choices make zero advancement writes. Extra choices need a verified native Talent.
+Creation refuses missing casting grants/unresolved Spell Class dependencies;
+required selected sources cannot silently disappear. Floor/current typing passes.
+All A02 native acceptance remains unexecuted.

@@ -90,6 +90,18 @@ await check('SD02-07 crafted advancement missing mandatory spell makes zero writ
     assert.equal(writes, 0, 'missing required spell must block HP/XP and Item writes');
     assert.equal(res.status, 400);
 });
+await check('SD02-07 crafted too-many/duplicate/wrong-list/wrong-tier/unauthorized extra choices make zero writes', async () => {
+    const catalog = (await adapter.getLevelUpData(knight(),undefined,undefined,caller)).availableSpells;
+    const tierOne = catalog.filter((spell: any) => spell.system.tier === 1), higher = catalog.find((spell: any) => spell.system.tier > 1);
+    for (const selectedSpells of [[tierOne[0],tierOne[1]], [tierOne[0],tierOne[0]], [higher], [rows.find(doc=>doc.type==='Spell' && doc.system?.tier===1 && !(doc.system.class??[]).includes(WITCH))]]) {
+        const actor = knight(); let writes = 0;
+        const res = await handleFinalizeLevelUp(actor._id,{userSession:{userId:'sanitized'},runtime:{...caller.runtime,documents:{...documents,get:async()=>structuredClone(actor),patch:async()=>{writes++},items:{create:async()=>{writes++}}}},json:async()=>({classUuid:KNIGHT,targetLevel:3,selectedSpells,hpRoll:3})} as any);
+        assert.equal(writes,0); assert.ok((res.status??0)>=400);
+    }
+    const actor = knight(); let writes=0;
+    const res=await handleFinalizeLevelUp(actor._id,{userSession:{userId:'sanitized'},runtime:{...caller.runtime,documents:{...documents,get:async()=>structuredClone(actor),patch:async()=>{writes++},items:{create:async()=>{writes++}}}},json:async()=>({classUuid:KNIGHT,targetLevel:3,selectedSpells:[tierOne[0]],extraSpellSelection:{selected:[tierOne[1]],active:true},hpRoll:3})} as any);
+    assert.equal(writes,0); assert.equal(res.status,400);
+});
 function management(failure = '') {
     const actor = castingActor(); const events: string[] = []; let sequence = 0;
     const receipts = new Map<string, any>();
@@ -148,6 +160,12 @@ await check('SD02-06 partial catalog, source filters and legitimate empty preser
     test.runtime.documents.list = async () => ({ rows: [], total: 0 });
     catalog = await adapter.spellCatalog({ runtime: test.runtime, isGM: false }, 'Item.noClass');
     assert.equal(catalog.state, 'complete'); assert.deepEqual(catalog.rows, []); assert.deepEqual(test.actor, before);
+});
+await check('SD02-06 public world Item pagination starts at zero and includes every source once', async () => {
+    const test = management(); const seen: number[] = [];
+    test.runtime.documents.list = async (_type: string, query: any) => { seen.push(query.page); return {rows: query.page === 0 ? [{_id:'first',type:'Spell',name:'First world spell',system:{class:['Item.worldClass'],tier:1,source:{title:''}}}] : [],total:1}; };
+    const catalog = await adapter.spellCatalog({runtime:test.runtime,isGM:false},'Item.worldClass');
+    assert.deepEqual(seen,[0]); assert.equal(catalog.state,'complete'); assert.ok(catalog.rows.some(row=>row.uuid==='Item.first'));
 });
 await check('SD02-01 current writers reject missing fixed grants and preserve distinct same-name sources', async () => {
     const context: any = { addedSourceIds: new Set(), addedNames: new Set(), targetLevel: 1, actor: null };

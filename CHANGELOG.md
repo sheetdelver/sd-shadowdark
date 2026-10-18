@@ -4,6 +4,9 @@ Historical entries are reconstructed from [published releases](https://github.co
 
 ## Unreleased
 
+- Preserve required native grants and exact Class authority
+- Retain open sheet state through caller context revalidation
+
 - Exact caller spell dependencies and native alternate progression
 - Required advancement spell validation before writes
 - Explicit owned-spell changes, durable receipts and safe partial recovery

@@ -99,5 +99,12 @@ jobs:
           SHADOWDARK_PLAYWRIGHT_MODULE="$RUNNER_TEMP/shadowdark-browser-tools/node_modules/playwright/index.mjs" \
             node .module-ci-data/local/modules/shadowdark/src/tests/collection-consumers.browser.mjs "$RUNNER_TEMP/shadowdark-collection-results"
 
+      - name: Verify action recovery and Actor lifecycle consumers
+        run: |
+          SHADOWDARK_PLAYWRIGHT_MODULE="$RUNNER_TEMP/shadowdark-browser-tools/node_modules/playwright/index.mjs" \
+            node .module-ci-data/local/modules/shadowdark/src/tests/action-consumers.browser.mjs "$RUNNER_TEMP/shadowdark-action-results"
+          SHADOWDARK_PLAYWRIGHT_MODULE="$RUNNER_TEMP/shadowdark-browser-tools/node_modules/playwright/index.mjs" \
+            node .module-ci-data/local/modules/shadowdark/src/tests/actor-lifecycle.browser.mjs "$RUNNER_TEMP/shadowdark-actor-results"
+
       - name: Verify distributable package
         run: npm run module:package -- 'shadowdark'

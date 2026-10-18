@@ -2,12 +2,10 @@
 
 import React from 'react';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Loader2, Sparkles } from 'lucide-react';
 import { useSDK } from '@sheet-delver/sdk/react';
 import SpellSelectionModal from './components/SpellSelectionModal';
-import { useShadowdarkCollections } from './context/ShadowdarkUIContext';
-import { CollectionStatus } from './components/CollectionStatus';
 import { useShadowdarkActor } from './context/ShadowdarkActorContext';
 import { bonusLabel, type PreparedAction } from '../logic/actions';
 import { RANGE_LABELS, spellDuration } from '../logic/resource-cards';
@@ -25,8 +23,6 @@ import type { SpellIntent } from './components/SpellSelectionModal';
 interface SpellSource { classUuid: string; listUuid: string; name: string; grant: string; limits: Record<number, any> }
 
 export default function SpellsTab() {
-    const data = useShadowdarkCollections(['classes']);
-    const { collections } = data;
     const { resolveImageUrl, addNotification, fetchWithAuth } = useSDK();
     const { actor, updateItem, deleteItem, startAction, openCard, isActionBusy, refreshActor, card, rollDialog, pendingConfirmation } = useShadowdarkActor();
     const [manage, setManage] = useState<{ source: SpellSource; tier: number } | null>(null);
@@ -48,10 +44,17 @@ export default function SpellsTab() {
     const spellRows = actions.filter(action => action.kind === 'spell' && itemById(action.itemId ?? '')?.type === 'Spell');
     const itemRows = actions.filter(action => action.kind === 'spell' && ['Scroll', 'Wand'].includes(itemById(action.itemId ?? '')?.type));
 
+    useEffect(() => {
+        if (manage && !saving && !sources.some(source => source.classUuid === manage.source.classUuid)) {
+            setManage(null); setSubmission(null); setReceipt(null);
+            addNotification('Casting source changed. Review the current character before managing spells.', 'info');
+        }
+    }, [manage, saving, sources]);
+
     const saveSelection = async (intent: SpellIntent) => {
         if (!manage || saving) return;
         if (!submission && !intent.additions.length && !intent.removals.length) { setManage(null); return; }
-        const body = submission ?? { requestId: globalThis.crypto.randomUUID(), baseline: spellReview(actor),
+        const body = submission ?? { requestId: globalThis.crypto.randomUUID(), baseline: actor.spellReviewToken ?? spellReview(actor),
             listUuid: manage.source.listUuid, tier: manage.tier, ...intent };
         setSubmission(body); setSaving(true);
         try {
@@ -125,9 +128,8 @@ export default function SpellsTab() {
 
             <section className="space-y-3" aria-label="Manage spells">
                 <h3 className="bg-black text-white p-2 font-serif font-bold text-xl uppercase tracking-wider shadow-md">Manage Spells</h3>
-                <CollectionStatus state={data} label="Loading classes…" />
                 {(derived.spellModel?.diagnostics ?? []).map((message: string) => <p key={message} role="status">{message}</p>)}
-                {data.ready && sources.length === 0 && (
+                {sources.length === 0 && (
                     <p className="text-sm">No spellcasting class progression is available for management. Owned spells remain visible above.</p>
                 )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -170,7 +172,7 @@ export default function SpellsTab() {
                     suspended={!!card || rollDialog.open || !!pendingConfirmation}
                     onOpenDocument={uuid => openCard({ kind: 'document', uuid })}
                     maxSelections={limitFor(manage.source, manage.tier)}
-                    isSaving={saving || !data.ready || !sources.some(source => source.classUuid === manage.source.classUuid)}
+                    isSaving={saving}
                     actor={actor}
                 />
             )}

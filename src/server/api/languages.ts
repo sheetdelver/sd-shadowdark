@@ -4,6 +4,8 @@ import { shadowdarkAdapter } from '../ShadowdarkAdapter';
 import { callerOf, requestRevision, contextConflict } from '../access';
 import { callerLanguagePlan } from '../languages';
 import { canonicalUuid } from '../../logic/identity';
+import { prepareShadowdarkView } from '../../logic/prepared-view';
+import { requestRules } from '../access';
 import { validateLanguageSelections } from '../../logic/languages';
 
 export async function resolveLanguageIdentity(uuid: unknown, type: 'Class' | 'Ancestry', req: ModuleServerRequest) {
@@ -46,6 +48,12 @@ export async function handleCreateCharacter(req: ModuleServerRequest) {
         const submitted = actor.system?.languages;
         if (!Array.isArray(submitted) || submitted.length !== choices.languages.length || new Set(submitted).size !== submitted.length || submitted.some(uuid => !choices.languages.includes(uuid)))
             return error('validation', 'Language inventory must match its exact fixed grants and separate reviewed choice pools.');
+        if (classDoc?.system?.spellcasting?.ability && actor.system.level.value === 1) {
+            const lookups = await shadowdarkAdapter.callerLookups(actor, callerOf(req));
+            const view = prepareShadowdarkView(actor, lookups, requestRules(req.runtime));
+            if (!view.spellModel.sources.some(source => source.classUuid === classDoc.uuid)) return error('validation', 'The created character is missing its native casting grant or exact Class dependencies. Review its fixed source talents.');
+            if (view.spellModel.owned.some(row => row.classification === 'unresolved')) return error('validation', 'A created Spell has unresolved Class data. Review the exact source before creation.');
+        }
         const conflict = contextConflict(req.runtime, revision); if (conflict) return conflict;
         const created = await req.runtime.documents.create('Actor', { ...actor, system: { ...actor.system, languages: choices.languages } });
         return json({ success: true, id: created._id ?? created.id });

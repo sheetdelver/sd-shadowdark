@@ -12,7 +12,8 @@ import { callerOf, contextConflict, requestRevision } from '../access';
  */
 export async function handleLearnSpell(actorId: string, req: ModuleServerRequest) {
     try {
-        const { spellUuid } = await req.json<{ spellUuid?: string }>();
+        const { spellUuid, intent } = await req.json<{ spellUuid?: string; intent?: string }>();
+        if (intent !== 'inventory') return error('validation', 'Ordinary source copying requires explicit inventory intent; use the reviewed management or advancement workflow for progression choices.');
         const canonical = canonicalUuid(spellUuid);
         if (!canonical) return error('validation', 'A Spell UUID is required');
 

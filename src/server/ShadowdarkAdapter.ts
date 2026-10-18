@@ -307,7 +307,7 @@ export class ShadowdarkAdapter extends BaseSystemAdapter {
                 status: canReadPack(caller, pack.id) ? 'ready' : 'failed', ...(!canReadPack(caller, pack.id) ? { reason: 'Pack is not readable by this caller.' } : {}) });
         } catch (e: any) { sources.push({ source: 'declared packs', status: 'failed', reason: String(e?.message ?? e) }); }
         try {
-            let page = 1, count = 0;
+            let page = 0, count = 0;
             do {
                 const result = await caller.runtime.documents.list('Item', { filter: { type: 'Spell' }, page, pageSize: 200 });
                 if (!Array.isArray(result.rows)) throw new Error('World Item read returned no source rows.');

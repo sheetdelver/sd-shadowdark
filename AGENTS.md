@@ -95,8 +95,7 @@ successful writes alone do not establish parity.
 
 The active post-release plan is [Shadowdark ADR-0002](docs/adr/0002-native-data-and-behavior-parity.md),
 with findings SD02-01–13 in the [native parity audit](docs/audits/2026-10-18-spellcasting-and-native-parity.md).
-It is proposed, not implemented. Follow its checkpoints when implementation is
-authorized; do not treat its existence as branch, live-write or release authority.
+Implementation is in progress; native acceptance remains open. Follow its checkpoints; do not treat its existence as branch, live-write or release authority.
 [ADR-0001](docs/adr/0001-native-alignment-and-resource-cards.md) and the
 [native-alignment audit](docs/audits/2026-10-15-native-alignment.md) remain completed
 within their selected scope. Their released-system baseline, future-version
@@ -114,8 +113,7 @@ before proposing new admin migration steps; keep applied history unchanged.
 
 Compare native behavior in order as well as final values. Limited-use abilities
 spend before rolling/posting; Potion identification swaps active/alternate
-name/description and enables effects before consumption. Current execution has
-documented gaps (SD02-09/10); do not call action descriptions proof of execution.
+name/description and enables effects before consumption. Maintain ordered source/receipt regressions for SD02-09/10; action descriptions alone are not execution evidence.
 Player focus is not an NPC exemption, and zero disables a native critical
 threshold. Languages use native rarity and separate explicit class/ancestry choice
 counts/pools, not English name inference or a nonempty-options fallback. Maintain

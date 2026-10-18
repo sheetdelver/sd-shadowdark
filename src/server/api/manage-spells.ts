@@ -7,6 +7,7 @@ import { canonicalUuid, documentId, formatUuid, ownedCopy } from '../../logic/id
 import { prepareShadowdarkView } from '../../logic/prepared-view';
 import { spellReview } from '../../logic/spell-review';
 import { withActorLock, operationProcess } from '../operation-lock';
+import { reviewToken, reviewMatches } from '../source-review';
 import { sourceAllowed } from '../../logic/world-settings';
 
 type Op = { kind: 'add' | 'remove'; target: string; status: 'pending' | 'started' | 'complete' | 'failed' | 'uncertain'; itemId?: string; error?: string };
@@ -41,7 +42,7 @@ export async function handleManageSpells(actorId: string, req: ModuleServerReque
             // identity from a name/source, repeat it, or proceed to removals.
             if (journal) for (const op of journal.operations) if (op.status === 'started') op.status = 'uncertain';
             const result = () => json({ success: true, replayed, state: journal!.operations.every(op => op.status === 'complete') ? 'complete' : 'partial',
-                operations: journal!.operations, baseline: spellReview(actor),
+                operations: journal!.operations, baseline: reviewToken(actor),
                 recovery: journal!.operations.some(op => op.status === 'uncertain' && op.kind === 'add')
                     ? 'An addition has no confirmed receipt. Review the Actor in Foundry before submitting any new replacement; this request will not create again or remove spells.'
                     : journal!.process !== operationProcess ? 'Saved receipts survived a server restart. Refresh and review actual inventory before submitting remaining changes as a new operation. This request will not write again.' : null });
@@ -49,7 +50,7 @@ export async function handleManageSpells(actorId: string, req: ModuleServerReque
             if (journal && journal.process !== operationProcess) return result();
             if (journal?.operations.some(op => op.status === 'uncertain' && op.kind === 'add')) return result();
             const reviewed = digest(spellReview(actor));
-            if (journal ? journal.review !== reviewed || journal.revision !== revision : digest(body.baseline) !== reviewed)
+            if (journal ? journal.review !== reviewed || journal.revision !== revision : !reviewMatches(actor, body.baseline))
                 return error('conflict', 'Character or world rules changed. Refresh and review actual results before changing more spells.');
             const lookups = await shadowdarkAdapter.callerLookups(actor, callerOf(req));
             const view = prepareShadowdarkView(actor, lookups, requestRules(req.runtime));
