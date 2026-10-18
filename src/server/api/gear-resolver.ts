@@ -1,4 +1,4 @@
-import { logger } from '@sheet-delver/sdk';
+import { canonicalUuid } from '../../logic/identity';
 import { shadowdarkAdapter } from '../../server/ShadowdarkAdapter';
 import { sanitizeItem } from '../../utils/Sanitizer';
 import type { Caller } from '../access';
@@ -18,16 +18,8 @@ export async function resolveBaggage(doc: any, caller: Caller): Promise<any[]> {
     if (!doc || !doc.system) return [];
 
     const baggage: any[] = [];
-    const talentChoiceCount = doc.system.talentChoiceCount || 0;
-    const rawTalents = doc.system.talents || [];
-
-    // Only include talents if they are FIXED (not choices)
-    const fixedTalents = (talentChoiceCount === 0 || rawTalents.length <= talentChoiceCount)
-        ? rawTalents
-        : [];
-
     const refs: string[] = [
-        ...fixedTalents,
+        ...(doc.system.talents || []),
         ...(doc.system.features || []),
         ...(doc.system.abilities || []),
         ...(doc.system.classAbilities || []),
@@ -36,24 +28,14 @@ export async function resolveBaggage(doc: any, caller: Caller): Promise<any[]> {
     ];
 
     for (const ref of refs) {
-        const uuid = getUuidRef(ref);
-        if (uuid) {
-            try {
-                const item = await shadowdarkAdapter.resolveReadable(uuid, caller);
-                if (item) {
-                    // DEEP CLONE: Prevent cache poisoning by ensuring each resolved item is a fresh instance
-                    const clean = JSON.parse(JSON.stringify(sanitizeItem(item)));
-                    delete clean._id;
-
-                    // ATTACH UUID: Essential for duplication checks in the Generator
-                    clean.uuid = uuid;
-
-                    baggage.push(clean);
-                }
-            } catch (e) {
-                logger.error(`[GearResolver] Failed to resolve baggage ${uuid}:`, e);
-            }
-        }
+        const uuid = canonicalUuid(getUuidRef(ref));
+        if (!uuid) throw new Error(`Required ${doc.name} grant has no exact UUID.`);
+        const item = await shadowdarkAdapter.resolveDocumentFor(uuid, caller);
+        if (!item) throw new Error(`Required ${doc.name} grant ${uuid} is unavailable; advancement has not written.`);
+        const clean = JSON.parse(JSON.stringify(sanitizeItem(item)));
+        delete clean._id;
+        clean.uuid = uuid;
+        baggage.push(clean);
     }
 
     return baggage;
@@ -90,21 +72,14 @@ export async function resolveGear(doc: any, caller: Caller): Promise<any[]> {
 
     const resolvedItems = [];
     for (const entry of candidates) {
-        try {
-            const item = await shadowdarkAdapter.resolveReadable(entry, caller);
-            if (item) {
-                // DEEP CLONE: Prevent cache poisoning
-                const clean = JSON.parse(JSON.stringify(sanitizeItem(item)));
-                delete clean._id;
-
-                // ATTACH UUID: Essential for duplication checks
-                clean.uuid = entry;
-
-                resolvedItems.push(clean);
-            }
-        } catch (e) {
-            logger.error(`[GearResolver] Failed to resolve gear ${entry}:`, e);
-        }
+        const uuid = canonicalUuid(entry);
+        if (!uuid) throw new Error(`Required gear ${entry} has no exact UUID.`);
+        const item = await shadowdarkAdapter.resolveDocumentFor(uuid, caller);
+        if (!item) throw new Error(`Required gear ${uuid} is unavailable; advancement has not written.`);
+        const clean = JSON.parse(JSON.stringify(sanitizeItem(item)));
+        delete clean._id;
+        clean.uuid = uuid;
+        resolvedItems.push(clean);
     }
 
     // Handle manual object arrays in 'equipment' or 'items'

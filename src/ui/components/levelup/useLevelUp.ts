@@ -893,25 +893,12 @@ export const useLevelUp = (props: LevelUpProps) => {
                     classLoaded = true;
                 }
 
-                // Determine if we MUST fetch from server (state mismatch or missing)
-                const currentUuid = currentClass?.uuid || currentClass?._id;
-
-                // Helper to normalize UUID comparison
-                const isMatch = (val1: string, val2: string) => {
-                    if (!val1 || !val2) return false;
-                    if (val1 === val2) return true;
-                    if (val1.endsWith(val2) || val2.endsWith(val1)) return true;
-                    return false;
-                };
-
-
-
                 const needsFetch = !classLoaded && (targetClassUuid || classUuid);
                 
                 if (targetClassUuid || classUuid) {
                     const findInList = (uuid: string) => {
                         return availableClasses.find((c: any) => 
-                            c.uuid === uuid || c._id === uuid || c.id === uuid
+                            c.uuid === uuid
                         );
                     };
 
@@ -933,22 +920,7 @@ export const useLevelUp = (props: LevelUpProps) => {
                     if (statuses.class !== 'LOADING') setStatuses(prev => ({ ...prev, class: 'LOADING' }));
                     const fetchUuid = targetClassUuid || classUuid;
 
-                    // Specific logic for availableClasses searching if it's a targetClassUuid
-                    let searchUuid = fetchUuid;
-                    if (targetClassUuid) {
-                        const targetClassFromList = availableClasses.find((c: any) => (c.uuid === targetClassUuid) || (c._id === targetClassUuid));
-                        if (targetClassFromList) {
-                            if (targetClassFromList.uuid) {
-                                searchUuid = targetClassFromList.uuid;
-                            } else if (targetClassFromList.pack) {
-                                // For items, the core system expects Compendium.pack.Item.id
-                                const id = targetClassFromList._id || targetClassFromList.id;
-                                searchUuid = `Compendium.${targetClassFromList.pack}.Item.${id}`;
-                            } else if (!targetClassFromList.uuid && targetClassFromList._id) {
-                                searchUuid = `Compendium.shadowdark.classes.Item.${targetClassFromList._id}`;
-                            }
-                        }
-                    }
+                    const searchUuid = fetchUuid;
                     const cls = await fetchDocument(searchUuid!);
 
                     if (cls) {

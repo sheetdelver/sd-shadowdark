@@ -44,8 +44,7 @@ export function prepareSpellModel(actor: any, core: PreparedActorCore, lookups: 
     const items: any[] = Array.isArray(actor?.items) ? actor.items : [];
     const identity = canonicalUuid(actor?.system?.class);
     const ref = parseUuid(identity);
-    const ownedClass = items.find(item => item.type === 'Class' && sourceRef(item) && formatUuid(sourceRef(item)!) === identity);
-    const classDoc = ownedClass ?? (ref ? lookups.classDocument?.(ref) : null);
+    const classDoc = ref ? lookups.classDocument?.(ref) : null;
     const listUuid = spellListIdentity(classDoc, identity);
     const listRef = parseUuid(listUuid);
     const listDoc = listUuid === identity ? classDoc : listRef ? lookups.classDocument?.(listRef) : null;
@@ -58,7 +57,7 @@ export function prepareSpellModel(actor: any, core: PreparedActorCore, lookups: 
         const innate = !!origin && granted.has(formatUuid(origin));
         const resolved = classes.length && classes.every((uuid: string | null) => {
             const ref = parseUuid(uuid);
-            return ref && (lookups.classDocument?.(ref) || items.some(owned => owned.type === 'Class' && sourceRef(owned) && formatUuid(sourceRef(owned)!) === uuid));
+            return ref && !!lookups.classDocument?.(ref);
         });
         return { actorId: documentId(actor), itemId: documentId(item), name: item.name, tier: item.system?.tier ?? null,
             source: origin, classes, innate, classification: innate ? 'granted' : resolved ? 'ordinary' : 'unresolved' };
@@ -72,5 +71,14 @@ export function prepareSpellModel(actor: any, core: PreparedActorCore, lookups: 
     }
     const sources = core.kind === 'Player' && active && listUuid ? [{ classUuid: identity!, listUuid, name: classDoc.name,
         grant: slugify(listDoc.name ?? ''), limits: Object.fromEntries([1,2,3,4,5].map(tier => [tier, spellLimit(classDoc.system?.spellcasting?.spellsknown, core.level, tier)])) }] : [];
+    // An additional active grant has no proven Actor progression owner. Keep its
+    // owned rows manageable for explicit removals, without borrowing its table.
+    if (core.kind === 'Player') for (const uuid of new Set<string>(owned.flatMap(row => row.classes).filter((uuid): uuid is string => !!uuid))) {
+        const ref = parseUuid(uuid), doc = ref ? lookups.classDocument?.(ref) : null;
+        const grant = slugify(doc?.name ?? '');
+        if (!doc || !grants.includes(grant) || sources.some(source => source.listUuid === uuid)) continue;
+        sources.push({ classUuid: uuid, listUuid: uuid, name: doc.name, grant, limits: Object.fromEntries([1,2,3,4,5].map(tier => [tier,
+            { status: 'unavailable', value: null, reason: 'This additional casting grant has no proven progression Class. Existing spells are preserved; choose an exact progression source before adding.' } as SpellLimit])) });
+    }
     return { classUuid: identity, listUuid, grants, sources, owned, diagnostics };
 }

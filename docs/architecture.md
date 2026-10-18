@@ -569,3 +569,10 @@ must verify these paths through the installed host as well as the controlled
 consumer suite; it must not add privileged Setting reads or polling. This fixes
 the ownership-only signal gap reported on 0.19.1, not the separately recorded
 CG-4 content-freshness concern across an offline interval.
+
+Required creation/advancement fixed references fail before writes if unavailable.
+Native talents and separate talentChoices are not interchangeable. Exact caller
+Class dependencies are authoritative; copied origins cannot fill a missing read.
+Secondary grants retain owned inventory with unknown progression. Historical
+missing grants/refs require the reviewed exact-source remediation guide; published
+migration history is unchanged.

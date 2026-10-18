@@ -739,3 +739,34 @@ suites and explicit typing pass. Actual native-method comparisons16/16 and
 69/31/9/4/9 controls pass. These are controlled/source/browser results, not native
 A02 acceptance. The new Generator creation route uses public caller SDK writes;
 installed-host creation/permissions remain D6 proof, with no Core blocker claimed.
+
+## D5 writer trace and historical disposition — October 18, 2026
+
+The current Generator/importer shared `resolveSubItems` and advancement baggage
+resolver could silently omit an unreadable fixed grant. The former also treated
+native ancestry `talents` as choices when `talentChoiceCount` was zero; native
+`CharacterGeneratorSD._loadAncestry/_loadClass` treats `talents` as fixed and
+`talentChoices` separately. Required exact references now fail before creation/
+advancement writes. Distinct same-name source documents survive enrichment.
+Current resolved Spell copies retain their native Class refs, effects and source
+metadata; no current writer was found fabricating the historical Knight grant.
+This trace establishes possible omission paths, not the author of live records.
+
+L01 (missing grants), L02 (missing Spell Class refs without provenance) and L04
+(modified Knight grant) require explicit exact-source GM remediation. No new
+migration is justified: deliberate removals/customizations cannot be distinguished
+from omissions by Class title or Item name. The two required published migration
+steps, identities and applied history are unchanged. See
+[exact-source remediation](../native-source-remediation.md) for preview fields and
+verification. Sanitized disposable copies for all three now prepare correctly
+after only the reviewed edit, retaining unrelated/custom data. These tests do not
+modify or establish acceptance in the operator world.
+
+The exact Class lookup now takes precedence over all copies: a copied Class's
+origin cannot satisfy a denied/missing reference. Extra active grants with owned
+spells remain visible with explicitly unknown progression, rather than borrowing
+a table or hiding inventory. Canonical Class selectors no longer match terminal
+IDs or construct guessed pack UUIDs. New writer/copied-Class cases fail before
+and pass after; the maintained parity suite is14/14. All fourteen existing suites
+pass after correcting one fake resolver to expose its exact native fixture through
+the public lookup path; explicit module/UI/hook typing passes.

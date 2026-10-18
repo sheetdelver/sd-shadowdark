@@ -42,9 +42,8 @@ function classTitle(actor: any, view: ReturnType<typeof prepareShadowdarkView>, 
     const level = view.level;
     const alignment = String(actor.system?.alignment ?? '');
     if (!alignment || view.kind !== 'Player') return '';
-    const owned = (actor.items ?? []).find((item: any) => item?.type === 'Class');
     const ref = view.identity.class.ref;
-    const doc = owned ?? (ref ? lookups.classDocument?.(ref) : null);
+    const doc = ref ? lookups.classDocument?.(ref) : null;
     const titles = Array.isArray(doc?.system?.titles) ? doc.system.titles : [];
     const match = titles.find((title: any) => level >= title.from && level <= title.to);
     return match?.[alignment] ?? '';

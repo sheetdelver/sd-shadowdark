@@ -332,10 +332,7 @@ function spellcastingAbility(core: PreparedActorCore, spell: any, viaItem: boole
     let classes = classRefs.flatMap(value => {
         const ref = parseUuid(value);
         if (!ref) { unresolved.push(String(value)); return []; }
-        const doc = lookups.classDocument?.(ref) ?? ownedClasses.find(owned => {
-            const source = sourceRef(owned);
-            return source && formatUuid(source) === formatUuid(ref);
-        }) ?? null;
+        const doc = lookups.classDocument?.(ref) ?? null;
         if (!doc) { unresolved.push(formatUuid(ref)); return []; }
         const ability = doc.system?.spellcasting?.ability;
         return ability ? [{ name: slugify(doc.name ?? ''), ability: ability as AbilityKey }] : [];

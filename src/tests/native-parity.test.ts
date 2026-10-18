@@ -11,13 +11,15 @@ import { prepareShadowdarkView } from '../logic/prepared-view';
 import { spellReview } from '../logic/spell-review';
 import { spellLimit } from '../logic/spell-model';
 import { handleManageSpells } from '../server/api/manage-spells';
+import { resolveSubItems, enrichItem } from '../logic/actor-enricher';
+import { resolveBaggage } from '../server/api/gear-resolver';
 import { SdkError } from '@sheet-delver/sdk';
 const nativeRoot = process.env.SHADOWDARK_NATIVE ?? path.resolve(process.cwd(), 'temp/shadowdark');
 const packs = nativePacks(nativeRoot, DECLARED_PACKS.map(p => p.id));
 const rows: any[] = Object.entries(packs).flatMap(([pack, docs]) => docs.map(doc => ({ ...doc, pack, uuid: `Compendium.${pack}.${doc.type === 'Player' || doc.type === 'NPC' ? 'Actor' : pack.endsWith('tables') ? 'RollTable' : 'Item'}.${doc._id}` })));
 const byUuid = new Map(rows.map(doc => [doc.uuid, doc]));
 const adapter = new ShadowdarkAdapter();
-const documents: any = { get: async () => null, list: async () => ({ rows: [], total: 0 }) };
+const documents: any = { get: async () => null, fetchByUuid: async () => null, list: async () => ({ rows: [], total: 0 }) };
 const caller: any = { runtime: { documents, access: { canReadPack: () => true }, world: { snapshot: () => worldSnapshot(1), assertRevision: () => {} } }, isGM: false };
 await adapter.initialize({ compendium: { findAll: async (type: string) => rows.filter(doc => type === 'Item' ? !['Player','NPC'].includes(doc.type) : type === doc.type), getById: async (_type: string, uuid: string) => byUuid.get(uuid) ?? null }, documents, logger: console, world: caller.runtime.world } as any);
 const KNIGHT = 'Compendium.shadowdark.classes.Item.0uVUOXKuX9xfJ600';
@@ -146,6 +148,51 @@ await check('SD02-06 partial catalog, source filters and legitimate empty preser
     test.runtime.documents.list = async () => ({ rows: [], total: 0 });
     catalog = await adapter.spellCatalog({ runtime: test.runtime, isGM: false }, 'Item.noClass');
     assert.equal(catalog.state, 'complete'); assert.deepEqual(catalog.rows, []); assert.deepEqual(test.actor, before);
+});
+await check('SD02-01 current writers reject missing fixed grants and preserve distinct same-name sources', async () => {
+    const context: any = { addedSourceIds: new Set(), addedNames: new Set(), targetLevel: 1, actor: null };
+    await assert.rejects(() => resolveSubItems({ type: 'Class', name: 'Required Class', system: { talents: ['Item.requiredGrant'] } }, async () => null, context), /requiredGrant|unavailable/i);
+    await assert.rejects(() => resolveBaggage({ type: 'Class', name: 'Required Class', system: { talents: ['Compendium.shadowdark.talents.Item.missingGrant'] } }, caller), /missingGrant|unavailable/i);
+    const one = await enrichItem({ uuid: 'Item.sourceOne', name: 'Same title', type: 'Spell', system: { class: [WIZARD] }, effects: [] }, context);
+    const two = await enrichItem({ uuid: 'Item.sourceTwo', name: 'Same title', type: 'Spell', system: { class: [WIZARD] }, effects: [] }, context);
+    assert.ok(one && two, 'names must not replace exact source identity');
+});
+await check('SD02-01 native fixed grants survive creation copies; exact-source historical remediation preserves custom fields', async () => {
+    const context: any = { addedSourceIds: new Set(), addedNames: new Set(), targetLevel: 1, actor: null };
+    const classDoc = byUuid.get(KNIGHT);
+    const grants = await resolveSubItems(classDoc, async uuid => byUuid.get(uuid) ?? null, context);
+    assert.ok(grants.some(doc => (doc.effects ?? []).some((effect: any) => (effect.changes ?? []).some((change: any) => change.key === 'system.spellcasting.classes' && change.value === 'witch'))));
+    const ancestry = { type: 'Ancestry', name: 'Exact ancestry', system: { talents: [talent.uuid], talentChoiceCount: 0 } };
+    assert.equal((await resolveSubItems(ancestry, async uuid => byUuid.get(uuid), { ...context, addedSourceIds: new Set(), addedNames: new Set() })).length, 1);
+    const wizardGrant = byUuid.get(WIZARD).system.talents.map((uuid: string) => byUuid.get(uuid)).find((doc: any) => doc.effects?.some((effect: any) => effect.changes?.some((change: any) => change.key === 'system.spellcasting.classes')));
+    const missing = castingActor(); missing.effects = []; missing.system.custom = { retain: true };
+    const explicit = structuredClone(missing); explicit.items.push({ ...ownedCopy(wizardGrant, wizardGrant.uuid), _id: 'reviewedGrant' });
+    assert.equal(prepareShadowdarkView(explicit, { classDocument: () => byUuid.get(WIZARD) }).actions.find(row => row.kind === 'spell')!.available, true);
+    explicit.items.pop(); assert.deepEqual(explicit, missing);
+    const wrong = knight(); wrong.items[1].effects[0].changes.find((change: any) => change.key === 'system.spellcasting.classes').value = 'knight-of-st.-ydris';
+    const reviewedKnight = structuredClone(wrong);
+    reviewedKnight.items[1].effects[0].changes = structuredClone(talent.effects[0].changes);
+    const knightLookups = { classDocument: (ref: any) => byUuid.get(ref.kind === 'compendium' ? `Compendium.${ref.pack}.${ref.documentType}.${ref.id}` : '') };
+    assert.equal(prepareShadowdarkView(reviewedKnight, knightLookups).spellModel.sources[0].listUuid, WITCH);
+    reviewedKnight.items[1].effects[0].changes = structuredClone(wrong.items[1].effects[0].changes); assert.deepEqual(reviewedKnight, wrong);
+    const original = castingActor(); original.system.custom = { retain: true }; original.items[0].system.class = [];
+    const repaired = structuredClone(original);
+    // Explicit GM preview on a disposable copy: only the chosen owned Spell's
+    // Class field changes. No source identity is inferred from its display name.
+    repaired.items[0].system.class = ['Item.worldClass'];
+    const changed = structuredClone(repaired); changed.items[0].system.class = [];
+    assert.deepEqual(changed, original);
+    assert.equal(prepareShadowdarkView(repaired, { classDocument: () => byUuid.get(WIZARD) }).actions.find(row => row.kind === 'spell')!.available, true);
+});
+await check('SD02-02 copied Class provenance cannot satisfy a denied exact reference', async () => {
+    const actor = castingActor(); actor.items.push({ ...ownedCopy(byUuid.get(WIZARD), 'Item.worldClass'), _id: 'copy' });
+    const model = prepareShadowdarkView(actor);
+    assert.equal(model.actions.find(row => row.kind === 'spell')!.available, false);
+    assert.equal(model.spellModel.sources.length, 0);
+    assert.equal(model.spellModel.owned[0].classification, 'unresolved');
+    const exact = prepareShadowdarkView(actor, { classDocument: () => byUuid.get(WIZARD) });
+    assert.equal(exact.actions.find(row => row.kind === 'spell')!.available, true);
+    assert.equal(exact.spellModel.sources[0].limits[1].status, 'known');
 });
 console.log(JSON.stringify({ method: 'Controlled native pack sources and actual module routes; not native acceptance', checks }, null, 2));
 if (checks.some(row => !row.passed) && !process.argv.includes('--baseline')) process.exitCode = 1;

@@ -79,7 +79,7 @@ function GeneratorContent() {
     // Identity shards contain full native documents. Always derive these from
     // the current caller's collection instead of retaining a prior context's doc.
     const fromCollection = (id: string, uuid: string) => data.ready
-        ? collections[id]?.find(doc => doc.uuid === uuid || doc._id === uuid) ?? null : null;
+        ? collections[id]?.find(doc => doc.uuid === uuid) ?? null : null;
     const ancestryDetails = fromCollection('ancestries', formData.ancestry);
     const classDetails = fromCollection('classes', formData.class);
     const patronDetails = fromCollection('patrons', formData.patron);
