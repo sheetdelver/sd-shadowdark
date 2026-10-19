@@ -1,5 +1,21 @@
 # Advancement receipt recovery
 
+**Automatic resolution (October 19, SD02-N14-01):** A lost acknowledgement does
+not require manual recovery when the entire advancement is already confirmed
+by authoritative source. Sheet refresh, operation reload or retry checks the
+saved final Actor token and every confirmed grant ID under the owner's current
+caller scope and Actor queue. Exact completion closes the local receipt without
+another Foundry write, including after Core restart. A read or bookkeeping
+failure keeps completion unconfirmed until a successful retry.
+
+Only genuinely partial, unknown or mismatching outcomes require the controls
+below. Both sheets offer **Review advancement** for the original caller even
+below the next XP threshold. This opens the saved request directly, without
+waiting on a new level's Class or Patron data, and displays the saved target.
+Do not change XP or delete receipts to bypass an unresolved outcome. The
+[corrective evidence](audits/2026-10-19-adr-0002-native-acceptance.md#automatic-completion-correction-and-native-recheck)
+records actual native completion and partial-state checks.
+
 The owner opens advancement to review its saved request, exact grant IDs and
 final Actor update. Refresh operation review obtains the current source baseline
 and context revision. These controls use the public module advancement request;

@@ -8,14 +8,16 @@
 
 **Audit:** [Post-release native parity](../audits/2026-10-18-spellcasting-and-native-parity.md)
 
-**Current status (October 19, restart/CI correction):** SD02-R1a-R1 and SD02-V1
-are corrected and offline verified. Proven zero-write attempts retire while
-preserving independent Actor edits; CI runs all 17 source suites using the pinned
-native 4.0.6 reference. R1b/R2/R3 remain covered. See the
-[corrective evidence](../audits/2026-10-18-adr-0002-validation.md#zero-write-restart-and-ci-checkpoint--october-19-2026).
-D3/R1a has passing offline evidence. Actual native D6, final D7 and A02-01–15
-remain open on both generations; this checkpoint does not close ADR-0002 or
-establish release acceptance.
+**Current status (October 19, automatic completion correction):** SD02-N14-01/02
+are corrected and verified offline and on actual Foundry 14.367 / Shadowdark
+4.0.6 with isolated Core 0.19.3. Fully confirmed advancement settles from exact
+primary source on refresh/retry/restart without another Foundry write. Partial
+or unknown outcomes retain their block and accessible saved-request review.
+Malformed selections return validation 400. The user-approved automatic policy
+below supersedes the earlier requirement for manual review of every uncertain
+final receipt. See the [native report](../audits/2026-10-19-adr-0002-native-acceptance.md#automatic-completion-correction-and-native-recheck).
+Remaining v14 matrix variants and all v13 acceptance still keep D6/final D7 and
+ADR-0002 open. No release, compatibility change or new Core dependency.
 
 **Predecessor:** [ADR-0001](0001-native-alignment-and-resource-cards.md), Completed; its accepted scope and explicit deferrals remain intact.
 
@@ -974,3 +976,143 @@ The pre-fix ADR was saved as
 This supersedes the immediately preceding review's open R1a/V1 disposition;
 all earlier review evidence and checkpoints are retained. Native D6/final D7
 and A02-01–15 on both generations remain open. ADR-0002 remains in progress.
+
+### Native v14 recovery-entry and validation addendum — October 19, 2026
+
+Actual native execution of checkpoint `032e824f` adds passing evidence for the
+selected casting, progression, creation/import, ownership, action, language,
+model, migration and installed UI workflows. It also confirms
+[SD02-N14-01 and SD02-N14-02](../audits/2026-10-18-spellcasting-and-native-parity.md#native-v14-review--october-19-2026).
+The [native report](../audits/2026-10-19-adr-0002-native-acceptance.md) records
+exact subcases and limitations. This adds no migration step, host contract or
+version requirement. Earlier R1 corrections and their evidence remain valid;
+R1's completion/recovery scope now explicitly includes discovery after reload.
+
+**Decision:** recovering an existing advancement is independent of eligibility
+to begin a new level. A final Actor update can commit and spend XP while its
+receipt remains uncertain. Both sheets must still expose the saved operation
+under the authorized caller, even when the new-level button would be absent.
+Do not infer completion from the Actor's level, award XP to reopen the button,
+delete the journal, or start a replacement request. Existing primary-source
+reconciliation is the authority for resolving the final receipt.
+
+Implement and verify these checkpoints in the module:
+
+1. **N14-C1 — Reproduce and preserve evidence.** Add a maintained regression for
+   final Actor patch committed, acknowledgement lost, one exact confirmed Item,
+   below-threshold XP, fresh paper/tabbed sheet and saved partial operation.
+   Establish the missing action before the correction. Preserve prior source,
+   tests and historical evidence; save this ADR before revising its disposition.
+2. **N14-C2 — Shared read-only discovery.** Use existing public runtime DataStore,
+   authorization and caller projection boundaries to expose only the current
+   caller's authorized unresolved advancement summary. Keep UI reads free of
+   receipt transitions and document writes. `pendingAdvancement` currently
+   retires zero-write journals, so separate read-only discovery from its existing
+   explicit advancement behavior. Do not put caller receipts into the invariant
+   registry, duplicate a world cache, poll privileged data or import private Core
+   internals. Recheck caller/source/context after awaits.
+3. **N14-C3 — Both sheet entry points.** Present a clear review action when the
+   saved operation needs attention, independently of XP eligibility. Open the
+   original request and existing recovery controls; do not prepare a new target
+   level first or require unrelated new-progression choices to review receipts.
+   Keep normal new-level behavior for eligible characters without pending work.
+   Use the shared state/handler so paper and tabs cannot diverge.
+4. **N14-C4 — Lifecycle and authorization.** Verify close/reopen, browser reload,
+   actual Core restart, Actor/caller/world/context changes, denied access and
+   late responses. Completion/retirement clears the summary; unrelated viewers
+   receive no request/receipt details or actionable controls. Preserve current
+   owner/caller binding and explicit exact-source resolution. A summary failure
+   must not masquerade as proof that no pending operation exists.
+5. **N14-C5 — Input classification.** Validate final advancement selection shapes
+   and exact source references before any grant or Actor write. Return typed
+   validation errors for malformed input, including bare-string Spell entries,
+   without inventing references. Keep authorization/concealment and actual
+   server-failure classification intact. Verify safe HTTP 400, no writes and no
+   new active partial operation; keep supported exact inputs passing.
+6. **N14-C6 — Corrected candidate and native continuation.** Run the affected
+   maintained handler/mounted regressions and the existing module validation and
+   packaging gates. Record the resulting archive identity. On the still-selected
+   v14 world, repeat the below-threshold recovery and malformed-input reproducers
+   using the installed candidate; confirm exact final source, unchanged grant
+   IDs and no duplicate writes. Finish the remaining v14 variants identified in
+   the report before requesting the user's v13 switch. Then execute the v13
+   matrix, preserving generation-specific results and cleanup receipts. Update
+   the active audit, this ADR, architecture, recovery guide, evidence and handoff
+   at each completed checkpoint. Commit/release only under current scoped
+   authorization; this testing pass performs neither.
+
+**Disposition:** N14-C1–C6 are the correction/acceptance plan, not completed
+implementation. D6, final D7, native A02 acceptance and release remain open.
+v14's executed passes are retained; unexecuted variants and all v13 rows are not
+silently marked passed. Required native checks include more than failure probes:
+complete the remaining table/list refresh, caller/dependency, final creation and
+action/language variants recorded in the report. F01–F06 remain deferred.
+
+Before this documentation change, the ADR was saved to
+`temp/native-a02-v14/ADR-0002.before-native-review.md`, SHA-256
+`b380344422045af83a6bbec733b81bdb115533cb9dab7086a26be65daf193b44`.
+All test fixtures/accounts/packs were removed and the native baseline matched
+with zero source differences. Task services stopped; operator Foundry remained
+running. Core/native/module product source and version metadata are unchanged.
+
+### Automatic completion policy and verified correction — October 19, 2026
+
+The user clarified that the fully applied case should be resolved automatically,
+not routinely sent through player recovery. This supersedes N14-C2/C3's blanket
+read-only-journal/manual-review proposal above. The original reproduction
+remains valid: it exposed an incomplete lifecycle, not a need for another Core
+migration capability. Its failure was deliberately injected; no production
+frequency was measured or asserted.
+
+The selected implementation has three outcomes:
+
+- **Proven zero writes:** preserve independent source changes, retire the attempt
+  with durable evidence and require fresh advancement (existing R1a policy).
+- **Proven complete writes:** re-read the current primary Actor under owner
+  authority, match the whole saved final source token and every distinct confirmed
+  owned grant ID, then persist completion locally. The final patch must have been
+  dispatched; grants must already be complete with no unresolved receipt/read
+  flags. Never issue another native create, patch, delete or roll. Retain the
+  original request/journal so replay remains terminal.
+- **Partial, unknown or mismatching writes:** retain exclusion and the original
+  exact-source review path. Do not discard uncertainty or treat a failed read/save
+  as success. No generic rollback is introduced.
+
+The shared caller projection performs this receipt lifecycle refresh under the
+same Actor queue as finalization; it may settle complete or retire zero-write
+bookkeeping. This explicitly permits server-side local receipt transitions on
+refresh, while UI rendering and projection preparation never write Foundry data.
+The projection exposes only a caller/owner-bound pending indicator, not journal
+contents in the invariant registry. Another caller's operation details remain
+private. Both sheets display **Review advancement** only for unresolved work,
+even below the next XP threshold. Review fetches the original saved request
+without new-progression Class/Patron hydration, uses its original target, and
+closes if a concurrent authoritative refresh has already settled it. Existing
+freshness, owner binding and R1a/R1b/R2/R3 rules remain.
+
+N14-02 now checks selection array/entry shapes and exact source references,
+returning typed validation 400 before any native or journal write. Actual
+permission, transport and persistence failures retain their classifications.
+No reference, class or grant is guessed.
+
+**Verification:** five new handler groups and two mounted cases fail before the
+correction. The final code passes all 17 maintained source suites (35 advancement
+handler groups), 16 mounted corrective cases, five Actor lifecycle cases,
+explicit module/UI/hook typing on Core 0.19.2/0.19.3, module checking and isolated
+packaging. The final archive passes nine public compiled-route cases on each
+Core version. Six actual native v14 groups pass, including exact-source
+settlement on fresh sheet load, real supervisor restart, no duplicate writes,
+unknown-create and independently changed-source exclusion, malformed-input 400,
+and interactive saved review in both installed layouts. See the
+[native correction record](../audits/2026-10-19-adr-0002-native-acceptance.md#automatic-completion-correction-and-native-recheck)
+for artifact identity, harness qualifications and cleanup.
+
+**Disposition:** N14-01/02 implementation and targeted v14 recheck are complete.
+The N14 correction portion of C1–C6 is satisfied under this clarified policy;
+C6's remaining broader v14 matrix, v13 acceptance and final D6/D7 closeout remain
+open. This is not release acceptance. Module version, compatibility, migration
+history and Core source are unchanged. Current work remains uncommitted.
+
+The pre-correction ADR snapshot is
+`temp/n14-auto-completion/ADR-0002.before-auto-completion.md`, SHA-256
+`5a0f3d4f2124861db49eecf674e4708ed413e2b859482ec6c612cb3e993b30ae`.

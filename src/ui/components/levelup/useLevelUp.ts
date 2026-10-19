@@ -27,6 +27,7 @@ export interface LevelUpProps {
     languageChoices?: LanguageSelections;
     contextRevision?: number;
     baseline?: string;
+    reviewOnly?: boolean;
     knownLanguages?: any[]; // Passed for new characters (pre-gen selections)
     skipLanguageSelection?: boolean; // For when languages are handled externally (Generator)
     onComplete: (data: { items: any[], hpRoll: number, gold?: number, languages?: string[], patronUuid?: string, creationPlan?: any }) => void;
@@ -112,6 +113,8 @@ export const useLevelUp = (props: LevelUpProps) => {
 
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [operation, setOperation] = useState<any>(null);
+    const closeReview = useRef(props.onCancel);
+    closeReview.current = props.onCancel;
     const submission = useRef<any>(null);
     const submitting = useRef(false);
     const mounted = useRef(true);
@@ -291,6 +294,11 @@ export const useLevelUp = (props: LevelUpProps) => {
 
             if (json.success && json.data) {
                 const apiData = json.data;
+                if (props.reviewOnly && !apiData.advancementOperation) {
+                    // A concurrent authoritative refresh may already have settled it.
+                    closeReview.current();
+                    return;
+                }
                 if (apiData.advancementOperation && !submitting.current) {
                     setOperation((previous: any) => previous?.state === 'retired' ? previous : apiData.advancementOperation);
                     submission.current ??= { requestId: apiData.advancementOperation.requestId };
@@ -333,7 +341,11 @@ export const useLevelUp = (props: LevelUpProps) => {
             setLevelData({ key, ready: false });
             setStatuses(prev => ({ ...prev, class: 'ERROR' }));
         }
-    }, [actorId, fetchWithAuth, selectedPatronUuid, authorityKey]);
+    }, [actorId, fetchWithAuth, selectedPatronUuid, authorityKey, props.reviewOnly]);
+
+    useEffect(() => {
+        if (props.reviewOnly) void fetchLevelUpData();
+    }, [props.reviewOnly, fetchLevelUpData]);
 
     const handlePatronChange = useCallback((uuid: string) => {
         setSelectedPatronUuid(uuid);
@@ -885,6 +897,7 @@ export const useLevelUp = (props: LevelUpProps) => {
 
     // Initialization and Sync logic
     useEffect(() => {
+        if (props.reviewOnly) return;
         const init = async () => {
             let currentClass = activeClassObj;
             let effectiveClassUuid: string | undefined = targetClassUuid || classUuid;
@@ -1111,7 +1124,7 @@ export const useLevelUp = (props: LevelUpProps) => {
             }
         };
         init();
-    }, [classObj, actorId, targetLevel, targetClassUuid, selectedPatronUuid, patronUuid, availableClasses, availablePatrons, collections, classUuid, currentLevel, fetchDocument, fetchLevelUpData, activeClassObj, statuses.class]);
+    }, [props.reviewOnly, classObj, actorId, targetLevel, targetClassUuid, selectedPatronUuid, patronUuid, availableClasses, availablePatrons, collections, classUuid, currentLevel, fetchDocument, fetchLevelUpData, activeClassObj, statuses.class]);
 
     useEffect(() => {
         if (!languageData.ready || !languageData.plan) return;

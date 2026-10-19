@@ -7,6 +7,7 @@ import { DECLARED_PACKS, ownedCopy } from '../logic/identity';
 import { primLike, worldSnapshot } from './fixtures/native-406';
 import { handleFinalizeLevelUp, handleGetLevelUpData } from '../server/api/level-up';
 import { reviewToken } from '../server/source-review';
+import { handleActorView } from '../server/api/actor-view';
 import { SdkError } from '@sheet-delver/sdk';
 const packs = nativePacks(process.env.SHADOWDARK_NATIVE ?? path.resolve('temp/shadowdark'), DECLARED_PACKS.map(p => p.id));
 const rows: any[] = Object.entries(packs).flatMap(([pack, docs]) => docs.map(doc => ({ ...doc, pack, uuid: `Compendium.${pack}.${['Player','NPC'].includes(doc.type) ? 'Actor' : pack.endsWith('tables') ? 'RollTable' : 'Item'}.${doc._id}` })));
@@ -70,9 +71,9 @@ await check('final Actor refusal retries frozen scalar values without repeating 
     assert.equal(result.body.operations.at(-1).status, 'failed'); f.restore(); assert.equal((await f.run()).body.state, 'complete'); finished(f);
     assert.deepEqual(f.events.map(e => e.kind), ['item','item','patch','patch']); assert.deepEqual(f.events[2]!.patch, f.events[3]!.patch);
 });
-await check('lost final Actor acknowledgement needs explicit exact-source review and no second patch', async () => {
+await check('lost final Actor acknowledgement settles on authoritative retry without a second patch', async () => {
     const f = fixture('patch-lost'); assert.equal((await f.run()).body.state, 'partial'); finished(f); f.restore();
-    assert.equal((await f.run()).body.state, 'partial'); assert.equal(f.events.length, 3);
+    assert.equal((await f.run()).body.state, 'complete'); assert.equal(f.events.length, 3);
     assert.equal((await f.run(f.review())).body.state, 'complete'); assert.equal(f.events.length, 3); finished(f);
 });
 await check('concurrent duplicate requests and completed replay write once', async () => {
@@ -300,8 +301,87 @@ await check('R1b final Actor primary-read failure reports partial despite target
     const f=fixture(),runtime=f.request().runtime,get=runtime.documents.get;let fail=true;
     runtime.documents.get=async(...args:any[])=>{if(fail&&f.events.length===3){fail=false;throw Error('Final primary read failed');}return get(...args);};
     const first=await f.run();assert.equal(first.body.state,'partial');assert.equal(first.body.operations.at(-1).acknowledged,true);assert.equal(first.body.operations.at(-1).status,'complete');assert.equal(first.body.operations.at(-1).verificationPending,true);finished(f);
-    assert.equal((await f.run()).body.state,'partial');assert.equal(f.events.length,3);
+    assert.equal((await f.run()).body.state,'complete');assert.equal(f.events.length,3);
     assert.equal((await f.run(f.review())).body.state,'complete');assert.equal(f.events.length,3);
+});
+const project = async (f: ReturnType<typeof fixture>, caller = 'offline-owner') => {
+    const response = await handleActorView(f.actor._id, { ...f.request(), method: 'GET', userSession: { userId: caller } });
+    return { status: response.status, body: await response.json() as any };
+};
+await check('N14 completed native source settles automatically on fresh sheet load after restart, without writes', async () => {
+    const f = fixture('patch-lost'); await f.run(); finished(f);
+    for (const row of f.records.values()) if (row.process) row.process = 'previous-process';
+    const before = structuredClone(f.actor), writes = f.events.length;
+    const view = await project(f); assert.equal(view.status, 200); assert.equal(view.body.actor.advancementPending, false);
+    assert.equal(view.body.derived.levelUp, false);
+    const journal = [...f.records.values()].find(row => row.grants);
+    assert.equal(journal.advancement.status, 'complete'); assert.equal(journal.advancement.sourceVerified, true);
+    assert.deepEqual(f.actor, before); assert.equal(f.events.length, writes);
+    assert.equal((await f.run({ requestId: f.body.requestId })).body.state, 'complete');
+    assert.equal((await project(f)).body.actor.advancementPending, false); assert.equal(f.events.length, writes);
+});
+await check('N14 partial, unknown and independently changed source never auto-complete or repeat writes', async () => {
+    for (const failure of ['item-2', 'item-lost', 'patch']) {
+        const f = fixture(failure); await f.run(); const before = structuredClone(f.actor), writes = f.events.length;
+        assert.equal((await project(f)).body.actor.advancementPending, true, failure);
+        assert.notEqual([...f.records.values()].find(row => row.grants).advancement.status, 'complete');
+        assert.deepEqual(f.actor, before); assert.equal(f.events.length, writes);
+    }
+    for (const alteration of ['actor', 'grant', 'receipt']) {
+        const f = fixture('patch-lost'); await f.run();
+        if (alteration === 'actor') f.actor.system.notes = 'Independent edit';
+        if (alteration === 'grant') f.actor.items.find((i: any) => i._id === 'confirmed1').system.level = 99;
+        if (alteration === 'receipt') [...f.records.values()].find(row => row.grants).grants[0].itemId = 'different';
+        assert.equal((await project(f)).body.actor.advancementPending, true, alteration);
+        assert.equal(f.events.length, 3);
+    }
+});
+await check('N14 caller and ownership boundaries conceal receipts and prohibit automatic completion', async () => {
+    const f = fixture('patch-lost'); await f.run(); const original = structuredClone([...f.records]);
+    assert.equal((await project(f, 'other-owner')).body.actor.advancementPending, false);
+    const request = { ...f.request(), userSession: { userId: 'other-owner' } };
+    const data: any = await (await handleGetLevelUpData(f.actor._id, request)).json();
+    assert.equal(data.data.advancementOperation, null);
+    f.authority(false); const observer = await project(f); assert.equal(observer.status, 200);
+    assert.equal(observer.body.actor.advancementPending, false); assert.deepEqual([...f.records], original);
+    f.authority(false, false); assert.equal((await project(f)).status, 404);
+    f.authority(true); assert.equal((await project(f)).body.actor.advancementPending, false);
+    assert.equal([...f.records.values()].find(row => row.grants).advancement.status, 'complete');
+});
+await check('N14 failed receipt persistence or primary read never announces completion; fresh retry settles', async () => {
+    for (const failure of ['store', 'read']) {
+        const f = fixture('patch-lost'); await f.run(); const runtime = f.request().runtime;
+        const set = runtime.dataStore.set, get = runtime.documents.get;
+        if (failure === 'store') runtime.dataStore.set = async () => { throw Error('Receipt persistence unavailable'); };
+        else runtime.documents.get = async () => { throw Error('Primary source unavailable'); };
+        assert.equal((await project(f)).status, 500);
+        assert.equal([...f.records.values()].find(row => row.grants).advancement.status, 'uncertain');
+        runtime.dataStore.set = set; runtime.documents.get = get;
+        assert.equal((await project(f)).body.actor.advancementPending, false); assert.equal(f.events.length, 3);
+    }
+});
+await check('N14 sheet refresh joins an in-flight final write and does not settle before its outcome', async () => {
+    const f = fixture('patch-lost'), runtime = f.request().runtime, patch = runtime.documents.patch;
+    let release!: () => void, entered!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const started = new Promise<void>(resolve => { entered = resolve; });
+    runtime.documents.patch = async (...args: any[]) => { entered(); await gate; return patch(...args); };
+    const running = f.run(); await started;
+    const refresh = project(f); await new Promise(resolve => setTimeout(resolve, 5));
+    assert.equal([...f.records.values()].find(row => row.grants).advancement.status, 'started');
+    release(); assert.equal((await running).body.state, 'partial');
+    // The pre-write projection snapshot may be retired; a fresh refresh must settle.
+    const result = await refresh; assert.ok([200, 409].includes(result.status ?? 0));
+    assert.equal((await project(f)).body.actor.advancementPending, false); finished(f); assert.equal(f.events.length, 3);
+});
+await check('N14 malformed grant selections reject before document or journal writes', async () => {
+    for (const invalid of [{ selectedSpells: [spell.uuid] }, { selectedSpells: {} }, { selectedSpells: [null] },
+        { selectedSpells: [{ uuid: KNIGHT }] }, { rolledTalents: [null] }, { rolledBoons: 'bad' },
+        { extraSpellSelection: { selected: ['bad'] } }]) {
+        const f = fixture(); const result = await f.run({ ...f.body, ...invalid });
+        assert.equal(result.status, 400, JSON.stringify(invalid)); assert.equal(f.events.length, 0);
+        assert.equal(f.records.size, 0); assert.deepEqual(f.actor, f.initial);
+    }
 });
 console.log(JSON.stringify({ scope: 'offline actual handlers; stored source/receipt/order assertions; not native acceptance', checks }, null, 2));
 if (checks.some(c => !c.pass)) process.exitCode = 1;

@@ -1,12 +1,25 @@
 # Shadowdark module architecture
 
+**Automatic completion correction (October 19):** SD02-N14-01/02 pass offline
+and targeted native v14 checks. The existing caller Actor projection now joins
+the shared Actor queue and refreshes only that caller's owned advancement
+receipt. A fully dispatched operation with exact final primary source and all
+confirmed grant IDs settles automatically; zero-write attempts retire using the
+existing policy. This is local bookkeeping, with no Foundry writes or new
+world cache. Uncertain/partial/mismatching source remains blocked. A boolean
+`advancementPending` exposes review on either sheet independently of XP without
+leaking another caller's receipts. Review loads its original request directly,
+not a new level's Class/Patron prerequisites. Invalid selection shapes/references
+return typed validation errors. See the [native evidence](audits/2026-10-19-adr-0002-native-acceptance.md#automatic-completion-correction-and-native-recheck).
+Remaining v14 variants and v13 acceptance are still open; Core/SDK are unchanged.
+
 **Corrective implementation (October 19):** R1b's acknowledgement and receipt
 separation and R2/R3 remain covered. SD02-R1a-R1 removes old-source equality from
 proven zero-write retirement, preserving independent Actor edits and requiring
 fresh preparation. CI now invokes all 17 maintained source suites with the pinned
 native reference. The original review and corrective evidence are recorded in
 [SD02-R1a-R1](audits/2026-10-18-spellcasting-and-native-parity.md#sd02-r1a-r1--zero-write-actor-edits-still-block-restart-p1).
-Native D6/final D7 and A02-01–15 remain open on both generations.
+Native D6/final D7 and A02 acceptance remain open; see the newer v14 record above.
 
 **Active follow-up (October 18):** the post-release 0.9.5
 [native parity audit](audits/2026-10-18-spellcasting-and-native-parity.md) and

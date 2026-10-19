@@ -4,6 +4,10 @@ Historical entries are reconstructed from [published releases](https://github.co
 
 ## Unreleased
 
+- Automatically settle confirmed advancement
+- Preserve accessible partial-operation review
+- Validate advancement selection shapes
+
 - Preserve independent Actor edits
 - Run complete parity regressions
 

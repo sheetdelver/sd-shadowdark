@@ -7,9 +7,14 @@ zero-write refusal/context change and exact-ID reconciliation after acknowledged
 creation plus receipt/read failure. R2/R3 retain passing implementation and rerun
 offline regressions; their separate native cases remain required.
 
-All A02 rows remain **open for actual Foundry**. Controlled native methods,
-isolated Core and browser tests are separate evidence. This run sheet is ready
-for scoped operator authorization; it does not grant that authority.
+**Execution update, October 19:** The user authorized v14 testing. The
+[native acceptance report](audits/2026-10-19-adr-0002-native-acceptance.md)
+records the original broader pass and the corrected candidate's six-group v14
+recheck. SD02-N14-01/02 pass: exact full advancement settles automatically after
+refresh/restart; partial/unknown outcomes keep review and no replay; malformed
+input returns 400. Finish the remaining v14 variants before requesting the v13
+switch. All v13 rows and overall D6/final D7 remain open. This run sheet itself
+grants no service or write authority.
 
 The [SD02-R1–R3 implementation findings](audits/2026-10-18-spellcasting-and-native-parity.md#independent-implementation-review--october-18-2026)
 now have failing-before/passing-after offline regressions. Select only the new

@@ -60,12 +60,12 @@ export const LevelUpModal = (props: LevelUpProps) => {
                     />
                 )}
 
-                {(state.loadingClass || state.loadingPatrons || state.isSubmitting) && <LoadingOverlay />}
+                {(state.isSubmitting || (!state.operation && (state.loadingClass || state.loadingPatrons))) && <LoadingOverlay />}
 
                 <LevelUpHeader
                     actorName={props.actorName}
-                    currentLevel={props.currentLevel}
-                    targetLevel={props.targetLevel}
+                    currentLevel={state.operation?.targetLevel ? state.operation.targetLevel - 1 : props.currentLevel}
+                    targetLevel={state.operation?.targetLevel ?? props.targetLevel}
                     targetClassUuid={state.targetClassUuid}
                     availableClasses={props.availableClasses || []}
                     error={state.error}
@@ -74,7 +74,7 @@ export const LevelUpModal = (props: LevelUpProps) => {
                     selectedPatronUuid={state.selectedPatronUuid}
                     onClassChange={actions.setTargetClassUuid}
                     onPatronChange={actions.setSelectedPatronUuid}
-                    classLocked={!!props.classUuid}
+                    classLocked={!!state.operation || !!props.classUuid}
                 />
 
                 {/* Main Scrollable Content */}

@@ -12,8 +12,13 @@ source suites. R1b retains its acknowledged-write recovery checks. R2/R3 retain 
 and rerun regressions. Historical
 review requirements remain recorded; see the
 [review addendum](2026-10-18-spellcasting-and-native-parity.md#independent-implementation-review--october-18-2026).
-**ADR-0002 stays open: actual native D6, final D7 and A02-01–15 are outstanding.** This report
-supplements the [active audit](2026-10-18-spellcasting-and-native-parity.md),
+**Native update (October 19):** The [native report](2026-10-19-adr-0002-native-acceptance.md)
+records the broader v14 execution and subsequent N14-01/02 correction. Automatic
+exact-source completion, retained partial review and malformed-input 400 pass
+both offline and a targeted six-group actual v14 recheck. Its final archive
+supersedes earlier candidates below. Remaining broader v14 variants and all v13
+acceptance keep ADR-0002 and D6/final D7 open. This record supplements the
+[active audit](2026-10-18-spellcasting-and-native-parity.md),
 [ADR](../adr/0002-native-data-and-behavior-parity.md) and
 [native run sheet](../native-parity-acceptance.md).
 
@@ -424,3 +429,30 @@ checks remain distinct from installed-host/native acceptance. No live Core or
 Foundry session was contacted, no services were started, and all test processes
 exited. Native D6/final D7 and every A02-01–15 on both generations remain open;
 ADR-0002 is not closed or release-approved by these offline results.
+
+## N14 automatic completion correction — October 19, 2026
+
+The final native/candidate identity and detailed qualifications are recorded in
+[the native correction report](2026-10-19-adr-0002-native-acceptance.md#automatic-completion-correction-and-native-recheck).
+Evidence directory: `temp/n14-auto-completion/`.
+
+| Check | Result |
+| --- | --- |
+| Maintained source suites | 17/17; advancement handler groups 35/35 |
+| New fail-before cases | Five handler groups; two mounted consumers |
+| Mounted corrective suite | 16/16, including real modal with held Class data and settled-review dismissal |
+| Shared Actor lifecycle | 5/5; caller/context invalidation, late results, reconnect and unmount |
+| Explicit types | Module/UI/hooks pass with Core 0.19.2 and 0.19.3 |
+| Module check and isolated package | Pass; physical source copy preserves migration confinement |
+| Final compiled public API routes | 9/9 on Core 0.19.2 and 0.19.3 |
+| Targeted actual native v14 | 6/6 groups; unchanged source after replay/refresh, restart and both sheet entry points |
+| Native cleanup | Both runs restored baseline with zero source differences; all task services stopped |
+
+Source: `advancement-recovery.test.ts`, `parity-corrections.browser.mjs`,
+`packaged-corrections.mjs` and existing lifecycle suites. Final archive:
+`temp/n14-auto-completion/package-data/dist/modules/shadowdark-0.9.5.tgz`,
+276056 bytes, SHA-256
+`7f193292d1e7e0213b922199f7795ec57afb51e235a4bee70136582d72a85469`.
+Native fixtures were confined to the approved disposable world. This does not
+complete the remaining native matrix or authorize publication. Code/docs are
+uncommitted; module/Core versions and migration history remain unchanged.

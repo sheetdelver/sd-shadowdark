@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { json, error, type ModuleServerRequest } from '@sheet-delver/sdk/server';
-import { getErrorMessage, isSdkError } from '@sheet-delver/sdk';
+import { getErrorMessage, isSdkError, SdkError } from '@sheet-delver/sdk';
 import { callerOf, contextConflict, requireOwnedActor } from './access';
 import { shadowdarkAdapter } from './ShadowdarkAdapter';
 import { documentId } from '../logic/identity';
@@ -59,15 +59,49 @@ async function retireZeroWrite(req: ModuleServerRequest, journal: Journal, key: 
     await req.runtime.dataStore.set(key, journal);
     return true;
 }
+/** Settle bookkeeping only when the entire dispatched operation is already present.
+ * Caller holds the Actor queue. Never replay a write or infer an unknown Item ID. */
+async function settleCompleted(req: ModuleServerRequest, journal: Journal, key: string, actor: any, revision: number | null) {
+    if (isTerminal(journal) || !journal.finalReview || !['started', 'uncertain', 'complete'].includes(journal.advancement.status)
+        || !journal.grants.every(op => op.status === 'complete' && op.itemId && !op.receiptPending && !op.verificationPending)) return false;
+    const current = await requireOwnedActor(req.runtime, documentId(actor));
+    if (contextConflict(req.runtime, revision)) throw new SdkError('conflict', 'World context changed while checking advancement completion.');
+    if (reviewToken(current) !== journal.finalReview) return false;
+    const ids = new Set<string>();
+    for (const op of journal.grants) {
+        const owned = current.items?.find((item: any) => documentId(item) === op.itemId);
+        if (!owned || ids.has(op.itemId!) || (typeof owned.uuid === 'string' && owned.uuid.startsWith('Actor.')
+            && owned.uuid !== `Actor.${documentId(current)}.Item.${op.itemId}`)) return false;
+        ids.add(op.itemId!);
+    }
+    const completed = structuredClone(journal);
+    completed.advancement = { ...completed.advancement, status: 'complete', sourceVerified: true, receiptPending: false, verificationPending: false };
+    delete completed.advancement.error; delete completed.advancement.persistenceError;
+    await req.runtime.dataStore.set(key, completed);
+    Object.assign(journal, completed);
+    return true;
+}
 export async function pendingAdvancement(req: ModuleServerRequest, actor: any) {
     const id = scope(req, documentId(actor)); if (!id) return null;
     const active = await req.runtime.dataStore.get<{ requestId: string; key: string }>(activeKey(req, documentId(actor)));
-    const journal = active && await req.runtime.dataStore.get<Journal>(active.key);
+    // The Actor-wide fence must not expose a different caller's receipt.
+    if (!active || active.key !== keyFor(id, active.requestId)) return null;
+    const journal = await req.runtime.dataStore.get<Journal>(active.key);
     if (journal && active!.key === keyFor(id, journal.requestId)) {
-        const retired = await retireZeroWrite(req, journal, active!.key, actor, req.runtime.world!.snapshot().identity.contextRevision);
+        const revision = req.runtime.world!.snapshot().identity.contextRevision;
+        if (await settleCompleted(req, journal, active.key, actor, revision)) return null;
+        const retired = await retireZeroWrite(req, journal, active.key, actor, revision);
         if (retired) return receipt(journal, actor, req.runtime.world!.snapshot().identity.contextRevision);
     }
     return journal && !isTerminal(journal) ? receipt(journal, actor, req.runtime.world!.snapshot().identity.contextRevision) : null;
+}
+
+/** Shared caller projection refresh; no Foundry writes, only proven receipt completion/retirement. */
+export async function advancementNeedsReview(req: ModuleServerRequest, actorId: string) {
+    if (!scope(req, actorId)) return false;
+    const owned = await req.runtime.documents.get('Actor', actorId, { minOwnership: 'owner' });
+    if (!owned) return false;
+    return (await pendingAdvancement(req, owned))?.state === 'partial';
 }
 
 /** Operation-local plans/receipts, not an Actor cache. Caller must hold the Actor queue. */
@@ -82,11 +116,15 @@ export async function resumeAdvancement(req: ModuleServerRequest, actor: any, bo
     if (journal && body.targetLevel !== undefined && journal.fingerprint !== fingerprint(body)) return error('conflict', 'This requestId already identifies a different advancement plan.');
     const result = async () => { actor = await requireOwnedActor(req.runtime, documentId(actor)); return json({ success: true, ...journal!.result, ...receipt(journal!, actor, revision) }); };
     if (journal && isTerminal(journal)) return result();
+    if (journal && await settleCompleted(req, journal, key, actor, revision)) return result();
     if (journal && await retireZeroWrite(req, journal, key, actor, revision)) return result();
     const active = await store.get<{ requestId: string; key: string }>(activeKey(req, documentId(actor)));
     if (active && active.key !== key) {
         const prior = await store.get<Journal>(active.key);
-        if (prior && active.key === keyFor(id, prior.requestId)) await retireZeroWrite(req, prior, active.key, actor, revision);
+        if (prior && active.key === keyFor(id, prior.requestId)) {
+            await settleCompleted(req, prior, active.key, actor, revision);
+            await retireZeroWrite(req, prior, active.key, actor, revision);
+        }
         if (prior && !isTerminal(prior)) return error('conflict', `Advancement ${prior.requestId} is incomplete. Reopen and review its receipts before any new advancement.`);
     }
     if (!journal) {

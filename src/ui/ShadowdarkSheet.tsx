@@ -245,12 +245,12 @@ export default function ShadowdarkSheet(props: ShadowdarkSheetProps) {
                         {/* Stats Summary */}
                         <div className="flex gap-4 md:gap-6 items-center px-4 md:pr-6 pb-2 md:pb-0 justify-around md:justify-end w-full md:w-auto bg-neutral-900 md:bg-transparent">
 
-                            {actor.computed?.levelUp && (
+                            {(actor.advancementPending || actor.computed?.levelUp) && (
                                 <button
                                     onClick={triggerLevelUp}
                                     className="bg-amber-500 text-black px-2 py-1 text-xs md:text-sm font-bold rounded animate-pulse shadow-lg ring-2 ring-amber-400/50 hover:bg-amber-400 transition-colors cursor-pointer"
                                 >
-                                    LEVEL UP!
+                                    {actor.advancementPending ? 'Review advancement' : 'LEVEL UP!'}
                                 </button>
                             )}
                             {actor.system?.attributes?.hp && (

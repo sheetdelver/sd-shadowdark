@@ -2,13 +2,14 @@
 
 **Date:** October 18, 2026
 
-**Status (October 19, restart/CI correction):** Active — SD02-R1a-R1 and
-SD02-V1 are corrected with passing offline evidence. Independent Actor edits
-survive zero-write restart, and CI invokes all 17 source suites with the pinned
-native reference. R1b/R2/R3 remain covered. The
-[checkpoint review](#independent-checkpoint-review--october-19-2026) records the
-original failures; the final correction below supersedes its open disposition.
-Actual native D6/D7/A02-01–15 remain open on both generations.
+**Status (October 19, automatic completion correction):** Active — SD02-N14-01/02
+are corrected with failing-before/passing-after offline regressions and a
+successful targeted native v14 recheck. Proven complete advancement now settles
+automatically; partial/unknown outcomes remain blocked. Earlier corrections and
+passing native evidence remain. The [native report](2026-10-19-adr-0002-native-acceptance.md#automatic-completion-correction-and-native-recheck)
+records final archive identity, six native groups and verified cleanup. Remaining
+v14 variants and all v13 acceptance keep D6/final D7 and release open. Core is
+unchanged.
 
 **Decision record:** [ADR-0002](../adr/0002-native-data-and-behavior-parity.md)
 
@@ -1447,3 +1448,117 @@ Mounted checks total65:13 corrective,41 collection/Generator,6 action/card and
 each Core version. The [validation record](2026-10-18-adr-0002-validation.md#zero-write-restart-and-ci-checkpoint--october-19-2026)
 records archive identity and logs. No new Core dependency, native connection,
 version change or migration change. Native D6/final D7/A02 remain open.
+
+## Native v14 review — October 19, 2026
+
+This later pass used the unchanged checkpoint `032e824f`, archive SHA-256
+`3aeccbb0c3924e32043be2f065d6248fac29e2081521a01a55608625a8bdd56f`, actual isolated
+Core 0.19.3 and the authorized Foundry 14.367/Shadowdark 4.0.6 disposable world.
+The [native evidence report](2026-10-19-adr-0002-native-acceptance.md) records
+identities, fault-injection boundaries, passing workflows and remaining variants.
+These findings are module-owned; they do not reopen Core migration scope.
+
+### SD02-N14-01 — Partial advancement recovery disappears after reload (P1)
+
+**Confirmed in the original candidate; corrected below.** A real native final Actor patch advanced a
+fixture from level 2 / XP 35 / HP 8 to level 3 / XP 15 / HP 11. Its one Fog Item
+was already confirmed by exact native ID. The test then deliberately discarded
+the Actor acknowledgement. The saved request correctly remained `partial` with
+an uncertain final Actor receipt. After a real Core restart and page reload,
+the owner-only `level-up/data` route still returned that operation, while both
+sheets exposed **no advancement or recovery action**.
+
+The level eligibility calculation correctly says false at XP 15 against the
+next threshold of 30. `src/ui/ShadowdarkPaperSheet.tsx` renders its only entry
+under `derived.levelUp`; `src/ui/ShadowdarkSheet.tsx` uses
+`actor.computed?.levelUp`. The shared `useShadowdarkLevelUp` hook opens only from
+that entry. `components/levelup/useLevelUp.ts` discovers the saved operation
+after the dialog opens, too late for either fresh sheet. The caller Actor view
+does not currently publish a recovery summary.
+
+Production trigger: the final update succeeds in Foundry, but its response or
+subsequent bookkeeping cannot establish completion, and the user closes/reloads
+the page or Core restarts. This need not corrupt character data to strand the
+workflow: another advancement remains fenced behind the unresolved request.
+Native exact-source reconciliation passes when called through the existing
+public operation route. No additional Core write permission or SDK capability
+is needed for the observed defect.
+
+**Required correction:** provide a shared, caller-authorized, read-only pending
+operation summary independent of XP eligibility. Both sheets must offer review
+of the original saved request after reload/restart, without constructing a new
+next-level plan or rerunning confirmed changes. Ordinary projection reads must
+not reconcile/retire journals or dispatch writes. In particular,
+`pendingAdvancement` currently calls `retireZeroWrite`; do not reuse it as a pure
+render-time lookup without separating that behavior. Preserve caller/Actor/world
+binding and prevent observers or other owners from receiving another caller's
+operation details.
+
+**Acceptance:** reproduce final-patch acknowledgement loss with below-threshold
+XP in both mounted sheet layouts, then reload and restart. Reach the original
+request, reconcile exact final source and confirm completion with one original
+grant and no extra Actor write. Exercise close/reopen, completed/retired removal,
+Actor/caller/context changes, late responses and ordinary no-pending characters.
+Add a fail-before/pass-after regression and rerun the native reproducer on v14
+before switching generations. Preserve all R1a/R1b/R2/R3 controls.
+
+Local reproduction: `restart-recovery.json` → `finalPatchReachability`, screenshots
+`final-patch-paper.png`/`final-patch-tabs.png`, and successful backend recovery in
+`recovery-final-patch.json` under the private run directory named in the report.
+Fixture/request/Item identities and source values are retained there; the fixtures
+were cleaned up. A separate restart assertion error was a harness mistake,
+corrected in `restart-verification.json`; it is not this finding.
+
+### SD02-N14-02 — Malformed advancement input returns an internal error (P2)
+
+**Confirmed in the original candidate; corrected below.** A malformed harness request
+submitted bare UUID strings in `selectedSpells` instead of the supported
+`{ uuid }` entries. `verifyGrants` → `resolveSpell` in
+`src/server/api/level-up.ts` throws generic `Error` for the missing reference;
+the public installed route reports HTTP 500. Supported-shaped missing, duplicate
+or wrong-list choices reject with HTTP 400 and no writes in the native controls.
+This observation does not establish a failed valid UI submission or data loss.
+
+Validate untrusted selection shapes and required exact references before grants
+or Actor writes. Classify malformed/missing source input with the public SDK
+validation error contract. Check equivalent input branches for missing/wrong
+grant types; retain safe permission/concealment behavior and do not relabel real
+transport or persistence failures as client mistakes. Never infer a source by
+name or silently coerce invalid input into a successful plan.
+
+Acceptance is a public-handler/compiled-archive regression: malformed entries
+return a safe 400, make zero document writes and do not create an active partial
+operation; valid exact selections still work. Recheck the native malformed case
+alongside N14-01. No version, compatibility or migration-history change is needed.
+
+### N14 corrective disposition — automatic source-confirmed completion
+
+The user selected automatic resolution of the fully applied case rather than
+requiring player recovery for it. `settleCompleted` reuses the durable final
+source token and confirmed owned Item IDs. Under the shared Actor queue and the
+original caller's current owner authority, refresh/retry can close the local
+receipt only when all grants are complete and the whole current primary Actor
+matches the saved final outcome. No new grant, Actor patch, roll or deletion is
+performed. An unavailable read/save does not announce completion; uncertain
+Item identity, partial application and source mismatch remain blocked.
+
+The shared caller projection returns only an owner/caller-bound
+`advancementPending` indicator. Both sheets expose review only when needed,
+independently of new-level XP eligibility. Review loads the original operation
+before unrelated Class/Patron preparation, shows the original target and remains
+interactive; a concurrently settled review closes without starting a replacement.
+The owner-only data route no longer exposes another caller's receipt. N14-02
+validates selection arrays/entries and maps missing/wrong references to typed
+400 errors before document or journal writes; runtime failures retain their
+existing classification.
+
+Five new handler groups and two mounted cases failed against the old source.
+The final implementation passes 35 handler groups, all 17 source suites, 16
+mounted corrective cases, five existing Actor lifecycle cases, explicit typing
+on Core 0.19.2/0.19.3, module checking and isolated packaging. Nine compiled-route
+checks pass on each Core version. Actual native v14 passes six groups including
+supervisor restart, exact-source/no-duplicate verification, unresolved/changed
+source exclusion, malformed-input 400, and interactive review in both sheets.
+The [final native record](2026-10-19-adr-0002-native-acceptance.md#automatic-completion-correction-and-native-recheck)
+contains archive identity and qualifications. This supersedes N14-01/02's open
+implementation disposition, not the remaining broader acceptance matrix.

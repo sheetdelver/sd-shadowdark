@@ -24,13 +24,17 @@ import { pendingAdvancement, resumeAdvancement } from '../advancement-operation'
  * name/type/system metadata; their effects are rebuilt by the server handlers.
  */
 async function verifyGrants(body: any, classObj: any, req: ModuleServerRequest) {
+    for (const value of [body.rolledTalents, body.rolledBoons, body.selectedSpells, body.extraSpellSelection?.selected]) {
+        if (value != null && (!Array.isArray(value) || value.some(entry => !entry || typeof entry !== 'object' || Array.isArray(entry))))
+            throw new SdkError('validation', 'Advancement selections must be arrays of exact source selections.');
+    }
     const resolveGrant = async (entry: any, allowed: string[]) => {
         const uuid = canonicalUuid(entry?.documentUuid ?? entry?.uuid);
         if (uuid) {
             const doc = await shadowdarkAdapter.resolveDocumentFor(uuid, callerOf(req));
-            if (!doc) throw new Error(`${entry?.name || uuid} is not available.`);
+            if (!doc) throw new SdkError('validation', `${entry?.name || uuid} is not available.`);
             if (doc.type === 'RollTable') return { name: doc.name, type: 'Talent', uuid, system: { ...(entry?.system ?? {}) }, effects: [] };
-            if (!allowed.includes(doc.type)) throw new Error(`${doc.name} is a ${doc.type}, not ${allowed.join('/')}.`);
+            if (!allowed.includes(doc.type)) throw new SdkError('validation', `${doc.name} is a ${doc.type}, not ${allowed.join('/')}.`);
             return { ...doc, uuid, system: { ...(doc.system ?? {}), ...(entry?.system?.level !== undefined ? { level: entry.system.level } : {}),
                 ...(entry?.system?.talentClass ? { talentClass: entry.system.talentClass } : {}) } };
         }
@@ -39,16 +43,16 @@ async function verifyGrants(body: any, classObj: any, req: ModuleServerRequest) 
         if (['PatronBoon', 'PatronBoonTwice', 'synthetic'].includes(entry?.type)
             && !TALENT_HANDLERS.some(handler => handler.action && handler.matches(entry))) return null;
         if (!TALENT_HANDLERS.some(handler => handler.action && handler.matches(entry))) {
-            throw new Error(`${entry?.name || 'A rolled result'} has no source document and no supported selection.`);
+            throw new SdkError('validation', `${entry?.name || 'A rolled result'} has no source document and no supported selection.`);
         }
         return { name: entry.name ?? entry.text, type: 'Talent', system: { ...(entry?.system ?? {}) }, effects: [] };
     };
     const classUuid = spellListIdentity(classObj, classObj?.uuid);
     const resolveSpell = async (entry: any, requireClass: boolean) => {
         const uuid = canonicalUuid(entry?.uuid);
-        if (!uuid) throw new Error(`${entry?.name || 'A selected spell'} has no source reference.`);
+        if (!uuid) throw new SdkError('validation', `${entry?.name || 'A selected spell'} has no source reference.`);
         const doc = await shadowdarkAdapter.resolveDocumentFor(uuid, callerOf(req));
-        if (!doc || doc.type !== 'Spell') throw new Error(`${entry?.name || uuid} is not an available Spell.`);
+        if (!doc || doc.type !== 'Spell') throw new SdkError('validation', `${entry?.name || uuid} is not an available Spell.`);
         if (requireClass && (!classUuid || !(doc.system?.class ?? []).some((value: unknown) => canonicalUuid(value) === classUuid))) {
             throw new SdkError('validation', `${doc.name} is not on the exact Class spell list.`);
         }

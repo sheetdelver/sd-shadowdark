@@ -91,8 +91,11 @@ above level zero and first-level HP from the hit die plus prepared CON (minimum1
 Generator and server share `logic/advancement.ts`; prepare grants before HP.
 Advancement completion requires all grant receipts and the final Actor patch;
 a target-level event is not completion. Keep exact confirmed IDs, frozen HP/XP
-and request identity through retries. Uncertain writes need explicit exact-source
-review; never recreate based on a name/origin or silently start a replacement.
+and request identity through retries. Fully dispatched advancement may settle automatically when the exact final
+Actor source and every confirmed grant ID match. This updates module receipts
+only; it never repeats a Foundry write. Partial writes and unknown grant IDs
+retain explicit exact-source review; never recreate from names/origins or silently
+start a replacement.
 Document consumers must use the route's actual bare-document response shape.
 Use native source and handler comparisons for these rules;
 successful writes alone do not establish parity.
@@ -109,6 +112,15 @@ fresh preparation; never require the player to undo unrelated changes when this
 operation made none. Partial/unknown outcomes never qualify for a zero-write
 restart. SD02-V1 adds the maintained advancement, final-creation and native-parity
 handler suites to CI using the pinned static native reference below.
+Native v14 evidence is recorded in the
+[acceptance report](docs/audits/2026-10-19-adr-0002-native-acceptance.md).
+SD02-N14-01/02 are corrected with offline and targeted native v14 evidence.
+Caller projection refresh settles proven complete advancement or retires proven
+zero-write attempts under the Actor queue. Only unresolved operations expose the
+caller-safe review indicator, independent of XP. UI never edits receipts directly;
+server bookkeeping transitions preserve the original record and never write
+Foundry documents. Recovery opens its saved request without new Class preparation.
+Malformed selection input returns typed validation errors before writes.
 Native acceptance remains open. Follow its checkpoints; do not treat its existence as branch, live-write or release authority.
 [ADR-0001](docs/adr/0001-native-alignment-and-resource-cards.md) and the
 [native-alignment audit](docs/audits/2026-10-15-native-alignment.md) remain completed

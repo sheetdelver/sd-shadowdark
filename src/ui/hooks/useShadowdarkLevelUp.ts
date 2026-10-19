@@ -28,7 +28,7 @@ export function useShadowdarkLevelUp(
         let fetchedLanguages = [];
 
         // Ensure hydration for base essentials needed for level-up resolution
-        if (onFetchPack) {
+        if (onFetchPack && !actor.advancementPending) {
             setIsFetching(true);
             try {
                 // Fetch packs explicitly and use the returned data
@@ -49,6 +49,7 @@ export function useShadowdarkLevelUp(
         }
 
         const data = {
+            reviewOnly: actor.advancementPending === true,
             currentLevel,
             baseline: actor.spellReviewToken ?? spellReview(actor),
             contextRevision: actor.worldContextRevision ?? actor.derived?.ruleInputs?.contextRevision,
