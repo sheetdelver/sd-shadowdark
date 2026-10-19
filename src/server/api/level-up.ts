@@ -502,7 +502,7 @@ async function finalizeLevelUp(actorId: string, req: ModuleServerRequest, input?
                 ...finalItems.flatMap(item => { const ref = sourceRef(item); return ref ? [formatUuid(ref)] : []; }),
                 ...finalItems.flatMap(item => item.type === 'Spell' ? item.system?.class ?? [] : [])].filter(Boolean);
             const applied = await resumeAdvancement(req, actor, body, revision, { items: finalItems, patch: actorUpdates, dependencies,
-                result: { actorId, targetLevel, items: finalItems, updates: actorUpdates, hpRoll: state.hpRoll, goldRoll: gold, languages: state.selectedLanguages } });
+                result: { actorId, targetLevel, updates: actorUpdates, hpRoll: state.hpRoll, goldRoll: gold, languages: state.selectedLanguages } });
             return applied ?? error('internal', 'Advancement plan could not be recorded.');
         }
 

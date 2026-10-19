@@ -1,11 +1,11 @@
 # ADR-0002 implementation validation
 
 SD02-01–13 have implementation checkpoint evidence and passing controlled checks.
-Independent review found **open SD02-R1–R3** in advancement recovery, final
-creation validation and management-source refresh; see the
+Independent review found SD02-R1–R3 in advancement recovery, final
+creation validation and management-source refresh; these are now corrected with
+new offline evidence below. Historical review requirements remain recorded; see the
 [review addendum](2026-10-18-spellcasting-and-native-parity.md#independent-implementation-review--october-18-2026).
-**ADR-0002 stays open: corrective verification and actual native A02-01–15 are
-outstanding.** This report
+**ADR-0002 stays open: actual native A02-01–15 is outstanding.** This report
 supplements the [active audit](2026-10-18-spellcasting-and-native-parity.md),
 [ADR](../adr/0002-native-data-and-behavior-parity.md) and
 [native run sheet](../native-parity-acceptance.md).
@@ -159,3 +159,80 @@ manual search and original operation receipts survive. Collection41/41 and
 current explicit typing pass. All three findings now have corrective execution
 coverage; integrated validation and a new archive are recorded separately below.
 No native acceptance was performed.
+
+## Integrated corrective validation — October 19, 2026
+
+This section supersedes the earlier candidate for R1–R3. All new tests are offline:
+no live Core/Foundry connection, installed service/browser session or native
+acceptance was performed. Older controlled-host/native-method evidence retains
+its original scope and artifact; it was neither overwritten nor promoted.
+
+| Checkpoint | Commit / contents |
+| --- | --- |
+| Review preservation | `08997a4`: eight existing review documentation files checkpointed before implementation. |
+| R1 | `30dc3cc`: durable exact advancement receipts, native order, refused/uncertain recovery and authoritative mounted completion. |
+| R2 | `215be57`: shared preparation at the final creation write, native grant multiset validation and lossless Generator plan forwarding. |
+| R3 | `75cd303`: current source facts in open management, immediate stale-intent masking, preserved original receipts and CI consumer coverage. |
+| Integrated verification | Final checkpoint adds compiled-archive contract checks, keeps saved grant payloads out of advancement responses and records this candidate. |
+
+Before editing the reviewed ADR, the complete current file was saved as
+`temp/adr0002-corrections/ADR-0002.before-corrections.md`, SHA-256
+`b29b30b39847de1871034f832db4867098db2afe714b18c441f2fe140b63c1e7`.
+Both `dbbe93f2` and the documentation checkpoint remain ancestors. All original
+implementation commits and review evidence remain available.
+
+| Finding | Failing before (08997a4) | Passing after / maintained entry |
+| --- | --- | --- |
+| R1 | Ten handler cases fail; the reviewed Knight grant refusal publishes3/15XP/11HP without its required Spell. Two mounted cases fail, including premature success on an Actor event. | `advancement-recovery.test.ts`10/10, corrective browser2/2. Refusal leaves2/35XP/8HP; completion confirms every exact Item ID then publishes advancement once. Lost acknowledgements stop; explicit exact-source review can reconcile IDs/final patch; restart requires review. |
+| R2 | Eight negative groups fail with Actor writes; both valid caster/level-zero controls pass. | `creation-validation.test.ts`10/10: missing/excess/duplicate/wrong-tier/list, stale source/progression/context, fixed/extra/ordinary distinction and complete native data comparison before create. |
+| R3 | Four mounted cases fail: stale limits/list/intent and incomplete original receipt display. | `parity-corrections.browser.mjs`4/4: same-Class level/table/list changes update current facts/request identity, preserve search and retain exact original operation receipts after retry failure. |
+
+Final source validation uses released Core0.19.2
+`13aef6b6676a6bfb2edc295cc71e296a75036dbd` and current Core0.19.3
+`90c13e5e57d88913cd3bae6bf6b9e6f0b995bad1`, both read-only. Native sources remain
+release4.0.6 `9677d16b3903b3b640f00d4efd48249142ac8334`, clean and read-only.
+Module0.9.5, all compatibility ranges/workflow pins, migration IDs/revisions and
+applied-history policy are unchanged; no `sdkVersion` was added.
+
+| Verification | Newly observed result | Local artifacts under temp/adr0002-corrections/ |
+| --- | --- | --- |
+| All maintained source suites |17/17 on each Core toolchain; includes new R1/R2 suites, parity17, conformance89, alignment61 and boundaries53. | `final-suites.json`, `final-floor/`, `final-current/`. |
+| Explicit module/UI/hook typing |Pass on both toolchains; root exclusion does not substitute for these checks. | Same directories, `types.log`. |
+| Native-method comparisons |20/20 on each toolchain;69 slots/31 weapons/9 armor/4 inventories/9 ordinary outcomes retained. Controlled collaborators, not full Foundry preparation. | Same directories, `native-methods.log`. |
+| Mounted offline consumers |Corrective6/6, collection/Generator41/41, action/card6/6, Actor lifecycle5/5; no page errors; outgoing browser traffic blocked. | `final-{corrective,collection,action,actor}-browser/`. |
+| Module checking |Pass without warnings on0.19.2/0.19.3, including boundaries and dry bundles. | `final-{floor,current}-check.log`. |
+| Isolated package |Pass on released0.19.2. | `final-package.log`, `final-package-identity.json`. |
+| Final compiled routes through public SDK |5/5 on each version: actual exported `apiRoutes`, public `@sheet-delver/sdk/testing`, refusal/retry/order/exact ID/completed replay, zero-spell rejection, valid lossless creation and tampered final body rejection. | `packaged-{floor,current}/results.log`; maintained `packaged-corrections.mjs`. |
+| Core public archive CLI |Artifact/manifest/dependencies/trust-override validation allow on both. Final preview correctly returns `wouldProceed:false`, `Full-GM service account required`. No install or service-account workaround. | `{floor,current}-archive-dry-run-install.log`, `archive-cli-results.json`. |
+
+Final archive:
+`temp/adr0002-corrections/package-data/dist/modules/shadowdark-0.9.5.tgz`,
+**272852 bytes**, SHA-256
+`2c2625964aa26094fa84ed608f5c2aaad73151ae382804422288e9b97bc7f299`.
+Its manifest/checksum siblings and identity JSON record all entry hashes. Packaged
+`info.json` is byte-identical to the prior candidate's packaged metadata.
+Migration catalog/definition bytes are identical; all six compiled hook programs
+are identical after removing comments. Their bytes differ only in generated
+build-path comments from the separate isolated output. The initial attempt to
+reuse precompiled inputs still recompiled them in the source packager; final
+packaging uses ordinary source hooks. The guide's copy guarantee concerns managed
+same-version repair. No hook logic, IDs/revisions, source catalog or history was
+changed. Existing larger-inventory/maintenance evidence is retained and was not
+rerun under this task's no-live-runtime constraint.
+
+No new Core dependency is established. Public writes remain non-atomic/process
+queues are not distributed CAS. An unknown absent write cannot be retried by
+guess; uncertain operations require exact source review, and unresolved absent
+outcomes/unrelated changes/stale rules require explicit operator remediation.
+The CLI deployment guard is an offline environment/authorization boundary, not a
+missing module contract. This task requests no operator action.
+
+**Exact remaining acceptance:** native D6, final D7 and every A02-01–15 on actual
+Foundry13 and14 remain open/unexecuted for this ADR. A02-03/05/07 additionally
+require the advancement recovery cases; A02-03/05/10 the final-writer cases;
+A02-06/09 the mounted manager cases. Complete the scoped matrix on one confirmed
+disposable generation before a switch. ADR-0001 accepted scope/F01–F06 deferrals
+remain intact. No task services remain; operator services were preserved and
+never contacted. A test file briefly written under Core was moved into this
+module immediately; the Core worktree is clean. Changes are local checkpoints
+on the approved branch, with no remote operation or version bump.

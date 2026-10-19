@@ -48,7 +48,7 @@ const unchangedAdvancement = (f: ReturnType<typeof fixture>) => { assert.deepEqu
 const finished = (f: ReturnType<typeof fixture>) => { assert.deepEqual(f.actor.system.level, { value: 3, xp: 15 }); assert.deepEqual(f.actor.system.attributes.hp, { value: 11, max: 11 }); assert.equal(f.actor.items.length, 4); };
 await check('first Item refusal preserves level/XP/HP and reports refused outcome', async () => {
     const f = fixture('item-1'), result = await f.run(); unchangedAdvancement(f); assert.equal(result.body.state, 'partial');
-    assert.equal(result.body.operations[0].status, 'failed'); assert.equal(result.body.operations[0].itemId, undefined); assert.equal(f.events.length, 1);
+    assert.equal(result.body.items, undefined, 'receipts must not serve saved source payloads'); assert.equal(result.body.operations[0].status, 'failed'); assert.equal(result.body.operations[0].itemId, undefined); assert.equal(f.events.length, 1);
     f.restore(); assert.equal((await f.run()).body.state, 'complete'); finished(f);
 });
 await check('later Item refusal resumes only outstanding grants; final patch follows all grants', async () => {

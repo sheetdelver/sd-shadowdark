@@ -31,8 +31,8 @@ native class/list handling, incomplete existing actor data, owned-spell identity
 safe selection, resource action ordering, identification and language choices.
 The audit separates confirmed matches, defects and feature gaps. Implementation
 is checkpointed with passing controlled checks; independent review leaves
-SD02-R1–R3 open for advancement recovery, final creation validation and management
-source refresh. Actual native acceptance remains open.
+SD02-R1–R3 now have corrective implementation and offline regression evidence.
+Actual native A02-01–15 acceptance remains open.
 
 ## Third-party license
 

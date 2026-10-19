@@ -2,7 +2,7 @@
 
 **Date:** October 18, 2026
 
-**Status:** Active — implementation checkpoint reviewed offline. SD02-R1–R3 remain open; maintained checks pass. Actual native A02-01–15 remains open. See the [independent review](#independent-implementation-review--october-18-2026).
+**Status (October19):** Active — SD02-R1–R3 corrected with offline execution regressions. Actual native A02-01–15 remains open. See the [independent review](#independent-implementation-review--october-18-2026).
 
 **Decision record:** [ADR-0002](../adr/0002-native-data-and-behavior-parity.md)
 
@@ -954,7 +954,7 @@ below include inputs, results and remediation without depending on ignored files
 
 ### SD02-R1 — high: advancement can report completion before required Item writes
 
-**Open; D3 and A02-03/05/07.**
+**Review finding at dbbe93f2; corrected offline below. Native A02-03/05/07 open.**
 [Finalization](../../src/server/api/level-up.ts) patches level/XP/HP before its
 sequential embedded Item writes. A later failure returns a truthful partial-error
 string, but no resumable operation record. The
@@ -990,7 +990,7 @@ claim is established as necessary by this finding.
 
 ### SD02-R2 — medium: the final creation writer bypasses required spell choices
 
-**Open; D3/D5 and A02-03/05/10.**
+**Review finding at dbbe93f2; corrected offline below. Native A02-03/05/10 open.**
 [The new creation route](../../src/server/api/languages.ts) checks exact identities,
 language pools, a casting grant and unresolved Class references, then submits the
 client's Actor body to the SDK. It never enforces required starting spell counts
@@ -1017,7 +1017,7 @@ guided Generator endpoint.
 
 ### SD02-R3 — medium: open management retains an obsolete source object
 
-**Open; D4 and A02-06/09. Source-inspection finding.**
+**Review source-inspection finding at dbbe93f2; corrected with mounted cases below. Native A02-06/09 open.**
 [SpellsTab](../../src/ui/SpellsTab.tsx) stores the whole `SpellSource` object in
 `manage`. Refresh replaces `derived.spellModel.sources`, but the effect only
 closes management if that `classUuid` disappears. It never substitutes the fresh
@@ -1114,3 +1114,23 @@ current source used listB. All browser traffic blocked. Collection consumers41/4
 and current explicit typing pass. Artifacts:
 `temp/adr0002-corrections/r3-browser{,-before}/results.json`,
 `r3-consumers/`, `r3-types.log`. No live/native cases executed.
+
+### Integrated corrective disposition — October 19, 2026
+
+SD02-R1–R3 are corrected in their execution paths with the cases above. Final
+verification passes17 source suites plus typing and20 native-method comparisons
+on both Core0.19.2/0.19.3; mounted6 corrective/41 collection/6 action/5 lifecycle
+cases pass offline. Final compiled `apiRoutes` pass5 public SDK contract cases on
+each Core. See the [integrated validation](2026-10-18-adr-0002-validation.md#integrated-corrective-validation--october-19-2026)
+for exact candidate hash, artifacts and qualifications. CLI artifact validation
+allows; deployment remains correctly stopped at its full-GM service-account gate.
+There is no new missing Core contract or module workaround.
+
+D3/D4 and final creation-writer D5 corrective verification is complete within this
+offline scope. Native D6/D7 and all A02-01–15 remain open on both generations.
+Unknown absent outcomes/stale rules/unrelated edits still need exact-source
+remediation; do not infer distributed atomicity from the passing recovery cases.
+No live runtime/Foundry was contacted or native case executed; older evidence
+keeps its original scope. Source migrations, applied history and compatibility
+remain unchanged. Compiled migration program comparison excludes only generated
+source-path comments; native/large-inventory tests were not repeated here.

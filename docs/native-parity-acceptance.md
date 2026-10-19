@@ -4,12 +4,14 @@ All A02 rows remain **open for actual Foundry**. Controlled native methods,
 isolated Core and browser tests are separate evidence. This run sheet is ready
 for scoped operator authorization; it does not grant that authority.
 
-Resolve the [SD02-R1–R3 implementation findings](audits/2026-10-18-spellcasting-and-native-parity.md#independent-implementation-review--october-18-2026)
-and record their offline regressions before selecting a new native candidate.
+The [SD02-R1–R3 implementation findings](audits/2026-10-18-spellcasting-and-native-parity.md#independent-implementation-review--october-18-2026)
+now have failing-before/passing-after offline regressions. Select only the new
+corrective archive identified in the validation record.
 A02-03/05/07 must include advancement partial-write/replay and premature-success
 checks; A02-03/05/10 must exercise the final creation endpoint's required spell
 validation; A02-06/09 must refresh an open manager after same-Class progression
-and alternate-list changes. Existing controlled passes do not cover these cases.
+and alternate-list changes. New controlled cases cover these corrections; actual native repetition remains
+required.
 
 Before connecting, the operator must confirm the disposable world's exact ID,
 title, URL, native generation/build and Shadowdark version, and authorize the
@@ -66,3 +68,11 @@ R3 offline mounted cases now cover same-Class level/table/list replacement and
 pending-operation source changes. A02-06/09 must repeat these against native
 prepared progression and exact lists, checking fresh next-request identity,
 stale-intent retirement, retained search and original operation receipts.
+
+Corrective candidate (October19): module0.9.5,272852 bytes, SHA-256
+`2c2625964aa26094fa84ed608f5c2aaad73151ae382804422288e9b97bc7f299`.
+See the validation record for the local archive/manifest/checksum and new offline
+results. Core archive preview verifies the artifact but requires a full-GM service
+account before deployment; that guard remains intact. This task performs no
+install into a live runtime and grants no native writes. Every A02-01–15 remains
+open for native13 and14, including the corrective cases above.

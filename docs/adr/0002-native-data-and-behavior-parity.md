@@ -8,9 +8,9 @@
 
 **Audit:** [Post-release native parity](../audits/2026-10-18-spellcasting-and-native-parity.md)
 
-**Current review:** Offline review of `dbbe93f2` found SD02-R1–R3. D3/D4 and the
-creation-writer portion of D5 require corrective verification; native D6 and D7
-remain open. See the [review addendum](#independent-review-addendum--october-18-2026).
+**Current status (October19):** SD02-R1–R3 are corrected with failing-before /
+passing-after offline execution coverage. D3/D4 and the creation-writer part of
+D5 have corrective verification; native D6 and D7 remain open. See the [review addendum](#independent-review-addendum--october-18-2026).
 
 **Predecessor:** [ADR-0001](0001-native-alignment-and-resource-cards.md), Completed; its accepted scope and explicit deferrals remain intact.
 
@@ -755,3 +755,35 @@ Collections41/41 and explicit current typing also pass. The offline browser entr
 point is now in CI without changing any workflow pin. R1–R3 have corrective
 implementation evidence; full integrated validation follows. Native D6/D7 and
 all A02-01–15 remain open.
+
+### Integrated corrective result — October 19, 2026
+
+SD02-R1–R3 are corrected with new failing-before/passing-after execution cases.
+Review preservation08997a4, R1 30dc3cc, R2 215be57 and R3 75cd303 retain coherent
+local checkpoints. [The validation record](../audits/2026-10-18-adr-0002-validation.md#integrated-corrective-validation--october-19-2026)
+records all new and retained evidence, package identity and remaining rows.
+
+On both Core0.19.2/0.19.3,17 suites and explicit module/UI/hook typing pass;
+20 controlled native-method checks retain69/31/9/4/9 controls. Offline mounted
+checks pass6 corrective,41 collection/Generator,6 action/card and5 Actor lifecycle
+cases. Module checking and isolated packaging pass. The final compiled archive
+passes five public SDK contract checks per Core version. Its public CLI artifact
+validation allows, while deployment correctly remains gated by `Full-GM service
+account required`; no installed runtime or native acceptance was attempted.
+Advancement responses expose exact receipts, without serving saved grant payloads.
+
+Candidate0.9.5:272852 bytes, SHA-256
+`2c2625964aa26094fa84ed608f5c2aaad73151ae382804422288e9b97bc7f299`,
+under `temp/adr0002-corrections/package-data/dist/modules/`.
+Source migration catalog/hooks/IDs/history remain unchanged. Packaged catalog and
+definition bytes match the previous archive; compiled hook programs differ only
+in generated build-path comments. No new Core dependency, higher minimum or
+version/pin change was introduced. The current ADR's pre-edit snapshot SHA-256 is
+`b29b30b39847de1871034f832db4867098db2afe714b18c441f2fe140b63c1e7`.
+
+D3/D4 and final creation-writer D5 have corrective offline verification. **ADR-0002,
+native D6, final D7 and A02-01–15 remain open on both native generations.** Unknown
+absent write outcomes, unrelated edits and changed rules require exact-source
+operator remediation; receipts are not a distributed transaction. Native testing
+requires separate disposable-world scope; this task requests none. All task-owned
+processes exited, no services were retained, and operator services were untouched.

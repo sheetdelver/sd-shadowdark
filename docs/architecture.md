@@ -9,9 +9,9 @@ fields (SD02-01–13). The audit includes bounded matching native-method control
 a model coverage matrix and separately scoped F01–F06 feature proposals.
 ADR-0002 implementation is in progress. The released0.9.5 gap descriptions below
 are historical baseline; current corrections are recorded here and in its checkpoint record.
-Independent review of `dbbe93f2` leaves SD02-R1–R3 open: advancement publishes
-level before required Item outcomes, the final creation writer does not enforce
-required starting spells, and an open manager retains stale Class/list limits.
+Independent review of `dbbe93f2` identified SD02-R1–R3. Corrective checkpoints now
+verify durable advancement completion/recovery, final creation spell validation
+and current facts in mounted spell management through offline regressions.
 See the [review findings and corrective checkpoints](audits/2026-10-18-spellcasting-and-native-parity.md#independent-implementation-review--october-18-2026).
 The older acceptance below remains scoped evidence, not a claim that every
 historical actor or spell-management workflow has been validated.
@@ -637,3 +637,8 @@ from the latest prepared view. The modal stays mounted across alternate-list
 changes; search/details survive while intent is masked against new authority
 facts. Stored operation requests/receipts remain bound to their original list
 and IDs and are never rebound as new intent. Retry errors preserve known receipts.
+
+Corrective archive verification runs compiled public apiRoutes against the public
+SDK test runtime, independently of source-route tests. Advancement responses
+expose operation receipts rather than saved grant payloads. This offline contract
+evidence does not satisfy deployment's full-GM guard or native acceptance.

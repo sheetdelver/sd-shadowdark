@@ -99,7 +99,7 @@ successful writes alone do not establish parity.
 
 The active post-release plan is [Shadowdark ADR-0002](docs/adr/0002-native-data-and-behavior-parity.md),
 with findings SD02-01–13 in the [native parity audit](docs/audits/2026-10-18-spellcasting-and-native-parity.md).
-Implementation is in progress; independent review leaves SD02-R1–R3 open
+SD02-R1–R3 have corrective implementation and offline regression evidence
 (advancement recovery, final creation validation and management-source refresh).
 Native acceptance remains open. Follow its checkpoints; do not treat its existence as branch, live-write or release authority.
 [ADR-0001](docs/adr/0001-native-alignment-and-resource-cards.md) and the
@@ -306,3 +306,10 @@ and shared preparation with exact pinned native sources).
 Open spell management keeps stable Class/tier identity and derives current list/
 progression facts. Retire intent on those facts, preserving search and exact
 original operation receipts. Corrective mounted checks run in CI.
+
+Final archive offline verification: `node src/tests/packaged-corrections.mjs
+--archive=<tgz> --out=<new-output> --core=<configured-toolchain>`. This executes
+compiled public apiRoutes with `@sheet-delver/sdk/testing`, not a live host. Core
+archive preview must retain its full-GM deployment guard when no service account
+is configured; do not invent credentials or bypass it to label an offline install
+passed. Source suites, compiled contracts and native acceptance are distinct.
