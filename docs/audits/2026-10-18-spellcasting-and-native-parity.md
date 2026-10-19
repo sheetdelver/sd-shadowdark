@@ -2,13 +2,13 @@
 
 **Date:** October 18, 2026
 
-**Status:** Active — SD02-01–13 implemented; final controlled verification passes. Actual native A02-01–15 remains open.
+**Status:** Active — implementation checkpoint reviewed offline. SD02-R1–R3 remain open; maintained checks pass. Actual native A02-01–15 remains open. See the [independent review](#independent-implementation-review--october-18-2026).
 
 **Decision record:** [ADR-0002](../adr/0002-native-data-and-behavior-parity.md)
 
 **Predecessor:** [Completed ADR-0001 audit](2026-10-15-native-alignment.md)
 
-## Outcome
+## Initial audit outcome (before implementation)
 
 The reported casting failures are observable in the running application. They
 have several causes, not one universal failure to recognize casting classes.
@@ -918,3 +918,133 @@ separate from passing transient reconnect, with no module workaround.
 All task services stopped; operator services preserved. No native world was
 contacted. **D6 native, D7 final closure and A02-01–15 remain open on both native
 generations** pending confirmed disposable-world authority and execution.
+
+
+## Independent implementation review — October 18, 2026
+
+Reviewed `f5838a86992646cb1742162b918e330f5294bcb8..dbbe93f2f8c5a2f56a95cecd2ea4e777a2f38b66`
+on `fix/adr-0002-native-parity`, including runtime checkpoint `50759ae6`.
+The module worktree was clean before this review. This pass read source/diffs,
+compared pinned native4.0.6 code and ran offline checks with in-memory SDK doubles.
+It did **not** contact Core/Foundry, run a browser/live acceptance harness, start a
+service or change application source, versions, Git history or remote state.
+
+### Independent checks
+
+- All15 maintained `src/tests/*.test.ts` suites pass (the prior fourteen plus
+  `native-parity.test.ts`). Native parity17/17, effect conformance89/89,
+  native alignment61/61 and boundaries53/53 retain their results.
+- `native-parity.oracles.mjs` passes20/20 selected native-method comparisons;
+  its69/31/9/4/9 control counts are retained. These remain controlled methods,
+  not a native preparation/browser run.
+- Explicit module/UI/hook typing passes with Core0.19.3 and the isolated
+  Core0.19.2 floor toolchain. Current Core's module checker passes with zero
+  warnings, including SDK boundaries and dry bundles.
+- Native reference remains clean at `9677d16b3903b3b640f00d4efd48249142ac8334`.
+  The migration catalog/hooks have no changes from the documentation checkpoint.
+  The retained archive's SHA-256 independently matches
+  `76d127ee33cb463ad93f0ab5f01f0678e3e8c67d1158e106a8d8546e73ac14a3`.
+  Packaging, installed UI and native acceptance were not rerun in this pass.
+
+Independent handler probes and logs are retained locally in
+`temp/adr0002-review/`. They call real exported module handlers and mutate only
+in-memory fixtures. They assert the defects below, so a successful probe exit
+means **reproduced failure**, not corrective acceptance. The durable descriptions
+below include inputs, results and remediation without depending on ignored files.
+
+### SD02-R1 — high: advancement can report completion before required Item writes
+
+**Open; D3 and A02-03/05/07.**
+[Finalization](../../src/server/api/level-up.ts) patches level/XP/HP before its
+sequential embedded Item writes. A later failure returns a truthful partial-error
+string, but no resumable operation record. The
+[level-up hook](../../src/ui/hooks/useShadowdarkLevelUp.ts) treats an observed
+target level alone as success, closes the modal and announces `Level Up Complete!`.
+An ordinary Actor update event can therefore hide the later Item failure.
+This ordering/UI gap predates this checkpoint; the new selected D3 workflow
+still relies on it and its existing tests do not cover the combined outcome.
+
+**Reproducer/result:** exact native Knight Class and Witch casting grant, level2,
+35XP,8/8HP, valid single Witch tier1 selection and HP roll3. Let the Actor patch
+succeed, then refuse the first Item create with an SDK permission error. The
+handler returns500 with `Actor updated and 0 of 1 items created`; source is now
+level3,15XP,11/11HP with **zero new spells**. Repeating the same request returns400
+`Advancement must be exactly one level.` No second write occurs, but the mandatory
+spell has no advancement-resume path. The automatic success notification is
+source-traced in this review, not freshly mounted/browser-tested.
+
+Native `system/src/apps/LevelUpSD.mjs::_finalizeLevelUp` creates talents/spells
+before publishing level/XP/HP. Its absence of a distributed transaction does not
+justify showing success for a partially applied module operation.
+
+**Correction/checkpoint:** require an authoritative completed operation result
+before success/closure. Publish advancement only after required grants have
+confirmed outcomes; retain the existing calculation using all planned native
+bonuses. Record exact confirmed IDs and uncertain operations so retry/review can
+finish safely without duplicating grants, spending XP twice or guessing outcomes.
+Reordering alone is insufficient if some Item writes succeed before another
+fails. Exercise first/later Item refusal, lost acknowledgement, final Actor-patch
+failure, duplicate request and intervening Actor events; prove accurate UI and
+source recovery. Use existing public SDK facilities; no Core change or atomicity
+claim is established as necessary by this finding.
+
+### SD02-R2 — medium: the final creation writer bypasses required spell choices
+
+**Open; D3/D5 and A02-03/05/10.**
+[The new creation route](../../src/server/api/languages.ts) checks exact identities,
+language pools, a casting grant and unresolved Class references, then submits the
+client's Actor body to the SDK. It never enforces required starting spell counts
+or binds the body to the earlier `level-up/finalize` preparation. UI validation
+and an earlier successful preparation are not validation of this final request.
+
+**Reproducer/result:** readable world Class copied from native Wizard, its
+unchanged spell progression and all three exact native fixed Talent copies,
+readable ancestry, zero language quotas for isolation, and **no Spell Items**.
+The Class requires three tier1 spells at level1. `characters/create` returns200
+`success:true` and performs one Actor create with zero spells. This is a direct
+handler bypass; the normal happy-path wizard was not observed skipping choices.
+A changed/stale client submission can reach the same unvalidated write boundary.
+
+**Correction/checkpoint:** share authoritative creation/advancement validation at
+the final write boundary, or bind an exact server-prepared creation plan and
+revalidate it there. Resolve current exact sources, distinguish required ordinary
+spells from granted/extra spells, and reject missing/excess/duplicate/wrong-tier/
+wrong-list selections before Actor creation. Preserve unknown source fields and
+all native arrays/effects. Cover valid level0 and native caster creation as
+positive controls. Ordinary inventory edits and explicitly authorized GM imports
+remain separate; do not invent quotas for those workflows or silently exempt the
+guided Generator endpoint.
+
+### SD02-R3 — medium: open management retains an obsolete source object
+
+**Open; D4 and A02-06/09. Source-inspection finding.**
+[SpellsTab](../../src/ui/SpellsTab.tsx) stores the whole `SpellSource` object in
+`manage`. Refresh replaces `derived.spellModel.sources`, but the effect only
+closes management if that `classUuid` disappears. It never substitutes the fresh
+source when the same Class has a new progression limit or alternate list.
+The modal key, owned grouping, addition list, request `listUuid` and limit still
+come from `manage.source`. The Actor page deliberately keeps these consumers
+mounted through revalidation; clearing picker intent does not refresh this object.
+
+For example, an open tier1 dialog at limit3 still enforces3 after the current
+Actor/Class now allows4. If the same Class's alternate list changes, it continues
+showing/submitting the old list until closed and reopened. The server does
+revalidate current sources/limits: this finding does **not** establish an invalid
+server write or bypass of access controls.
+
+**Correction/checkpoint:** retain stable selection identity and derive facts from
+the current prepared source, or explicitly retire/rebind the dialog on changed
+list/progression identity. Preserve harmless search/manual state where possible;
+retire unsafe intent and preserve accurate receipts. Add mounted consumer cases
+for same-Class level/table changes and same-Class alternate-list changes, not only
+catalog membership, ownership changes or a removed casting grant. Confirm the
+next request and displayed count/list use the new source and stale intents cannot
+submit. No new mounted/browser run was performed during this review.
+
+### Disposition
+
+The earlier passing evidence is retained. It does not cover these three gaps.
+D3/D4 and the final creation-writer part of D5 need corrections before claiming
+implementation completion. D6 actual native and D7 closeout remain open on both
+generations. No new migration/Core blocker was established; no SDK/version bump
+is justified by these findings. F01–F06 and accepted ADR-0001 scope are unchanged.

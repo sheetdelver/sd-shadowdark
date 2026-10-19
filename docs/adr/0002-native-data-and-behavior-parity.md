@@ -8,6 +8,10 @@
 
 **Audit:** [Post-release native parity](../audits/2026-10-18-spellcasting-and-native-parity.md)
 
+**Current review:** Offline review of `dbbe93f2` found SD02-R1–R3. D3/D4 and the
+creation-writer portion of D5 require corrective verification; native D6 and D7
+remain open. See the [review addendum](#independent-review-addendum--october-18-2026).
+
 **Predecessor:** [ADR-0001](0001-native-alignment-and-resource-cards.md), Completed; its accepted scope and explicit deferrals remain intact.
 
 ## Context
@@ -654,3 +658,35 @@ separate from passing transient reconnect, with no module workaround.
 All task services stopped; operator services preserved. No native world was
 contacted. **D6 native, D7 final closure and A02-01–15 remain open on both native
 generations** pending confirmed disposable-world authority and execution.
+
+
+## Independent review addendum — October 18, 2026
+
+The implementation review of `dbbe93f2` reran offline suites, controlled native
+methods, explicit typing on both supported Core toolchains and current module
+checking. These pass, but independent handler probes/source tracing establish
+three open corrections in the [active audit](../audits/2026-10-18-spellcasting-and-native-parity.md#independent-implementation-review--october-18-2026).
+The pre-review ADR was saved locally before edits as
+`temp/adr0002-review/ADR-0002.before-review.md`, SHA-256
+`627a7220e3923136917995c2d605df1a9d4703e37b565f4f8a5921651044962b`.
+
+| Finding | Required correction | Completion evidence |
+| --- | --- | --- |
+| SD02-R1 | Advancement completion must include required Item outcomes. Keep native grant-before-final-advancement ordering and safe partial-operation review/recovery. A target-level event alone cannot close the dialog as success. | First/later grant failure, uncertain receipt, final Actor-write failure and replay preserve exact source and confirmed IDs; mounted UI never announces completion prematurely. |
+| SD02-R2 | Enforce native creation spell requirements at the final `characters/create` boundary using shared authoritative preparation/validation. | Missing, excess, duplicate, wrong-tier/list and changed-plan submissions make zero Actor writes; valid caster/level0 creation preserves native fields/effects. |
+| SD02-R3 | Rebind open management to current Class/list/progression facts while preserving safe manual state. | Same-Class progression and alternate-list changes refresh counts/list/request identity; stale intent retires and completed/uncertain receipts remain accurate. |
+
+These are selected implementation corrections, not requests for new Core APIs,
+new migrations, feature-backlog work or a higher compatibility floor. R1 exposes
+an existing finalizer/UI gap retained by this implementation; R2 is in the new
+creation writer; R3 is in the revised management consumer. Public SDK writes
+remain non-atomic. Correct source ordering and truthful recovery are required;
+no implementation can promise that an upstream write never fails.
+
+Earlier declarations that D0–D5 were complete are checkpoint evidence, qualified
+by this addendum: **D3/D4 and the creation-writer part of D5 require corrective
+verification.** Preserve passing evidence and add the missing failing-before /
+passing-after cases. D6 native, D7 and A02-01–15 remain open; this offline review
+provides no new live/browser/native acceptance. Follow the existing scoped
+checkpoint process during remediation; this review itself authorizes no Git,
+release or live operations.

@@ -25,12 +25,14 @@ See the [releases](https://github.com/sheetdelver/sd-shadowdark/releases),
 [working guidance](AGENTS.md).
 
 Known post-release native behavior gaps are tracked in the
-[active audit](docs/audits/2026-10-18-spellcasting-and-native-parity.md) and proposed
+[active audit](docs/audits/2026-10-18-spellcasting-and-native-parity.md) and
 [ADR-0002](docs/adr/0002-native-data-and-behavior-parity.md). The plan covers
 native class/list handling, incomplete existing actor data, owned-spell identity,
 safe selection, resource action ordering, identification and language choices.
-The audit separates confirmed matches, defects and feature gaps. Its corrections
-are not yet implemented.
+The audit separates confirmed matches, defects and feature gaps. Implementation
+is checkpointed with passing controlled checks; independent review leaves
+SD02-R1–R3 open for advancement recovery, final creation validation and management
+source refresh. Actual native acceptance remains open.
 
 ## Third-party license
 

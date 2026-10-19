@@ -1,7 +1,7 @@
 # Shadowdark module architecture
 
 **Active follow-up (October 18):** the post-release 0.9.5
-[native parity audit](audits/2026-10-18-spellcasting-and-native-parity.md) and proposed
+[native parity audit](audits/2026-10-18-spellcasting-and-native-parity.md) and
 [ADR-0002](adr/0002-native-data-and-behavior-parity.md) cover newly observed
 actor-data omissions, alternate spell lists, owned-spell accounting and selection
 safety, plus action phases, Potion identification, NPC focus/outcomes and language
@@ -9,6 +9,10 @@ fields (SD02-01–13). The audit includes bounded matching native-method control
 a model coverage matrix and separately scoped F01–F06 feature proposals.
 ADR-0002 implementation is in progress. The released0.9.5 gap descriptions below
 are historical baseline; current corrections are recorded here and in its checkpoint record.
+Independent review of `dbbe93f2` leaves SD02-R1–R3 open: advancement publishes
+level before required Item outcomes, the final creation writer does not enforce
+required starting spells, and an open manager retains stale Class/list limits.
+See the [review findings and corrective checkpoints](audits/2026-10-18-spellcasting-and-native-parity.md#independent-implementation-review--october-18-2026).
 The older acceptance below remains scoped evidence, not a claim that every
 historical actor or spell-management workflow has been validated.
 

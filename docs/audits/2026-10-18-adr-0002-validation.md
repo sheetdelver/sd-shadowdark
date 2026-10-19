@@ -1,7 +1,11 @@
 # ADR-0002 implementation validation
 
-SD02-01–13 are implemented and controlled verification passes. **ADR-0002 stays
-open: actual native A02-01–15 is unexecuted on both generations.** This report
+SD02-01–13 have implementation checkpoint evidence and passing controlled checks.
+Independent review found **open SD02-R1–R3** in advancement recovery, final
+creation validation and management-source refresh; see the
+[review addendum](2026-10-18-spellcasting-and-native-parity.md#independent-implementation-review--october-18-2026).
+**ADR-0002 stays open: corrective verification and actual native A02-01–15 are
+outstanding.** This report
 supplements the [active audit](2026-10-18-spellcasting-and-native-parity.md),
 [ADR](../adr/0002-native-data-and-behavior-parity.md) and
 [native run sheet](../native-parity-acceptance.md).
@@ -113,8 +117,10 @@ atomic multi-document transaction. Unknown create/result acknowledgements need
 review; no source/name guess establishes success. Historical omissions retain
 [explicit exact-source GM remediation](../native-source-remediation.md).
 
-D0–D5/D5a/D5b and controlled D1/D6 evidence are complete. D6 actual native and
-D7 final acceptance closure remain open. **A02-01–15: not executed on native13;
+D0–D5/D5a/D5b and controlled D1/D6 evidence below describe the implementation
+checkpoint. The independent review qualifies D3/D4 and the creation-writer
+portion of D5 with SD02-R1–R3; they require correction and verification.
+D6 actual native and D7 final acceptance closure remain open. **A02-01–15: not executed on native13;
 not executed on native14.** Confirm a disposable world's exact identity and
 scoped writes/backups/cleanup before connecting. Complete all selected rows on
 one generation before requesting a switch. F01–F06 and ADR-0001's accepted scope

@@ -95,7 +95,9 @@ successful writes alone do not establish parity.
 
 The active post-release plan is [Shadowdark ADR-0002](docs/adr/0002-native-data-and-behavior-parity.md),
 with findings SD02-01–13 in the [native parity audit](docs/audits/2026-10-18-spellcasting-and-native-parity.md).
-Implementation is in progress; native acceptance remains open. Follow its checkpoints; do not treat its existence as branch, live-write or release authority.
+Implementation is in progress; independent review leaves SD02-R1–R3 open
+(advancement recovery, final creation validation and management-source refresh).
+Native acceptance remains open. Follow its checkpoints; do not treat its existence as branch, live-write or release authority.
 [ADR-0001](docs/adr/0001-native-alignment-and-resource-cards.md) and the
 [native-alignment audit](docs/audits/2026-10-15-native-alignment.md) remain completed
 within their selected scope. Their released-system baseline, future-version

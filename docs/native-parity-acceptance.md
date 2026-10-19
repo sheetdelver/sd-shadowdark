@@ -4,6 +4,13 @@ All A02 rows remain **open for actual Foundry**. Controlled native methods,
 isolated Core and browser tests are separate evidence. This run sheet is ready
 for scoped operator authorization; it does not grant that authority.
 
+Resolve the [SD02-R1–R3 implementation findings](audits/2026-10-18-spellcasting-and-native-parity.md#independent-implementation-review--october-18-2026)
+and record their offline regressions before selecting a new native candidate.
+A02-03/05/07 must include advancement partial-write/replay and premature-success
+checks; A02-03/05/10 must exercise the final creation endpoint's required spell
+validation; A02-06/09 must refresh an open manager after same-Class progression
+and alternate-list changes. Existing controlled passes do not cover these cases.
+
 Before connecting, the operator must confirm the disposable world's exact ID,
 title, URL, native generation/build and Shadowdark version, and authorize the
 named fixture namespace, test accounts, permission/setting changes, backup and
