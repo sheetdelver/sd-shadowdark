@@ -2,7 +2,7 @@
 
 | Record | Status |
 | --- | --- |
-| [Spellcasting and native parity](2026-10-18-spellcasting-and-native-parity.md) | **Active.** Original R1–R3 regressions pass; independent review leaves SD02-R1a/R1b recovery gaps open. R2/R3 offline evidence retained; native A02 acceptance pending. |
+| [Spellcasting and native parity](2026-10-18-spellcasting-and-native-parity.md) | **Active.** SD02-R1a-R1 preserves independent Actor edits during zero-write restart; SD02-V1 wires all 17 suites into CI. R1b/R2/R3 remain covered. Native A02 acceptance remains pending. |
 | [ADR-0002 validation](2026-10-18-adr-0002-validation.md) | Supporting checkpoint, archive and controlled-test evidence, qualified by the active review findings. |
 | [Native alignment and resource cards](2026-10-15-native-alignment.md#final-native-v14-acceptance-and-closeout--october-18-2026) | Completed October18,2026. ADR-0001 acceptance on native13.351/14.367; explicit deferrals and CG-4/6/8 qualifications retained. |
 | [Core/SDK proposal](2026-10-16-core-sdk-world-data-proposal.md) | Historical; superseded by released Core0.19.2 contracts and completed module adoption. |

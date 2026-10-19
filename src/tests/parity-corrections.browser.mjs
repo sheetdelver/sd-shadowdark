@@ -88,6 +88,38 @@ await test('R1a mounted zero-write refusal requires restart without recovery and
  assert.notEqual(await p.evaluate(()=>window.calls.filter(c=>c.url.endsWith('/finalize')).at(-1).body.requestId),original);
  await p.evaluate(()=>window.answer(1,{success:true,state:'complete'}));await p.waitForFunction(()=>window.completions.length===1);assert.equal((await p.evaluate(()=>window.notices)).length,1);
 });
+await test('R1a restart after an independent Actor edit uses a fresh request and current baseline', {which:'advance', actor:{...actor,spellReviewToken:'reviewed-before-gm-edit'}}, async p => {
+ await p.getByRole('button',{name:'Open advancement'}).click();
+ await p.getByRole('button',{name:'Confirm advancement'}).click();
+ await p.waitForFunction(()=>window.pending.length===1);
+ const original=await p.evaluate(()=>window.calls.find(c=>c.url.endsWith('/finalize')).body);
+ assert.equal(original.baseline,'reviewed-before-gm-edit');
+ await p.evaluate(id=>{
+   const current=structuredClone(window.actorContext.actor);
+   current.system.level.xp=16;current.system.notes='Independent GM edit';current.spellReviewToken='reviewed-after-gm-edit';
+   window.setActor(current);
+   window.answer(0,{success:true,requestId:id,state:'retired',baseline:current.spellReviewToken,
+     terminal:{disposition:'zero-write',note:'No advancement writes occurred; current Actor changes are preserved'},
+     operations:[{kind:'item',name:'Required grant',status:'pending'},{kind:'advancement',status:'pending'}]});
+ },original.requestId);
+ await p.getByRole('button',{name:'Start advancement again',exact:true}).waitFor();
+ assert.equal(await p.getByRole('checkbox').count(),0);
+ assert.deepEqual(await p.evaluate(()=>window.completions),[]);
+ assert.deepEqual(await p.evaluate(()=>window.notices),[]);
+ await p.getByRole('button',{name:'Start advancement again',exact:true}).click();
+ await p.getByRole('button',{name:'Open advancement'}).click();
+ await p.getByRole('button',{name:'Confirm advancement'}).click();
+ await p.waitForFunction(()=>window.pending.length===2);
+ const fresh=await p.evaluate(()=>window.calls.filter(c=>c.url.endsWith('/finalize')).at(-1).body);
+ assert.notEqual(fresh.requestId,original.requestId);
+ assert.equal(fresh.baseline,'reviewed-after-gm-edit');
+ assert.equal(fresh.targetLevel,2);
+ assert.deepEqual(await p.evaluate(()=>[window.actorContext.actor.system.level.xp,window.actorContext.actor.system.notes]),[16,'Independent GM edit']);
+ await p.evaluate(()=>window.answer(1,{success:true,state:'complete'}));
+ await p.waitForFunction(()=>window.completions.length===1);
+ assert.equal((await p.evaluate(()=>window.notices)).length,1);
+ assert.equal(await p.evaluate(()=>window.calls.filter(c=>c.url.endsWith('/finalize')).length),2);
+});
 await test('R1a reopened automatically retired stale operation offers restart with no recovery controls',{which:'advance',actor,operation:{...zeroReceipt,state:'retired',terminal:{disposition:'zero-write',note:'No confirmed, unresolved or in-flight writes'},recovery:'Start advancement again against current data.'}},async p=>{
  await p.getByRole('button',{name:'Open advancement'}).click();await p.getByRole('button',{name:'Start advancement again',exact:true}).waitFor();
  assert.equal(await p.getByRole('checkbox').count(),0);assert.equal(await p.getByRole('button',{name:'Reconcile receipts without replay',exact:true}).count(),0);assert.deepEqual(await p.evaluate(()=>window.completions),[]);

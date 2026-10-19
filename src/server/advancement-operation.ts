@@ -47,13 +47,15 @@ function receipt(journal: Journal, actor: any, revision: number | null) {
             : journal.terminal ? 'Independent restoration verified. This saved request can never resume. Close this review and prepare a fresh advancement.'
             : 'Retry known refusals under the same rules. Review exact IDs to reconcile uncertain writes; they are never recreated automatically. Changed rules block replay. Zero-write rejections restart automatically; a settled partial plan can be closed after verified restoration using the controls below.' };
 }
-async function retireUnchanged(req: ModuleServerRequest, journal: Journal, key: string, actor: any, revision: number | null) {
+async function retireZeroWrite(req: ModuleServerRequest, journal: Journal, key: string, actor: any, revision: number | null) {
     if (isTerminal(journal) || !journal.grants.every(settledWithoutWrite) || !settledWithoutWrite(journal.advancement)) return false;
     const current = await requireOwnedActor(req.runtime, documentId(actor));
-    if (reviewToken(current) !== journal.initialReview || contextConflict(req.runtime, revision)) return false;
+    if (contextConflict(req.runtime, revision)) return false;
+    // These receipts prove this operation made no writes. Independent Actor
+    // edits must survive retirement; only partial writes require restoration.
     journal.terminal = { disposition: 'zero-write', baseline: reviewToken(current), revision: revision!,
         callerId: (req.userSession?.userId ?? req.getAccessContext?.().userId)!, at: new Date().toISOString(),
-        note: 'Native writes were not attempted or were definitely refused; primary source unchanged. Start advancement again with current data.' };
+        note: 'Advancement was not applied. Current character changes are preserved; start advancement again with current data.' };
     await req.runtime.dataStore.set(key, journal);
     return true;
 }
@@ -62,7 +64,7 @@ export async function pendingAdvancement(req: ModuleServerRequest, actor: any) {
     const active = await req.runtime.dataStore.get<{ requestId: string; key: string }>(activeKey(req, documentId(actor)));
     const journal = active && await req.runtime.dataStore.get<Journal>(active.key);
     if (journal && active!.key === keyFor(id, journal.requestId)) {
-        const retired = await retireUnchanged(req, journal, active!.key, actor, req.runtime.world!.snapshot().identity.contextRevision);
+        const retired = await retireZeroWrite(req, journal, active!.key, actor, req.runtime.world!.snapshot().identity.contextRevision);
         if (retired) return receipt(journal, actor, req.runtime.world!.snapshot().identity.contextRevision);
     }
     return journal && !isTerminal(journal) ? receipt(journal, actor, req.runtime.world!.snapshot().identity.contextRevision) : null;
@@ -80,11 +82,11 @@ export async function resumeAdvancement(req: ModuleServerRequest, actor: any, bo
     if (journal && body.targetLevel !== undefined && journal.fingerprint !== fingerprint(body)) return error('conflict', 'This requestId already identifies a different advancement plan.');
     const result = async () => { actor = await requireOwnedActor(req.runtime, documentId(actor)); return json({ success: true, ...journal!.result, ...receipt(journal!, actor, revision) }); };
     if (journal && isTerminal(journal)) return result();
-    if (journal && await retireUnchanged(req, journal, key, actor, revision)) return result();
+    if (journal && await retireZeroWrite(req, journal, key, actor, revision)) return result();
     const active = await store.get<{ requestId: string; key: string }>(activeKey(req, documentId(actor)));
     if (active && active.key !== key) {
         const prior = await store.get<Journal>(active.key);
-        if (prior && active.key === keyFor(id, prior.requestId)) await retireUnchanged(req, prior, active.key, actor, revision);
+        if (prior && active.key === keyFor(id, prior.requestId)) await retireZeroWrite(req, prior, active.key, actor, revision);
         if (prior && !isTerminal(prior)) return error('conflict', `Advancement ${prior.requestId} is incomplete. Reopen and review its receipts before any new advancement.`);
     }
     if (!journal) {
@@ -195,7 +197,7 @@ export async function resumeAdvancement(req: ModuleServerRequest, actor: any, bo
     const refuse = async (op: Grant | Journal['advancement'], e: unknown) => {
         op.status = isSdkError(e) && ['permission_denied', 'validation', 'not_found'].includes(e.code) ? 'failed' : 'uncertain';
         op.error = getErrorMessage(e); await store.set(key, journal);
-        await retireUnchanged(req, journal!, key, actor, revision); return result();
+        await retireZeroWrite(req, journal!, key, actor, revision); return result();
     };
     const persistAcknowledgement = async (op: WriteState) => {
         try { await store.set(key, journal); return true; }
@@ -211,7 +213,10 @@ export async function resumeAdvancement(req: ModuleServerRequest, actor: any, bo
         if (op.status === 'complete') continue;
         const conflict = contextConflict(req.runtime, revision); if (conflict) return conflict;
         const current = await requireOwnedActor(req.runtime, documentId(actor));
-        if (reviewToken(current) !== journal.review) return result();
+        if (reviewToken(current) !== journal.review) {
+            await retireZeroWrite(req, journal, key, current, revision);
+            return result();
+        }
         actor = current; op.status = 'started'; delete op.error; await store.set(key, journal);
         let created: any;
         try { created = await req.runtime.documents.items.create({ type: 'Actor', id: documentId(actor) }, op.item); }
@@ -234,7 +239,10 @@ export async function resumeAdvancement(req: ModuleServerRequest, actor: any, bo
         if (!await persistAcknowledgement(op) || op.verificationPending) return result();
     }
     const current = await requireOwnedActor(req.runtime, documentId(actor)); actor = current;
-    if (reviewToken(actor) !== journal.review) return result();
+    if (reviewToken(actor) !== journal.review) {
+        await retireZeroWrite(req, journal, key, actor, revision);
+        return result();
+    }
     const conflict = contextConflict(req.runtime, revision); if (conflict) return conflict;
     journal.advancement.status = 'started'; journal.finalReview = reviewToken(apply(actor)); await store.set(key, journal);
     try { await req.runtime.documents.patch('Actor', documentId(actor), journal.patch); }

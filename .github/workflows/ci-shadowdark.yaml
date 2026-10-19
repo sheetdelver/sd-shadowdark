@@ -53,6 +53,14 @@ jobs:
           path: sheet-delver-core/.module-ci-data/local/modules/shadowdark
           persist-credentials: false
 
+      - name: Check out static native Shadowdark 4.0.6 test reference
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: Muttley/foundryvtt-shadowdark
+          ref: 9677d16b3903b3b640f00d4efd48249142ac8334 # release-4.0.6
+          path: sheet-delver-core/temp/shadowdark
+          persist-credentials: false
+
       - name: Use Node.js 22
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -85,6 +93,9 @@ jobs:
           npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/world-adoption.test.ts"
           npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/migration-hooks.test.ts"
           npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/system-index.test.ts"
+          npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/native-parity.test.ts"
+          npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/advancement-recovery.test.ts"
+          npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/creation-validation.test.ts"
 
       - name: Explicit module, UI and migration typing
         run: node .module-ci-data/local/modules/shadowdark/src/tests/verify-types.mjs

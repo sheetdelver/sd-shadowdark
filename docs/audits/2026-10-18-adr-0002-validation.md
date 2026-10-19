@@ -5,8 +5,11 @@ Independent review found SD02-R1–R3 in advancement recovery, final
 creation validation and management-source refresh; their original regressions
 pass with new offline evidence below. Independent review of `1e91840` found two
 additional R1 recovery defects, [SD02-R1a/R1b](2026-10-18-spellcasting-and-native-parity.md#independent-corrective-review--october-19-2026).
-R1a/R1b now pass the simplified corrective implementation and full offline rerun
-below. R2/R3 retain passing implementation and rerun regressions. Historical
+Independent review of `00b154b` found SD02-R1a-R1 and SD02-V1. The final
+restart/CI checkpoint below corrects both with failing-before/passing-after
+handler and compiled-archive evidence, updated mounted coverage and all 17 CI
+source suites. R1b retains its acknowledged-write recovery checks. R2/R3 retain passing implementation
+and rerun regressions. Historical
 review requirements remain recorded; see the
 [review addendum](2026-10-18-spellcasting-and-native-parity.md#independent-implementation-review--october-18-2026).
 **ADR-0002 stays open: actual native D6, final D7 and A02-01–15 are outstanding.** This report
@@ -349,3 +352,75 @@ acknowledgement/bookkeeping/recovery cases. Existing R2 A02-03/05/10 and R3 A02-
 repetitions remain required. ADR-0002 stays open. Separate scoped disposable-world
 authorization and cleanup remain prerequisites for native testing; this task asks
 for none. No remote writes, branch switch/reset or release/version change.
+
+
+## Independent checkpoint verification — October 19, 2026
+
+Reviewed source `00b154b` with a clean initial module worktree. All prior local
+checkpoints remain ancestors. Current Core is read-only 0.19.3 at
+`90c13e5e57d88913cd3bae6bf6b9e6f0b995bad1`; the existing floor toolchain is
+0.19.2. The read-only native reference remains 4.0.6 at
+`9677d16b3903b3b640f00d4efd48249142ac8334`.
+
+| Newly executed verification | Result |
+| --- | --- |
+| Maintained source suites | 17/17 on each Core version, including 27 recovery groups and final-creation controls. |
+| Controlled native-method comparisons | 20/20 on each version; not actual Foundry acceptance. |
+| Explicit module/UI/hook typing and module checking | Pass on each version; module checks report no warnings. |
+| Compiled reported archive, public SDK/testing | 6/6 on each version. No host deployment or native connection. |
+| Mounted consumers | 12 corrective + 41 collection/Generator + 6 action/card + 5 Actor lifecycle = 64 passes; browser network blocked. |
+| Reported archive identity | 275818 bytes, SHA-256 `7ad1fc5979bb310ca87a452966a5f78f3bb74116b8d80efda5e932e4bf980431`. |
+| Additional independent Actor-edit probe | Reproduces SD02-R1a-R1 on both versions: zero write calls, all receipts pending, fresh request blocked with 409. Diagnostic exit 0 asserts reproduction, not acceptance. |
+| CI source-suite inventory | 14/17 invoked; SD02-V1 records the three missing handler suites. |
+
+Logs and the independent probe are under `temp/sd02-final-review-uegtewbp/`;
+`{current,floor}/results.json` retain all 21 command results per toolchain and
+`browser/` contains the four mounted reports. The tracked active audit records
+the exact reproduction and correction without requiring these ignored files.
+The original pre-review handoff and ADR are preserved there.
+
+R1b, R2/R3 and the existing maintained checks pass. R1a's independent-edit case
+still contradicts the agreed zero-write restart policy, so this review does not
+satisfy the user's conditional commit or release-preparation gate. No source or
+workflow edits, Git mutations, version changes, live checks or new package build
+were performed. Documentation/handoff annotations remain uncommitted. All test
+commands and their browser processes exited; no test services were started.
+Native D6/final D7 and A02-01–15 remain open on both native generations.
+
+
+## Zero-write restart and CI checkpoint — October 19, 2026
+
+User authorized the two narrow corrections and a local commit after verification.
+The starting review annotations and all checkpoints through `00b154b` are retained.
+The runtime change is confined to zero-write retirement; no Core/API/compatibility,
+version, native reference or migration changes were made.
+
+| Verification | Observed result |
+| --- | --- |
+| Updated actual-handler regressions before runtime changes | 3 failures/26 passing controls. The old code requires old Actor equality despite zero-write receipts. |
+| Corrected actual-handler regressions | 29/29; independent XP/notes edits survive, fresh advancement completes once, retired replay never writes, partial/unknown/owner/persistence guards remain. |
+| All source suites and native-method comparisons | 17/17 suites and20/20 controlled methods on Core0.19.2/0.19.3. |
+| Explicit module/UI/hook typing and module checks | Pass on both. An initial test-assertion narrowing error was fixed; final type logs supersede the preserved initial failure. |
+| Mounted consumers | 13 corrective +41 collection/Generator +6 action/card +5 Actor lifecycle =65 passes, network blocked. |
+| Clean CI layout on Node22.23.3/Core0.19.2 | Exact workflow managed generation, module check, all17 tests, explicit typing and packaging pass. Local tracked-source archives/static native reference; installed dependencies reused. No remote workflow or fresh npm-ci claim. |
+| Compiled-archive failing-before check | New Actor-edit regression fails against old SHA256 `7ad1fc5979bb310ca87a452966a5f78f3bb74116b8d80efda5e932e4bf980431`: returns partial instead of retired. |
+| Corrected compiled archive | 7/7 public-SDK cases on each Core version; floor probe runs Node22.23.3. |
+
+Corrected candidate (module0.9.5, no version bump): **274985 bytes**,
+SHA-256 `3aeccbb0c3924e32043be2f065d6248fac29e2081521a01a55608625a8bdd56f`.
+Local archive: `temp/sd02-r1a-r1-fix-awky1o07/ci-core/.module-ci-data/dist/modules/shadowdark-0.9.5.tgz`.
+The archive is an offline validation candidate, not a published release.
+
+Evidence is under `temp/sd02-r1a-r1-fix-awky1o07/`: `handler-before.log`,
+`{current,floor}/` source/method/type/module-check logs, `browser/`,
+`ci-final-results.json`, `ci-final-*.log`, `archive-before.log`,
+`archive-{current,floor}.log` and `archive-identity.json`. Initial CI/type
+failures are retained with distinct filenames. The ADR snapshot SHA-256 is
+`3f12ca159ece6940a047513ffffaeed2dbab8948b6ce5d5103b554d587f38610`.
+Tracked tests and the audit describe the correction without requiring these logs.
+
+This passes the narrow module correction/checkpoint gate. Source and archive
+checks remain distinct from installed-host/native acceptance. No live Core or
+Foundry session was contacted, no services were started, and all test processes
+exited. Native D6/final D7 and every A02-01–15 on both generations remain open;
+ADR-0002 is not closed or release-approved by these offline results.

@@ -1,10 +1,12 @@
 # Shadowdark module architecture
 
-**Corrective review (October19):** original R1–R3 regressions pass, but
-[SD02-R1a/R1b](audits/2026-10-18-spellcasting-and-native-parity.md#independent-corrective-review--october-19-2026)
-remain open: no supported terminal disposition for a context-retired advancement,
-and recovery rejects an uncertain operation's own retained Item ID after receipt
-persistence fails. R2/R3 retain offline verification; D3/R1 recovery remains open.
+**Corrective implementation (October 19):** R1b's acknowledgement and receipt
+separation and R2/R3 remain covered. SD02-R1a-R1 removes old-source equality from
+proven zero-write retirement, preserving independent Actor edits and requiring
+fresh preparation. CI now invokes all 17 maintained source suites with the pinned
+native reference. The original review and corrective evidence are recorded in
+[SD02-R1a-R1](audits/2026-10-18-spellcasting-and-native-parity.md#sd02-r1a-r1--zero-write-actor-edits-still-block-restart-p1).
+Native D6/final D7 and A02-01–15 remain open on both generations.
 
 **Active follow-up (October 18):** the post-release 0.9.5
 [native parity audit](audits/2026-10-18-spellcasting-and-native-parity.md) and
@@ -651,7 +653,12 @@ expose operation receipts rather than saved grant payloads. This offline contrac
 evidence does not satisfy deployment's full-GM guard or native acceptance.
 
 Proven zero-write attempts retire automatically after current owner/caller and
-unchanged-source verification. Only a durable terminal disposition releases the
+context verification. Durable no-write receipts permit retirement even when an
+independent Actor edit invalidates the old source snapshot. Preserve current
+Actor data and require a new current plan. The pre-write source guard returns
+the retired result immediately when it discovers such an obsolete attempt.
+Partial writes retain the source-restoration check.
+Only a durable terminal disposition releases the
 active block; retained journals can never replay after retirement. Operation
 reviews share the Actor queue with writes, so review cannot retire in-flight work.
 Partial operations retain explicit reconciliation and independently verified

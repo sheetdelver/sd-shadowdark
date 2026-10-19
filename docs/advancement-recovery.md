@@ -7,8 +7,10 @@ they do not edit DataStore records or automatically roll back documents.
 
 A stale or rejected attempt with proven zero document writes retires
 **automatically**. The server checks the current caller's owner authority, the
-unchanged reviewed source and receipts proving no acknowledged, uncertain or
-in-flight write. It records a durable `zero-write` disposition, preserves the
+current context and receipts proving no acknowledged, uncertain or in-flight
+write. Independent Actor edits do not prevent retirement: the module preserves
+those changes and requires a fresh plan against current data. It records a
+durable `zero-write` disposition, preserves the
 original journal and releases that operation's block. The dialog says
 **Advancement was not applied** and offers **Start advancement again**. No
 character changes are saved, and no recovery review is required for this case.

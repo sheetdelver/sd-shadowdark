@@ -101,10 +101,14 @@ The active post-release plan is [Shadowdark ADR-0002](docs/adr/0002-native-data-
 with findings SD02-01–13 in the [native parity audit](docs/audits/2026-10-18-spellcasting-and-native-parity.md).
 SD02-R1–R3 have corrective implementation and offline regression evidence
 (advancement recovery, final creation validation and management-source refresh).
-SD02-R1a/R1b have corrective offline verification: proven zero-write refusals
-retire automatically for fresh preparation; acknowledged writes keep exact IDs
+SD02-R1b has independent offline verification: acknowledged writes keep exact IDs
 through bookkeeping failures and require primary-source reconciliation before
-continuation. Partial/unknown outcomes never qualify for a zero-write restart.
+continuation. SD02-R1a-R1 permits zero-write retirement even when an independent
+Actor edit invalidates the old source snapshot. Preserve that edit and require
+fresh preparation; never require the player to undo unrelated changes when this
+operation made none. Partial/unknown outcomes never qualify for a zero-write
+restart. SD02-V1 adds the maintained advancement, final-creation and native-parity
+handler suites to CI using the pinned static native reference below.
 Native acceptance remains open. Follow its checkpoints; do not treat its existence as branch, live-write or release authority.
 [ADR-0001](docs/adr/0001-native-alignment-and-resource-cards.md) and the
 [native-alignment audit](docs/audits/2026-10-15-native-alignment.md) remain completed
@@ -211,6 +215,9 @@ npx tsx data/local/modules/shadowdark/src/tests/effect-conformance.test.ts
 npx tsx data/local/modules/shadowdark/src/tests/world-adoption.test.ts
 npx tsx data/local/modules/shadowdark/src/tests/migration-hooks.test.ts
 npx tsx data/local/modules/shadowdark/src/tests/system-index.test.ts
+npx tsx data/local/modules/shadowdark/src/tests/native-parity.test.ts
+npx tsx data/local/modules/shadowdark/src/tests/advancement-recovery.test.ts
+npx tsx data/local/modules/shadowdark/src/tests/creation-validation.test.ts
 node data/local/modules/shadowdark/src/tests/verify-types.mjs
 npm run module:check -- shadowdark
 ```
@@ -220,6 +227,11 @@ checking types. Use isolated package output when validating distribution.
 The current workflow is `.github/workflows/ci-shadowdark.yaml`; inspect its pinned
 host version before running compatibility checks. Tools may run from Core,
 but module work does not authorize changing Core files or generated settings.
+CI checks out `Muttley/foundryvtt-shadowdark` at
+`9677d16b3903b3b640f00d4efd48249142ac8334` (release-4.0.6) into the isolated
+toolchain's `temp/shadowdark`. All 17 source suites run against that static
+reference; missing required native fixtures fail rather than silently skip.
+This is source-only testing and does not require a running Foundry service.
 
 Maintained consumer checks: `src/tests/collection-consumers.browser.mjs` renders
 the actual providers/pickers/Spells/Generator with a controlled SDK boundary and

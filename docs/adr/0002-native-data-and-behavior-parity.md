@@ -8,12 +8,14 @@
 
 **Audit:** [Post-release native parity](../audits/2026-10-18-spellcasting-and-native-parity.md)
 
-**Current status (October19, corrective implementation):** SD02-R1a/R1b now
-pass the clarified offline policy and integrated verification. Proven zero-write
-attempts restart; acknowledged grants survive bookkeeping failure without
-recreation. R2/R3 retain passing implementation and newly rerun regressions.
-D3 has corrective offline evidence. Actual native D6, final D7 and A02-01–15
-remain open. See the [final corrective validation](../audits/2026-10-18-adr-0002-validation.md#r1ar1b-integrated-corrective-validation--october-19-2026).
+**Current status (October 19, restart/CI correction):** SD02-R1a-R1 and SD02-V1
+are corrected and offline verified. Proven zero-write attempts retire while
+preserving independent Actor edits; CI runs all 17 source suites using the pinned
+native 4.0.6 reference. R1b/R2/R3 remain covered. See the
+[corrective evidence](../audits/2026-10-18-adr-0002-validation.md#zero-write-restart-and-ci-checkpoint--october-19-2026).
+D3/R1a has passing offline evidence. Actual native D6, final D7 and A02-01–15
+remain open on both generations; this checkpoint does not close ADR-0002 or
+establish release acceptance.
 
 **Predecessor:** [ADR-0001](0001-native-alignment-and-resource-cards.md), Completed; its accepted scope and explicit deferrals remain intact.
 
@@ -908,3 +910,67 @@ No new Core dependency is established. Unknown absent/in-flight outcomes stay
 blocked pending exact independent evidence; no rollback or atomicity is promised.
 ADR-0002/native D6/final D7 and all A02-01–15 remain open on13/14. No task services
 remain, no live endpoints were contacted, and operator services were preserved.
+
+
+### Independent checkpoint qualification — October 19, 2026
+
+Review of `00b154b` reran the maintained offline checks successfully on Core
+0.19.2/0.19.3, including R1b's acknowledgement/persistence/reconciliation cases.
+An additional actual-handler probe reproduces
+[SD02-R1a-R1](../audits/2026-10-18-spellcasting-and-native-parity.md#sd02-r1a-r1--zero-write-actor-edits-still-block-restart-p1):
+a GM Actor edit between plan persistence and the first write leaves all receipts
+pending, but old-source equality prevents zero-write retirement and fresh
+advancement. There were zero native document-write calls in either toolchain.
+
+**Policy clarification:** the requirement to preserve current Actor data must
+not require restoring the obsolete snapshot when this operation made no writes.
+Proven zero-write attempts retire using durable outcome evidence and current
+caller/owner authority, then require a new plan against current data. Preserve
+independent edits and retain the old request as terminal. Keep partial/unknown
+outcome exclusion, durable retirement before replacement, and exact restoration
+requirements for operations that actually wrote documents.
+
+Before D3/R1a can pass review, add the independent-edit interleaving to maintained
+handler and mounted restart coverage and retain all existing R1b/R2/R3 controls.
+SD02-V1 separately records that CI currently runs only 14 of the 17 maintained
+source suites; wire the missing three to the pinned static native reference.
+These are module-owned corrections and establish no new Core contract need.
+
+The pre-review ADR was preserved as
+`temp/sd02-final-review-uegtewbp/ADR-0002.before-review.md`, SHA-256
+`7ca12901f380131599b8d9a88e1404c60f00658b2e42a65cdc53530e2e69c151`.
+Prior checkpoints, snapshots and passing evidence remain valid within their
+recorded scope. No new commit follows this review because its passing condition
+was not met. Native D6/final D7 and every A02 case remain open on both generations;
+ADR-0002 stays open. The [validation record](../audits/2026-10-18-adr-0002-validation.md#independent-checkpoint-verification--october-19-2026)
+separates the rerun passes, new blocker and retained acceptance requirements.
+
+
+### Zero-write restart and CI correction — October 19, 2026
+
+SD02-R1a-R1 is corrected. Retirement relies on durable no-write receipts, current
+owner/caller authority and current context; it does not require restoring the
+obsolete Actor snapshot. The pre-write guard immediately retires a stale
+zero-write plan. Independent XP/notes survive, old requests stay retired, and a
+fresh plan uses current data. Partial, acknowledged, started and uncertain
+operations retain their existing exclusion and exact-source recovery controls.
+
+SD02-V1 is corrected by adding advancement-recovery, creation-validation and
+native-parity suites to CI. The workflow checks out static native 4.0.6 at
+`9677d16b3903b3b640f00d4efd48249142ac8334`; the Core v0.19.2 pin and all manifest
+compatibility/version declarations are unchanged. No live service is required.
+
+Three handler groups fail before the change and all 29 pass afterward. The new
+compiled regression also fails against the prior archive. All 17 suites,
+20 native-method comparisons and explicit typing pass on Core 0.19.2/0.19.3;
+65 mounted cases pass. Clean-layout CI commands pass locally on Node 22.23.3,
+including packaging; the corrected archive passes seven public-SDK cases per
+Core version. See the [validation record](../audits/2026-10-18-adr-0002-validation.md#zero-write-restart-and-ci-checkpoint--october-19-2026)
+for candidate identity and evidence limits.
+
+The pre-fix ADR was saved as
+`temp/sd02-r1a-r1-fix-awky1o07/ADR-0002.before-fix.md`, SHA-256
+`3f12ca159ece6940a047513ffffaeed2dbab8948b6ce5d5103b554d587f38610`.
+This supersedes the immediately preceding review's open R1a/V1 disposition;
+all earlier review evidence and checkpoints are retained. Native D6/final D7
+and A02-01–15 on both generations remain open. ADR-0002 remains in progress.

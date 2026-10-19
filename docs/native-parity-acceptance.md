@@ -112,3 +112,26 @@ Both toolchains pass six compiled public SDK checks. This archive has not been
 installed into a live runtime or accepted on native. All A02-01–15 and native
 D6/final D7 remain open on13/14; complete the scoped matrix on one generation
 before requesting a switch. No new Core dependency or native testing authority.
+
+
+Independent review of `00b154b` retains R1b/R2/R3 offline evidence but leaves
+SD02-R1a-R1 open before native acceptance. Extend A02-03/05/07 with an independent
+GM Actor edit after the plan is saved and before its first advancement write:
+the obsolete attempt must make zero writes, retire without undoing the GM edit,
+and allow one fresh advancement against the new baseline. Old request replay
+must remain retired. Keep partial/unknown-write exclusion and all exact-ID
+recovery controls. Current source instead blocks the fresh request; both offline
+toolchains reproduce this. SD02-V1 separately records incomplete CI source-suite
+coverage. The candidate above is not release-cleared by its passing existing
+checks; all native A02 rows remain open.
+
+
+The subsequent R1a-R1/CI correction passes offline: independent edits survive
+zero-write retirement, fresh preparation uses the new Actor baseline and retired
+replay cannot write. The29 handler/13 corrective mounted cases and7 compiled
+archive cases per Core version cover this correction; CI includes all17 source
+suites with the pinned static native reference. Repeat the independent-edit
+scenario above during A02-03/05/07. Use the final candidate identity from the
+[validation checkpoint](audits/2026-10-18-adr-0002-validation.md#zero-write-restart-and-ci-checkpoint--october-19-2026);
+the preceding candidate hashes remain historical. Native D6/final D7 and all
+A02-01–15 remain open on both generations.

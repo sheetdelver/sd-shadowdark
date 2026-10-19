@@ -2,11 +2,13 @@
 
 **Date:** October 18, 2026
 
-**Status (October19):** Active — SD02-R1a/R1b have corrective offline
-implementation and integrated verification under the simplified restart/acknowledged-ID
-policy. R2/R3 pass rerun regressions. Actual native D6/D7/A02-01–15 remain open.
-The [independent review](#independent-corrective-review--october-19-2026) and its
-original reproductions remain below; see the final corrective disposition.
+**Status (October 19, restart/CI correction):** Active — SD02-R1a-R1 and
+SD02-V1 are corrected with passing offline evidence. Independent Actor edits
+survive zero-write restart, and CI invokes all 17 source suites with the pinned
+native reference. R1b/R2/R3 remain covered. The
+[checkpoint review](#independent-checkpoint-review--october-19-2026) records the
+original failures; the final correction below supersedes its open disposition.
+Actual native D6/D7/A02-01–15 remain open on both generations.
 
 **Decision record:** [ADR-0002](../adr/0002-native-data-and-behavior-parity.md)
 
@@ -1323,3 +1325,125 @@ changed. Earlier public CLI full-GM guard and broader inventory evidence were
 retained, not rerun. No new Core dependency; absent unknown outcomes remain
 safely fenced. Native D6/final D7/A02-01–15 remain unexecuted/open on13/14; task
 services none, operator services untouched.
+
+
+## Independent checkpoint review — October 19, 2026
+
+Reviewed `00b154b` on `fix/adr-0002-native-parity`, preserving `3e8f892`,
+`a21375a`, `6d41a83` and all earlier checkpoints. This review made no application,
+workflow, version, migration, Core or native-reference changes. Existing source
+and archive checks pass; the additional R1a probe below fails the agreed restart
+outcome. The user's new commit instruction was conditional on passing review, so
+no new commit, staging or remote operation was performed.
+
+### SD02-R1a-R1 — zero-write Actor edits still block restart (P1)
+
+**Reproduction, using the actual handler on both supported Core toolchains:**
+
+1. Review a level-two Knight with 35 XP and 8 HP; prepare level three with the
+   required Talent and Spell grants. Save the pending advancement journal.
+2. Before the handler's first pre-write primary Actor read, an independent GM
+   update changes XP from 35 to 36. No advancement Item create or Actor patch
+   has been dispatched. This models an ordinary native Actor edit outside the
+   module's process queue, not a failed or uncertain advancement write.
+3. The pre-write source comparison correctly stops the obsolete plan. The
+   response is HTTP 200 / `state: partial`; both grant receipts and the final
+   Actor receipt remain `pending`. The document-write call list is empty.
+4. Submit a fresh request ID and baseline for the current 36-XP Actor. It returns
+   HTTP 409: the old advancement is incomplete. Reopening shows the pending
+   operation with `canResolveRestored: false`; explicit review cannot reconcile
+   away the independent edit. No terminal disposition is recorded.
+
+`server/advancement-operation.ts:50–57` requires the Actor to equal
+`journal.initialReview` before retiring a zero-write journal. The guard at the
+first grant read correctly prevents stale writes, but the retirement equality
+makes the resulting zero-write operation impossible to discard while preserving
+legitimate new Actor data. The maintained test named “R1a automatic retirement
+checks original source and current owner/caller authority” currently asserts
+that an independent XP edit must remain partial; that expectation must change.
+
+**Required correction:** current caller/owner authority, serialized execution and
+reliable no-write receipts must permit durable retirement without requiring the
+old Actor snapshot. Preserve independent edits, the original plan and terminal
+history. A fresh request must prepare against the current source. Do not resume
+the obsolete plan or require restoration of changes the operation never made.
+Keep the existing exclusion for any acknowledged, partial, started, uncertain or
+otherwise unresolved write; source-restoration checks still apply to partial
+operations that actually wrote documents.
+
+**Acceptance:** add the above interleaving to maintained handler coverage and
+show zero writes from the rejected attempt, preserved 36 XP until fresh
+advancement, retired old-request replay, one fresh completion (16 XP after the
+native 20-XP cost), and no duplicate grants. Exercise the mounted restart path
+against the updated Actor/baseline. Preserve all partial/unknown/caller/persistence
+controls. This is a remaining module R1a policy defect; it establishes no new
+Core dependency or migration requirement.
+
+The independent artifact is
+`temp/sd02-final-review-uegtewbp/zero-write-actor-edit.ts`, with current and floor
+logs. Exit 0 in this diagnostic means the blocking outcome was reproduced; it
+is not passing acceptance. The inputs, ordering and outcomes above are sufficient
+without the ignored artifact.
+
+### SD02-V1 — three maintained handler suites are absent from CI (P2)
+
+`.github/workflows/ci-shadowdark.yaml` runs 14 of the 17 maintained `.test.ts`
+suites. It does not invoke `advancement-recovery.test.ts`,
+`creation-validation.test.ts` or `native-parity.test.ts`. The corrective mounted
+consumer job exists, but its controlled response boundary does not replace these
+server-handler tests. Both independent local toolchain runs include all 17 and
+pass; this is an automation coverage gap, not a newly failing runtime check.
+
+Add the three suites to CI with the same pinned, read-only native 4.0.6 source
+fixture required by their test loaders. Keep fixture preparation explicit and
+static, with no Foundry service, credentials or normal-runtime dependency. Prove
+the clean-checkout CI command sequence; do not silently skip a missing reference.
+The current review records this follow-up without changing workflows.
+
+**Verified scope:** 17 suites, 20 controlled native-method comparisons, explicit
+module/UI/hook types, module checking and six compiled public-SDK archive cases
+pass on each of Core 0.19.2 and 0.19.3. All 64 mounted consumers pass (12 corrective,
+41 collection/Generator, 6 action/card, 5 Actor lifecycle), with outgoing browser
+traffic blocked. Archive identity matches the reported 275818 bytes and SHA-256
+`7ad1fc5979bb310ca87a452966a5f78f3bb74116b8d80efda5e932e4bf980431`.
+R1b's own-ID reconciliation, acknowledged outcome and completion guards pass;
+R2/R3 evidence is retained. No native acceptance or fresh packaging was performed.
+Native D6/final D7 and A02-01–15 on both generations remain open. ADR-0002 remains
+open and the candidate is not release-cleared by this review.
+
+
+## Zero-write restart and CI correction — October 19, 2026
+
+**SD02-R1a-R1: corrected offline.** `retireZeroWrite` preserves current Actor data
+while retiring only an operation whose receipts establish no writes. The first
+pre-write source conflict now returns retirement immediately. A later retry,
+reopen or fresh request can also retire a saved zero-write refusal despite an
+independent edit. Current owner/caller/context checks and durable-terminal
+persistence remain. Partial/unknown operations retain exact-source recovery and
+cannot use this restart path.
+
+The maintained handler reproduces the GM XP35→36/notes edit after journal
+persistence. The obsolete attempt makes zero write calls and retires; fresh
+advancement writes each grant once, applies level3/16XP/11HP and preserves the
+GM note. Old request replay stays retired. The corrected authority expectation
+and two new groups fail against the pre-fix source; all29 groups pass after.
+The new mounted restart control verifies a new request ID/current baseline,
+no premature success and retained Actor data. It is a UI control case, not a
+claim that the old UI code failed independently. The same compiled-route
+regression fails against the old candidate and passes in the corrected archive.
+
+**SD02-V1: corrected offline.** CI now invokes all17 maintained source suites.
+The three newly included suites use the explicitly checked-out native4.0.6
+commit `9677d16b3903b3b640f00d4efd48249142ac8334` at `temp/shadowdark`.
+Local clean-layout execution of the workflow's managed generation, module check,
+all source tests, explicit typing and packaging passes on Node22.23.3/Core0.19.2.
+This used local tracked-source archives and existing installed dependencies;
+GitHub Actions checkout/npm-ci/workflow execution was not remotely dispatched.
+
+R1b/R2/R3 and all prior negative controls pass. Both Core versions pass17 suites,
+20 controlled native-method comparisons, explicit typing and module checks.
+Mounted checks total65:13 corrective,41 collection/Generator,6 action/card and
+5 Actor lifecycle. The corrected archive passes7 compiled public-SDK cases on
+each Core version. The [validation record](2026-10-18-adr-0002-validation.md#zero-write-restart-and-ci-checkpoint--october-19-2026)
+records archive identity and logs. No new Core dependency, native connection,
+version change or migration change. Native D6/final D7/A02 remain open.

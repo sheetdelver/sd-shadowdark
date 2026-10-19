@@ -141,14 +141,58 @@ await check('R1a terminal disposition must persist before a fresh request can wr
     fail=false;assert.equal((await f.run(fresh)).body.state,'complete');finished(f);
     assert.equal((await f.run()).body.state,'retired');
 });
-await check('R1a automatic retirement checks original source and current owner/caller authority', async () => {
+await check('R1a automatic retirement checks current owner/caller authority and preserves independent edits', async () => {
     const f=await legacyZero();f.context(2);
-    f.actor.system.level.xp++;assert.equal((await f.run()).body.state,'partial');assert.equal([...f.records.values()].find(row=>row.grants).terminal,undefined);f.actor.system.level.xp--;
     f.authority(false);assert.equal((await f.run()).status,403);f.authority(false,false);assert.equal((await f.run()).status,404);f.authority(true);
     const request=f.request({requestId:f.body.requestId});request.userSession.userId='another-owner';const response=await handleFinalizeLevelUp(f.actor._id,request);assert.equal(response!.status,404);
     assert.equal([...f.records.values()].find(row=>row.grants).terminal,undefined);assert.equal(f.events.length,1);
     assert.equal((await f.run({...f.body,hpRoll:5})).status,409,'changed intent cannot replay the saved request');
+    f.actor.system.level.xp++;
     assert.equal((await f.run()).body.state,'retired');assert.equal(f.events.length,1);
+    assert.equal(f.actor.system.level.xp,36);
+});
+await check('R1a independent Actor edit before the first write retires the stale plan and preserves fresh advancement', async () => {
+    const f = fixture(), runtime = f.request().runtime, get = runtime.documents.get;
+    let edited = false;
+    runtime.documents.get = async (...args: any[]) => {
+        if (!edited && [...f.records.values()].some(row => row.grants) && f.events.length === 0) {
+            edited = true;
+            f.actor.system.level.xp = 36;
+            f.actor.system.notes = 'Independent GM edit';
+        }
+        return get(...args);
+    };
+    const first = await f.run();
+    assert.equal(first.status, 200);
+    assert.equal(first.body.state, 'retired');
+    assert.equal(first.body.terminal.disposition, 'zero-write');
+    assert.equal(f.events.length, 0, 'The obsolete attempt must not dispatch a document write');
+    assert.deepEqual(f.actor, { ...f.initial, system: { ...f.initial.system, level: { value: 2, xp: 36 }, notes: 'Independent GM edit' } });
+    const old = [...f.records.values()].find(row => row.grants);
+    assert.equal(old.initialReview, reviewToken(f.initial));
+    assert.equal(old.terminal.baseline, reviewToken(f.actor));
+    assert.ok(old.grants.every((op: any) => op.status === 'pending'));
+    const fresh = { ...f.body, requestId: 'fresh-after-gm-edit', baseline: reviewToken(f.actor) };
+    assert.equal((await f.run(fresh)).body.state, 'complete');
+    assert.deepEqual(f.actor.system.level, { value: 3, xp: 16 });
+    assert.deepEqual(f.actor.system.attributes.hp, { max: 11, value: 11 });
+    assert.equal(f.actor.system.notes, 'Independent GM edit');
+    assert.deepEqual(f.events.map(row => row.kind), ['item', 'item', 'patch']);
+    assert.equal((await f.run()).body.state, 'retired');
+    assert.equal((await f.run(fresh)).body.state, 'complete');
+    assert.equal(f.events.length, 3, 'Retired and completed replay must not repeat writes');
+});
+await check('R1a fresh request retires an earlier definite refusal without undoing later Actor edits', async () => {
+    const f = await legacyZero(); f.context(2);
+    f.actor.system.level.xp = 36;
+    const fresh = { ...f.body, requestId: 'fresh-after-edited-refusal', baseline: reviewToken(f.actor) };
+    assert.equal((await f.run(fresh)).body.state, 'complete');
+    assert.deepEqual(f.actor.system.level, { value: 3, xp: 16 });
+    const old = [...f.records.values()].find(row => row.grants && row.requestId === f.body.requestId);
+    assert.equal(old.terminal.disposition, 'zero-write');
+    assert.equal(old.grants[0].status, 'failed');
+    assert.equal((await f.run()).body.state, 'retired');
+    assert.equal(f.events.length, 4, 'One refused call, two confirmed grants and one final patch');
 });
 await check('R1a uncertain/in-flight outcomes cannot be discarded even when source appears unchanged', async () => {
     for(const status of ['uncertain','started']){const f=fixture('item-lost');await f.run();f.restore();f.context(2);
