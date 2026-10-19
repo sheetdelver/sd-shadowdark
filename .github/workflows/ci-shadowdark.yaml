@@ -4,13 +4,17 @@ on:
   push:
     branches:
       - main
+    tags:
+      - 'v*'
     paths:
       - 'src/**'
       - 'module/**'
+      - 'scripts/**'
       - 'assets/**'
       - '.github/workflows/**'
       - 'info.json'
       - 'package.json'
+      - 'CHANGELOG.md'
       - 'migration.json'
       - 'migrations/**'
   pull_request:
@@ -19,10 +23,12 @@ on:
     paths:
       - 'src/**'
       - 'module/**'
+      - 'scripts/**'
       - 'assets/**'
       - '.github/workflows/**'
       - 'info.json'
       - 'package.json'
+      - 'CHANGELOG.md'
       - 'migration.json'
       - 'migrations/**'
   workflow_dispatch:
@@ -67,6 +73,9 @@ jobs:
           node-version: '22.x'
           cache: npm
           cache-dependency-path: sheet-delver-core/package-lock.json
+
+      - name: Test standalone release helper
+        run: node --test ".module-ci-data/local/modules/shadowdark/scripts/release.test.mjs"
 
       - name: Install reviewed Sheet Delver toolchain
         run: npm ci

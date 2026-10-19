@@ -41,3 +41,9 @@ compatibility remains unchanged.
 ## Third-party license
 
 This product is an independent product published under the Shadowdark RPG Third-Party License and is not affiliated with The Arcane Library, LLC. Shadowdark RPG © 2023 The Arcane Library, LLC.
+
+## Release tooling
+
+Use this repository’s independent `npm run release:tag` command. It prepares the
+numbered changelog release, pushes its tag for validation, and asks separately
+before publication. See [module release instructions](docs/RELEASING.md).
