@@ -8,10 +8,12 @@
 
 **Audit:** [Post-release native parity](../audits/2026-10-18-spellcasting-and-native-parity.md)
 
-**Current status (October19, independent corrective review):** The original
-R1–R3 regressions pass. R2/R3 retain offline verification; two reproduced R1
-recovery gaps (SD02-R1a/R1b) leave D3 open. Native D6/D7 remain open. See the
-[corrective review addendum](#independent-corrective-review--october-19-2026).
+**Current status (October19, corrective implementation):** SD02-R1a/R1b now
+pass the clarified offline policy and integrated verification. Proven zero-write
+attempts restart; acknowledged grants survive bookkeeping failure without
+recreation. R2/R3 retain passing implementation and newly rerun regressions.
+D3 has corrective offline evidence. Actual native D6, final D7 and A02-01–15
+remain open. See the [final corrective validation](../audits/2026-10-18-adr-0002-validation.md#r1ar1b-integrated-corrective-validation--october-19-2026).
 
 **Predecessor:** [ADR-0001](0001-native-alignment-and-resource-cards.md), Completed; its accepted scope and explicit deferrals remain intact.
 
@@ -878,3 +880,31 @@ results above are retained, not substituted for the simplified policy checks.
 R2/R3 runtime implementation remains intact. Integrated packaging/full validation
 follows this checkpoint. R1a/R1b are corrected offline; native D6, final D7 and
 all A02-01–15 on13/14 remain open. No new Core dependency is established.
+
+### R1a/R1b integrated checkpoint — October 19, 2026
+
+Correction6d41a83 implements the clarified policy with source/mounted tests and
+guidance. The final [validation record](../audits/2026-10-18-adr-0002-validation.md#r1ar1b-integrated-corrective-validation--october-19-2026)
+records17/17 maintained suites, explicit typing and20/20 controlled native-method
+comparisons on Core0.19.2 and0.19.3. Mounted checks pass12 corrective,41 collection/
+Generator,6 action/card and5 Actor lifecycle cases. Module checks pass on both;
+isolated packaging on released0.19.2 and six compiled public-SDK archive checks
+per toolchain pass. No live/runtime/native check was performed in this task.
+
+Candidate0.9.5 is275818 bytes, SHA-256
+`7ad1fc5979bb310ca87a452966a5f78f3bb74116b8d80efda5e932e4bf980431`,
+at `temp/adr0002-recovery-resolution/package-data/dist/modules/shadowdark-0.9.5.tgz`.
+Metadata/catalog/definition bytes match the prior candidate; all six compiled
+migration programs match after ignoring generated path comments. IDs/history,
+compatibility ranges, workflow pins and versions are unchanged. Prior packages,
+review probes, snapshots and larger-inventory evidence remain historical.
+
+Provenance qualification:13aef6b6676a6bfb2edc295cc71e296a75036dbd is the annotated
+v0.19.2 tag object, not the commit as earlier text labels it. Its commit is
+b010f590e56d87e3fcd6fce42c7894028e5f0c3a; all939 tracked floor files match. Current
+0.19.3 is90c13e5e57d88913cd3bae6bf6b9e6f0b995bad1 (942 tracked copied files match).
+The read-only native4.0.6 commit remains9677d16b3903b3b640f00d4efd48249142ac8334.
+No new Core dependency is established. Unknown absent/in-flight outcomes stay
+blocked pending exact independent evidence; no rollback or atomicity is promised.
+ADR-0002/native D6/final D7 and all A02-01–15 remain open on13/14. No task services
+remain, no live endpoints were contacted, and operator services were preserved.

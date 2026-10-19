@@ -1,10 +1,11 @@
 # ADR-0002 native acceptance run sheet
 
-Independent review of `1e91840` leaves [SD02-R1a/R1b](audits/2026-10-18-spellcasting-and-native-parity.md#independent-corrective-review--october-19-2026)
-open. Before choosing a new native candidate, verify a supported retirement path
-after a proven zero-write refusal/context change and safe reconciliation when an
-Item's acknowledged ID survives a receipt persistence failure. Include these in
-the existing advancement recovery acceptance scope; retain the passing R2/R3 evidence.
+SD02-R1a/R1b now have corrected offline implementation and integrated evidence
+in the [validation record](audits/2026-10-18-adr-0002-validation.md#r1ar1b-integrated-corrective-validation--october-19-2026).
+Native A02-03/05/07 must repeat automatic retirement/restart after a proven
+zero-write refusal/context change and exact-ID reconciliation after acknowledged
+creation plus receipt/read failure. R2/R3 retain passing implementation and rerun
+offline regressions; their separate native cases remain required.
 
 All A02 rows remain **open for actual Foundry**. Controlled native methods,
 isolated Core and browser tests are separate evidence. This run sheet is ready
@@ -102,3 +103,12 @@ IDs, late review responses and final Actor-patch outcomes. Completion requires a
 confirmed changes. No rollback/all-or-nothing promise applies. The27 handler and12
 mounted offline groups do not execute any native A02 row; every native row stays
 open on13/14 pending separate scoped acceptance.
+
+Final R1a/R1b candidate (supersedes the earlier candidate above): module0.9.5,
+275818 bytes, SHA-256
+`7ad1fc5979bb310ca87a452966a5f78f3bb74116b8d80efda5e932e4bf980431`,
+at `temp/adr0002-recovery-resolution/package-data/dist/modules/shadowdark-0.9.5.tgz`.
+Both toolchains pass six compiled public SDK checks. This archive has not been
+installed into a live runtime or accepted on native. All A02-01–15 and native
+D6/final D7 remain open on13/14; complete the scoped matrix on one generation
+before requesting a switch. No new Core dependency or native testing authority.

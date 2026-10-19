@@ -2,7 +2,11 @@
 
 **Date:** October 18, 2026
 
-**Status (October19):** Active — original R1–R3 regressions pass; independent review confirms two remaining R1 recovery defects, SD02-R1a/R1b. R2/R3 retain offline verification. Actual native A02-01–15 remains open. See the [corrective review](#independent-corrective-review--october-19-2026).
+**Status (October19):** Active — SD02-R1a/R1b have corrective offline
+implementation and integrated verification under the simplified restart/acknowledged-ID
+policy. R2/R3 pass rerun regressions. Actual native D6/D7/A02-01–15 remain open.
+The [independent review](#independent-corrective-review--october-19-2026) and its
+original reproductions remain below; see the final corrective disposition.
 
 **Decision record:** [ADR-0002](../adr/0002-native-data-and-behavior-parity.md)
 
@@ -1295,3 +1299,27 @@ Both toolchains typecheck. `simplified-*` artifacts under
 `temp/adr0002-recovery-resolution/` are new; earlier results remain historical.
 Full suites/archive checks follow. R2/R3 behavior is preserved. No new Core
 contract is needed; native D6/D7 and A02-01–15 remain open on13/14.
+
+### Final R1a/R1b disposition — October 19, 2026
+
+**Corrected with offline evidence; native acceptance open.**6d41a83 preserves the
+passing R2/R3 code and fixes both reviewed execution paths. Review docs3e8f892
+and intermediate terminal checkpointa21375a remain ancestors of the final code.
+The clarified policy supersedes the intermediate zero-write review action.
+
+All17 maintained suites, explicit module/UI/hook typing and20 native-method
+comparisons pass on released0.19.2/current0.19.3. Actual mounted cases pass12
+corrective +41 collection/Generator +6 action/card +5 Actor lifecycle. Module
+checks pass both; isolated0.19.2 package and six compiled public SDK checks per
+version pass. Source before/after27 cases and mounted12 cases retain16/6 new
+failures against3e8f892 and27/12 passes after. The initial review reproducer's
+exit0 records the defects; it is not acceptance. See the complete
+[validation/identity record](2026-10-18-adr-0002-validation.md#r1ar1b-integrated-corrective-validation--october-19-2026).
+
+Candidate0.9.5:275818 bytes, SHA-256
+`7ad1fc5979bb310ca87a452966a5f78f3bb74116b8d80efda5e932e4bf980431`.
+No migrations, versions, ranges/pins, native/Core/sibling source or live data were
+changed. Earlier public CLI full-GM guard and broader inventory evidence were
+retained, not rerun. No new Core dependency; absent unknown outcomes remain
+safely fenced. Native D6/final D7/A02-01–15 remain unexecuted/open on13/14; task
+services none, operator services untouched.

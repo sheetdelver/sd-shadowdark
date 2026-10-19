@@ -5,9 +5,11 @@ Independent review found SD02-R1–R3 in advancement recovery, final
 creation validation and management-source refresh; their original regressions
 pass with new offline evidence below. Independent review of `1e91840` found two
 additional R1 recovery defects, [SD02-R1a/R1b](2026-10-18-spellcasting-and-native-parity.md#independent-corrective-review--october-19-2026).
-R2/R3 retain offline verification. Historical review requirements remain recorded; see the
+R1a/R1b now pass the simplified corrective implementation and full offline rerun
+below. R2/R3 retain passing implementation and rerun regressions. Historical
+review requirements remain recorded; see the
 [review addendum](2026-10-18-spellcasting-and-native-parity.md#independent-implementation-review--october-18-2026).
-**ADR-0002 stays open: R1 recovery correction and actual native A02-01–15 are outstanding.** This report
+**ADR-0002 stays open: actual native D6, final D7 and A02-01–15 are outstanding.** This report
 supplements the [active audit](2026-10-18-spellcasting-and-native-parity.md),
 [ADR](../adr/0002-native-data-and-behavior-parity.md) and
 [native run sheet](../native-parity-acceptance.md).
@@ -288,3 +290,62 @@ New verification under `temp/adr0002-recovery-resolution/`:
 No live runtime, native acceptance, migration or compatibility/pin/version change.
 R2/R3 consumers and creation implementation remain intact. Full integrated checks
 and final archive identity follow; native D6/final D7/A02-01–15 remain open.
+
+## R1a/R1b integrated corrective validation — October 19, 2026
+
+Newly executed evidence uses `temp/adr0002-recovery-resolution/`. Earlier
+`adr0002-implementation/`, `adr0002-corrections/`, independent-review probes and
+intermediate `r1a-*`/`r1b-*` results remain intact and historical.
+
+| Finding | Same specification against3e8f892 | Final corrected outcome |
+| --- | --- | --- |
+| R1a | Zero-write requests remain partial/blocked after context change; no terminal restart. The new source and mounted restart/terminal cases fail. | Definite first refusal/stale saved zero-write attempt automatically retires, source remains2/35XP/8HP with original Items, fresh current plan completes once. Restart/duplicates preserve terminal evidence; failed persistence cannot release it; partial/unknown/in-flight outcomes cannot discard. No recovery workflow for zero writes. |
+| R1b | Completed receipt save failure downgrades the acknowledged grant to uncertain; own retained ID is rejected. New persistence/read/receipt consumer cases fail. | Exact acknowledged ID survives storage/read failures, reload/reconciliation; later writes stop until safe durable recovery. No second creation of that grant. Other-operation/grant, wrong-parent/source and rebound IDs are rejected. Final Actor outcome/read/receipt failures retain the completion guard. |
+| Preserved controls |11 handler/6 mounted controls already pass. |27/27 handler and12/12 mounted cases pass;16 source/6 mounted failures before are now passes. R2/R3 behavior remains intact. |
+
+| Verification | Newly observed result | Artifacts |
+| --- | --- | --- |
+| All maintained suites |17/17 per toolchain, including advancement27, creation10, parity17, conformance89, alignment61 and boundaries53. | `final-suites.json`, `final-{floor,current}/*.log`. |
+| Explicit module/UI/hook typing |Pass per toolchain, independent of root exclusion. | `final-{floor,current}/types.log`. |
+| Native-method comparisons |20/20 per toolchain;69 slots/31 weapons/9 armor/4 inventories/9 ordinary outcomes retained. Controlled collaborators, not actual native preparation. | `final-{floor,current}/native-methods.log`. |
+| Mounted consumers |12/12 corrective,41/41 collection/Generator,6/6 action/card,5/5 Actor lifecycle. Browser traffic blocked; no page errors. | `simplified-browser/`, `final-{collection,action,actor}-browser/`. |
+| Failing-before |Same27 source/12 mounted specifications on preserved3e8f892:16 source/6 mounted fail,11/6 controls pass. | `simplified-before.log`, `simplified-browser-before/`; fresh baseline copy leaves old fixtures/evidence intact. |
+| Module checks |Pass on0.19.2/0.19.3, no warnings. | `final-{floor,current}-check.log`. |
+| Isolated package |Pass on released0.19.2. | `final-package.log`, `final-package-checks.json`. |
+| Final compiled public routes |6/6 per version via actual exported apiRoutes + public SDK/testing: zero-write retirement/new request; acknowledged receipt failure/reload; exact reconciliation/complete replay/no duplicate; zero-spell creation rejection; valid full-source creation; final-body tamper rejection. | `packaged-{floor,current}/results.log`; maintained `packaged-corrections.mjs`. |
+| Toolchain provenance |All939 floor and942 copied current tracked files match their Git objects. | `toolchain-provenance.json`. |
+| Cleanup |No task services or retained test/browser processes. Core/native worktrees clean. No live connection. | `cleanup-processes.json`. |
+
+Released floor v0.19.2's annotated tag object is
+`13aef6b6676a6bfb2edc295cc71e296a75036dbd`; its **commit** is
+`b010f590e56d87e3fcd6fce42c7894028e5f0c3a`. Earlier records labelled the tag object
+as a commit; this clarifies provenance without changing the toolchain. Current
+0.19.3 commit is`90c13e5e57d88913cd3bae6bf6b9e6f0b995bad1`; native4.0.6 remains
+`9677d16b3903b3b640f00d4efd48249142ac8334`, read-only.
+
+Final archive: `temp/adr0002-recovery-resolution/package-data/dist/modules/shadowdark-0.9.5.tgz`,
+**275818 bytes**, SHA-256
+`7ad1fc5979bb310ca87a452966a5f78f3bb74116b8d80efda5e932e4bf980431`.
+Manifest/checksum siblings and `final-package-identity.json` record entry hashes.
+Packaged info/catalog/definition bytes match the prior candidate. All six compiled
+migration programs match after ignoring generated path comments; source steps,
+IDs/history and compatibility/version/workflow pins are unchanged.
+
+No new Core dependency is established. Public primary reads and SDK write results
+are sufficient for these corrections; module bookkeeping failures do not redefine
+native outcomes. A total ledger outage retains the durable started fence and
+response ID; restart cannot infer acknowledgement from that fence alone. An
+unknown absent/in-flight outcome remains blocked until independently resolved.
+Separate writes are not atomic and no rollback/all-or-nothing promise applies.
+The supported partial restoration path performs receipt resolution, not document
+rollback. Previous Core public CLI guard (`Full-GM service account required`) and
+larger-inventory/installed-host evidence are retained, **not newly rerun**. This
+archive was tested through compiled public SDK in-memory contracts, not installed
+into or connected to a live Core/Foundry runtime.
+
+**Remaining acceptance:** native D6, final D7 and each A02-01–15 on actual Foundry13
+and14 remain open/unexecuted. A02-03/05/07 must repeat the clarified restart and
+acknowledgement/bookkeeping/recovery cases. Existing R2 A02-03/05/10 and R3 A02-06/09
+repetitions remain required. ADR-0002 stays open. Separate scoped disposable-world
+authorization and cleanup remain prerequisites for native testing; this task asks
+for none. No remote writes, branch switch/reset or release/version change.
