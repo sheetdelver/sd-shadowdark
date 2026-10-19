@@ -818,3 +818,24 @@ performed, and no source/versions/commits were changed by this review.
 
 Pre-edit ADR saved as `temp/adr0002-corrective-review/ADR-0002.before-review.md`,
 SHA-256 `a4734f8805cf067ec0a5df70e24485b9473b8a213d80ef7f939fadcf058fb8ba`.
+
+### R1a terminal-resolution checkpoint — October 19, 2026
+
+The existing review documentation was preserved in3e8f892. Before implementation,
+the current ADR was saved byte-for-byte under
+`temp/adr0002-recovery-resolution/ADR-0002.before.md`, SHA-256
+`71c40816e248de84540bb9b791c6a4c5bc7eb89fc4d82be36dd08877ae434d53`.
+
+R1a now has explicit owner/caller-bound terminal dispositions. A proven unchanged
+zero-write operation can be retired after a context change; a settled partial
+operation can close after independently verified exact-source restoration.
+Original journals/receipts remain, and active exclusion releases only after a
+durable terminal record. Receipt-only reconciliation is separate from stale-rule
+replay. See the [supported recovery procedure](../advancement-recovery.md).
+
+Seven new maintained handler groups pass (five fail before; two negative guards
+already pass), alongside the original ten. Three mounted recovery cases fail
+before and pass after, including current revision headers, source review reset,
+restoration evidence and terminal state surviving late refresh without a false
+success. Explicit typing passes Core0.19.2/current. R1b still needs its independent
+receipt-persistence correction; R2/R3 and native D6/D7/A02 status are unchanged.

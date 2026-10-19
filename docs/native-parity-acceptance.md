@@ -82,3 +82,10 @@ results. Core archive preview verifies the artifact but requires a full-GM servi
 account before deployment; that guard remains intact. This task performs no
 install into a live runtime and grants no native writes. Every A02-01–15 remains
 open for native13 and14, including the corrective cases above.
+
+R1a's new offline cases prove terminal-resolution flow, including the current
+context header and durable retirement/restoration receipts. A02-03/05/07 must
+repeat zero-write context-change retirement/fresh advancement, failure to save
+terminal evidence, restart/duplicate retirement, uncertain-write exclusion and
+independent exact-source restoration using the supported recovery controls.
+These remain unexecuted on actual Foundry13/14.

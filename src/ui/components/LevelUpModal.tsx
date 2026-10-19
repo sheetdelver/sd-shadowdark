@@ -80,7 +80,7 @@ export const LevelUpModal = (props: LevelUpProps) => {
                 {/* Main Scrollable Content */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
 
-                    {state.operation && <AdvancementRecovery operation={state.operation} busy={state.isSubmitting} refresh={actions.refreshOperation} resume={actions.handleConfirm} />}
+                    {state.operation && <AdvancementRecovery operation={state.operation} busy={state.isSubmitting} refresh={actions.refreshOperation} resume={actions.handleConfirm} onClose={props.onCancel} />}
                     {!state.operation && !state.loadingPatrons && (
                         <>
                             {ClassCard}

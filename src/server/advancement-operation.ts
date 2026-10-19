@@ -10,7 +10,8 @@ import { operationProcess } from './operation-lock';
 const hash = (value: any) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 type Status = 'pending' | 'started' | 'complete' | 'failed' | 'uncertain';
 type Grant = { item: any; status: Status; itemId?: string; error?: string };
-type Journal = { requestId: string; fingerprint: string; process: string; revision: number; review: string; initialReview: string; finalReview?: string;
+type Terminal = { disposition: 'zero-write' | 'restored'; baseline: string; revision: number; callerId: string; at: string; note: string };
+type Journal = { terminal?: Terminal; initialPatch?: { path: string; value?: unknown; absent: boolean }[]; requestId: string; fingerprint: string; process: string; revision: number; review: string; initialReview: string; finalReview?: string;
     targetLevel: number; grants: Grant[]; patch: any; advancement: { status: Status; error?: string };
     dependencies: { uuid: string; hash: string }[]; result: any };
 function scope(req: ModuleServerRequest, actorId: string) {
@@ -24,17 +25,30 @@ const activeKey = (req: ModuleServerRequest, actorId: string) => {
 };
 const keyFor = (scope: string, id: string) => `advancement-${scope}-${id}`;
 const fingerprint = (body: any) => { const { recovery: _recovery, ...intent } = body; return hash(intent); };
-function receipt(journal: Journal, actor: any) {
-    return { requestId: journal.requestId, targetLevel: journal.targetLevel, state: journal.advancement.status === 'complete' ? 'complete' : 'partial',
+const settledWithoutWrite = (op: { status: Status; itemId?: string }) => ['pending', 'failed'].includes(op.status) && !op.itemId;
+const unsettled = (journal: Journal) => [...journal.grants, journal.advancement].some(op => ['started', 'uncertain'].includes(op.status));
+const isTerminal = (journal: Journal) => !!journal.terminal || journal.advancement.status === 'complete';
+function receipt(journal: Journal, actor: any, revision: number | null) {
+    const originalSource = reviewToken(actor) === journal.initialReview;
+    const zeroWrite = journal.grants.every(settledWithoutWrite) && settledWithoutWrite(journal.advancement);
+    return { requestId: journal.requestId, targetLevel: journal.targetLevel,
+        state: journal.terminal ? 'retired' : journal.advancement.status === 'complete' ? 'complete' : 'partial', terminal: journal.terminal,
+        contextRevision: revision, planRevision: journal.revision,
+        canRetireZeroWrite: !isTerminal(journal) && zeroWrite && originalSource,
+        canResolveRestored: !isTerminal(journal) && !zeroWrite && !unsettled(journal) && originalSource
+            && journal.grants.every(op => !op.itemId || !(actor.items ?? []).some((item: any) => documentId(item) === op.itemId)),
+        restoration: { values: journal.initialPatch ?? null,
+            instructions: 'To close a partial operation after independent restoration: first reconcile every uncertain write to an exact owned ID or the exact final Actor outcome. Using ordinary authorized document controls, remove only the confirmed grants listed here and restore the original Actor values/source from your reviewed export. Refresh this review, record the restoration evidence, then verify and close the restored operation. This control performs no document writes. Unknown absent/in-flight outcomes cannot be declared restored.' },
         baseline: reviewToken(actor), operations: [...journal.grants.map((op, index) => ({ index, kind: 'item', name: op.item.name, status: op.status, itemId: op.itemId, error: op.error })),
             { kind: 'advancement', ...journal.advancement }],
-        recovery: 'Retry confirmed refusals with this request. After restart, review the current source and explicitly continue. For an uncertain Item, supply its exact owned Item ID after independent source review; it is never recreated automatically. An uncertain final patch can be confirmed only against its complete expected source. Unresolved outcomes require exact-source operator remediation; do not start a replacement advancement.' };
+        recovery: journal.terminal ? `Operation retired (${journal.terminal.disposition}). Its saved plan can never resume. Close this review and prepare a fresh advancement.`
+            : 'Retry known refusals under the same rules. Review exact IDs to reconcile uncertain writes; they are never recreated automatically. Changed rules block replay. A proven zero-write plan can be retired; a settled partial plan can be closed after verified restoration using the controls below.' };
 }
 export async function pendingAdvancement(req: ModuleServerRequest, actor: any) {
     const id = scope(req, documentId(actor)); if (!id) return null;
     const active = await req.runtime.dataStore.get<{ requestId: string; key: string }>(activeKey(req, documentId(actor)));
     const journal = active && await req.runtime.dataStore.get<Journal>(active.key);
-    return journal && journal.advancement.status !== 'complete' ? receipt(journal, actor) : null;
+    return journal && !isTerminal(journal) ? receipt(journal, actor, req.runtime.world!.snapshot().identity.contextRevision) : null;
 }
 
 /** Operation-local plans/receipts, not an Actor cache. Caller must hold the Actor queue. */
@@ -47,10 +61,12 @@ export async function resumeAdvancement(req: ModuleServerRequest, actor: any, bo
     let journal = await store.get<Journal>(key);
     if (!journal && !plan) return body.targetLevel === undefined ? error('not_found', 'No saved advancement exists for this caller and requestId.') : null;
     if (journal && body.targetLevel !== undefined && journal.fingerprint !== fingerprint(body)) return error('conflict', 'This requestId already identifies a different advancement plan.');
+    const result = async () => { actor = await requireOwnedActor(req.runtime, documentId(actor)); return json({ success: true, ...journal!.result, ...receipt(journal!, actor, revision) }); };
+    if (journal && isTerminal(journal)) return result();
     const active = await store.get<{ requestId: string; key: string }>(activeKey(req, documentId(actor)));
     if (active && active.key !== key) {
         const prior = await store.get<Journal>(active.key);
-        if (prior && prior.advancement.status !== 'complete') return error('conflict', `Advancement ${prior.requestId} is incomplete. Reopen and review its receipts before any new advancement.`);
+        if (prior && !isTerminal(prior)) return error('conflict', `Advancement ${prior.requestId} is incomplete. Reopen and review its receipts before any new advancement.`);
     }
     if (!journal) {
         if (typeof body.baseline !== 'string' || !reviewMatches(actor, body.baseline)) return error('conflict', 'Review the current Actor before advancing.');
@@ -62,20 +78,37 @@ export async function resumeAdvancement(req: ModuleServerRequest, actor: any, bo
         }
         journal = { requestId: body.requestId, fingerprint: fingerprint(body), revision, process: operationProcess, review: reviewToken(actor), initialReview: reviewToken(actor),
             targetLevel: plan!.result.targetLevel, grants: plan!.items.map(item => ({ item, status: 'pending' })), patch: plan!.patch,
-            advancement: { status: 'pending' }, dependencies, result: plan!.result };
+            advancement: { status: 'pending' }, dependencies, result: plan!.result,
+            initialPatch: Object.keys(plan!.patch).map(path => { const value = path.split('.').reduce((obj, key) => obj?.[key], actor); return { path, absent: value === undefined, ...(value !== undefined ? { value: structuredClone(value) } : {}) }; }) };
         await store.set(key, journal); await store.set(activeKey(req, documentId(actor)), { requestId: body.requestId, key });
     }
-    const result = async () => { actor = await requireOwnedActor(req.runtime, documentId(actor)); return json({ success: true, ...journal!.result, ...receipt(journal!, actor) }); };
-    if (journal.advancement.status === 'complete') return result();
+
     for (const op of [...journal.grants, journal.advancement]) if (op.status === 'started') op.status = 'uncertain';
     const recovery = body.recovery;
+    if (recovery?.action && !['retire-zero-write', 'resolve-restored', 'reconcile'].includes(recovery.action)) return error('validation', 'Unknown advancement recovery action.');
     const reviewed = recovery?.reviewed === true && recovery.baseline === reviewToken(actor);
-    if ((journal.process !== operationProcess || journal.review !== reviewToken(actor)) && !reviewed) return result();
-    if (journal.revision !== revision) return error('conflict', 'World context changed. Review and remediate the saved advancement; its old rules cannot be replayed.');
-    for (const dependency of journal.dependencies) {
-        const doc = await shadowdarkAdapter.resolveDocumentFor(dependency.uuid, callerOf(req));
-        if (!doc || hash(doc) !== dependency.hash) return error('conflict', `Advancement source ${dependency.uuid} changed or became unavailable. Review the saved plan before remediation.`);
+    if (['retire-zero-write', 'resolve-restored'].includes(recovery?.action)) {
+        if (!reviewed) return error('conflict', 'Refresh and explicitly review the current Actor before retiring this operation.');
+        const current = await requireOwnedActor(req.runtime, documentId(actor));
+        const conflict = contextConflict(req.runtime, revision); if (conflict) return conflict;
+        if (reviewToken(current) !== recovery.baseline || reviewToken(current) !== journal.initialReview)
+            return error('conflict', 'Retirement requires the exact original Actor source, independently restored when necessary. Refresh the review.');
+        const zeroWrite = journal.grants.every(settledWithoutWrite) && settledWithoutWrite(journal.advancement);
+        if (unsettled(journal)) return error('conflict', 'An uncertain or in-flight outcome remains. Reconcile its exact receipt before terminal resolution.');
+        if (recovery.action === 'retire-zero-write' && !zeroWrite) return error('conflict', 'This operation has acknowledged writes. Use verified restoration, never the zero-write escape.');
+        if (recovery.action === 'resolve-restored' && (zeroWrite || journal.grants.some(op => op.itemId && current.items?.some((item: any) => documentId(item) === op.itemId))))
+            return error('conflict', 'Verify removal of every exact confirmed grant and restoration of the original Actor before closing this partial operation.');
+        if (recovery.action === 'resolve-restored' && (typeof recovery.note !== 'string' || !recovery.note.trim() || recovery.note.length > 1000))
+            return error('validation', 'Record the independent restoration evidence (1–1000 characters).');
+        journal.terminal = { disposition: recovery.action === 'retire-zero-write' ? 'zero-write' : 'restored', baseline: recovery.baseline, revision: revision!,
+            callerId: (req.userSession?.userId ?? req.getAccessContext?.().userId)!, at: new Date().toISOString(),
+            note: recovery.action === 'retire-zero-write' ? 'Verified original source and no confirmed, uncertain or in-flight write.' : recovery.note.trim() };
+        // Keep the original journal and pointer. A replacement reads the durable
+        // terminal disposition before releasing exclusion; no delete/save gap.
+        await store.set(key, journal);
+        return result();
     }
+    if ((journal.process !== operationProcess || journal.review !== reviewToken(actor)) && !reviewed) return result();
     // Explicit reconciliation uses exact IDs and full planned source fields,
     // never names/origins as an inferred write acknowledgement.
     if (reviewed) {
@@ -106,6 +139,12 @@ export async function resumeAdvancement(req: ModuleServerRequest, actor: any, bo
         if (reviewToken(before) !== journal.initialReview) return error('conflict', 'Actor differs from the reviewed plan beyond confirmed grants. Explicit exact-source remediation is required.');
         journal.review = reviewToken(actor); journal.process = operationProcess;
         await store.set(key, journal);
+    }
+    if (recovery?.action === 'reconcile') return result();
+    if (journal.revision !== revision) return error('conflict', 'World context changed. Review and remediate the saved advancement; its old rules cannot be replayed.');
+    for (const dependency of journal.dependencies) {
+        const doc = await shadowdarkAdapter.resolveDocumentFor(dependency.uuid, callerOf(req));
+        if (!doc || hash(doc) !== dependency.hash) return error('conflict', `Advancement source ${dependency.uuid} changed or became unavailable. Review the saved plan before remediation.`);
     }
     if (journal.grants.some(op => op.status === 'uncertain') || journal.advancement.status === 'uncertain') return result();
     if (reviewToken(actor) !== journal.review) return result();

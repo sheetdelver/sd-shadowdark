@@ -255,3 +255,13 @@ for exact inputs, results and required checks. D3/R1 is therefore still open;
 R2/R3 verification is retained. No live/runtime/native testing, application source
 edits or Git mutations occurred. Local logs/probes are under
 `temp/adr0002-corrective-review/` and do not replace the durable findings.
+
+## R1a terminal-resolution checkpoint — October 19, 2026
+
+Review docs checkpoint3e8f892 precedes code. R1a's seven new handler groups pass
+(five fail before; two retain defensive passes); all17 advancement groups pass.
+Three mounted recovery-control cases fail before/pass after. Both toolchains
+pass explicit typing. These new results use `temp/adr0002-recovery-resolution/`,
+leaving older artifacts intact. Supported zero-write retirement and independently
+restored partial closure preserve journals and record durable terminal evidence.
+R1b and native D6/D7/A02 remain open at this checkpoint.

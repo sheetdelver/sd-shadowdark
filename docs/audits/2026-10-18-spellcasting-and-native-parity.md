@@ -1237,3 +1237,26 @@ open. The full-GM archive CLI guard is still an expected offline deployment
 boundary, not a new Core defect. No new migration, SDK/version bump or external
 Core dependency is established. This review changed no application source or Git
 history and did not start services or touch operator data.
+
+### R1a terminal-resolution evidence — October 19, 2026
+
+R1a is corrected offline through the existing public operation flow: explicit
+`retire-zero-write`, `reconcile` and `resolve-restored` actions. Zero-write
+retirement checks current authority, the reviewed original source and settled
+non-writing outcomes. Terminal disposition is appended durably before a new
+plan can pass active exclusion. Original request replay cannot write. Partial
+closure requires independent restoration, absence of exact confirmed grant IDs,
+a restoration note and no unresolved outcome; the module performs no rollback.
+[Recovery guidance](../advancement-recovery.md) names concrete controls and API.
+
+`advancement-recovery.test.ts`17/17 passes: the original ten plus seven new groups
+cover changed-context retirement/fresh completion, restart/duplicate retirement,
+failed terminal persistence, stale source/review and denied/foreign callers,
+unknown/in-flight exclusion, settled partial restoration, and receipt-only
+reconciliation across context before restoration. Five new groups fail against
+3e8f892; two defensive groups already pass. Three actual mounted recovery cases
+fail before/pass after, verifying controls/messages, current revision headers,
+review reset, terminal closure and no false advancement notification. Both Core
+toolchains pass explicit typing. Artifacts under
+`temp/adr0002-recovery-resolution/r1a-*`. No new native/Core connection, migration
+or R2/R3 runtime change. R1b remains open at this checkpoint; native D6/D7/A02 open.

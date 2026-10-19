@@ -4,6 +4,8 @@ Historical entries are reconstructed from [published releases](https://github.co
 
 ## Unreleased
 
+- Add verified terminal retirement/restoration for blocked advancement plans
+
 - Refresh open spell limits/lists and retire stale selections while retaining receipts
 
 - Revalidate exact native creation choices and grants at the final Actor write

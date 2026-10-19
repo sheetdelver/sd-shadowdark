@@ -22,7 +22,7 @@ let ids=0;Object.defineProperty(window.crypto,'randomUUID',{value:()=> 'offline-
 window.calls=[];window.pending=[];window.notices=[];window.completions=[];
 const cls={_id:'class',uuid:'Item.class',type:'Class',name:'Wizard',system:{hitPoints:'d4',talents:[],patron:{required:false}}};
 window.sdk={isConnected:true,worldId:'offline',currentUser:{id:'owner',role:1},resolveImageUrl:x=>x||'',addNotification:(...v)=>window.notices.push(v),events:{on:()=>()=>{}},
-fetchWithAuth:async(url,options={})=>{window.calls.push({url,body:options.body?JSON.parse(options.body):null});
+fetchWithAuth:async(url,options={})=>{window.calls.push({url,headers:options.headers,body:options.body?JSON.parse(options.body):null});
  if(url.endsWith('/finalize')||url.endsWith('/manage'))return new Promise(resolve=>window.pending.push(resolve));
  if(url.includes('/document/'))return Response.json(url.endsWith('Actor.actor')?window.actorContext.actor:cls);
  if(url.includes('/level-up/data'))return Response.json({success:true,data:{progressionReady:true,isSpellcaster:false,spellsToChoose:{},availableSpells:[],advancementOperation:window.initial.operation||null}});
@@ -33,13 +33,13 @@ fetchWithAuth:async(url,options={})=>{window.calls.push({url,body:options.body?J
 }};
 window.actorContext={actor:window.initial.actor,rollDialog:{open:false},refreshActor:async()=>{},isActionBusy:()=>false};
 const app=createRoot(document.getElementById('root'));
-function Form(props){const {state,actions}=useLevelUp({...props,skipLanguageSelection:true});window.confirm=()=>actions.handleConfirm();return <><button onClick={()=>actions.handleConfirm()}>Confirm advancement</button><output>{state.error}</output>{state.operation&&<AdvancementRecovery operation={state.operation} busy={state.isSubmitting} refresh={actions.refreshOperation} resume={actions.handleConfirm}/>}</>;}
+function Form(props){const {state,actions}=useLevelUp({...props,skipLanguageSelection:true});window.confirm=()=>actions.handleConfirm();return <><button onClick={()=>actions.handleConfirm()}>Confirm advancement</button><output>{state.error}</output>{state.operation&&<AdvancementRecovery operation={state.operation} busy={state.isSubmitting} refresh={actions.refreshOperation} resume={actions.handleConfirm} onClose={props.onCancel}/>}</>;}
 function Advancement(){const flow=useShadowdarkLevelUp(window.actorContext.actor,window.sdk.addNotification);return <><button onClick={flow.triggerLevelUp}>Open advancement</button>{flow.showLevelUpModal&&<section aria-label="Advancement dialog"><Form actorId="actor" {...flow.levelUpData} onComplete={result=>{window.completions.push(result);window.sdk.addNotification('Authoritatively complete','success');flow.closeLevelUp();}} onCancel={flow.closeLevelUp}/></section>}</>;}
 window.render=()=>app.render(<ShadowdarkUIProvider>{window.initial.which==='advance'?<Advancement/>:<Spells/>}</ShadowdarkUIProvider>);
 window.setActor=actor=>{window.actorContext.actor=actor;window.render()};
 window.answer=(index,result,status=200)=>window.pending[index](Response.json(result,{status}));window.render();
 ` }, bundle: true, write: false, format: 'iife', platform: 'browser', jsx: 'automatic', plugins: [{ name: 'controlled-sdk', setup(b) {
-    if(baseline)b.onLoad({filter:/(?:useShadowdarkLevelUp\.ts|useLevelUp\.ts|SpellsTab\.tsx|SpellSelectionModal\.tsx)$/},a=>({loader:a.path.endsWith('.tsx')?'tsx':'ts',resolveDir:path.dirname(a.path),contents:execFileSync('git',['show',`${baseline}:${path.relative(root,a.path)}`],{cwd:root,encoding:'utf8'})}));
+    if(baseline)b.onLoad({filter:/(?:AdvancementRecovery\.tsx|useShadowdarkLevelUp\.ts|useLevelUp\.ts|SpellsTab\.tsx|SpellSelectionModal\.tsx)$/},a=>({loader:a.path.endsWith('.tsx')?'tsx':'ts',resolveDir:path.dirname(a.path),contents:execFileSync('git',['show',`${baseline}:${path.relative(root,a.path)}`],{cwd:root,encoding:'utf8'})}));
     b.onResolve({filter:/^@sheet-delver\/sdk(?:\/react)?$/},a=>({path:a.path,namespace:'sdk'}));
     b.onResolve({filter:/ShadowdarkActorContext$/},()=>({path:'actor',namespace:'sdk'}));
     b.onLoad({filter:/.*/,namespace:'sdk'},a=>({loader:'tsx',resolveDir:root,contents:a.path==='actor'?'export const useShadowdarkActor=()=>window.actorContext;':a.path.endsWith('/react')?`export const useSDK=()=>window.sdk;export const useSDKComponents=()=>({ConfirmationModal:()=>null});`:`export const logger={info(){},error(){},warn(){},debug(){}};export const processHtmlContent=x=>x;`}));
@@ -74,6 +74,36 @@ await test('R1 reopened advancement presents durable receipts and retries origin
  await p.getByRole('button',{name:'Retry same request'}).click();await p.waitForFunction(()=>window.pending.length===1);
  assert.deepEqual(await p.evaluate(()=>window.calls.find(c=>c.url.endsWith('/finalize')).body),{requestId:'saved-request'});
  await p.evaluate(()=>window.answer(0,{success:true,state:'partial',requestId:'saved-request',operations:[]}));assert.deepEqual(await p.evaluate(()=>window.completions),[]);
+});
+const zeroReceipt={requestId:'saved-retirement',targetLevel:2,state:'partial',baseline:'reviewed-original',contextRevision:2,planRevision:1,canRetireZeroWrite:true,canResolveRestored:false,operations:[{kind:'item',index:0,name:'Required grant',status:'failed',error:'Definitely refused'},{kind:'advancement',status:'pending'}]};
+await test('R1a mounted zero-write retirement uses current context and terminal state never reports level-up success',{which:'advance',actor:{...actor,worldContextRevision:1},operation:zeroReceipt},async p=>{
+ await p.getByRole('button',{name:'Open advancement'}).click();await p.getByText(/World rules changed. The old plan cannot replay/).waitFor();
+ const retire=p.getByRole('button',{name:'Retire verified zero-write plan',exact:true});assert.equal(await retire.isDisabled(),true);
+ await p.getByRole('checkbox').check();await retire.click();await p.waitForFunction(()=>window.pending.length===1);
+ const call=await p.evaluate(()=>window.calls.find(c=>c.url.endsWith('/finalize')));assert.equal(call.headers['X-SheetDelver-Context-Revision'],'2');
+ assert.equal(call.body.requestId,'saved-retirement');assert.equal(call.body.recovery.action,'retire-zero-write');assert.equal(call.body.recovery.baseline,'reviewed-original');
+ await p.evaluate(()=>window.answer(0,{success:true,...window.initial.operation,state:'retired',terminal:{disposition:'zero-write',note:'Verified no writes'},recovery:'Operation retired. Its saved plan can never resume.'}));
+ await p.getByText('Advancement operation retired',{exact:true}).waitFor();assert.equal(await p.getByRole('button',{name:'Retry same request',exact:true}).count(),0);
+ assert.deepEqual(await p.evaluate(()=>window.completions),[]);assert.deepEqual(await p.evaluate(()=>window.notices),[]);
+ await p.getByRole('button',{name:'Close and prepare fresh plan',exact:true}).click();await p.getByRole('region',{name:'Advancement dialog'}).waitFor({state:'detached'});
+ await p.evaluate(()=>{window.initial.operation=null;});await p.getByRole('button',{name:'Open advancement'}).click();await p.getByRole('button',{name:'Confirm advancement'}).click();await p.waitForFunction(()=>window.pending.length===2);
+ assert.notEqual(await p.evaluate(()=>window.calls.filter(c=>c.url.endsWith('/finalize')).at(-1).body.requestId),'saved-retirement');
+});
+await test('R1a mounted partial restoration shows exact evidence and resets review before terminal closure',{which:'advance',actor,operation:{...zeroReceipt,canRetireZeroWrite:false,canResolveRestored:false,operations:[{kind:'item',index:0,name:'Grant',status:'complete',itemId:'confirmed1'},{kind:'advancement',status:'pending'}],restoration:{instructions:'Remove only confirmed1 and independently restore reviewed source; no automatic rollback.',values:[{path:'system.level.xp',value:15,absent:false}]}}},async p=>{
+ await p.getByRole('button',{name:'Open advancement'}).click();await p.getByText('Resolve a partially applied operation after restoration',{exact:true}).click();
+ await p.getByText('system.level.xp: 15',{exact:true}).waitFor();await p.getByText('Grant: complete · Item confirmed1',{exact:true}).waitFor();
+ const resolve=p.getByRole('button',{name:'Verify restoration and close operation',exact:true});assert.equal(await resolve.isDisabled(),true);
+ await p.getByRole('checkbox').check();await p.evaluate(()=>{window.initial.operation={...window.initial.operation,baseline:'independently-restored',canResolveRestored:true};});
+ await p.getByRole('button',{name:'Refresh operation review',exact:true}).click();await p.waitForTimeout(80);assert.equal(await p.getByRole('checkbox').isChecked(),false);assert.equal(await resolve.isDisabled(),true);
+ await p.getByLabel('Independent restoration evidence').fill('Removed exact confirmed1 and compared original source export');await p.getByRole('checkbox').check();await resolve.click();await p.waitForFunction(()=>window.pending.length===1);
+ const body=await p.evaluate(()=>window.calls.find(c=>c.url.endsWith('/finalize')).body);assert.equal(body.recovery.action,'resolve-restored');assert.equal(body.recovery.baseline,'independently-restored');assert.match(body.recovery.note,/confirmed1/);
+ await p.evaluate(()=>window.answer(0,{success:true,...window.initial.operation,state:'retired',terminal:{disposition:'restored',note:'Independent source restoration verified'}}));
+ await p.getByText(/Terminal disposition: restored/).waitFor();await p.getByText('Grant: complete · Item confirmed1',{exact:true}).waitFor();assert.deepEqual(await p.evaluate(()=>window.completions),[]);
+});
+await test('R1a mounted uncertain outcome blocks retirement and supports receipt-only exact-ID review',{which:'advance',actor,operation:{...zeroReceipt,canRetireZeroWrite:false,operations:[{kind:'item',index:0,name:'Uncertain grant',status:'uncertain'},{kind:'advancement',status:'pending'}]}},async p=>{
+ await p.getByRole('button',{name:'Open advancement'}).click();await p.getByRole('checkbox').check();assert.equal(await p.getByRole('button',{name:'Retire verified zero-write plan',exact:true}).isDisabled(),true);
+ await p.getByLabel('Exact owned Item ID after source review').fill('reviewed-owned-id');await p.getByRole('button',{name:'Reconcile receipts without replay',exact:true}).click();await p.waitForFunction(()=>window.pending.length===1);
+ const body=await p.evaluate(()=>window.calls.find(c=>c.url.endsWith('/finalize')).body);assert.equal(body.recovery.action,'reconcile');assert.deepEqual(body.recovery.items,{'0':'reviewed-owned-id'});assert.deepEqual(await p.evaluate(()=>window.completions),[]);
 });
 for(const changeLevel of [true,false])await test(`R3 same-Class ${changeLevel?'level':'progression-only'} refresh updates limit and retires intent`,{actor:casting(),catalog},async p=>{
  await openManager(p);await p.getByPlaceholder('Filter spells by name...').fill('List');await p.getByRole('button',{name:'Add List A new',exact:true}).click();

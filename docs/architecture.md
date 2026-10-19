@@ -648,3 +648,11 @@ Corrective archive verification runs compiled public apiRoutes against the publi
 SDK test runtime, independently of source-route tests. Advancement responses
 expose operation receipts rather than saved grant payloads. This offline contract
 evidence does not satisfy deployment's full-GM guard or native acceptance.
+
+Advancement terminal resolution is a separate receipt operation. It can retire
+proven zero-write plans or verify independently restored partial source, with
+current caller/owner/review checks, without replaying stale rules or rolling back
+documents. Journals are retained; only a durable terminal disposition releases
+active exclusion. Receipt-only reconciliation permits source review across a
+context change. The recovery UI uses the current review revision and protects
+terminal state from older pending refreshes. See [recovery](advancement-recovery.md).

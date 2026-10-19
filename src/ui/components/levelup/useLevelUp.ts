@@ -292,7 +292,7 @@ export const useLevelUp = (props: LevelUpProps) => {
             if (json.success && json.data) {
                 const apiData = json.data;
                 if (apiData.advancementOperation && !submitting.current) {
-                    setOperation(apiData.advancementOperation);
+                    setOperation((previous: any) => previous?.state === 'retired' ? previous : apiData.advancementOperation);
                     submission.current ??= { requestId: apiData.advancementOperation.requestId };
                 }
                 setLevelData({ key, ready: apiData.progressionReady !== false });
@@ -822,7 +822,7 @@ export const useLevelUp = (props: LevelUpProps) => {
         setStatuses(prev => ({ ...prev, class: 'LOADING' }));
         try {
             const headers: any = { 'Content-Type': 'application/json' };
-            const revision = props.contextRevision ?? languageData.plan?.contextRevision;
+            const revision = operation?.contextRevision ?? props.contextRevision ?? languageData.plan?.contextRevision;
             if (typeof revision === 'number') headers['X-SheetDelver-Context-Revision'] = String(revision);
 
             submission.current ??= {
@@ -851,7 +851,7 @@ export const useLevelUp = (props: LevelUpProps) => {
             if (!mounted.current || authority !== authorityRef.current) return;
             if (!res.ok || !json.success) throw new Error(json.error?.message ?? json.error ?? 'Failed to finalize level-up');
             if (actorId && actorId !== 'new' && json.state !== 'complete') {
-                setOperation(json); setError('Advancement is incomplete. Review the exact receipts below before continuing.');
+                setOperation(json); setError(json.state === 'retired' ? null : 'Advancement is incomplete. Review the exact receipts below before continuing.');
                 setStatuses(prev => ({ ...prev, class: 'READY' }));
                 return;
             }
