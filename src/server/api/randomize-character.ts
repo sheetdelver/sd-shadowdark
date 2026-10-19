@@ -1,16 +1,13 @@
 import { json, error, type ModuleServerRequest, type ModuleRequestRuntime } from '@sheet-delver/sdk/server';
 import { shadowdarkAdapter } from '../../server/ShadowdarkAdapter';
-import { getErrorMessage, logger } from '@sheet-delver/sdk';
+import { getErrorMessage, logger, isSdkError } from '@sheet-delver/sdk';
+import { callerLanguagePlan } from '../languages';
+import { emptyLanguageSelections, validateLanguageSelections } from '../../logic/languages';
 import { callerOf, type Caller } from '../access';
 
-/** A collection limited to the caller's readable packs; an unreadable one offers nothing. */
+/** Caller-readable collection; denied/unavailable reads stay explicit. */
 async function collection(id: string, caller: Caller): Promise<any[]> {
-    try {
-        return await shadowdarkAdapter.getCollection(id, { summary: true, caller });
-    } catch (e: any) {
-        if (e?.code === 'permission_denied') return [];
-        throw e;
-    }
+    return shadowdarkAdapter.getCollection(id, { summary: true, caller });
 }
 
 // --- Logic Helpers ---
@@ -171,17 +168,17 @@ async function getRandomGear(runtime: ModuleRequestRuntime, level0: boolean) {
     return gear;
 }
 
+const shuffle = <T>(array: T[]): T[] => {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+};
+
 function getRandomTalents(ancestryDoc: any, classDoc?: any) {
     const results = { ancestry: [] as any[], class: [] as any[] };
-
-    const shuffle = <T>(array: T[]): T[] => {
-        const shuffled = [...array];
-        for (let i = shuffled.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-        }
-        return shuffled;
-    };
 
     // Ancestry
     if (ancestryDoc?.system?.talents?.length) {
@@ -212,105 +209,21 @@ function getRandomTalents(ancestryDoc: any, classDoc?: any) {
     return results;
 }
 
-async function getRandomLanguages(caller: Caller, ancestryDoc: any, classDoc: any, intMod: number) {
-    const known = new Set<string>();
-    const languagesIndex = await collection('languages', caller);
-
-    // 1. Fixed Languages
-    const commonLang = languagesIndex.find((l: any) => l.name.trim().toLowerCase() === 'common');
-    if (commonLang) known.add(commonLang.uuid);
-
-    ancestryDoc?.system?.languages?.fixed?.forEach((u: string) => known.add(u));
-    classDoc?.system?.languages?.fixed?.forEach((u: string) => known.add(u));
-
-    const fixed = Array.from(known);
-
-    // Helper to pick randomly from a pool based on rarity
-    const pickFromPool = (count: number, rarity: string) => {
-        const results: string[] = [];
-        const pool = languagesIndex.filter((l: any) =>
-            l.rarity === rarity && !known.has(l.uuid)
-        );
-        if (pool.length === 0) return results;
-
-        const shuffled = [...pool].sort(() => 0.5 - Math.random());
-        for (let i = 0; i < count && i < shuffled.length; i++) {
-            const l = shuffled[i];
-            results.push(l.uuid);
-            known.add(l.uuid);
-        }
-        return results;
-    };
-
-    // 2. Aggregate counts and selections
-    const selectedAncestry: string[] = [];
-    const selectedClass: string[] = [];
-    const selectedCommon: string[] = [];
-    const selectedRare: string[] = [];
-
-    // 2a. Ancestry
-    const aLangs = ancestryDoc?.system?.languages || {};
-    if (aLangs.select > 0 && aLangs.selectOptions?.length > 0) {
-        const pool = aLangs.selectOptions.filter((u: string) => !known.has(u));
-        const picked = pool.sort(() => 0.5 - Math.random()).slice(0, aLangs.select);
-        picked.forEach((u: string) => {
-            selectedAncestry.push(u);
-            known.add(u);
-        });
+async function getRandomLanguages(caller: Caller, ancestryDoc: any, classDoc: any) {
+    const plan = await callerLanguagePlan(caller, ancestryDoc, classDoc);
+    if (plan.errors.length) throw new Error(plan.errors.join(' '));
+    const selected = emptyLanguageSelections(), used = new Set(plan.fixed);
+    // Native _loadLanguages randomizes class, ancestry, common, then rare.
+    for (const id of ['class','ancestry','common','rare'] as const) {
+        const group = plan.groups.find(group => group.id === id)!;
+        const pool = group.options.filter(uuid => !used.has(uuid));
+        selected[id] = shuffle(pool).slice(0,group.count);
+        selected[id].forEach(uuid => used.add(uuid));
     }
-
-    if (aLangs.common > 0) {
-        selectedCommon.push(...pickFromPool(aLangs.common, 'common'));
-    }
-    if (aLangs.rare > 0) {
-        selectedRare.push(...pickFromPool(aLangs.rare, 'rare'));
-    }
-
-    // 2b. Class (ONLY if level 1)
-    const isLevel0 = !classDoc || classDoc.name === "Level 0";
-    if (!isLevel0) {
-        const cLangs = classDoc?.system?.languages || {};
-        if (cLangs.select > 0 && cLangs.selectOptions?.length > 0) {
-            const pool = cLangs.selectOptions.filter((u: string) => !known.has(u));
-            const picked = pool.sort(() => 0.5 - Math.random()).slice(0, cLangs.select);
-            picked.forEach((u: string) => {
-                selectedClass.push(u);
-                known.add(u);
-            });
-        }
-        if (cLangs.common > 0) {
-            selectedCommon.push(...pickFromPool(cLangs.common, 'common'));
-        }
-        if (cLangs.rare > 0) {
-            selectedRare.push(...pickFromPool(cLangs.rare, 'rare'));
-        }
-    }
-
-    // 2c. Int Mod Bonus
-    let remaining = Math.max(0, intMod);
-    if (remaining > 0) {
-        const p = pickFromPool(remaining, 'common');
-        selectedCommon.push(...p);
-        remaining -= p.length;
-    }
-    if (remaining > 0) {
-        const p = pickFromPool(remaining, 'rare');
-        selectedRare.push(...p);
-        remaining -= p.length;
-    }
-
-    return {
-        fixed,
-        known: Array.from(known),
-        selected: {
-            ancestry: selectedAncestry,
-            class: selectedClass,
-            common: selectedCommon,
-            rare: selectedRare
-        }
-    };
+    const checked = validateLanguageSelections(plan, selected);
+    if (!checked.valid) throw new Error(checked.errors.join(' '));
+    return { fixed: plan.fixed, known: checked.languages, selected };
 }
-
 
 // --- Route Handlers ---
 
@@ -319,14 +232,14 @@ export async function handleRandomizeName(req: ModuleServerRequest) {
         const body = await req.json<any>().catch(() => ({}));
         const name = await getRandomName(callerOf(req), body.ancestryUuid);
         return json({ name });
-    } catch (e: unknown) { return error('internal', getErrorMessage(e)); }
+    } catch (e: unknown) { return error(isSdkError(e) ? e.code : 'internal', getErrorMessage(e)); }
 }
 
 export async function handleRandomizeStats(_req: ModuleServerRequest) {
     try {
         const stats = getRandomStats();
         return json({ stats });
-    } catch (e: unknown) { return error('internal', getErrorMessage(e)); }
+    } catch (e: unknown) { return error(isSdkError(e) ? e.code : 'internal', getErrorMessage(e)); }
 }
 
 
@@ -368,7 +281,7 @@ export async function handleRandomizeCharacter(req: ModuleServerRequest) {
 
         // Languages (needs ancestry + class + int mod)
         const intMod = stats.INT?.mod || 0;
-        const languages = await getRandomLanguages(caller, ancestry, cls, intMod);
+        const languages = await getRandomLanguages(caller, ancestry, cls);
 
         const result = {
             name,
@@ -390,7 +303,7 @@ export async function handleRandomizeCharacter(req: ModuleServerRequest) {
 
     } catch (e: unknown) {
         logger.error(`Randomize Character Error: ${getErrorMessage(e)}`);
-        return error('internal', getErrorMessage(e));
+        return error(isSdkError(e) ? e.code : 'internal', getErrorMessage(e));
     }
 }
 

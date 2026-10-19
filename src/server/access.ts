@@ -18,7 +18,7 @@ import { ruleInputsFrom, UNAVAILABLE_RULE_INPUTS, type RuleInputs } from '../log
  * content: there is no allow-all fallback.
  */
 export interface Caller {
-    runtime: Pick<ModuleRequestRuntime, 'documents'> & { access?: ModuleRequestRuntime['access'] };
+    runtime: Pick<ModuleRequestRuntime, 'documents'> & Partial<Pick<ModuleRequestRuntime, 'access' | 'compendium' | 'world'>>;
     /** Informational only; never used to grant pack access. */
     isGM: boolean;
 }
@@ -95,4 +95,15 @@ export function contextConflict(runtime: { world?: ModuleRequestRuntime['world']
     } catch {
         return error('conflict', 'World rules changed while this request ran; refresh and try again.');
     }
+}
+
+/** SDK strict reads return null at any unmet threshold. Distinguish an
+ * observable non-owner (403) from concealed/absent source (404), without writing
+ * or raising the caller's authority. */
+export async function requireOwnedActor(runtime: Pick<ModuleRequestRuntime, 'documents'>, actorId: string): Promise<any> {
+    const actor = await runtime.documents.get('Actor', actorId, { minOwnership: 'owner' });
+    if (actor) return actor;
+    const visible = await runtime.documents.get('Actor', actorId, { minOwnership: 'observer' });
+    if (visible) throw new SdkError('permission_denied', 'Actor is visible, but this operation requires owner access.');
+    throw new SdkError('not_found', 'Actor not found or not visible.');
 }

@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useShadowdarkUI } from '../context/ShadowdarkUIContext';
 import { formatUuid } from '../../logic/identity';
+import { spellReview } from '../../logic/spell-review';
 
 /**
  * Shared hook to manage the Shadowdark Level-Up process.
@@ -15,15 +16,6 @@ export function useShadowdarkLevelUp(
     const [levelUpData, setLevelUpData] = useState<any>(null);
     const [isFetching, setIsFetching] = useState(false);
 
-    // Auto-close Level Up Modal when level effectively changes in the background
-    useEffect(() => {
-        if (showLevelUpModal && levelUpData && actor.system?.level?.value === levelUpData.targetLevel) {
-            setShowLevelUpModal(false);
-            setLevelUpData(null);
-            addNotification('Level Up Complete!', 'success');
-        }
-    }, [actor.system?.level?.value, showLevelUpModal, levelUpData, addNotification]);
-
     /**
      * Prepares level-up data and opens the modal.
      */
@@ -36,7 +28,7 @@ export function useShadowdarkLevelUp(
         let fetchedLanguages = [];
 
         // Ensure hydration for base essentials needed for level-up resolution
-        if (onFetchPack) {
+        if (onFetchPack && !actor.advancementPending) {
             setIsFetching(true);
             try {
                 // Fetch packs explicitly and use the returned data
@@ -57,13 +49,17 @@ export function useShadowdarkLevelUp(
         }
 
         const data = {
+            reviewOnly: actor.advancementPending === true,
             currentLevel,
+            baseline: actor.spellReviewToken ?? spellReview(actor),
+            contextRevision: actor.worldContextRevision ?? actor.derived?.ruleInputs?.contextRevision,
             targetLevel,
             classObj: actor.items?.find((item: any) => item.type === 'Class') ?? null,
             ancestry: actor.items?.find((item: any) => item.type === 'Ancestry') ?? null,
             patron: actor.items?.find((item: any) => item.type === 'Patron') ?? null,
             abilities: actor.derived?.abilities,
             spells: actor.items?.filter((i: any) => i.type === 'Spell') || [],
+            knownLanguages: (actor.derived?.identity?.languages ?? []).map((entry: any) => ({ uuid: entry.ref ? formatUuid(entry.ref) : entry.value, name: entry.label ?? entry.value ?? 'Unavailable language' })),
             // Exact references come from the prepared view; the host projection
             // turns raw compendium UUIDs into names (SD01-05), which are never
             // mapped back by name. Level 0 prompts for a class.

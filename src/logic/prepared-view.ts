@@ -4,6 +4,8 @@ import { UNAVAILABLE_RULE_INPUTS, hasLuckToken, luckMode, type RuleInputs } from
 import type { CanonicalEffect } from './effects';
 import { documentId, formatUuid, parseUuid, type DocumentRef } from './identity';
 import { slugify } from './foundry';
+import { grantedSpellSources, prepareSpellModel } from './spell-model';
+import { languageRarity } from './languages';
 
 /**
  * The single module-prepared Shadowdark view, published as `derived` (with
@@ -52,6 +54,9 @@ export interface EffectView {
 export interface ViewLookups extends PreparationLookups {
     /** Exact declared-pack label for a reference; never a suffix or name match. */
     label?: (ref: DocumentRef) => string | null;
+    /** Exact documents actually read for a bounded caller operation. */
+    dependencies?: readonly string[];
+    languageDocument?: (ref: DocumentRef) => any | null;
 }
 
 const CATEGORY: Record<string, string> = {
@@ -59,11 +64,6 @@ const CATEGORY: Record<string, string> = {
     Basic: 'gear', Gem: 'gem', 'Class Ability': 'feature', Talent: 'feature', Boon: 'feature',
     'NPC Attack': 'npc-attack', 'NPC Special Attack': 'npc-attack', 'NPC Feature': 'feature', Effect: 'effect',
     Class: 'identity', Ancestry: 'identity', Background: 'identity', Deity: 'identity', Patron: 'identity', Language: 'identity',
-};
-
-/** Exact-UUID talent → granted spell pairs (native priest Turn Undead). */
-const GRANTED_SPELLS: Record<string, string> = {
-    'Compendium.shadowdark.talents.Item.LfHTnYW8I65x8Y31': 'Compendium.shadowdark.spells.Item.mByUvcHIVEPWscfH',
 };
 
 function labelled(value: unknown, lookups: ViewLookups, owned?: any): LabelledRef {
@@ -96,8 +96,7 @@ export function prepareShadowdarkView(source: any, lookups: ViewLookups = {}, ru
     const byItem = new Map<string, PreparedAction[]>();
     for (const action of actions) if (action.itemId) byItem.set(action.itemId, [...(byItem.get(action.itemId) ?? []), action]);
 
-    const grantedSpells = new Set(items.map(item => parseUuid(item?._stats?.compendiumSource ?? item?.flags?.core?.sourceId))
-        .filter((ref): ref is DocumentRef => !!ref).map(ref => GRANTED_SPELLS[formatUuid(ref)]).filter(Boolean));
+    const grantedSpells = grantedSpellSources(items);
 
     const itemViews: ItemView[] = core.items.map(basics => {
         const item = items.find(entry => documentId(entry) === basics.id);
@@ -154,18 +153,26 @@ export function prepareShadowdarkView(source: any, lookups: ViewLookups = {}, ru
     }));
 
     const system = source?.system ?? {};
-    const ownedOf = (type: string) => items.find(item => item?.type === type);
+    const ownedOf = (type: string, value: unknown) => {
+        const ref = parseUuid(value);
+        return ref?.kind === 'embedded' && ref.parentType === 'Actor' && ref.parentId === documentId(source)
+            ? items.find(item => item?.type === type && documentId(item) === ref.id) : undefined;
+    };
+    const languageRef = (value: unknown) => {
+        const entry = labelled(value, lookups);
+        return { ...entry, rarity: entry.ref ? languageRarity(lookups.languageDocument?.(entry.ref)) : null };
+    };
     const identity = {
-        class: labelled(system.class, lookups, ownedOf('Class')),
-        ancestry: labelled(system.ancestry, lookups, ownedOf('Ancestry')),
-        background: labelled(system.background, lookups, ownedOf('Background')),
-        deity: labelled(system.deity, lookups, ownedOf('Deity')),
-        patron: labelled(system.patron, lookups, ownedOf('Patron')),
-        languages: (Array.isArray(system.languages) ? system.languages : []).map((value: unknown) => labelled(value, lookups)),
+        class: labelled(system.class, lookups, ownedOf('Class', system.class)),
+        ancestry: labelled(system.ancestry, lookups, ownedOf('Ancestry', system.ancestry)),
+        background: labelled(system.background, lookups, ownedOf('Background', system.background)),
+        deity: labelled(system.deity, lookups, ownedOf('Deity', system.deity)),
+        patron: labelled(system.patron, lookups, ownedOf('Patron', system.patron)),
+        languages: (Array.isArray(system.languages) ? system.languages : []).map(languageRef),
         // Languages added by effects (e.g. "Speak Goblin"): shown, never written back.
         grantedLanguages: (Array.isArray(core.effective?.languages) ? core.effective.languages : [])
             .filter((value: unknown) => !(Array.isArray(system.languages) && system.languages.includes(value)))
-            .map((value: unknown) => labelled(value, lookups)),
+            .map(languageRef),
     };
 
     const isSpellcaster = core.kind === 'Player'
@@ -191,7 +198,8 @@ export function prepareShadowdarkView(source: any, lookups: ViewLookups = {}, ru
         spellcastingAbility: null,
         isSpellcaster,
         canUseMagicItems,
-        showSpellsTab: isSpellcaster || canUseMagicItems,
+        showSpellsTab: isSpellcaster || canUseMagicItems || items.some(item => ['Spell', 'Scroll', 'Wand'].includes(item.type)),
+        spellModel: prepareSpellModel(source, core, lookups),
         maxSlots: core.maxSlots,
         gearSlots: core.maxSlots,
         slotsUsed: core.slotUsage?.total ?? null,

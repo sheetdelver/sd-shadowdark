@@ -22,14 +22,20 @@ export interface ShadowdarkActorPageProps {
  * the module's `actorPage` surface in `module/ui.tsx`.
  */
 export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProps) {
-    const { foundryUrl, addNotification: addToast, isDiceTrayOpen, toggleDiceTray, events, fetchWithAuth, navigate, isConnected } = useSDK();
+    const { foundryUrl, addNotification: addToast, isDiceTrayOpen, toggleDiceTray, events, fetchWithAuth, navigate, isConnected, worldId, currentUser } = useSDK();
     const { LoadingModal, SharedContentModal } = useSDKComponents();
 
-    const [actor, setActor] = useState<any>(null);
+    const scope = JSON.stringify([worldId, currentUser?.id, currentUser?.role]);
+    const [loaded, setLoaded] = useState<{ scope: string; actor: any } | null>(null);
+    const actor = loaded?.scope === scope ? loaded.actor : null;
+    const setActor = useCallback((value: any) => setLoaded({ scope, actor: value }), [scope]);
+    const [reviewing, setReviewing] = useState(false);
     const [loading, setLoading] = useState(true);
     const [actorError, setActorError] = useState<string | null>(null);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
 
+    const fetchRef = useRef(fetchWithAuth);
+    fetchRef.current = fetchWithAuth;
     const foundryUrlRef = useRef(foundryUrl);
     useEffect(() => { foundryUrlRef.current = foundryUrl; }, [foundryUrl]);
 
@@ -48,7 +54,7 @@ export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProp
         const stale = () => seq !== requestSeq.current || currentActorId.current !== id;
         if (!silent) setLoading(true);
         try {
-            const res = await fetchWithAuth(`/api/actors/${id}`);
+            const res = await fetchRef.current(`/api/modules/shadowdark/actors/${id}/view`);
             if (stale()) return;
             if (res.status === 404) {
                 setActor(null);
@@ -57,7 +63,8 @@ export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProp
                 return;
             }
             if (!res.ok) {
-                if (!silent) setActorError(res.status === 503
+                setActor(null);
+                setActorError(res.status === 503
                     ? 'Character data is temporarily unavailable.'
                     : 'Could not load this character.');
                 return;
@@ -65,55 +72,56 @@ export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProp
 
             const data = await res.json();
             if (stale()) return;
-            if (data && !data.error) {
-                setActor(data);
+            if (data.actor && !data.error) {
+                setActor(data.actor);
                 setActorError(null);
                 setShowDeleteModal(false);
-            } else if (!silent) setActorError(data?.error || 'Could not load this character.');
-        } catch {
-            if (!silent && !stale()) setActorError('Character data is temporarily unavailable.');
+            } else throw new Error(getErrorMessage(data?.error ?? 'Could not load this character.'));
+        } catch (e) {
+            if (!stale()) { setActor(null); setActorError(`Character data is unavailable: ${getErrorMessage(e)}`); }
         } finally {
-            if (!silent && !stale()) setLoading(false);
+            if (!stale()) { setLoading(false); setReviewing(false); }
         }
-    }, [fetchWithAuth]);
+    }, [setActor]);
 
+    const notifyRef = useRef(addNotification);
+    notifyRef.current = addNotification;
     const loadingRef = useRef(loading);
     useEffect(() => { loadingRef.current = loading; }, [loading]);
 
     useEffect(() => {
         if (!actorId) return;
-        fetchActor(actorId);
+        if (isConnected) fetchActor(actorId, true);
+        else { requestSeq.current++; setReviewing(true); }
 
         // Realtime refresh via the SDK event bus (replaces the raw socket actorChanged).
         const off = events.on('document:changed', ({ type, id }) => {
-            if (type === 'Actor' && id === actorId) {
+            if ((type === 'Actor' && id === actorId) || type === 'Item') {
                 fetchActor(actorId, true);
             }
         });
         // World rules changed (a setting or declared pack): Core re-prepares Actors;
         // reload so luck mode, actions and the context revision are current.
-        const offContext = events.on('world:contextChanged', () => fetchActor(actorId, true));
+        const offContext = events.on('world:contextChanged', () => {
+            // Retire visibility/interaction immediately, keeping mounted picker
+            // search until the caller's new source is authorized. Denial clears it.
+            setReviewing(true);
+            if (isConnected) fetchActor(actorId, true);
+        });
 
         const timeout = setTimeout(() => {
             if (loadingRef.current) {
-                addNotification('Loading is taking longer than expected. The server might be busy.', 'error');
+                notifyRef.current('Loading is taking longer than expected. The server might be busy.', 'error');
             }
         }, 15000);
 
         return () => {
             off();
             offContext();
+            requestSeq.current++;
             clearTimeout(timeout);
         };
-    }, [actorId, fetchActor, addNotification, events]);
-
-    // Core owns the world outage overlay. Revalidate this module-local Actor
-    // once the same world becomes ready again without remounting its sheet.
-    const wasConnected = useRef(isConnected);
-    useEffect(() => {
-        if (isConnected && !wasConnected.current && actorId) fetchActor(actorId, true);
-        wasConnected.current = isConnected;
-    }, [actorId, fetchActor, isConnected]);
+    }, [actorId, fetchActor, events, worldId, currentUser?.id, currentUser?.role, isConnected]);
 
     /** JSON request that rejects with the server's message on any failure. */
     const request = useCallback(async (url: string, init: RequestInit = {}) => {
@@ -202,8 +210,9 @@ export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProp
                 </div>
             </nav>
 
+            {reviewing && <p role="status">Refreshing character access…</p>}
             {actor && (
-                <div className="w-full max-w-5xl mx-auto p-4">
+                <div inert={reviewing || !isConnected} aria-hidden={reviewing || !isConnected || undefined} style={{ visibility: reviewing || !isConnected ? 'hidden' : undefined }} className="w-full max-w-5xl mx-auto p-4">
                     <ShadowdarkUIProvider>
                         <ShadowdarkActorProvider
                             actor={actor}
@@ -231,7 +240,8 @@ export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProp
 
             {!actor && actorError && !showDeleteModal && (
                 <div className="w-full max-w-5xl mx-auto p-4 text-center text-neutral-300" role="alert">
-                    {actorError}
+                    <p>{actorError}</p>
+                    <button type="button" onClick={() => fetchActor(actorId)}>Retry character</button>
                 </div>
             )}
 
@@ -240,8 +250,8 @@ export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProp
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in duration-300">
                     <div className="bg-neutral-900 border border-amber-500/30 p-8 rounded-xl max-w-md w-full text-center shadow-2xl">
                         <div className="text-5xl mb-4">💀</div>
-                        <h2 className="text-2xl font-bold text-white mb-2 font-serif">Character Deleted</h2>
-                        <p className="text-neutral-400 mb-8">This character has been deleted from the world.</p>
+                        <h2 className="text-2xl font-bold text-white mb-2 font-serif">Character Unavailable</h2>
+                        <p className="text-neutral-400 mb-8">This character is absent or no longer visible to you.</p>
                         <button
                             onClick={() => navigate('/')}
                             className="bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 px-8 rounded shadow-lg uppercase tracking-widest transition-all w-full"

@@ -153,11 +153,7 @@ export const TALENT_EFFECTS_MAP: Record<string, string> = {
     'Ability Score Improvement (Cha)': 'Compendium.shadowdark.talents.5INkcbMVFxK6cW5Z',
 };
 
-// Mapping of Talent UUIDs to Spell UUIDs they grant (to be excluded from spell count)
-// Note: We use the tail of the UUID for matching if needed, but primary check should be full UUID.
-export const TALENT_GRANTED_SPELLS: Record<string, string> = {
-    "LfHTnYW8I65x8Y31": "mByUvcHIVEPWscfH" // Turn Undead Talent -> Turn Undead Spell
-};
+export { GRANTED_SPELLS as TALENT_GRANTED_SPELLS } from '../logic/spell-model';
 
 // Helper to find partial matches
 export const findEffectUuid = (text: string): string | null => {

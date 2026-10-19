@@ -1,6 +1,5 @@
 import type { ActorSheetData } from '@sheet-delver/sdk';
 import { prepareShadowdarkView, type ViewLookups } from './prepared-view';
-import { getLanguageLimits } from './rules';
 import { canonicalUuid, documentId, formatUuid } from './identity';
 import { UNAVAILABLE_RULE_INPUTS, type RuleInputs } from './world-settings';
 
@@ -31,6 +30,10 @@ export function lookupsFromSystemData(cachedSystemData: any, documents?: (uuid: 
             const doc = documents?.(formatUuid(ref)) ?? null;
             return doc?.type === 'Spell' ? doc : null;
         },
+        languageDocument: ref => {
+            const doc = documents?.(formatUuid(ref)) ?? null;
+            return doc?.type === 'Language' ? doc : null;
+        },
     };
 }
 
@@ -39,9 +42,8 @@ function classTitle(actor: any, view: ReturnType<typeof prepareShadowdarkView>, 
     const level = view.level;
     const alignment = String(actor.system?.alignment ?? '');
     if (!alignment || view.kind !== 'Player') return '';
-    const owned = (actor.items ?? []).find((item: any) => item?.type === 'Class');
     const ref = view.identity.class.ref;
-    const doc = owned ?? (ref ? lookups.classDocument?.(ref) : null);
+    const doc = ref ? lookups.classDocument?.(ref) : null;
     const titles = Array.isArray(doc?.system?.titles) ? doc.system.titles : [];
     const match = titles.find((title: any) => level >= title.from && level <= title.to);
     return match?.[alignment] ?? '';
@@ -69,7 +71,6 @@ export class ShadowdarkNormalizer {
             },
             title: classTitle(actor, view, lookups),
         };
-        derived.languageLimits = getLanguageLimits({ ...actor, derived }, cachedSystemData, collections);
 
         return {
             id: documentId(actor),

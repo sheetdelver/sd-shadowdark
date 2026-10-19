@@ -89,15 +89,68 @@ block the affected write before creation.
 Advancement follows native `LevelUpSD._finalizeLevelUp`, including XP carryover
 above level zero and first-level HP from the hit die plus prepared CON (minimum1).
 Generator and server share `logic/advancement.ts`; prepare grants before HP.
+Advancement completion requires all grant receipts and the final Actor patch;
+a target-level event is not completion. Keep exact confirmed IDs, frozen HP/XP
+and request identity through retries. Fully dispatched advancement may settle automatically when the exact final
+Actor source and every confirmed grant ID match. This updates module receipts
+only; it never repeats a Foundry write. Partial writes and unknown grant IDs
+retain explicit exact-source review; never recreate from names/origins or silently
+start a replacement.
 Document consumers must use the route's actual bare-document response shape.
 Use native source and handler comparisons for these rules;
 successful writes alone do not establish parity.
 
-The native-alignment plan is [Shadowdark ADR-0001](docs/adr/0001-native-alignment-and-resource-cards.md),
-with evidence in the [native-alignment audit](docs/audits/2026-10-15-native-alignment.md).
-Its released-system baseline and future-version exclusions are explicit there;
-local source checkout details belong in the handoff. Existing legacy effect
-fixtures do not establish v14 serialized-effect parity.
+The completed post-release plan is [Shadowdark ADR-0002](docs/adr/0002-native-data-and-behavior-parity.md),
+with findings SD02-01–13 in the [native parity audit](docs/audits/2026-10-18-spellcasting-and-native-parity.md).
+SD02-R1–R3 have corrective implementation and offline regression evidence
+(advancement recovery, final creation validation and management-source refresh).
+SD02-R1b has independent offline verification: acknowledged writes keep exact IDs
+through bookkeeping failures and require primary-source reconciliation before
+continuation. SD02-R1a-R1 permits zero-write retirement even when an independent
+Actor edit invalidates the old source snapshot. Preserve that edit and require
+fresh preparation; never require the player to undo unrelated changes when this
+operation made none. Partial/unknown outcomes never qualify for a zero-write
+restart. SD02-V1 adds the maintained advancement, final-creation and native-parity
+handler suites to CI using the pinned static native reference below.
+Native v14 evidence is recorded in the
+[acceptance report](docs/audits/2026-10-19-adr-0002-native-acceptance.md).
+SD02-N14-01/02 are corrected with offline and targeted native v14 evidence.
+Caller projection refresh settles proven complete advancement or retires proven
+zero-write attempts under the Actor queue. Only unresolved operations expose the
+caller-safe review indicator, independent of XP. UI never edits receipts directly;
+server bookkeeping transitions preserve the original record and never write
+Foundry documents. Recovery opens its saved request without new Class preparation.
+Malformed selection input returns typed validation errors before writes.
+The selected A02-01–15 matrix and D6/final D7 are complete on native13.351/14.367.
+SD02-N13-01 corrects recovery field/action styling only; the final native report
+records16 packaged layout checks and byte-identical server/migration evidence.
+Use that current ledger instead of historical pending paragraphs. Earlier runtime
+checkpoint: `b962bf0`. Preserve the visible, keyboard-usable controls and exact
+receipt behavior. Release preparation/publication is separate; completed evidence
+does not grant branch, live-write or release authority.
+[ADR-0001](docs/adr/0001-native-alignment-and-resource-cards.md) and the
+[native-alignment audit](docs/audits/2026-10-15-native-alignment.md) remain completed
+within their selected scope. Their released-system baseline, future-version
+exclusions and explicit deferrals remain. Local source checkout details belong
+in the handoff. Existing legacy effect fixtures do not establish v14 serialized-effect parity.
+
+Spell corrections must distinguish actor class, active casting grants, alternate
+spell-list identity, progression table and optional source provenance. Never
+infer a casting grant from a class name or infer a Spell identity from its name.
+Owned spell identity is the Actor plus embedded Item ID; catalog filtering must
+not hide or implicitly remove owned items. Preserve custom/source-less and
+duplicate copies. Successful effect-key migration is not proof that all native
+character content exists. Diagnose missing data and prove repair preconditions
+before proposing new admin migration steps; keep applied history unchanged.
+
+Compare native behavior in order as well as final values. Limited-use abilities
+spend before rolling/posting; Potion identification swaps active/alternate
+name/description and enables effects before consumption. Maintain ordered source/receipt regressions for SD02-09/10; action descriptions alone are not execution evidence.
+Player focus is not an NPC exemption, and zero disables a native critical
+threshold. Languages use native rarity and separate explicit class/ancestry choice
+counts/pools, not English name inference or a nonempty-options fallback. Maintain
+the audit's coverage matrix and distinguish controlled native-method probes from
+real Foundry acceptance. F01–F06 feature proposals remain separately scoped.
 
 Effect definitions come from native data only: compendium documents (copied
 with their effects) and `src/data/native-predefined-effects.ts`, generated from
@@ -174,10 +227,15 @@ npx tsx data/local/modules/shadowdark/src/tests/roll-feedback.test.ts
 npx tsx data/local/modules/shadowdark/src/tests/importer-mapping.test.ts
 npx tsx data/local/modules/shadowdark/src/tests/native-alignment.test.ts
 npx tsx data/local/modules/shadowdark/src/tests/boundaries.test.ts
+npx tsx data/local/modules/shadowdark/src/tests/action-phases.test.ts
+npx tsx data/local/modules/shadowdark/src/tests/languages.test.ts
 npx tsx data/local/modules/shadowdark/src/tests/effect-conformance.test.ts
 npx tsx data/local/modules/shadowdark/src/tests/world-adoption.test.ts
 npx tsx data/local/modules/shadowdark/src/tests/migration-hooks.test.ts
 npx tsx data/local/modules/shadowdark/src/tests/system-index.test.ts
+npx tsx data/local/modules/shadowdark/src/tests/native-parity.test.ts
+npx tsx data/local/modules/shadowdark/src/tests/advancement-recovery.test.ts
+npx tsx data/local/modules/shadowdark/src/tests/creation-validation.test.ts
 node data/local/modules/shadowdark/src/tests/verify-types.mjs
 npm run module:check -- shadowdark
 ```
@@ -187,6 +245,11 @@ checking types. Use isolated package output when validating distribution.
 The current workflow is `.github/workflows/ci-shadowdark.yaml`; inspect its pinned
 host version before running compatibility checks. Tools may run from Core,
 but module work does not authorize changing Core files or generated settings.
+CI checks out `Muttley/foundryvtt-shadowdark` at
+`9677d16b3903b3b640f00d4efd48249142ac8334` (release-4.0.6) into the isolated
+toolchain's `temp/shadowdark`. All 17 source suites run against that static
+reference; missing required native fixtures fail rather than silently skip.
+This is source-only testing and does not require a running Foundry service.
 
 Maintained consumer checks: `src/tests/collection-consumers.browser.mjs` renders
 the actual providers/pickers/Spells/Generator with a controlled SDK boundary and
@@ -225,3 +288,62 @@ before/after transient transport loss. `--server-disconnect` selects an explicit
 native session kick instead; keep that diagnostic result separate from ordinary
 reconnect and never add automatic relogin to make it pass. Resource dialog tests
 also cover floating-tool clearance and yielding to shared SDK dialogs.
+
+ADR-0002 regressions additionally run `src/tests/native-parity.test.ts` and
+`node --import tsx src/tests/native-parity.oracles.mjs` from the configured Core
+toolchain, with the read-only native4.0.6 reference available. `--baseline` records
+known failures and is never passing acceptance. Caller-bound spell dependencies
+remain request-local and use the common preparer; never warm private world
+Class/Spell documents into the user-invariant registry.
+
+Spell inventory management uses explicit additions and owned Item-ID removals;
+never derive deletion from catalog membership. The shared spell catalog exposes
+partial-source failures, and native sourceFilters affects browsing only. Durable
+operation receipts may reconcile confirmed IDs, never guessed names/origins;
+partial operations from another process need fresh review.
+
+Actions have prerequisite, one-result-attempt and consequence phases. Preserve
+confirmed spending/identification on later failure. Unknown roll/chat receipts
+never authorize another result call; partial durable records without a process
+continuation require fresh review. Potion effect activation is a complete native
+group with exact owned parent/IDs. Actor-specific focus and zero critical
+thresholds belong to the shared action model.
+
+Language rarity comes only from system.rarity; unknown remains unclassified.
+Creation uses native Class/Ancestry fixed/common/rare/select fields with separate
+restricted pools and server validation. No implicit Common/INT or Background
+allowance is added. Ordinary inventory editing has no creation quota and retains
+custom/unreadable entries. Source filters constrain browsing, not fixed grants.
+
+For owner-bound operations, SDK strict get reads can return null at a higher
+threshold even when observer-visible. Use the shared requireOwnedActor guard to
+retain403 versus concealed404 semantics. Context revalidation preserves mounted
+manual state but retires action callbacks/results; keep both browser regressions.
+Actor creation uses the caller SDK route, never the generic writer that strips
+native Item string arrays. Level-one creation revalidates the exact native plan
+at the final writer; earlier UI/preparation success never validates a changed
+Actor body. Preserve the complete prepared grant multiset and separate ordinary,
+fixed and extra spells; ordinary inventory/import flows have distinct authority.
+
+World Spell catalog changes use public Item document/detail-directory hints,
+coalesced through the existing shared store; cover loaded and pending consumers.
+Advancement HP dice come from the exact selected Class; missing source is an
+explicit failure, not an owned-copy or generic-die fallback.
+
+Corrective advancement coverage: `src/tests/advancement-recovery.test.ts` and
+`src/tests/parity-corrections.browser.mjs` (offline mounted consumers). Native
+pack fixtures use the pinned read-only source; no transports/services are needed.
+
+Final creation regressions: `src/tests/creation-validation.test.ts` (real writer
+and shared preparation with exact pinned native sources).
+
+Open spell management keeps stable Class/tier identity and derives current list/
+progression facts. Retire intent on those facts, preserving search and exact
+original operation receipts. Corrective mounted checks run in CI.
+
+Final archive offline verification: `node src/tests/packaged-corrections.mjs
+--archive=<tgz> --out=<new-output> --core=<configured-toolchain>`. This executes
+compiled public apiRoutes with `@sheet-delver/sdk/testing`, not a live host. Core
+archive preview must retain its full-GM deployment guard when no service account
+is configured; do not invent credentials or bypass it to label an offline install
+passed. Source suites, compiled contracts and native acceptance are distinct.

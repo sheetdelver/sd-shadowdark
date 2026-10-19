@@ -1,6 +1,6 @@
 {
     "id": "shadowdark",
-    "version": "0.9.5",
+    "version": "0.9.6",
     "title": "Shadowdark RPG",
     "manifest": {
         "ui": "module/ui.tsx",
@@ -31,6 +31,15 @@
             "systemVersion": ">=4.0.0 <=4.0.6",
             "schema": { "type": "boolean" },
             "default": { "value": true, "source": "native Shadowdark release-4.0.0 to release-4.0.6 src/settings.mjs: world Boolean autoConsumeAmmunition, default true", "systemVersion": ">=4.0.0 <=4.0.6" },
+            "affectsPreparation": true,
+            "exposure": "authenticated"
+        },
+        {
+            "key": "shadowdark.sourceFilters",
+            "scope": "world",
+            "systemVersion": ">=4.0.0 <=4.0.6",
+            "schema": { "type": "array" },
+            "default": { "value": [], "source": "native Shadowdark release-4.0.0 through release-4.0.6 system/src/apps/SourceFilterSettings.mjs registerSetting: world Array, default []", "systemVersion": ">=4.0.0 <=4.0.6" },
             "affectsPreparation": true,
             "exposure": "authenticated"
         }

@@ -22,7 +22,7 @@
 export type SystemIndexStatus = 'offline' | 'loading' | 'ready' | 'failed';
 export type CollectionState =
     | { status: 'loading' }
-    | { status: 'ready' }
+    | { status: 'ready'; warnings?: string[] }
     | { status: 'failed'; error: string; failure: 'denied' | 'unavailable' | 'failed'; httpStatus?: number };
 
 export interface SystemIndexSnapshot {
@@ -160,11 +160,14 @@ export function createSystemIndexStore(options: SystemIndexStoreOptions) {
                 }
                 const data = await response.json();
                 if (!current()) return;
-                if (!Array.isArray(data)) throw new Error('The server returned an invalid collection; an array was required.');
+                const catalog = packId === 'spells' && Array.isArray(data?.rows) && Array.isArray(data?.sources) && ['complete', 'partial'].includes(data?.state);
+                if (!Array.isArray(data) && !catalog) throw new Error('The server returned an invalid collection; source rows were required.');
+                const rows = catalog ? data.rows : data;
+                const warnings = catalog ? data.sources.filter((source: any) => source.status === 'failed').map((source: any) => `${source.source}: ${source.reason ?? 'Unavailable'}`) : [];
                 pending.delete(packId);
-                publish({ collections: { ...snapshot.collections, [packId]: data },
-                    collectionStates: { ...snapshot.collectionStates, [packId]: { status: 'ready' } } });
-                finish(data);
+                publish({ collections: { ...snapshot.collections, [packId]: rows },
+                    collectionStates: { ...snapshot.collectionStates, [packId]: { status: 'ready', ...(warnings.length ? { warnings } : {}) } } });
+                finish(rows);
             } catch (error) {
                 if (!current()) return;
                 const failure = httpStatus === 401 || httpStatus === 403 ? 'denied'
@@ -200,7 +203,8 @@ export function createSystemIndexStore(options: SystemIndexStoreOptions) {
         release() { retire(); scopeKey = null; },
         fetchCollection,
         retryCollection(packId: string) {
-            if (snapshot.collectionStates[packId]?.status !== 'failed') return;
+            const state = snapshot.collectionStates[packId];
+            if (state?.status !== 'failed' && !(state?.status === 'ready' && state.warnings?.length)) return;
             const states = { ...snapshot.collectionStates };
             delete states[packId];
             publish({ collectionStates: states });

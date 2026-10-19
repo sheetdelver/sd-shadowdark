@@ -48,14 +48,15 @@ const source = (state: WorldState) => ({ actors: state.actors, items: state.item
     worldPacks: Object.fromEntries(Object.keys(allLocations?.expected.worldPacks ?? {}).map(id => [id, state.packs[id]])) });
 const corePackage = JSON.parse(fs.readFileSync(path.join(CORE, 'package.json'), 'utf8'));
 const coreCommit = spawnSync('git', ['-C', CORE, 'rev-parse', 'HEAD'], { encoding: 'utf8' });
-assert.equal(coreCommit.status, 0, 'Core provenance must be observable');
+const observedCommit = coreCommit.status === 0 ? coreCommit.stdout.trim() : JSON.parse(fs.readFileSync(path.join(CORE,'.source-provenance.json'),'utf8')).commit;
+assert.match(observedCommit, /^[a-f0-9]{40}$/, 'Core provenance must be observable');
 assert.equal(corePackage.version, '0.19.2', 'selected released toolchain');
 const nativeContract = path.resolve(process.env.SHADOWDARK_FOUNDRY_REFERENCE ?? path.join(CORE, `temp/foundry-v${generation}.mjs`));
 const nativeBytes = fs.readFileSync(nativeContract);
 assert.ok(nativeBytes.includes(Buffer.from('return this.config.locked ?? (this.metadata.packageType !== "world");')), 'static native lock oracle');
 const evidence: Doc = { nativeAcceptance: false, generation,
     scenario: allLocations ? 'all-locations + native lock policy' : 'pack-only + native lock policy',
-    core: { version: corePackage.version, commit: coreCommit.stdout.trim() },
+    core: { version: corePackage.version, commit: observedCommit },
     archive: { file: archive, sha256: createHash('sha256').update(fs.readFileSync(archive)).digest('hex') },
     inventory: { actors, itemsPerActor, expectedWrites, totalWrites }, checks: [], cases: {}, skipped: [],
     provenance: { lock: 'Foundry v13 CompendiumCollection.locked: config.locked ?? (metadata.packageType !== world); v14 same contract',

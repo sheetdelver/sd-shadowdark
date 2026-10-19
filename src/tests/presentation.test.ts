@@ -24,6 +24,7 @@ assert.equal((manifest.info as any).sdkVersion, undefined, 'no invented SDK mani
 assert.deepEqual((manifest.info.worldSettings ?? []).map(row => [row.key, row.scope, row.systemVersion, row.schema.type, row.default?.value, row.affectsPreparation, row.exposure]), [
     ['shadowdark.usePulpMode', 'world', '>=4.0.0 <=4.0.6', 'boolean', false, true, 'authenticated'],
     ['shadowdark.autoConsumeAmmunition', 'world', '>=4.0.0 <=4.0.6', 'boolean', true, true, 'authenticated'],
+    ['shadowdark.sourceFilters', 'world', '>=4.0.0 <=4.0.6', 'array', [], true, 'authenticated'],
 ]);
 assert.equal(manifest.info.combatTracking?.attributes?.[0]?.path, 'system.attributes.hp');
 assert.equal(manifest.info.combatTracking?.attributes?.[1]?.path, 'derived.ac');

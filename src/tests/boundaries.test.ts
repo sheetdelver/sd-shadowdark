@@ -36,14 +36,17 @@ async function check(id: string, name: string, fn: () => unknown | Promise<unkno
 
 function fakeRuntime(actor: any, options: { owner?: boolean; rolls?: number[]; failWrites?: string[] } = {}) {
     const writes: any[] = [];
+    const state = structuredClone(actor);
+    const apply = (target: any, patch: any) => { for (const [path,value] of Object.entries(patch)) { const keys=path.split('.');const leaf=keys.pop()!;let owner=target;for(const key of keys)owner=owner[key]??={};owner[leaf]=structuredClone(value); } };
     const rolls = [...(options.rolls ?? [])];
     let rollCount = 0;
     const runtime: any = {
+        access: { canReadPack: () => true, packs: () => [] },
         documents: {
             get: async (type: string, id: string, opts?: any) => {
                 if (type !== 'Actor' || id !== (actor?._id)) return null;
                 if (opts?.minOwnership === 'owner' && options.owner === false) return null;
-                return structuredClone(actor);
+                return structuredClone(state);
             },
             list: async () => ({ rows: [], total: 0 }),
             fetchByUuid: async () => { throw new Error('fetchByUuid must not be used for caller reads'); },
@@ -57,11 +60,11 @@ function fakeRuntime(actor: any, options: { owner?: boolean; rolls?: number[]; f
                 create: async (parent: any, data: any) => { writes.push(['item.create', parent, data]); return { _id: 'created' }; },
                 update: async (parent: any, id: string, data: any) => {
                     if (options.failWrites?.includes(id)) throw new Error(`write to ${id} refused`);
-                    writes.push(['item.update', parent, id, data]); return {};
+                    writes.push(['item.update', parent, id, data]); const item=state.items?.find((row:any)=>row._id===id);if(item)apply(item,data);return {};
                 },
                 delete: async (parent: any, id: string) => {
                     if (options.failWrites?.includes(id)) throw new Error(`delete of ${id} refused`);
-                    writes.push(['item.delete', parent, id]);
+                    writes.push(['item.delete', parent, id]);state.items=state.items?.filter((row:any)=>row._id!==id);
                 },
             },
         },
@@ -166,7 +169,7 @@ async function actions() {
     const lookupsFn = shadowdarkAdapter.lookups;
     shadowdarkAdapter.lookups = () => lookups as any;
     const resolveFor = shadowdarkAdapter.resolveDocumentFor;
-    shadowdarkAdapter.resolveDocumentFor = async (uuid: string) => spellDocs[uuid] ?? null;
+    shadowdarkAdapter.resolveDocumentFor = async (uuid: string) => spellDocs[uuid] ?? classDocs[uuid] ?? null;
     try {
         const core = prepareActorCore(wizardActor(), lookups);
         await check('SD01-08', 'spell ability comes from the spell class (PlayerSD._getSpellcastingAbility)', () => {
@@ -178,7 +181,7 @@ async function actions() {
             assert.match(prepareRequestedAction(core, wizardActor(), lookups, { kind: 'spell', itemId: 'lost' })!.reason!, /lost/);
             const fighter = wizardActor(); fighter.items = fighter.items.filter((item: any) => item._id !== 'talent');
             assert.match(prepareRequestedAction(prepareActorCore(fighter, lookups), fighter, lookups, { kind: 'spell', itemId: 'mm' })!.reason!, /not a spellcaster/);
-            assert.match(prepareRequestedAction(core, wizardActor(), { ...lookups, classDocument: () => null }, { kind: 'spell', itemId: 'mm' })!.reason!, /not available from declared/);
+            assert.match(prepareRequestedAction(core, wizardActor(), { ...lookups, classDocument: () => null }, { kind: 'spell', itemId: 'mm' })!.reason!, /unavailable or not visible/);
         });
         await check('SD01-08', 'each wand spell is its own action; a missing spell is unavailable', () => {
             const wandActions = listActions(core, wizardActor(), lookups).filter(action => action.itemId === 'wand');
@@ -191,7 +194,7 @@ async function actions() {
             const { status } = await statusOf(await handleActorAction('w1', request(runtime, { requestId: 'req-lost-0001', kind: 'spell', itemId: 'lost' }) as any));
             assert.equal(status, 409); assert.equal(rolls(), 0); assert.equal(writes.length, 0);
         });
-        await check('C4', 'non-owners cannot run actions (no roll)', async () => {
+        await check('C4', 'observable non-owners cannot run actions (403, no roll)', async () => {
             const { runtime, rolls } = fakeRuntime(wizardActor(), { owner: false });
             const { status } = await statusOf(await handleActorAction('w1', request(runtime, { requestId: 'req-owner-001', kind: 'spell', itemId: 'mm' }) as any));
             assert.equal(status, 403); assert.equal(rolls(), 0);
@@ -231,8 +234,9 @@ async function actions() {
             assert.equal(result.body.consequences.every((entry: any) => entry.status === 'applied'), true);
             const failing = fakeRuntime(wizardActor(), { rolls: [2], failWrites: ['turn'] });
             const partial = await statusOf(await handleActorAction('w1', request(failing.runtime, { requestId: 'req-ability-2', kind: 'ability', itemId: 'turn' }) as any));
-            assert.equal(partial.body.consequences[0].status, 'failed');
-            assert.equal(partial.body.pending.length, 1, 'later consequences are reported as not applied');
+            assert.equal(partial.body.consequences[0].status, 'uncertain');
+            assert.equal(partial.body.phase, 'prerequisites'); assert.equal(failing.rolls(), 0, 'a failed spend must not request a result');
+            assert.equal(partial.body.outcome, null);
         });
         await check('C4', 'potion is consumed after a confirmation, without a roll', async () => {
             const { runtime, writes, rolls } = fakeRuntime(wizardActor());
@@ -378,8 +382,8 @@ async function registryAndRoutes() {
             : { _id: 'sp', name: 'Light', type: 'Spell', img: 'x.webp', system: { tier: 1, class: ['c'] }, effects: [{ name: 'E' }], flags: { keep: true } };
         try {
             const { runtime, writes } = fakeRuntime(actor);
-            assert.equal((await statusOf(await handleLearnSpell('a1', request(runtime, { spellUuid: 'Compendium.shadowdark.spells.Item.notspell' }) as any))).status, 400);
-            await handleLearnSpell('a1', request(runtime, { spellUuid: 'Compendium.shadowdark.spells.Item.sp' }) as any);
+            assert.equal((await statusOf(await handleLearnSpell('a1', request(runtime, { intent: 'inventory', spellUuid: 'Compendium.shadowdark.spells.Item.notspell' }) as any))).status, 400);
+            await handleLearnSpell('a1', request(runtime, { intent: 'inventory', spellUuid: 'Compendium.shadowdark.spells.Item.sp' }) as any);
             const created = writes.find(write => write[0] === 'item.create')[2];
             assert.deepEqual(created.effects, [{ name: 'E' }]); assert.deepEqual(created.flags, { keep: true });
             assert.equal(created._stats.compendiumSource, 'Compendium.shadowdark.spells.Item.sp');
@@ -396,7 +400,7 @@ async function registryAndRoutes() {
             const body = { targetLevel: 1, classUuid: 'Compendium.shadowdark.classes.Item.wiz', classObj: { name: 'Injected', type: 'Class' },
                 selectedSpells: [{ name: 'Cure', uuid: 'Compendium.shadowdark.spells.Item.heal' }] };
             const response = await statusOf(await handleFinalizeLevelUp('a1', request(runtime, body) as any));
-            assert.equal(response.status, 500); assert.match(response.body.error, /not on the Wizard spell list/);
+            assert.equal(response.status, 400); assert.match(response.body.error, /not on the exact Class spell list/);
             assert.equal(writes.length, 0);
         } finally { shadowdarkAdapter.resolveDocumentFor = resolveFor; }
     });
@@ -478,7 +482,7 @@ async function reviewCorrections() {
         });
         await check('RV-01', 'every caller-bound document path applies the same policy (spell learning)', async () => {
             const { runtime: owned, writes } = fakeRuntime({ _id: 'a1', type: 'Player', system: {}, items: [] });
-            const learn = await statusOf(await handleLearnSpell('a1', { ...caller(false), runtime: owned, json: async () => ({ spellUuid: monsterUuid }) } as any));
+            const learn = await statusOf(await handleLearnSpell('a1', { ...caller(false), runtime: { ...owned, access: packAccess(() => false) }, json: async () => ({ intent: 'inventory', spellUuid: monsterUuid }) } as any));
             assert.equal(learn.status, 403); assert.equal(writes.length, 0);
             assert.doesNotMatch(JSON.stringify(learn.body), /Synthetic Ogre/);
         });
@@ -488,6 +492,8 @@ async function reviewCorrections() {
 
     const lookupsFn = shadowdarkAdapter.lookups;
     shadowdarkAdapter.lookups = () => lookups as any;
+    const resolver = shadowdarkAdapter.resolveDocumentFor;
+    shadowdarkAdapter.resolveDocumentFor = async (uuid, caller) => classDocs[uuid] ?? spellDocs[uuid] ?? resolver.call(shadowdarkAdapter, uuid, caller);
     try {
         const potionActor = () => ({ _id: 'a1', name: 'Drinker', type: 'Player', system: { abilities: {} }, effects: [],
             items: [{ _id: 'potion', name: 'Healing Potion', type: 'Potion', system: {}, effects: [] },
@@ -500,9 +506,10 @@ async function reviewCorrections() {
             runtime.documents.get = async (type: string, id: string, opts?: any) => { reads++; return opts?.minOwnership === 'owner' && !owner ? null : get(type, id, opts); };
             const body = { requestId: 'rv03-revoke-01', kind: 'potion', itemId: 'potion' };
             assert.equal((await statusOf(await handleActorAction('a1', request(runtime, body) as any))).status, 200);
+            const beforeReplayReads = reads;
             owner = false;
             const replay = await statusOf(await handleActorAction('a1', request(runtime, body) as any));
-            assert.equal(replay.status, 403); assert.equal(reads, 2, 'the replay re-read the Actor');
+            assert.equal(replay.status, 403); assert.equal(reads, beforeReplayReads + 2, 'the replay re-read the Actor under current ownership');
             assert.doesNotMatch(JSON.stringify(replay.body), /Healing Potion/);
             assert.equal(writes.filter(write => write[0] === 'item.delete').length, 1);
         });
@@ -561,6 +568,7 @@ async function reviewCorrections() {
         });
     } finally {
         shadowdarkAdapter.lookups = lookupsFn;
+        shadowdarkAdapter.resolveDocumentFor = resolver;
     }
 }
 

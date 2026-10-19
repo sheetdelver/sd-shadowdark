@@ -14,6 +14,12 @@ export async function handleGetCollection(req: ModuleServerRequest, id: string) 
         const url = new URL(req.url, 'http://localhost');
         const summary = url.searchParams.get('summary') === 'true';
         logger.debug(`Shadowdark API | Fetching collection: ${id} (summary: ${summary})`);
+        if (id === 'spells') {
+            const catalog = await shadowdarkAdapter.spellCatalog(callerOf(req));
+            const conflict = contextConflict(req.runtime, revision); if (conflict) return conflict;
+            if (catalog.state === 'failed') return error('not_ready', catalog.sources.map(source => `${source.source}: ${source.reason}`).join(' '));
+            return json(catalog);
+        }
         return json(await shadowdarkAdapter.getCollection(id, { summary, caller: callerOf(req) }));
     } catch (e: unknown) {
         if (isSdkError(e)) return error(e.code, e.message);

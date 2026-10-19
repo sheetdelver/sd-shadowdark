@@ -2,17 +2,16 @@
 
 import React from 'react';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Loader2, Sparkles } from 'lucide-react';
 import { useSDK } from '@sheet-delver/sdk/react';
 import SpellSelectionModal from './components/SpellSelectionModal';
-import { useShadowdarkCollections } from './context/ShadowdarkUIContext';
-import { CollectionStatus } from './components/CollectionStatus';
 import { useShadowdarkActor } from './context/ShadowdarkActorContext';
 import { bonusLabel, type PreparedAction } from '../logic/actions';
 import { RANGE_LABELS, spellDuration } from '../logic/resource-cards';
-import { canonicalUuid, formatUuid } from '../logic/identity';
-import { slugify } from '../logic/foundry';
+import { formatUuid } from '../logic/identity';
+import { spellReview } from '../logic/spell-review';
+import type { SpellIntent } from './components/SpellSelectionModal';
 
 /**
  * Spells tab. Casting facts come from the prepared spell actions shared with the
@@ -21,69 +20,58 @@ import { slugify } from '../logic/foundry';
  * `spellcasting.classes` (PlayerSD semantics), and limits come only from that
  * class's native `spellsknown` table.
  */
-interface SpellSource { classUuid: string; name: string; slug: string; spellsknown: any | null }
+interface SpellSource { classUuid: string; listUuid: string; name: string; grant: string; limits: Record<number, any> }
 
 export default function SpellsTab() {
-    const data = useShadowdarkCollections(['classes']);
-    const { collections } = data;
     const { resolveImageUrl, addNotification, fetchWithAuth } = useSDK();
-    const { actor, updateItem, deleteItem, startAction, openCard, isActionBusy, refreshActor } = useShadowdarkActor();
-    const [manage, setManage] = useState<{ source: SpellSource; tier: number } | null>(null);
+    const { actor, updateItem, deleteItem, startAction, openCard, isActionBusy, refreshActor, card, rollDialog, pendingConfirmation } = useShadowdarkActor();
+    const [manage, setManage] = useState<{ classUuid: string; tier: number } | null>(null);
     const [saving, setSaving] = useState(false);
+    const [submission, setSubmission] = useState<any>(null);
+    const [receipt, setReceipt] = useState<any>(null);
     const derived = actor.derived ?? {};
     const actions: PreparedAction[] = derived.actions ?? [];
     const views: any[] = derived.items ?? [];
     const itemById = (id: string) => (actor.items ?? []).find((item: any) => String(item.id ?? item._id) === id);
 
-    const sources: SpellSource[] = useMemo(() => {
-        const classes: string[] = derived.spellcasting?.classes ?? [];
-        const classDocs: any[] = collections?.classes ?? [];
-        const ownedClass = (actor.items ?? []).find((item: any) => item.type === 'Class');
-        const primary = derived.identity?.class?.ref ? formatUuid(derived.identity.class.ref) : null;
-        return classes.flatMap(slug => {
-            const doc = classDocs.find(entry => slugify(entry.name ?? '') === slug && entry.system?.spellcasting?.ability);
-            if (!doc) return [];
-            const uuid = canonicalUuid(doc.uuid)!;
-            const isPrimary = uuid === primary;
-            return [{ classUuid: uuid, name: doc.name, slug, spellsknown: (isPrimary ? ownedClass?.system?.spellcasting?.spellsknown : null) ?? doc.system?.spellcasting?.spellsknown ?? null }];
-        });
-    }, [derived.spellcasting, derived.identity, collections?.classes, actor.items]);
-
-    const knownFor = (source: SpellSource, tier: number) => views.filter(view => view.type === 'Spell'
-        && Number(itemById(view.id)?.system?.tier) === tier && (view.spellClasses ?? []).some((entry: any) => entry.slug === source.slug));
-    const limitFor = (source: SpellSource, tier: number): number | undefined => {
-        const value = source.spellsknown?.[String(derived.level ?? 0)]?.[String(tier)];
-        return value === null || value === undefined ? undefined : Number(value);
-    };
-    const tiersFor = (source: SpellSource) => [1, 2, 3, 4, 5].filter(tier => (limitFor(source, tier) ?? 0) > 0 || knownFor(source, tier).length > 0);
+    const sources: SpellSource[] = derived.spellModel?.sources ?? [];
+    const owned = derived.spellModel?.owned ?? [];
+    const managedSource = sources.find(source => source.classUuid === manage?.classUuid);
+    const intentRevision = managedSource ? JSON.stringify([managedSource.classUuid, managedSource.listUuid, managedSource.grant, managedSource.limits]) : '';
+    const knownFor = (source: SpellSource, tier: number) => owned.filter((row: any) => row.tier === tier
+        && (row.classes.includes(source.listUuid) || row.classification === 'unresolved'));
+    const limitFor = (source: SpellSource, tier: number) => source.limits[tier]?.status === 'known' ? source.limits[tier].value : undefined;
+    const tiersFor = (source: SpellSource) => [1,2,3,4,5].filter(tier => (limitFor(source, tier) ?? 0) > 0 || knownFor(source,tier).length);
 
     const spellRows = actions.filter(action => action.kind === 'spell' && itemById(action.itemId ?? '')?.type === 'Spell');
     const itemRows = actions.filter(action => action.kind === 'spell' && ['Scroll', 'Wand'].includes(itemById(action.itemId ?? '')?.type));
 
-    /** Sequential learn/remove with an explicit result; nothing is reported as done unless it was. */
-    const saveSelection = async (selected: any[]) => {
-        if (!manage || !data.ready || !sources.some(source => source.classUuid === manage.source.classUuid)) return;
-        setSaving(true);
-        const owned = knownFor(manage.source, manage.tier).filter(view => !view.innate && view.source);
-        const ownedSources = new Map(owned.map(view => [formatUuid(view.source), view]));
-        const selectedUuids = new Set(selected.filter(spell => !spell.isInnate).map(spell => canonicalUuid(spell.uuid)).filter(Boolean) as string[]);
-        const toAdd = [...selectedUuids].filter(uuid => !ownedSources.has(uuid));
-        const toRemove = [...ownedSources.entries()].filter(([uuid]) => !selectedUuids.has(uuid)).map(([, view]) => view);
-        const failed: string[] = [];
-        for (const uuid of toAdd) {
-            try {
-                const res = await fetchWithAuth(`/api/modules/shadowdark/actors/${actor.id}/spells/learn`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ spellUuid: uuid }),
-                });
-                const data = await res.json().catch(() => null);
-                if (!res.ok || !data?.success) failed.push(`${uuid}: ${data?.error ?? `HTTP ${res.status}`}`);
-            } catch (error) { failed.push(`${uuid}: ${(error as Error).message}`); }
+    useEffect(() => {
+        if (manage && !saving && !submission && !receipt && !managedSource) {
+            setManage(null); setSubmission(null); setReceipt(null);
+            addNotification('Casting source changed. Review the current character before managing spells.', 'info');
         }
-        for (const view of toRemove) if (!(await deleteItem(view.id))) failed.push(`${view.name}: not removed`);
-        await refreshActor();
-        setSaving(false);
-        if (failed.length) addNotification(`Spell changes were partly applied. Not saved: ${failed.join('; ')}`, 'error');
-        else { addNotification(`Updated ${manage.source.name} tier ${manage.tier} spells.`, 'success'); setManage(null); }
+    }, [manage, saving, managedSource, submission, receipt, addNotification]);
+
+    const saveSelection = async (intent: SpellIntent) => {
+        if (!manage || saving || (!managedSource && !submission)) return;
+        if (!submission && !intent.additions.length && !intent.removals.length) { setManage(null); return; }
+        const body = submission ?? { requestId: globalThis.crypto.randomUUID(), baseline: actor.spellReviewToken ?? spellReview(actor),
+            listUuid: managedSource!.listUuid, tier: manage.tier, ...intent };
+        setSubmission(body); setSaving(true);
+        try {
+            const res = await fetchWithAuth(`/api/modules/shadowdark/actors/${actor.id ?? actor._id}/spells/manage`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json', ...(typeof actor.worldContextRevision === 'number' ? { 'X-SheetDelver-Context-Revision': String(actor.worldContextRevision) } : {}) }, body: JSON.stringify(body),
+            });
+            const result = await res.json();
+            if (!res.ok || !result.success) throw new Error(result.error?.message ?? result.error ?? `HTTP ${res.status}`);
+            setReceipt({ ...result, requestId: body.requestId, listUuid: body.listUuid });
+            if (result.state === 'complete') { setManage(null); setSubmission(null); setReceipt(null); addNotification('Spell changes completed.', 'success'); }
+        } catch (e) {
+            // Keep the exact request for a lost response. A retry never invents
+            // new identity or a catalog-derived removal set.
+            setReceipt((previous: any) => ({ ...(previous ?? { state: 'partial', operations: [] }), requestId: body.requestId, listUuid: body.listUuid, recovery: `No complete response: ${(e as Error).message}. Retry this same request to reconcile receipts, or close and review actual inventory.` }));
+        } finally { await refreshActor(); setSaving(false); }
     };
 
     const castRow = (action: PreparedAction, item: any, label: string, spellItem: any | null, lostPath: boolean) => {
@@ -142,9 +130,9 @@ export default function SpellsTab() {
 
             <section className="space-y-3" aria-label="Manage spells">
                 <h3 className="bg-black text-white p-2 font-serif font-bold text-xl uppercase tracking-wider shadow-md">Manage Spells</h3>
-                <CollectionStatus state={data} label="Loading classes…" />
-                {data.ready && sources.length === 0 && (
-                    <p className="text-sm">No spellcasting class from the character's native spellcasting classes ({(derived.spellcasting?.classes ?? []).join(', ') || 'none'}) is available in declared Shadowdark data.</p>
+                {(derived.spellModel?.diagnostics ?? []).map((message: string) => <p key={message} role="status">{message}</p>)}
+                {sources.length === 0 && (
+                    <p className="text-sm">No spellcasting class progression is available for management. Owned spells remain visible above.</p>
                 )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {sources.map(source => (
@@ -153,9 +141,9 @@ export default function SpellsTab() {
                             <div className="p-3 flex flex-wrap gap-2">
                                 {tiersFor(source).map(tier => {
                                     const limit = limitFor(source, tier);
-                                    const known = knownFor(source, tier).filter(view => !view.innate).length;
+                                    const known = knownFor(source, tier).filter((view: any) => !view.innate).length;
                                     return (
-                                        <button type="button" key={tier} onClick={() => setManage({ source, tier })}
+                                        <button type="button" key={tier} onClick={() => { setSubmission(null); setReceipt(null); setManage({ classUuid: source.classUuid, tier }); }}
                                             className="min-h-11 px-4 py-2 bg-white border-2 border-black font-serif font-bold text-sm hover:bg-black hover:text-white flex flex-col items-center min-w-[100px]">
                                             <span>TIER {tier}</span>
                                             <span className="text-[10px] font-sans">{known} / {limit ?? '—'}</span>
@@ -169,19 +157,31 @@ export default function SpellsTab() {
                 </div>
             </section>
 
-            {manage && (
+            {manage && !managedSource && (submission || receipt) && <section role="status">
+                <p>The casting source is unavailable. Saved operation {submission?.requestId} still belongs to list {submission?.listUuid}; review actual inventory before another request.</p>
+                {receipt?.operations?.map((op: any, index: number) => <p key={index}>{op.kind} {op.itemId ?? op.target}: {op.status}</p>)}
+                <button type="button" disabled={saving} onClick={() => saveSelection({ additions: [], removals: [] })}>Retry saved operation</button>
+                <button type="button" disabled={saving} onClick={() => { setManage(null); setSubmission(null); setReceipt(null); }}>Close operation review</button>
+            </section>}
+            {manage && managedSource && (
                 <SpellSelectionModal
                     isOpen
-                    title={`Manage ${manage.source.name} Spells - Tier ${manage.tier}`}
+                    title={`Manage ${managedSource.name} Spells - Tier ${manage.tier}`}
                     tier={manage.tier}
-                    classUuid={manage.source.classUuid}
-                    knownSpells={knownFor(manage.source, manage.tier).filter(view => view.source).map(view => ({
-                        name: view.name, uuid: formatUuid(view.source), tier: manage.tier, img: view.img, isInnate: view.innate === true,
-                    } as any))}
+                    key={`${actor.id ?? actor._id}:${manage.classUuid}:${manage.tier}`}
+                    intentRevision={intentRevision}
+                    classUuid={managedSource.listUuid}
+                    knownSpells={knownFor(managedSource, manage.tier).map((row: any) => ({
+                        itemId: row.itemId, name: row.name, tier: row.tier, uuid: row.source ? formatUuid(row.source) : null,
+                        isInnate: row.innate, unresolved: row.classification === 'unresolved', system: itemById(row.itemId)?.system,
+                    }))}
                     onSave={saveSelection}
-                    onClose={() => setManage(null)}
-                    maxSelections={limitFor(manage.source, manage.tier)}
-                    isSaving={saving || !data.ready || !sources.some(source => source.classUuid === manage.source.classUuid)}
+                    onClose={() => { if (!saving) { setManage(null); setSubmission(null); setReceipt(null); } }}
+                    receipt={receipt}
+                    suspended={!!card || rollDialog.open || !!pendingConfirmation}
+                    onOpenDocument={uuid => openCard({ kind: 'document', uuid })}
+                    maxSelections={limitFor(managedSource, manage.tier)}
+                    isSaving={saving}
                     actor={actor}
                 />
             )}

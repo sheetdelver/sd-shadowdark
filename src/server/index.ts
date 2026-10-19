@@ -5,6 +5,9 @@ import { handleLearnSpell, handleGetSpellsBySource } from './api/spells';
 import { handleGetDocument } from './api/document';
 import { handleEffects } from './api/effects';
 import { handleActorAction } from './api/actions';
+import { handleActorView } from './api/actor-view';
+import { handleManageSpells } from './api/manage-spells';
+import { handleLanguagePlan, handleCreateCharacter } from './api/languages';
 import { handleLuck } from './api/luck';
 import { handleBestiaryCard, handleBestiaryList } from './api/bestiary';
 import { getErrorMessage, isSdkError } from '@sheet-delver/sdk';
@@ -31,6 +34,8 @@ async function effectRoute(run: () => Promise<unknown>) {
 }
 
 export const apiRoutes = {
+    'languages/plan': handleLanguagePlan,
+    'characters/create': handleCreateCharacter,
     'index': handleIndex,
     'custom-maps': handleGetCustomMaps,
     'import': handleImport,
@@ -66,6 +71,9 @@ export const apiRoutes = {
         const url = new URL(req.url, 'http://localhost');
         return effectRoute(async () => ({ success: true, result: await handleEffects(await actorIdFrom(params), req.runtime, 'delete', { ref: url.searchParams.get('ref') }) }));
     },
+    'actors/[id]/view': async (req: ModuleServerRequest, { params }: ModuleServerParams) => {
+        return handleActorView(await actorIdFrom(params), req);
+    },
     'actors/[id]/actions': async (req: ModuleServerRequest, { params }: ModuleServerParams) => {
         return handleActorAction(await actorIdFrom(params), req);
     },
@@ -97,6 +105,9 @@ export const apiRoutes = {
     },
     'actors/[id]/level-up/roll-boon': async (req: ModuleServerRequest, { params }: ModuleServerParams) => {
         return handleRollBoon(await actorIdFrom(params), req);
+    },
+    'actors/[id]/spells/manage': async (req: ModuleServerRequest, { params }: ModuleServerParams) => {
+        return handleManageSpells(await actorIdFrom(params), req);
     },
     'actors/[id]/spells/learn': async (req: ModuleServerRequest, { params }: ModuleServerParams) => {
         return handleLearnSpell(await actorIdFrom(params), req);

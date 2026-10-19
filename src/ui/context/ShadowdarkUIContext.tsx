@@ -62,6 +62,20 @@ export function ShadowdarkUIProvider({ children }: { children: React.ReactNode }
         return () => store.release();
     }, [store, worldId, userId, role, isConnected]);
     useEffect(() => events.on('world:contextChanged', () => store.invalidate()), [events, store]);
+    useEffect(() => {
+        let active = true, queued = false;
+        const invalidateItems = ({ type }: { type: string }) => {
+            if (type !== 'Item' || queued) return;
+            queued = true;
+            // A host change may publish both detail and directory hints. One
+            // generation retires pending catalog results and preserves search.
+            queueMicrotask(() => { queued = false; if (active) store.invalidate(); });
+        };
+        const offItem = events.on('document:changed', invalidateItems);
+        const offList = events.on('document:listInvalidated', invalidateItems);
+        return () => { active = false; offItem(); offList(); };
+    }, [events, store]);
+
 
     const fetchPack = useCallback((packId: string) => store.fetchCollection(packId), [store]);
     const retrySystem = useCallback(() => store.retry(), [store]);
@@ -113,5 +127,6 @@ export function useShadowdarkCollections(packIds: readonly string[], enabled = t
         if (systemStatus !== 'ready') retrySystem();
         else ids.forEach(retryCollection);
     };
-    return { collections, collectionStates, generation, ready, loading: enabled && !ready && !error, error, retry };
+    const warnings = ids.flatMap(id => { const state = collectionStates[id]; return state?.status === 'ready' ? state.warnings ?? [] : []; });
+    return { collections, collectionStates, generation, ready, loading: enabled && !ready && !error, error, warnings, retry };
 }

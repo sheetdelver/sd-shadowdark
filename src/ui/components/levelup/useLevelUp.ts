@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { isClassSpellcaster } from '../../../logic/rules';
 import { logger } from '@sheet-delver/sdk';
 import { useSDK } from '@sheet-delver/sdk/react';
@@ -8,6 +8,8 @@ import { canonicalUuid } from '../../../logic/identity';
 import { useChoiceCatalog } from '../../hooks/useChoiceCatalog';
 import { fixedTalentReferences, masteryKind } from '../../../logic/talent-choices';
 import { slugify } from '../../../logic/foundry';
+import { useLanguagePlan } from '../../hooks/useLanguagePlan';
+import { emptyLanguageSelections, validateLanguageSelections, type LanguageSelections } from '../../../logic/languages';
 
 export interface LevelUpProps {
     actorId: string;
@@ -22,9 +24,13 @@ export interface LevelUpProps {
     availableClasses?: any[];
     availablePatrons?: any[];
     availableLanguages?: any[];
+    languageChoices?: LanguageSelections;
+    contextRevision?: number;
+    baseline?: string;
+    reviewOnly?: boolean;
     knownLanguages?: any[]; // Passed for new characters (pre-gen selections)
     skipLanguageSelection?: boolean; // For when languages are handled externally (Generator)
-    onComplete: (data: { items: any[], hpRoll: number, gold?: number, languages?: string[], patronUuid?: string }) => void;
+    onComplete: (data: { items: any[], hpRoll: number, gold?: number, languages?: string[], patronUuid?: string, creationPlan?: any }) => void;
     onCancel: () => void;
     foundryUrl?: string;
     actorName?: string;
@@ -80,7 +86,7 @@ export const useLevelUp = (props: LevelUpProps) => {
         onComplete,
     } = props;
 
-    const { systemData, collections } = useShadowdarkUI();
+    const { systemData, collections, generation } = useShadowdarkUI();
     const { fetchWithAuth } = useSDK();
 
     const availableClasses = useMemo(() => {
@@ -106,11 +112,23 @@ export const useLevelUp = (props: LevelUpProps) => {
     });
 
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [operation, setOperation] = useState<any>(null);
+    const closeReview = useRef(props.onCancel);
+    closeReview.current = props.onCancel;
+    const submission = useRef<any>(null);
+    const submitting = useRef(false);
+    const mounted = useRef(true);
+    useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
 
     const [error, setError] = useState<string | null>(null);
     const [confirmReroll, setConfirmReroll] = useState(false);
 
     const [targetClassUuid, setTargetClassUuid] = useState(classUuid || "");
+    const authorityKey = JSON.stringify([actorId, targetClassUuid, classUuid, currentLevel, targetLevel, generation]);
+    const authorityRef = useRef(authorityKey); authorityRef.current = authorityKey;
+    const dataSequence = useRef(0);
+    const [levelData, setLevelData] = useState<{ key: string; ready: boolean }>({ key: '', ready: false });
+    useEffect(() => () => { dataSequence.current++; }, []);
     const [activeClassObj, setActiveClassObj] = useState<any>(classObj);
 
     // Sync props to state if not yet set
@@ -142,10 +160,17 @@ export const useLevelUp = (props: LevelUpProps) => {
     }, [propsAvailablePatrons, collections.patrons]);
 
 
-    const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
+    const [selectedLanguageGroups, setSelectedLanguageGroups] = useState<LanguageSelections>(emptyLanguageSelections);
     const [fixedLanguages, setFixedLanguages] = useState<string[]>([]);
     const [knownLanguages, setKnownLanguages] = useState<any[]>(initialKnownLanguages);
-    const [languageGroups, setLanguageGroups] = useState<any[]>([]);
+    const languageData = useLanguagePlan({
+        ancestryUuid: !actorId || actorId === 'new' ? ancestry?.uuid : undefined,
+        classUuid: activeClassObj?.uuid ?? targetClassUuid,
+        actorId: actorId && actorId !== 'new' ? actorId : undefined,
+        enabled: !skipLanguageSelection && targetLevel === 1 && !!activeClassObj,
+    });
+    const languageGroups = languageData.plan?.groups ?? [];
+    const selectedLanguages = [...new Set([...fixedLanguages, ...Object.values(selectedLanguageGroups).flat()])];
 
     const [talentTable, setTalentTable] = useState<any>(null);
     const [boonTable, setBoonTable] = useState<any>(null);
@@ -248,6 +273,9 @@ export const useLevelUp = (props: LevelUpProps) => {
 
     const fetchLevelUpData = useCallback(async (classUuidOverride?: string) => {
         if (!actorId && !classUuidOverride) return;
+        const key = authorityKey, sequence = ++dataSequence.current;
+        const stale = () => key !== authorityRef.current || sequence !== dataSequence.current;
+        setLevelData({ key, ready: false });
         try {
             let url = `/api/modules/shadowdark/actors/${actorId || 'new'}/level-up/data`;
             const params = new URLSearchParams();
@@ -261,9 +289,22 @@ export const useLevelUp = (props: LevelUpProps) => {
 
             const res = await fetchWithAuth(url, { headers, cache: 'no-store' });
             const json = await res.json();
+            if (stale()) return;
+            if (!res.ok || !json.success || !json.data) throw new Error(json.error?.message ?? json.error ?? `Advancement data HTTP ${res.status}`);
 
             if (json.success && json.data) {
                 const apiData = json.data;
+                if (props.reviewOnly && !apiData.advancementOperation) {
+                    // A concurrent authoritative refresh may already have settled it.
+                    closeReview.current();
+                    return;
+                }
+                if (apiData.advancementOperation && !submitting.current) {
+                    setOperation((previous: any) => previous?.state === 'retired' ? previous : apiData.advancementOperation);
+                    submission.current ??= { requestId: apiData.advancementOperation.requestId };
+                }
+                setLevelData({ key, ready: apiData.progressionReady !== false });
+                if (apiData.diagnostics?.length) setError(apiData.diagnostics.join(' '));
                 const isCaster = apiData.isSpellcaster;
                 if (isCaster !== undefined) setIsSpellcaster(isCaster);
 
@@ -278,7 +319,7 @@ export const useLevelUp = (props: LevelUpProps) => {
                     const unique = new Map();
                     if (Array.isArray(apiData.availableSpells)) {
                         apiData.availableSpells.forEach((s: any) => {
-                            if (!unique.has(s.name)) unique.set(s.name, s);
+                            if (!unique.has(s.uuid)) unique.set(s.uuid, s);
                         });
                         setAvailableSpells(Array.from(unique.values()));
                     }
@@ -294,10 +335,17 @@ export const useLevelUp = (props: LevelUpProps) => {
                 }));
             }
         } catch (e) {
+            if (stale()) return;
             logger.error("Failed to fetch level up data", e);
+            setError(`Advancement data is unavailable: ${getErrorMessage(e)}. Reopen after refreshing to retry.`);
+            setLevelData({ key, ready: false });
             setStatuses(prev => ({ ...prev, class: 'ERROR' }));
         }
-    }, [actorId, fetchWithAuth, selectedPatronUuid]);
+    }, [actorId, fetchWithAuth, selectedPatronUuid, authorityKey, props.reviewOnly]);
+
+    useEffect(() => {
+        if (props.reviewOnly) void fetchLevelUpData();
+    }, [props.reviewOnly, fetchLevelUpData]);
 
     const handlePatronChange = useCallback((uuid: string) => {
         setSelectedPatronUuid(uuid);
@@ -776,18 +824,24 @@ export const useLevelUp = (props: LevelUpProps) => {
         setRolledBoons(prev => prev.filter((_, i) => i !== index));
     };
 
-    const handleConfirm = async () => {
-        if (needsMastery && !masteryData.ready) return;
-        if (extraSpellSelection.active && !extraSpellData.ready) return;
+    const handleConfirm = async (recovery?: any) => {
+        if (submitting.current) return;
+        const authority = authorityKey;
+        if (!submission.current && needsMastery && !masteryData.ready) return;
+        if (!submission.current && extraSpellSelection.active && !extraSpellData.ready) return;
+        // A review fetched before this attempt cannot replace newer write
+        // receipts after its response arrives late.
+        dataSequence.current++;
+        submitting.current = true;
         setIsSubmitting(true);
         setStatuses(prev => ({ ...prev, class: 'LOADING' }));
         try {
             const headers: any = { 'Content-Type': 'application/json' };
+            const revision = operation?.contextRevision ?? props.contextRevision ?? languageData.plan?.contextRevision;
+            if (typeof revision === 'number') headers['X-SheetDelver-Context-Revision'] = String(revision);
 
-            const res = await fetchWithAuth(`/api/modules/shadowdark/actors/${actorId || 'new'}/level-up/finalize`, {
-                method: 'POST',
-                headers,
-                body: JSON.stringify({
+            submission.current ??= {
+                    ...(actorId && actorId !== 'new' ? { requestId: globalThis.crypto.randomUUID(), baseline: props.baseline } : {}),
                     targetLevel,
                     classUuid: targetClassUuid,
                     ancestryUuid: ancestry?.uuid,
@@ -798,31 +852,44 @@ export const useLevelUp = (props: LevelUpProps) => {
                     hpRoll,
                     gold: goldRoll,
                     languages: selectedLanguages,
+                    languageChoices: props.languageChoices ?? selectedLanguageGroups,
                     statSelection,
                     statPool,
                     weaponMasterySelection,
                     armorMasterySelection,
                     extraSpellSelection
-                })
+            };
+            const res = await fetchWithAuth(`/api/modules/shadowdark/actors/${actorId || 'new'}/level-up/finalize`, {
+                method: 'POST', headers, body: JSON.stringify({ ...submission.current, ...(recovery ? { recovery } : {}) })
             });
-
             const json = await res.json();
-            if (!res.ok) {
-                throw new Error(json.error || 'Failed to finalize level-up');
+            if (!mounted.current || authority !== authorityRef.current) return;
+            if (!res.ok || !json.success) throw new Error(json.error?.message ?? json.error ?? 'Failed to finalize level-up');
+            if (actorId && actorId !== 'new' && json.state !== 'complete') {
+                dataSequence.current++;
+                setOperation(json); setError(json.state === 'retired' ? null : 'Advancement is incomplete. Review the exact receipts below before continuing.');
+                setStatuses(prev => ({ ...prev, class: 'READY' }));
+                return;
             }
+            setOperation(null);
 
             onComplete({
                 items: json.items || [],
+                creationPlan: json.creationPlan,
                 hpRoll: json.hpRoll ?? hpRoll ?? 0,
                 gold: json.goldRoll ?? goldRoll ?? 0,
-                languages: selectedLanguages,
+                languages: json.languages ?? selectedLanguages,
                 patronUuid: selectedPatronUuid
             });
 
         } catch (error: unknown) {
-            setError(getErrorMessage(error));
-            setStatuses(prev => ({ ...prev, class: 'ERROR' }));
+            if (mounted.current && authority === authorityRef.current) {
+                setError(`${getErrorMessage(error)}. Reconcile this same request; do not submit replacement grants.`);
+                setOperation((previous: any) => previous ?? { requestId: submission.current?.requestId, state: 'partial', operations: [], recovery: 'No authoritative completion response. Retry the same request to obtain saved receipts.' });
+                setStatuses(prev => ({ ...prev, class: 'READY' }));
+            }
         } finally {
+            submitting.current = false;
             setIsSubmitting(false);
         }
     };
@@ -830,6 +897,7 @@ export const useLevelUp = (props: LevelUpProps) => {
 
     // Initialization and Sync logic
     useEffect(() => {
+        if (props.reviewOnly) return;
         const init = async () => {
             let currentClass = activeClassObj;
             let effectiveClassUuid: string | undefined = targetClassUuid || classUuid;
@@ -864,25 +932,12 @@ export const useLevelUp = (props: LevelUpProps) => {
                     classLoaded = true;
                 }
 
-                // Determine if we MUST fetch from server (state mismatch or missing)
-                const currentUuid = currentClass?.uuid || currentClass?._id;
-
-                // Helper to normalize UUID comparison
-                const isMatch = (val1: string, val2: string) => {
-                    if (!val1 || !val2) return false;
-                    if (val1 === val2) return true;
-                    if (val1.endsWith(val2) || val2.endsWith(val1)) return true;
-                    return false;
-                };
-
-
-
                 const needsFetch = !classLoaded && (targetClassUuid || classUuid);
                 
                 if (targetClassUuid || classUuid) {
                     const findInList = (uuid: string) => {
                         return availableClasses.find((c: any) => 
-                            c.uuid === uuid || c._id === uuid || c.id === uuid
+                            c.uuid === uuid
                         );
                     };
 
@@ -904,22 +959,7 @@ export const useLevelUp = (props: LevelUpProps) => {
                     if (statuses.class !== 'LOADING') setStatuses(prev => ({ ...prev, class: 'LOADING' }));
                     const fetchUuid = targetClassUuid || classUuid;
 
-                    // Specific logic for availableClasses searching if it's a targetClassUuid
-                    let searchUuid = fetchUuid;
-                    if (targetClassUuid) {
-                        const targetClassFromList = availableClasses.find((c: any) => (c.uuid === targetClassUuid) || (c._id === targetClassUuid));
-                        if (targetClassFromList) {
-                            if (targetClassFromList.uuid) {
-                                searchUuid = targetClassFromList.uuid;
-                            } else if (targetClassFromList.pack) {
-                                // For items, the core system expects Compendium.pack.Item.id
-                                const id = targetClassFromList._id || targetClassFromList.id;
-                                searchUuid = `Compendium.${targetClassFromList.pack}.Item.${id}`;
-                            } else if (!targetClassFromList.uuid && targetClassFromList._id) {
-                                searchUuid = `Compendium.shadowdark.classes.Item.${targetClassFromList._id}`;
-                            }
-                        }
-                    }
+                    const searchUuid = fetchUuid;
                     const cls = await fetchDocument(searchUuid!);
 
                     if (cls) {
@@ -1084,35 +1124,18 @@ export const useLevelUp = (props: LevelUpProps) => {
             }
         };
         init();
-    }, [classObj, actorId, targetLevel, targetClassUuid, selectedPatronUuid, patronUuid, availableClasses, availablePatrons, collections, classUuid, currentLevel, fetchDocument, fetchLevelUpData, activeClassObj, statuses.class]);
+    }, [props.reviewOnly, classObj, actorId, targetLevel, targetClassUuid, selectedPatronUuid, patronUuid, availableClasses, availablePatrons, collections, classUuid, currentLevel, fetchDocument, fetchLevelUpData, activeClassObj, statuses.class]);
 
     useEffect(() => {
-        if (activeClassObj) {
-            // Check skip first
-            if (skipLanguageSelection) {
-                setLanguageGroups([]);
-                setFixedLanguages([]);
-                return;
-            }
-
-
-            // Only allow language selection at Level 1 (or 0 -> 1)
-            if (targetLevel === 1 || currentLevel === 0) {
-                const langData = activeClassObj.system?.languages || { common: 0, fixed: [], rare: 0, select: 0 };
-                const groups = [];
-                setFixedLanguages(langData.fixed || []);
-                setSelectedLanguages(prev => Array.from(new Set([...prev, ...(langData.fixed || [])])));
-
-                if (langData.select > 0) groups.push({ id: 'select', label: 'Class Selection', count: langData.select, options: langData.selectOptions });
-                if (langData.common > 0) groups.push({ id: 'common', label: 'Common Languages', count: langData.common });
-                if (langData.rare > 0) groups.push({ id: 'rare', label: 'Rare Languages', count: langData.rare });
-                setLanguageGroups(groups);
-            } else {
-                setLanguageGroups([]);
-                setFixedLanguages([]);
-            }
-        }
-    }, [activeClassObj, targetLevel, currentLevel, skipLanguageSelection]);
+        if (!languageData.ready || !languageData.plan) return;
+        const plan = languageData.plan;
+        setFixedLanguages(plan.fixed);
+        setSelectedLanguageGroups(previous => {
+            const next = { ...previous }, used = new Set(plan.fixed);
+            for (const group of plan.groups) { next[group.id] = previous[group.id].filter(uuid => group.options.includes(uuid) && !used.has(uuid)).slice(0,group.count);next[group.id].forEach(uuid => used.add(uuid)); }
+            return next;
+        });
+    }, [languageData.plan, languageData.ready]);
 
     // Clear LOADING status when selections update
     useEffect(() => {
@@ -1246,6 +1269,7 @@ export const useLevelUp = (props: LevelUpProps) => {
 
     // Validation
     const isComplete = useCallback(() => {
+        if (levelData.key !== authorityKey || !levelData.ready) return false;
         if (!fixedChoices || fixedChoices.key !== fixedChoiceKey || fixedChoices.error) return false;
         // 1. Talents
         for (const handler of TALENT_HANDLERS) {
@@ -1307,31 +1331,14 @@ export const useLevelUp = (props: LevelUpProps) => {
         }
 
         // 7. Languages
-        for (const group of languageGroups) {
-            const groupOptions = availableLanguages?.filter((l: any) => {
-                const id = l.uuid || l._id;
-                if (fixedLanguages.includes(id)) return false;
-                if (group.id === 'select') return group.options?.includes(id);
-                if (group.id === 'common') return !l.rarity || l.rarity === 'common';
-                if (group.id === 'rare') return l.rarity === 'rare';
-                return false;
-            }) || [];
-
-            const groupSelections = selectedLanguages.filter(lid => {
-                const opt = groupOptions.find((o: any) => (o.uuid || o._id) === lid);
-                if (!opt) return false;
-                return !knownLanguages.some(kl => kl.name?.toLowerCase() === opt.name?.toLowerCase());
-            });
-
-            if (groupSelections.length < group.count) return false;
-        }
+        if (!skipLanguageSelection && targetLevel === 1 && (!languageData.ready || !languageData.plan || !validateLanguageSelections(languageData.plan, selectedLanguageGroups).valid)) return false;
 
         // 8. Spells
-        if (isSpellcaster && spellsToChooseTotal > 0 && availableSpells && availableSpells.length > 0) {
-            if (selectedSpells.length < spellsToChooseTotal) return false;
+        if (isSpellcaster && spellsToChooseTotal > 0) {
+            if (selectedSpells.length !== spellsToChooseTotal || !availableSpells?.length) return false;
             for (const [tier, count] of Object.entries(spellsToChoose)) {
                 const selectedInTier = selectedSpells.filter(s => Number(s.tier || s.system?.tier || 0) === Number(tier)).length;
-                if (selectedInTier < count) return false;
+                if (selectedInTier !== count) return false;
             }
         }
 
@@ -1352,10 +1359,10 @@ export const useLevelUp = (props: LevelUpProps) => {
 
         return true;
     }, [
-        rolledTalents, requiredTalents, targetLevel, existingItems, statSelection, statPool, weaponMasterySelection, armorMasterySelection, activeClassObj, fixedChoices, fixedChoiceKey,
+        rolledTalents, requiredTalents, targetLevel, existingItems, statSelection, statPool, weaponMasterySelection, armorMasterySelection, activeClassObj, fixedChoices, fixedChoiceKey, levelData, authorityKey,
         rolledBoons, choiceRolls,
         extraSpellSelection, extraSpellData.ready, extraSpellsList, needsMastery, masteryData.ready, masteryData.catalog,
-        languageGroups, availableLanguages, fixedLanguages, selectedLanguages, knownLanguages,
+        languageGroups, availableLanguages, fixedLanguages, selectedLanguages, knownLanguages, languageData, selectedLanguageGroups, skipLanguageSelection,
         isSpellcaster, spellsToChooseTotal, availableSpells, selectedSpells, spellsToChoose,
         pendingChoices,
         hpRoll, goldRoll, totalRequiredBoons
@@ -1388,6 +1395,7 @@ export const useLevelUp = (props: LevelUpProps) => {
             statuses,
             error,
             isSubmitting,
+            operation,
             activeClassObj,
             rolledTalents,
             rolledBoons,
@@ -1412,6 +1420,8 @@ export const useLevelUp = (props: LevelUpProps) => {
             fixedLanguages,
             knownLanguages,
             languageGroups,
+            languageData,
+            selectedLanguageGroups,
             boonTable,
             availableSpells,
             selectedSpells,
@@ -1433,6 +1443,7 @@ export const useLevelUp = (props: LevelUpProps) => {
             talentTable
         },
         actions: {
+            refreshOperation: () => fetchLevelUpData(targetClassUuid),
             handleRollHP,
             handleRollGold,
             handleRollTalent,
@@ -1454,7 +1465,7 @@ export const useLevelUp = (props: LevelUpProps) => {
             handleRollBoon,
             handleRemoveTalent,
             handleRemoveBoon,
-            setSelectedLanguages,
+            setSelectedLanguageGroups,
             handleStatPoolChange,
             handleResetTalents,
             handleResetBoons,

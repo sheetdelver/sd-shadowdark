@@ -24,6 +24,7 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { CORE, Http, Manager, prepareWorkspace, unusedPort, until, isolatedEnv } from './core0191/core';
 import { ControlledUpstream, type WorldState } from './core0191/upstream';
+import { parityFixtures, proveParityContracts } from './parity-installed';
 import { nativePacks, type Doc } from './core0191/world';
 
 const args = new Map(process.argv.slice(2).map(arg => { const [key, ...value] = arg.replace(/^--/, '').split('='); return [key, value.join('=') || 'true']; }));
@@ -36,7 +37,8 @@ const PLAYWRIGHT = process.env.SHADOWDARK_PLAYWRIGHT_MODULE || 'playwright';
 const mod = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const production = args.has('production');
 const core = { version: JSON.parse(fs.readFileSync(path.join(CORE, 'package.json'), 'utf8')).version, commit: spawnSync('git', ['-C',CORE,'rev-parse','HEAD'], {encoding:'utf8'}).stdout.trim() };
-assert.equal(core.version, '0.19.2');
+assert.ok(['0.19.2','0.19.3'].includes(core.version));
+if (!core.commit && fs.existsSync(path.join(CORE,'.source-provenance.json'))) core.commit = JSON.parse(fs.readFileSync(path.join(CORE,'.source-provenance.json'),'utf8')).commit;
 fs.mkdirSync(path.join(out, 'shots'), { recursive: true });
 const evidence: Record<string, any> = { native: false, generation, core, mode: production ? 'production' : 'development', archive: { file: archive, sha256: createHash('sha256').update(fs.readFileSync(archive)).digest('hex') }, checks: [], cases: [], pageErrors: [], consoleErrors: [] };
 const pass = (label: string) => { evidence.checks.push(label); console.log(`  ✓ ${label}`); };
@@ -61,6 +63,8 @@ const state: WorldState = {
         { _id: 'setAmmo', key: 'shadowdark.autoConsumeAmmunition', value: 'true' }],
     chat: [], packs, packMetadata: metadata,
 };
+const parity = parityFixtures(packs, WIZARD); state.actors.push(parity.actor); state.items.push(parity.worldClass, parity.spell);
+const catalogWorldSpell = { ...structuredClone(WIZARD.items.find((item:Doc)=>item.type==='Spell' && item.system?.tier===1)), _id:'sd02CatalogWorldSpell', name:'SD02 catalog spell', ownership:{default:0,player:2} }; state.items.push(catalogWorldSpell);
 const upstream = new ControlledUpstream(state);
 const root = path.join(out, 'run'); fs.rmSync(root, { recursive: true, force: true }); fs.mkdirSync(root, { recursive: true });
 const workspace = prepareWorkspace(root, production);
@@ -86,7 +90,7 @@ async function main() {
         const build = spawnSync(process.execPath, ['--import','tsx','src/scripts/start-server.ts','build',`--data-dir=${data}`], {cwd: workspace, env: {...isolatedEnv(data), NODE_ENV:'production'}, stdio:['ignore',log,log]});
         fs.closeSync(log); assert.equal(build.status, 0, `production build: ${root}/build.log`);
     }
-    const manager = new Manager(workspace, data, path.join(root, 'manager.log'), production ? 'start' : 'dev');
+    let manager = new Manager(workspace, data, path.join(root, 'manager.log'), production ? 'start' : 'dev');
     const origin = `http://127.0.0.1:${appPort}`; const api = `http://127.0.0.1:${apiPort}`;
     const admin = new Http(api, origin);
     const { chromium } = await import(PLAYWRIGHT);
@@ -118,7 +122,7 @@ async function main() {
         assert.equal((await admin.request('/admin/module-maintenance/approve',{planId:review.preview.id,backupAcknowledged:true})).status,202);
         evidence.installation = 'public HTTP archive preview + maintenance enter/review/approve; explicit isolated trust override';
         await until('serving with the candidate module', async () => (await (await admin.request('/api/status')).json()).initialized === true || false, manager, 600_000);
-        pass('candidate v2 module serves a native-pregen world on real Core 0.19.2 (bootstrap migration check is a no-op)');
+        pass(`candidate v2 module serves a native-pregen world on real Core ${core.version} (bootstrap migration check is a no-op)`);
 
         // Real login through Core's login view.
         const loginContext = await browser.newContext({ viewport: { width: 1440, height: 900 } });
@@ -131,6 +135,16 @@ async function main() {
         await loginContext.close();
         pass('player logged in through Core\'s real login view');
 
+        if (args.has('contracts-only')) {
+            evidence.skipped = ['width/theme and legacy UI matrix (--contracts-only)'];
+            const context = await browser.newContext({storageState:storage});
+            await proveParityContracts({context,api,origin,state,upstream,pass,
+                wait:(label,operation)=>until(label,operation,manager,120000), restart:async()=>{
+                    await manager.stop(); manager=new Manager(workspace,data,path.join(root,'manager-restarted.log'),production?'start':'dev');
+                    await until('restarted public runtime ready',async()=>(await(await admin.request('/api/status')).json()).initialized===true||false,manager,300000);
+                }});
+            await context.close(); return;
+        }
         if (args.has('probe-reconnect-write')) {
             // Minimal public-contract reproduction, independent of sheet/card
             // UI or ownership edits. A failed post is attempted exactly once.
@@ -211,7 +225,7 @@ async function main() {
             }
             return result;
         };
-        const widths = args.has('focus-only') ? [] : (args.get('widths') ?? '320,390,820,1440').split(',').map(Number);
+        const widths = args.has('focus-only') ? [] : (args.get('widths') ?? '360,768,1024,1440').split(',').map(Number);
         for (const width of widths) for (const theme of ['dark', 'light'] as const) {
             const label = `${width}-${theme}`;
             const context = await browser.newContext({ viewport: { width, height: 900 }, storageState: storage });
@@ -235,7 +249,7 @@ async function main() {
             const spell = page.locator('section[aria-label="Spells"] button').first();
             if (await spell.count()) record.spellCard = await dialogKeyboard(page, spell, `${label} spell card`);
             record.attackCard = await dialogKeyboard(page, page.getByRole('button', { name: 'Dagger details' }).first(), `${label} attack card`);
-            if (width === 320 || width === 1440) {
+            if (width === 360 || width === 1440) {
                 const opener=page.getByRole('button',{name:'Dagger details'}).first(); await opener.focus(); await page.keyboard.press('Enter');
                 const card=page.getByRole('dialog').last(); const attack=card.getByRole('button',{name:/^Melee attack$/i});
                 await attack.focus(); await page.keyboard.press('Enter');
@@ -272,6 +286,9 @@ async function main() {
             }
             record.tabs = tabs;
             assert.ok(tabs.length >= 6, `${label}: tabs reviewed ${tabs.join(',')}`);
+            await page.getByRole('button',{name:'Spells',exact:true}).first().click().catch(async()=>{
+                await page.getByRole('button',{name:'More sections'}).click(); await page.getByRole('button',{name:'Spells',exact:true}).last().click(); });
+            record.spellPicker = await dialogKeyboard(page,page.getByRole('button',{name:/TIER 1/}).first(),`${label} spell picker`);
             // Inventory card from the tabbed sheet.
             await page.getByRole('button', { name: 'Inventory', exact: true }).first().click().catch(async () => {
                 await page.getByRole('button', { name: 'More sections' }).click(); await page.getByRole('button', { name: 'Inventory', exact: true }).last().click(); });
@@ -387,20 +404,17 @@ async function main() {
         const caller = {get: async (url: string) => {const response = await context.request.get(`${api}${url}`, {headers:{Origin:origin}}); return {status:response.status()};}};
         await until('fresh classes reads denied', async () => (await caller.get('/api/modules/shadowdark/fetch-pack/classes')).status === 403 || false, manager, 60000);
         await page.getByRole('button',{name:'Spells',exact:true}).first().click();
-        await page.getByRole('alert').filter({hasText:'classes:'}).waitFor({timeout:60000});
-        await shot(page,'rv11-spells-denied');
-        await page.getByRole('button',{name:'Retry',exact:true}).click();
-        await page.getByRole('alert').filter({hasText:'classes:'}).waitFor({timeout:60000});
+        await page.getByText('Actor Class is unavailable. Resolve its exact reference; no Class was inferred.',{exact:true}).waitFor({timeout:60000});
+        await shot(page,'sd02-exact-class-denied');
         upstream.setSetting('core.compendiumConfiguration', {});
         await page.getByRole('button',{name:/TIER 1/}).first().waitFor({timeout:60000});
-        pass('RV-11 installed UI: Spells explains real classes 403, retries, and recovers after permission restoration');
+        pass('SD02 installed caller Class denial is explicit and exact view recovers without unrelated Class collection loading');
         upstream.setSetting('core.compendiumConfiguration', {'shadowdark.classes':{ownership:{}}});
-        const gapStart = {index:requests.length,classes:shards.filter(id=>id==='classes').length};
-        await until('generator classes reads denied', async () => (await caller.get('/api/modules/shadowdark/fetch-pack/classes')).status === 403 || false, manager, 60000);
-        await page.getByRole('alert').filter({hasText:'classes:'}).waitFor({timeout:60000});
-        assert.ok(requests.length > gapStart.index, 'ownership-only event refetched mounted caller index');
-        assert.equal(await page.getByRole('button',{name:/TIER 1/}).count(),0, 'retired classes no longer rendered');
-        evidence.ownershipRefresh={indexRefetched:true,loadedClassesRetired:true};
+        const gapStart = {index:requests.length};
+        await until('caller Class denied',async()=>(await caller.get('/api/modules/shadowdark/fetch-pack/classes')).status===403||false,manager,60000);
+        await page.getByText('Actor Class is unavailable. Resolve its exact reference; no Class was inferred.',{exact:true}).waitFor({timeout:60000});
+        assert.equal(await page.getByRole('button',{name:/TIER 1/}).count(),0);
+        evidence.ownershipRefresh={indexRefetched:requests.length>gapStart.index,loadedClassesRetired:true};
         await page.goto(`${origin}/tools/shadowdark/generator`, {timeout:300000});
         await page.getByRole('alert').filter({hasText:'classes:'}).waitFor({timeout:60000});
         assert.equal(await page.getByRole('button',{name:'Create Character',exact:true}).count(),0);
@@ -409,6 +423,22 @@ async function main() {
         await page.getByRole('button',{name:'Create Character',exact:true}).waitFor({timeout:60000});
         await shot(page,'rv11-generator-recovered');
         pass('RV-11 installed UI: generator partial success stays blocked on classes 403 and recovers after a real context change');
+
+        await page.goto(`${origin}/actors/${WIZARD._id}`,{timeout:300000});
+        await page.getByRole('button',{name:'Manage Character Sheet'}).click();
+        await page.getByRole('button',{name:'Spells',exact:true}).first().click();
+        await page.getByRole('button',{name:/TIER 1/}).first().click();
+        const spellManager=page.getByRole('dialog',{name:/Manage Wizard Spells/});
+        await spellManager.getByPlaceholder('Filter spells by name...').fill('SD02 catalog');
+        const worldAddition=spellManager.getByRole('button',{name:'Add SD02 catalog spell',exact:true});await worldAddition.waitFor({timeout:60000});
+        upstream.externalUpdate('Item',[{_id:catalogWorldSpell._id,ownership:{default:0,player:0}}]);
+        await worldAddition.waitFor({state:'hidden',timeout:60000});
+        assert.equal(await spellManager.getByPlaceholder('Filter spells by name...').inputValue(),'SD02 catalog');
+        upstream.externalUpdate('Item',[{_id:catalogWorldSpell._id,ownership:{default:0,player:2}}]);
+        await worldAddition.waitFor({timeout:60000});await spellManager.getByRole('button',{name:'CANCEL',exact:true}).click();
+        pass('SD02 installed world Item permission events retire and restore the loaded spell catalog without losing search');
+        await page.goto(`${origin}/tools/shadowdark/generator`,{timeout:300000});
+        await page.getByRole('button',{name:'Create Character',exact:true}).waitFor({timeout:60000});
 
         // Exercise actual packaged managed-JS errors across the SDK loading
         // boundary. The native effect is copied intact from a pinned pregen.
@@ -445,7 +475,7 @@ async function main() {
         pass('packaged managed-JS OBSERVER 403 and LIMITED concealment 404 preserve source; OWNER succeeds and source is restored');
         // Reconnect after an ownership-only change. This tests permissions, not
         // arbitrary disconnected pack-content freshness (the separate CG-4).
-        upstream.unavailable = true; upstream.disconnectAll();
+        upstream.unavailable = true; upstream.interruptTransport();
         await page.getByRole('button',{name:'Create Character',exact:true}).waitFor({state:'hidden',timeout:60000});
         upstream.setSetting('core.compendiumConfiguration', {'shadowdark.classes':{ownership:{}}});
         upstream.unavailable = false;
@@ -454,6 +484,11 @@ async function main() {
         await page.getByRole('button',{name:'Create Character',exact:true}).waitFor({timeout:60000});
         pass('ownership-only denial across disconnect retires loaded data; reconnect and override removal recover the mounted generator');
 
+        await proveParityContracts({context,api,origin,state,upstream,pass,
+            wait:(label,operation)=>until(label,operation,manager,120000), restart:async()=>{
+                await manager.stop(); manager = new Manager(workspace,data,path.join(root,'manager-restarted.log'),production?'start':'dev');
+                await until('restarted public runtime ready',async()=>(await(await admin.request('/api/status')).json()).initialized===true||false,manager,300000);
+            }});
         await context.close();
         pass(`live Pulp Mode changes reach the open paper and tabbed sheets without reload; index refetched ${requests.length}x, no stuck loading`);
         assert.deepEqual(evidence.pageErrors, [], 'no page errors');

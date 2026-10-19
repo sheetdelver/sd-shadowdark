@@ -49,6 +49,7 @@ const view = (who: any) => prepareShadowdarkView(who, { propertyName: uuid => (n
 
 async function masteryAssemblyRegression() {
     const resolve = shadowdarkAdapter.resolveReadable;
+    const resolveFor = shadowdarkAdapter.resolveDocumentFor;
     const catalogFn = shadowdarkAdapter.getChoiceCatalog;
     const templates = ['Weapon', 'Armor'].map(kind => ({ name: `${kind} Mastery`, type: 'Talent',
         uuid: `Compendium.shadowdark.talents.Item.${kind.toLowerCase()}`, system: {}, effects: [{ name: `${kind} Mastery`, changes: [
@@ -56,6 +57,7 @@ async function masteryAssemblyRegression() {
         ] }] }));
     const original = JSON.stringify(templates);
     shadowdarkAdapter.resolveReadable = async (uuid: string) => structuredClone(templates.find(item => item.uuid === uuid) ?? null);
+    shadowdarkAdapter.resolveDocumentFor = (uuid, caller) => shadowdarkAdapter.resolveReadable(uuid, caller);
     shadowdarkAdapter.getChoiceCatalog = async (_caller: unknown) => catalog;
     const state = (kind: string, choices: string[], rolled: any[]) => ({ rolledTalents: rolled, rolledBoons: [],
         selectedSpells: [], selectedLanguages: [], statSelection: { selected: [] }, statPool: {},
@@ -104,6 +106,7 @@ async function masteryAssemblyRegression() {
         }
     } finally {
         shadowdarkAdapter.resolveReadable = resolve;
+        shadowdarkAdapter.resolveDocumentFor = resolveFor;
         shadowdarkAdapter.getChoiceCatalog = catalogFn;
     }
     assert.equal(JSON.stringify(templates), original, 'assembly never mutates cached templates');
@@ -267,8 +270,10 @@ export async function run() {
     assert.ok(await enrichItem(mastery, { ...multiple, bonusTo: 'Longsword' }));
     assert.ok(await enrichItem(mastery, { ...multiple, bonusTo: 'Dagger' }));
     const resolve = shadowdarkAdapter.resolveReadable;
+    const resolveFor = shadowdarkAdapter.resolveDocumentFor;
     const catalogFn = shadowdarkAdapter.getChoiceCatalog;
     shadowdarkAdapter.resolveReadable = async (uuid: string) => uuid === mastery.uuid ? structuredClone(mastery) : null;
+    shadowdarkAdapter.resolveDocumentFor = (uuid, caller) => shadowdarkAdapter.resolveReadable(uuid, caller);
     shadowdarkAdapter.getChoiceCatalog = async (_caller: unknown) => catalog;
     const state: any = { rolledTalents: [], rolledBoons: [], selectedSpells: [], selectedLanguages: [],
         weaponMasterySelection: { required: 1, selected: ['Longsword'] }, armorMasterySelection: { required: 0, selected: [] },
@@ -284,6 +289,7 @@ export async function run() {
         assert.doesNotMatch(JSON.stringify(advancement), /REPLACEME/);
     } finally {
         shadowdarkAdapter.resolveReadable = resolve;
+        shadowdarkAdapter.resolveDocumentFor = resolveFor;
         shadowdarkAdapter.getChoiceCatalog = catalogFn;
     }
     assert.equal(JSON.stringify(mastery), before, 'choice, import and advancement never mutate the cached template');

@@ -57,7 +57,7 @@ export async function enrichItem(item: any, context: EnrichmentContext): Promise
     // 2. Prevent Duplicates
     const typeNameKey = `${enriched.type}:${itemName}`;
     if (sourceKey && context.addedSourceIds.has(sourceKey)) return null;
-    if (context.addedNames.has(typeNameKey)) return null;
+    // Display names never replace an exact source identity.
     
     // 3. Ensure ID exists
     if (!enriched._id && !enriched.id) {
@@ -185,40 +185,13 @@ export async function resolveSubItems(
     logger.debug(`[ActorEnricher] Resolving ${allRefs.length} sub-items for ${parentItem.name} (${parentItem.type})...`);
 
     const resolvePromises = allRefs.map(async (ref) => {
-        const uuid = (typeof ref === 'string') ? ref : (ref.uuid || ref._id || ref.id);
-        if (!uuid) return null;
-
-        try {
-            const doc = await resolveDocFn(uuid);
-            if (doc) {
-                let include = true;
-
-                // IF Parent is Ancestry: Resolve ONLY if Fixed
-                if (isAncestry && talentRefs.includes(uuid)) {
-                    const count = parentItem.system.talentChoiceCount || 0;
-                    const total = talentRefs.length || 0;
-                    // It's a choice IF total > count. Items in choice pools should not be 'fixed'.
-                    if (total > count) {
-                        include = false;
-                        logger.debug(`[ActorEnricher] Skipping ancestry choice item: ${doc.name}`);
-                    }
-                }
-
-                if (include) {
-                    // Create a sub-context with the appropriate hint
-                    const subContext: EnrichmentContext = {
-                        ...context,
-                        defaultTalentClass: isAncestry ? 'ancestry' : (parentItem.type === 'Class' ? 'class' : context.defaultTalentClass)
-                    };
-                    return await enrichItem(doc, subContext);
-                }
-            } else {
-                logger.warn(`[ActorEnricher] Could not resolve sub-item: ${uuid}`);
-            }
-        } catch (e) {
-            logger.error(`[ActorEnricher] Error resolving sub-item ${uuid}:`, e);
-        }
-        return null;
+        const uuid = canonicalUuid(typeof ref === 'string' ? ref : ref?.uuid);
+        if (!uuid) throw new Error(`Required ${parentItem.name} grant has no exact UUID.`);
+        const doc = await resolveDocFn(uuid);
+        if (!doc) throw new Error(`Required ${parentItem.name} grant ${uuid} is unavailable; no partial character was created.`);
+        // Native talents are fixed; talentChoices is the separate choice pool.
+        return enrichItem({ ...doc, uuid }, { ...context,
+            defaultTalentClass: isAncestry ? 'ancestry' : parentItem.type === 'Class' ? 'class' : context.defaultTalentClass });
     });
 
     const results = await Promise.all(resolvePromises);

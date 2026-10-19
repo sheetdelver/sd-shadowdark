@@ -1,5 +1,45 @@
 # Shadowdark module architecture
 
+**Automatic completion correction (October 19):** SD02-N14-01/02 pass offline
+and targeted native v14 checks. The existing caller Actor projection now joins
+the shared Actor queue and refreshes only that caller's owned advancement
+receipt. A fully dispatched operation with exact final primary source and all
+confirmed grant IDs settles automatically; zero-write attempts retire using the
+existing policy. This is local bookkeeping, with no Foundry writes or new
+world cache. Uncertain/partial/mismatching source remains blocked. A boolean
+`advancementPending` exposes review on either sheet independently of XP without
+leaking another caller's receipts. Review loads its original request directly,
+not a new level's Class/Patron prerequisites. Invalid selection shapes/references
+return typed validation errors. See the [native evidence](audits/2026-10-19-adr-0002-native-acceptance.md#automatic-completion-correction-and-native-recheck).
+The selected native13.351/14.367 acceptance is complete; Core/SDK are unchanged.
+Recovery controls now have explicit field/button/focus/disabled styling, spaced
+review actions and long-text wrapping. See the [final closeout](audits/2026-10-19-adr-0002-native-acceptance.md#v13-completion-and-final-closeout--october-19-2026)
+for the UI-only delta and native evidence qualification.
+
+**Corrective implementation (October 19):** R1b's acknowledgement and receipt
+separation and R2/R3 remain covered. SD02-R1a-R1 removes old-source equality from
+proven zero-write retirement, preserving independent Actor edits and requiring
+fresh preparation. CI now invokes all 17 maintained source suites with the pinned
+native reference. The original review and corrective evidence are recorded in
+[SD02-R1a-R1](audits/2026-10-18-spellcasting-and-native-parity.md#sd02-r1a-r1--zero-write-actor-edits-still-block-restart-p1).
+Native D6/final D7 and the selected A02 matrix are complete; see the final ledger above.
+
+**Completed follow-up (October 19):** the post-release 0.9.5
+[native parity audit](audits/2026-10-18-spellcasting-and-native-parity.md) and
+[ADR-0002](adr/0002-native-data-and-behavior-parity.md) cover newly observed
+actor-data omissions, alternate spell lists, owned-spell accounting and selection
+safety, plus action phases, Potion identification, NPC focus/outcomes and language
+fields (SD02-01–13). The audit includes bounded matching native-method controls,
+a model coverage matrix and separately scoped F01–F06 feature proposals.
+ADR-0002 is completed within its selected scope; F01–F06 remain deferred. The released0.9.5 gap descriptions below
+are historical baseline; current corrections are recorded here and in its checkpoint record.
+Independent review of `dbbe93f2` identified SD02-R1–R3. Corrective checkpoints now
+verify durable advancement completion/recovery, final creation spell validation
+and current facts in mounted spell management through offline regressions.
+See the [review findings and corrective checkpoints](audits/2026-10-18-spellcasting-and-native-parity.md#independent-implementation-review--october-18-2026).
+The older acceptance below remains scoped evidence, not a claim that every
+historical actor or spell-management workflow has been validated.
+
 **Current status (October18, completed):** ADR-0001's selected native alignment,
 resource cards and G8 adoption are accepted on actual Foundry13.351/14.367 with
 native Shadowdark4.0.6 and Core0.19.2. The [final ADR closeout](adr/0001-native-alignment-and-resource-cards.md#final-native-v14-acceptance-and-closeout--october-18-2026)
@@ -29,6 +69,109 @@ Core owns authorization, world/session lifecycle and shared chat/media/dice
 presentation. Generator/importer pages own only their resource loading and
 Actor-specific operations. Spell-description references are not starting
 inventory; do not convert linked templates into owned items implicitly.
+
+## Caller spell preparation
+
+`logic/spell-model.ts` supplies owned Item-ID rows, exact identity/list/grant
+inputs and explicit known/unavailable progression limits. `callerLookups` reads
+only the selected Actor's bounded dependencies through public caller capabilities;
+these never enter the registry. The sheet's caller-view route uses the same
+preparer as actions, compares source reviews around awaited reads, and rejects
+stale results. ActorPage retires responses by Actor, caller, role, world and
+connection; public Item/context events refresh dependency results.
+
+Advancement uses the exact alternate list, the Actor Class's own table and native
+planned/active grants. Mandatory tier choices are validated before all writes;
+missing catalogs and invalid progression do not waive choices. HP/XP computation
+is unchanged. Generic Core preparation remains synchronous and user-invariant.
+
+The spell picker consumes `derived.spellModel` owned rows and the shared caller
+spell catalog. Management sends exact additions and owned Item-ID removals to
+`actors/:id/spells/manage`; it never subtracts the catalog from inventory. The
+server validates the reviewed source, list, tier, progression limit and native
+source filters before writes. Adds run first and stop removal on failure or
+uncertainty. Durable module operation receipts preserve confirmed identities;
+unknown creates require explicit inventory review. The process queue is not a
+distributed transaction. Partial receipts from another process require fresh
+review; completed receipts never repeat their writes.
+
+`fetch-pack/spells` and `spells/list` use one catalog over readable declared packs
+and caller-visible world Items. The collection store retains rows plus explicit
+partial-source warnings/retry, under its existing world/caller/context lifecycle.
+Native `sourceFilters` is a world Array (default[] proven4.0.0–4.0.6) read from
+Core context, filtering choices by native source title without changing owned
+items. Known exact undeclared-pack reads and catalog discovery are separate.
+The picker uses ModuleDialog, shared range/duration facts and separate owned
+removal/addition controls. Search survives refresh; authority changes retire intent.
+
+## Known spell workflow gaps in 0.9.5
+
+Casting actions are shared, but spell management is not yet a unified model.
+`SpellsTab` derives class sources/counts/limits; `SpellSelectionModal` represents
+selection by catalog UUID; adapter/server level-up uses another class/list path.
+The current picker omits source-less owned spells, collapses duplicate origins
+and can derive removals from missing catalog rows. Add failures do not stop its
+subsequent removals. These are SD02-03–07 correction targets, not supported
+inventory semantics. Paper/tabs/cards must retain owned Item identity and the
+same source-based availability reasons in the proposed replacement.
+
+Native casting eligibility comes from active grants. A class's casting ability,
+its alternate spell list and its progression table serve different purposes.
+Knight of St. Ydris uses the Witch list with Knight's own spells-known table;
+current advancement ignores that list override. Missing Class references on a
+Spell and missing casting grants on an Actor need separate diagnostics and a
+proven repair disposition, not class-name or spell-name inference.
+
+Current synchronous lookups use declared pack data. Public Core 0.19.3 supports
+caller world/embedded reads and exact known, present compendium UUID reads;
+connecting these bounded dependencies to preparation is module work to prove.
+Arbitrary pack catalog discovery is a distinct capability question. Native
+`sourceFilters` is not yet declared/consumed by the module. The existing world
+Array-setting contract can support it without inventing a settings transport.
+
+These statements describe observed current gaps. Proposed remedies, acceptance
+and historical-data qualifications are owned by ADR-0002 and its active audit.
+
+## Native language inventory and creation choices
+
+`logic/languages.ts` projects stored rarity and validates exact fixed grants plus
+separate ancestry/class/common/rare pools. Unknown rarity is explicit. Counts
+come from native Class/Ancestry fields; there is no inferred Common/INT allowance
+or Background pool. A nonempty selectOptions array with select0 grants nothing.
+Native Number/Array initial values are0/[]; invalid/required unavailable inputs
+block creation instead of providing a guessed rule. Fixed/restricted refs resolve
+exactly through the caller, separate from browsing/discovery.
+
+The caller language-plan route supplies one bounded form plan and current readable
+rows. Generator and advancement use it with the shared generation lifecycle and
+accessible choice controls. The module creation route validates assignments before
+public SDK Actor creation; advancement validates before HP/XP/items and checks its
+Actor source/context again. Existing languages survive advancement.
+Details and the ordinary inventory picker impose no creation quota, classify by
+source field only, retain custom/unreadable entries and make unchanged saves a
+no-op. Actor identity exposes current caller-readable language rarity/labels.
+
+## Released0.9.5 action and language baseline before ADR-0002
+
+The released baseline executor spent limited uses after the result, despite native
+spend-before-roll/chat ordering. Potion use posts before identifying and updates
+only the identified flag; native also swaps name/description and enables effects.
+Incomplete consumption therefore leaves inconsistent source. NPC spell failure
+inherited the Player focus exemption. Shared outcome evaluation treats
+a zero critical-success threshold as always successful, while native disables it.
+SD02-09/10/11/13 define corrections and ordered-state/failure evidence.
+
+Registry and language UI infer rarity from names, ignoring `system.rarity`.
+The general language-limit helper also infers allowances from nonempty pools and
+combines restricted choices. Native fields already provide explicit counts and
+separate class/ancestry pools; ordinary language editing has a distinct contract.
+SD02-12 plans one field-based projection and validation path across consumers.
+
+New controlled comparisons match native defaults for 31 weapons, 69 physical
+item slot records, nine no-effect armor configurations, four mixed inventory/coin
+configurations and nine ordinary roll outcomes. These are bounded source/method
+comparisons; they neither establish whole-system parity nor replace A02 native
+acceptance. The twelve existing offline suites pass despite the new defects.
 
 ## Initiative
 
@@ -143,24 +286,30 @@ modes; the item card shows them disabled with the reason. The server only rolls
 modes the weapon has.
 
 Attacks roll through the existing item-roll hook. Spells, Class Abilities and
-potions go through `POST actors/[id]/actions`, which re-reads the Actor through
-the caller, requires owner access, refuses unavailable actions before rolling,
-rolls through `req.runtime.rolls` and then applies native consequences: lost
-spell on failure (not on focus checks), scroll consumed, wand spell lost and
-wand broken on a critical failure, limited uses and loss on failure, potion
-consumed after confirmation. Consequence writes are sequential, not atomic;
-each outcome is reported and the response `state` is `complete` or `partial`.
+Potions use the owner-bound module action route and one common preparer.
+`planPrerequisites` runs before the result: a limited ability spends first; an
+unidentified Potion swaps active/alternate fields and activates every owned
+effect by exact parent/ID. The effect group follows native Promise.all semantics.
+Only successful prerequisites permit roll/no-check chat. Potion use then deletes
+the whole owned Item, independent of quantity. Partial source remains explicit.
 
-A `requestId` is bound to the adapter runtime (world/epoch), the user, the
-Actor and the request body, for ten minutes (process-local). Repeating it with
-the same body re-checks owner access, then returns the first result with
-`replayed: true` without rolling or consuming again; reusing it with a different
-body is a 409 conflict. A failure before a result exists (refusal, unavailable
-action, failed roll call) can be retried. Once a roll is evaluated it is final:
-a chat failure after that is returned in `warnings`, and a replay of a
-`partial` result re-reads the Actor and applies only the consequences it does
-not already show. The sheets send a new id per action, so this replay path
-serves client retries of the same request.
+An Actor operation queue serializes module action/management requests in this
+process. It is not a distributed CAS/transaction. Write-ahead operation receipts
+through SDK DataStore bind world, caller, Actor, request and body; they contain
+operation outcomes, not a second world store. Unknown spend/result calls stop;
+the same request never rolls/posts/spends again after an uncertain result. A
+known result can retry outstanding consequences after fresh source/ownership/
+dependency checks. Completed durable receipts replay without writes. Partial
+receipts without their process continuation need fresh review after restart or
+lease expiry. No automatic claim resolves a lost upstream acknowledgement.
+
+The Actor provider retains the exact request for explicit recovery. Its dialog
+suspends the resource card and distinguishes pending prerequisites, uncertain
+results and outstanding consequences. Actor/unmount changes retire UI results.
+Player owned-spell actions alone allow focus to exempt loss; NPC cards hide it
+and the server applies NPC loss even to a crafted focus request. Scroll/Wand
+rules remain distinct. Zero disables critical thresholds, missing thresholds
+retain native defaults, and manual totals establish no natural critical.
 
 World settings: `info.json.worldSettings` declares the two native settings the
 rules use, `shadowdark.usePulpMode` (default false) and
@@ -448,3 +597,98 @@ must verify these paths through the installed host as well as the controlled
 consumer suite; it must not add privileged Setting reads or polling. This fixes
 the ownership-only signal gap reported on 0.19.1, not the separately recorded
 CG-4 content-freshness concern across an offline interval.
+
+Required creation/advancement fixed references fail before writes if unavailable.
+Native talents and separate talentChoices are not interchangeable. Exact caller
+Class dependencies are authoritative; copied origins cannot fill a missing read.
+Secondary grants retain owned inventory with unknown progression. Historical
+missing grants/refs require the reviewed exact-source remediation guide; published
+migration history is unchanged.
+
+The module Actor view is a bounded caller SDK read, dependency resolution and
+independent source re-read, normalized once with a compact review token. Context
+changes retire visibility/interactions while mounted UI state awaits current
+authority. Fetch callback identity is not a world scope. Class collection browsing
+is not a prerequisite for an already resolved world Class. Catalog world pages
+follow the SDK's zero-based contract.
+
+Identity labels follow the exact reference. An owned copy is a label source only
+when the reference itself addresses that Actor+embedded Item. Caller identity
+lookups remain bounded and permission-checked. Hidden/absent action Actors return
+404; explicit owner denials retain403, including durable receipt replays. Explicit
+native session kicks and ordinary transport loss have separate recovery evidence.
+
+Owner-bound workflows share an SDK guard that distinguishes a visible non-owner
+(403) from hidden/absent source (404) using observer visibility only after an
+unsuccessful strict owner read. No denied operation writes. Pending action UI
+callbacks retire with context/scope; late results require source review and cannot
+authorize replay under a new context. Generator SDK creation avoids the generic
+Core Actor writer's demonstrated string-array cleaning.
+
+World Item detail/directory hints coalesce into the same collection generation
+invalidation as context changes; pending catalog responses retire and open pickers
+retain search. HP rolls read the exact referenced Class die, never an unrelated
+owned copy or an unavailable-source fallback.
+
+Final controlled evidence and package identity are recorded in the
+[ADR-0002 validation record](audits/2026-10-18-adr-0002-validation.md).
+Actual native A02-01–15 acceptance remains open on both generations.
+
+### Advancement operation completion
+
+`server/advancement-operation.ts` persists a bounded advancement plan/receipt,
+not world data. Grants run before the frozen Actor patch. Exact confirmed IDs
+survive retries. A proven zero-write refusal/stale attempt retires durably and
+requires fresh preparation; partial refusals can resume, while uncertain outcomes
+stop for explicit exact-source review. Pending partial advancement blocks replacement requests.
+Restart continuation requires review; unavailable/changed rules and unrelated
+Actor edits require remediation rather than guessing. The mounted workflow uses
+a completed operation response, never a level-change event, as its success signal.
+
+### Final Generator write validation
+
+Level-one `characters/create` repeats the authoritative new-character advancement
+preparation, checking exact identities, current revision and canonical grant
+review against both the earlier prepared plan and the final submitted Items.
+Counts/lists/tiers and complete native source fields must agree; a client plan
+hash alone is never trusted. Generator copies prepared grants intact and forwards
+the choices/review. Gear keeps its separate creation flow. Level-zero creation,
+ordinary inventory edits and authorized GM imports retain their own contracts.
+
+### Open spell-management facts
+
+SpellsTab stores Class UUID/tier identity, deriving current source/list/limits
+from the latest prepared view. The modal stays mounted across alternate-list
+changes; search/details survive while intent is masked against new authority
+facts. Stored operation requests/receipts remain bound to their original list
+and IDs and are never rebound as new intent. Retry errors preserve known receipts.
+
+Corrective archive verification runs compiled public apiRoutes against the public
+SDK test runtime, independently of source-route tests. Advancement responses
+expose operation receipts rather than saved grant payloads. This offline contract
+evidence does not satisfy deployment's full-GM guard or native acceptance.
+
+Proven zero-write attempts retire automatically after current owner/caller and
+context verification. Durable no-write receipts permit retirement even when an
+independent Actor edit invalidates the old source snapshot. Preserve current
+Actor data and require a new current plan. The pre-write source guard returns
+the retired result immediately when it discovers such an obsolete attempt.
+Partial writes retain the source-restoration check.
+Only a durable terminal disposition releases the
+active block; retained journals can never replay after retirement. Operation
+reviews share the Actor queue with writes, so review cannot retire in-flight work.
+Partial operations retain explicit reconciliation and independently verified
+restoration controls, without module rollback or stale-rule replay.
+
+Native SDK acknowledgements, primary-source verification and journal persistence
+are separate outcomes. Returned Item IDs remain authoritative after a receipt
+save fails. Acknowledged grants reconcile their own exact IDs, full planned
+source and Actor parent; other grant/operation IDs are excluded. Receipt or
+verification failure stops later writes and cannot downgrade an acknowledged
+creation to an uncertain outcome or authorize another creation. Reconciliation
+must persist first. Lost acknowledgements/failed reads never establish zero writes.
+A total journal outage leaves the durable started fence; an exact response ID
+must be retained for later review. No distributed transaction/CAS is implied.
+The mounted workflow retires old review reads across write attempts, preserves
+known receipts on errors, uses the current review revision and reports completion
+only from the confirmed full-operation response. See [recovery](advancement-recovery.md).

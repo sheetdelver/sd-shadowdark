@@ -144,8 +144,8 @@ export default function ShadowdarkPaperSheet({ onToggleView }: ShadowdarkPaperSh
                         {info('Class', actor.details?.class)}
                         <div className={`${box} h-16 p-1 flex items-center justify-center`}>
                             <span className={tag}>Level</span>
-                            {derived.levelUp ? (
-                                <button type="button" onClick={triggerLevelUp} className="mt-3 bg-amber-500 text-black px-2 py-1 text-xs font-bold rounded hover:bg-amber-400">LEVEL UP!</button>
+                            {actor.advancementPending || derived.levelUp ? (
+                                <button type="button" onClick={triggerLevelUp} className="mt-3 bg-amber-500 text-black px-2 py-1 text-xs font-bold rounded hover:bg-amber-400">{actor.advancementPending ? 'Review advancement' : 'LEVEL UP!'}</button>
                             ) : <span className="text-2xl font-bold pt-4">{derived.level ?? 0}</span>}
                         </div>
                         <div className={`${box} h-16 flex flex-col`}>

@@ -1,6 +1,6 @@
 import { logger } from '@sheet-delver/sdk';
 import type { CompendiumPackReader, ReadonlyDocumentStore } from '@sheet-delver/sdk/server';
-import { isRareLanguage } from '../logic/rules';
+import { languageRarity } from '../logic/languages';
 import { BOON_TYPE_MAP, EFFECT_TRANSLATIONS_MAP } from '../data/talent-effects';
 import { NATIVE_PREDEFINED_EFFECTS } from '../data/native-predefined-effects';
 import { canonicalUuid, declaredPack, formatUuid, parseUuid } from '../logic/identity';
@@ -427,7 +427,7 @@ export class ShadowdarkRegistry {
         if (!category && ['potion', 'scroll', 'wand', 'gem'].includes(type)) category = 'gear';
         if (!category) return;
         if (category === 'languages') {
-            doc.rarity = isRareLanguage(doc.name) ? 'rare' : 'common';
+            doc.rarity = languageRarity(doc);
         } else if (category === 'classes' && doc.system?.titles) {
             results.titles[doc.name] = doc.system.titles;
         }

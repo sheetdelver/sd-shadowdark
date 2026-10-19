@@ -18,6 +18,7 @@ import { LevelUpFooter } from './levelup/sections/LevelUpFooter';
 import { ExtraSpellSelectionSection } from './levelup/sections/ExtraSpellSelectionSection';
 import { useSDK } from '@sheet-delver/sdk/react';
 import { presentDescription } from '../../logic/description';
+import { AdvancementRecovery } from './levelup/AdvancementRecovery';
 import { CollectionStatus } from './CollectionStatus';
 
 export const LevelUpModal = (props: LevelUpProps) => {
@@ -59,12 +60,12 @@ export const LevelUpModal = (props: LevelUpProps) => {
                     />
                 )}
 
-                {(state.loadingClass || state.loadingPatrons || state.isSubmitting) && <LoadingOverlay />}
+                {(state.isSubmitting || (!state.operation && (state.loadingClass || state.loadingPatrons))) && <LoadingOverlay />}
 
                 <LevelUpHeader
                     actorName={props.actorName}
-                    currentLevel={props.currentLevel}
-                    targetLevel={props.targetLevel}
+                    currentLevel={state.operation?.targetLevel ? state.operation.targetLevel - 1 : props.currentLevel}
+                    targetLevel={state.operation?.targetLevel ?? props.targetLevel}
                     targetClassUuid={state.targetClassUuid}
                     availableClasses={props.availableClasses || []}
                     error={state.error}
@@ -73,13 +74,14 @@ export const LevelUpModal = (props: LevelUpProps) => {
                     selectedPatronUuid={state.selectedPatronUuid}
                     onClassChange={actions.setTargetClassUuid}
                     onPatronChange={actions.setSelectedPatronUuid}
-                    classLocked={!!props.classUuid}
+                    classLocked={!!state.operation || !!props.classUuid}
                 />
 
                 {/* Main Scrollable Content */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
 
-                    {!state.loadingPatrons && (
+                    {state.operation && <AdvancementRecovery operation={state.operation} busy={state.isSubmitting} refresh={actions.refreshOperation} resume={actions.handleConfirm} onClose={props.onCancel} />}
+                    {!state.operation && !state.loadingPatrons && (
                         <>
                             {ClassCard}
 
@@ -194,15 +196,12 @@ export const LevelUpModal = (props: LevelUpProps) => {
                                         />
                                     )}
 
-                                    {!props.skipLanguageSelection && (
+                                    {!props.skipLanguageSelection && props.targetLevel === 1 && (
                                         <LanguageSelectionSection
-                                            languageGroups={state.languageGroups}
-                                            selectedLanguages={state.selectedLanguages}
-                                            fixedLanguages={state.fixedLanguages}
+                                            data={state.languageData}
+                                            selected={state.selectedLanguageGroups}
+                                            onChange={actions.setSelectedLanguageGroups}
                                             knownLanguages={state.knownLanguages}
-                                            availableLanguages={props.availableLanguages || []}
-                                            status={state.statuses.languages}
-                                            onSelectedLanguagesChange={actions.setSelectedLanguages}
                                         />
                                     )}
                                 </>
@@ -213,8 +212,8 @@ export const LevelUpModal = (props: LevelUpProps) => {
 
                 <LevelUpFooter
                     onCancel={props.onCancel}
-                    onConfirm={actions.handleConfirm}
-                    isComplete={actions.isComplete()}
+                    onConfirm={() => actions.handleConfirm()}
+                    isComplete={!state.operation && actions.isComplete()}
                     loading={state.loading}
                     targetLevel={props.targetLevel}
                 />

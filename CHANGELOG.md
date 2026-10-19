@@ -2,6 +2,18 @@
 
 Historical entries are reconstructed from [published releases](https://github.com/sheetdelver/sd-shadowdark/releases), their tags, and merged changes. Version numbers follow the published tags; the Unreleased section collects notes for the next authorized release.
 
+## Unreleased
+
+## 0.9.6
+
+- Native casting and spell progression
+- Exact owned-spell management
+- Safe advancement completion and recovery
+- Authoritative character-creation validation
+- Reactive spell catalogs and dialogs
+- Native ability and Potion sequencing
+- Correct focus, outcomes and languages
+
 ## 0.9.5
 
 - Native effects and combat rules

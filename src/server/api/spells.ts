@@ -2,7 +2,7 @@ import { json, error, type ModuleServerRequest } from '@sheet-delver/sdk/server'
 import { getErrorMessage, isSdkError, logger } from '@sheet-delver/sdk';
 import { shadowdarkAdapter } from '../../server/ShadowdarkAdapter';
 import { canonicalUuid, ownedCopy } from '../../logic/identity';
-import { callerOf } from '../access';
+import { callerOf, contextConflict, requestRevision, requireOwnedActor } from '../access';
 
 /**
  * POST /api/modules/shadowdark/actors/[id]/spells/learn
@@ -12,12 +12,12 @@ import { callerOf } from '../access';
  */
 export async function handleLearnSpell(actorId: string, req: ModuleServerRequest) {
     try {
-        const { spellUuid } = await req.json<{ spellUuid?: string }>();
+        const { spellUuid, intent } = await req.json<{ spellUuid?: string; intent?: string }>();
+        if (intent !== 'inventory') return error('validation', 'Ordinary source copying requires explicit inventory intent; use the reviewed management or advancement workflow for progression choices.');
         const canonical = canonicalUuid(spellUuid);
         if (!canonical) return error('validation', 'A Spell UUID is required');
 
-        const actor = await req.runtime.documents.get('Actor', actorId, { minOwnership: 'owner' });
-        if (!actor) return error('not_found', 'Actor not found or not owned');
+        const actor = await requireOwnedActor(req.runtime, actorId);
 
         const spellData = await shadowdarkAdapter.resolveDocumentFor(canonical, callerOf(req));
         if (!spellData) return error('not_found', `Spell not available: ${canonical}`);
@@ -39,35 +39,16 @@ export async function handleLearnSpell(actorId: string, req: ModuleServerRequest
  * when they share a name and tier.
  */
 export async function handleGetSpellsBySource(req: ModuleServerRequest) {
+    const revision = requestRevision(req.runtime);
     try {
         const { searchParams } = new URL(req.url, 'http://localhost');
         const classUuid = canonicalUuid(searchParams.get('class'));
         if (!classUuid) return error('validation', 'class must be an exact Class UUID');
-
-        const local = await shadowdarkAdapter.getSpellsForClass(classUuid, callerOf(req));
-        const world: any[] = [];
-        try {
-            const worldItems = await req.runtime.documents.list('Item', { filter: { type: 'Spell' } });
-            for (const spell of worldItems.rows as any[]) {
-                if (spell.type !== 'Spell') continue;
-                if ((spell.system?.class ?? []).some((value: unknown) => canonicalUuid(value) === classUuid)) {
-                    world.push({ ...spell, uuid: canonicalUuid(spell.uuid) ?? `Item.${spell._id}`, source: 'world' });
-                }
-            }
-        } catch (err) {
-            logger.warn('[API] Failed to fetch world spells:', err);
-        }
-
-        const byUuid = new Map<string, any>();
-        for (const spell of [...local, ...world]) {
-            const uuid = canonicalUuid(spell.uuid);
-            if (uuid && !byUuid.has(uuid)) byUuid.set(uuid, { ...spell, uuid, tier: spell.system?.tier ?? null });
-        }
-        const merged = [...byUuid.values()].sort((a, b) => (a.tier ?? 0) - (b.tier ?? 0) || String(a.name).localeCompare(String(b.name)));
-        return json({ success: true, spells: merged });
+        const catalog = await shadowdarkAdapter.spellCatalog(callerOf(req), classUuid);
+        const conflict = contextConflict(req.runtime, revision); if (conflict) return conflict;
+        if (catalog.state === 'failed') return error('not_ready', catalog.sources.map(source => `${source.source}: ${source.reason}`).join(' '));
+        return json({ success: true, spells: catalog.rows, sources: catalog.sources, state: catalog.state });
     } catch (e: unknown) {
-        if (isSdkError(e)) return error(e.code, e.message);
-        logger.error('[API] Fetch Spells Error:', e);
-        return error('internal', getErrorMessage(e));
+        return contextConflict(req.runtime, revision) ?? error(isSdkError(e) ? e.code : 'internal', getErrorMessage(e));
     }
 }
