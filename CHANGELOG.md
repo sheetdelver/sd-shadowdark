@@ -4,6 +4,8 @@ Historical entries are reconstructed from [published releases](https://github.co
 
 ## Unreleased
 
+- Refresh open spell limits/lists and retire stale selections while retaining receipts
+
 - Revalidate exact native creation choices and grants at the final Actor write
 
 - Preserve native advancement order and exact grant receipts through failure, retry and explicit recovery.

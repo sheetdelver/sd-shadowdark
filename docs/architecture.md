@@ -629,3 +629,11 @@ Counts/lists/tiers and complete native source fields must agree; a client plan
 hash alone is never trusted. Generator copies prepared grants intact and forwards
 the choices/review. Gear keeps its separate creation flow. Level-zero creation,
 ordinary inventory edits and authorized GM imports retain their own contracts.
+
+### Open spell-management facts
+
+SpellsTab stores Class UUID/tier identity, deriving current source/list/limits
+from the latest prepared view. The modal stays mounted across alternate-list
+changes; search/details survive while intent is masked against new authority
+facts. Stored operation requests/receipts remain bound to their original list
+and IDs and are never rebound as new intent. Retry errors preserve known receipts.

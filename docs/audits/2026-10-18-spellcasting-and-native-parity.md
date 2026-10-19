@@ -1093,3 +1093,24 @@ module/UI/hook typing passes on both Core toolchains. Artifacts:
 `temp/adr0002-corrections/r2-{before,tests,languages}.json`,
 `r2-{types,floor-types}.log`, `r2-consumers/`.
 No migration, import quota, compatibility change or Core dependency was added.
+
+### SD02-R3 corrective evidence — October 18, 2026
+
+**Corrected offline; native acceptance remains open.** SpellsTab now stores only
+stable Class/tier selection and derives fresh source facts. Modal intent is
+bound to current list/progression/grant/Actor/catalog facts, so derived-only
+progression edits retire additions/removals before effects run. Search and
+expanded details survive; current owned grouping and catalog follow the new
+list. Existing operation receipts remain associated with their original request
+and list, including confirmed Item IDs after a failed retry.
+
+`parity-corrections.browser.mjs --only=R3`: four mounted SpellsTab/modal cases
+fail before and pass after (same-Class level, progression-only, alternate list,
+and source change while an operation is pending). The next fresh request uses
+`Item.listB`, contains only the newly reviewed addition and no old removal;
+retry of an existing operation retains its original list/body. The baseline
+visibly retained limit3 while current Class allowed4, and retained listA while
+current source used listB. All browser traffic blocked. Collection consumers41/41
+and current explicit typing pass. Artifacts:
+`temp/adr0002-corrections/r3-browser{,-before}/results.json`,
+`r3-consumers/`, `r3-types.log`. No live/native cases executed.

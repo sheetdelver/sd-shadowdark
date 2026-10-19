@@ -106,5 +106,10 @@ jobs:
           SHADOWDARK_PLAYWRIGHT_MODULE="$RUNNER_TEMP/shadowdark-browser-tools/node_modules/playwright/index.mjs" \
             node .module-ci-data/local/modules/shadowdark/src/tests/actor-lifecycle.browser.mjs "$RUNNER_TEMP/shadowdark-actor-results"
 
+      - name: Verify corrective advancement and spell-management consumers
+        run: |
+          SHADOWDARK_PLAYWRIGHT_MODULE="$RUNNER_TEMP/shadowdark-browser-tools/node_modules/playwright/index.mjs" \
+            node .module-ci-data/local/modules/shadowdark/src/tests/parity-corrections.browser.mjs "$RUNNER_TEMP/shadowdark-corrective-results"
+
       - name: Verify distributable package
         run: npm run module:package -- 'shadowdark'

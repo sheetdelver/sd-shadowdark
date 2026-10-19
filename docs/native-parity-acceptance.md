@@ -61,3 +61,8 @@ Wizard three-spell counts, Priest fixed-spell exclusion and extra-Talent choices
 For A02-03/05/10, submit altered final bodies and changed plans directly and
 independently verify zero Actor creation; compare valid final arrays/effects and
 unknown source fields. Controlled tests do not establish native creation parity.
+
+R3 offline mounted cases now cover same-Class level/table/list replacement and
+pending-operation source changes. A02-06/09 must repeat these against native
+prepared progression and exact lists, checking fresh next-request identity,
+stale-intent retirement, retained search and original operation receipts.

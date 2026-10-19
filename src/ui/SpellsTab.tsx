@@ -9,7 +9,7 @@ import SpellSelectionModal from './components/SpellSelectionModal';
 import { useShadowdarkActor } from './context/ShadowdarkActorContext';
 import { bonusLabel, type PreparedAction } from '../logic/actions';
 import { RANGE_LABELS, spellDuration } from '../logic/resource-cards';
-import { canonicalUuid, formatUuid } from '../logic/identity';
+import { formatUuid } from '../logic/identity';
 import { spellReview } from '../logic/spell-review';
 import type { SpellIntent } from './components/SpellSelectionModal';
 
@@ -25,7 +25,7 @@ interface SpellSource { classUuid: string; listUuid: string; name: string; grant
 export default function SpellsTab() {
     const { resolveImageUrl, addNotification, fetchWithAuth } = useSDK();
     const { actor, updateItem, deleteItem, startAction, openCard, isActionBusy, refreshActor, card, rollDialog, pendingConfirmation } = useShadowdarkActor();
-    const [manage, setManage] = useState<{ source: SpellSource; tier: number } | null>(null);
+    const [manage, setManage] = useState<{ classUuid: string; tier: number } | null>(null);
     const [saving, setSaving] = useState(false);
     const [submission, setSubmission] = useState<any>(null);
     const [receipt, setReceipt] = useState<any>(null);
@@ -36,6 +36,8 @@ export default function SpellsTab() {
 
     const sources: SpellSource[] = derived.spellModel?.sources ?? [];
     const owned = derived.spellModel?.owned ?? [];
+    const managedSource = sources.find(source => source.classUuid === manage?.classUuid);
+    const intentRevision = managedSource ? JSON.stringify([managedSource.classUuid, managedSource.listUuid, managedSource.grant, managedSource.limits]) : '';
     const knownFor = (source: SpellSource, tier: number) => owned.filter((row: any) => row.tier === tier
         && (row.classes.includes(source.listUuid) || row.classification === 'unresolved'));
     const limitFor = (source: SpellSource, tier: number) => source.limits[tier]?.status === 'known' ? source.limits[tier].value : undefined;
@@ -45,17 +47,17 @@ export default function SpellsTab() {
     const itemRows = actions.filter(action => action.kind === 'spell' && ['Scroll', 'Wand'].includes(itemById(action.itemId ?? '')?.type));
 
     useEffect(() => {
-        if (manage && !saving && !sources.some(source => source.classUuid === manage.source.classUuid)) {
+        if (manage && !saving && !submission && !receipt && !managedSource) {
             setManage(null); setSubmission(null); setReceipt(null);
             addNotification('Casting source changed. Review the current character before managing spells.', 'info');
         }
-    }, [manage, saving, sources]);
+    }, [manage, saving, managedSource, submission, receipt, addNotification]);
 
     const saveSelection = async (intent: SpellIntent) => {
-        if (!manage || saving) return;
+        if (!manage || saving || (!managedSource && !submission)) return;
         if (!submission && !intent.additions.length && !intent.removals.length) { setManage(null); return; }
         const body = submission ?? { requestId: globalThis.crypto.randomUUID(), baseline: actor.spellReviewToken ?? spellReview(actor),
-            listUuid: manage.source.listUuid, tier: manage.tier, ...intent };
+            listUuid: managedSource!.listUuid, tier: manage.tier, ...intent };
         setSubmission(body); setSaving(true);
         try {
             const res = await fetchWithAuth(`/api/modules/shadowdark/actors/${actor.id ?? actor._id}/spells/manage`, {
@@ -63,12 +65,12 @@ export default function SpellsTab() {
             });
             const result = await res.json();
             if (!res.ok || !result.success) throw new Error(result.error?.message ?? result.error ?? `HTTP ${res.status}`);
-            setReceipt(result);
+            setReceipt({ ...result, requestId: body.requestId, listUuid: body.listUuid });
             if (result.state === 'complete') { setManage(null); setSubmission(null); setReceipt(null); addNotification('Spell changes completed.', 'success'); }
         } catch (e) {
             // Keep the exact request for a lost response. A retry never invents
             // new identity or a catalog-derived removal set.
-            setReceipt({ state: 'partial', operations: [], recovery: `No complete response: ${(e as Error).message}. Retry this same request to reconcile receipts, or close and review actual inventory.` });
+            setReceipt((previous: any) => ({ ...(previous ?? { state: 'partial', operations: [] }), requestId: body.requestId, listUuid: body.listUuid, recovery: `No complete response: ${(e as Error).message}. Retry this same request to reconcile receipts, or close and review actual inventory.` }));
         } finally { await refreshActor(); setSaving(false); }
     };
 
@@ -141,7 +143,7 @@ export default function SpellsTab() {
                                     const limit = limitFor(source, tier);
                                     const known = knownFor(source, tier).filter((view: any) => !view.innate).length;
                                     return (
-                                        <button type="button" key={tier} onClick={() => { setSubmission(null); setReceipt(null); setManage({ source, tier }); }}
+                                        <button type="button" key={tier} onClick={() => { setSubmission(null); setReceipt(null); setManage({ classUuid: source.classUuid, tier }); }}
                                             className="min-h-11 px-4 py-2 bg-white border-2 border-black font-serif font-bold text-sm hover:bg-black hover:text-white flex flex-col items-center min-w-[100px]">
                                             <span>TIER {tier}</span>
                                             <span className="text-[10px] font-sans">{known} / {limit ?? '—'}</span>
@@ -155,14 +157,21 @@ export default function SpellsTab() {
                 </div>
             </section>
 
-            {manage && (
+            {manage && !managedSource && (submission || receipt) && <section role="status">
+                <p>The casting source is unavailable. Saved operation {submission?.requestId} still belongs to list {submission?.listUuid}; review actual inventory before another request.</p>
+                {receipt?.operations?.map((op: any, index: number) => <p key={index}>{op.kind} {op.itemId ?? op.target}: {op.status}</p>)}
+                <button type="button" disabled={saving} onClick={() => saveSelection({ additions: [], removals: [] })}>Retry saved operation</button>
+                <button type="button" disabled={saving} onClick={() => { setManage(null); setSubmission(null); setReceipt(null); }}>Close operation review</button>
+            </section>}
+            {manage && managedSource && (
                 <SpellSelectionModal
                     isOpen
-                    title={`Manage ${manage.source.name} Spells - Tier ${manage.tier}`}
+                    title={`Manage ${managedSource.name} Spells - Tier ${manage.tier}`}
                     tier={manage.tier}
-                    key={`${actor.id ?? actor._id}:${manage.source.listUuid}:${manage.tier}`}
-                    classUuid={manage.source.listUuid}
-                    knownSpells={knownFor(manage.source, manage.tier).map((row: any) => ({
+                    key={`${actor.id ?? actor._id}:${manage.classUuid}:${manage.tier}`}
+                    intentRevision={intentRevision}
+                    classUuid={managedSource.listUuid}
+                    knownSpells={knownFor(managedSource, manage.tier).map((row: any) => ({
                         itemId: row.itemId, name: row.name, tier: row.tier, uuid: row.source ? formatUuid(row.source) : null,
                         isInnate: row.innate, unresolved: row.classification === 'unresolved', system: itemById(row.itemId)?.system,
                     }))}
@@ -171,7 +180,7 @@ export default function SpellsTab() {
                     receipt={receipt}
                     suspended={!!card || rollDialog.open || !!pendingConfirmation}
                     onOpenDocument={uuid => openCard({ kind: 'document', uuid })}
-                    maxSelections={limitFor(manage.source, manage.tier)}
+                    maxSelections={limitFor(managedSource, manage.tier)}
                     isSaving={saving}
                     actor={actor}
                 />

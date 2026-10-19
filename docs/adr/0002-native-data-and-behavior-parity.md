@@ -736,3 +736,22 @@ zero-spells bypass now returns400 and makes zero Actor writes. Valid caster,
 extra-spell and level-zero cases preserve exact source data. Existing language
 regressions9/9 and mounted collection/Generator checks41/41 pass; explicit typing
 passes on0.19.2/0.19.3. This is offline evidence; R3 and native A02 remain open.
+
+### SD02-R3 correction checkpoint — October 18, 2026
+
+Open management stores Class UUID/tier identity and derives current limits,
+list, grouping and title from each prepared view. The dialog remains mounted
+across same-Class changes, retaining search/details. Its intent is scoped to
+current Actor/catalog/list/limit/grant facts and masked immediately in render
+when those facts change. Pending/completed/uncertain receipts retain their original
+request/list and confirmed IDs; a failed retry no longer erases known operations.
+New intent uses the fresh list; an existing operation retries its exact body.
+
+Four actual SpellsTab/modal regressions fail against08997a4 and pass after:
+same-Class level, progression-only, alternate-list and pending-operation/source
+changes. They check displayed counts/owned/catalog rows, search, retired unsafe
+selections, next request identity and preserved confirmed receipts after refusal.
+Collections41/41 and explicit current typing also pass. The offline browser entry
+point is now in CI without changing any workflow pin. R1–R3 have corrective
+implementation evidence; full integrated validation follows. Native D6/D7 and
+all A02-01–15 remain open.

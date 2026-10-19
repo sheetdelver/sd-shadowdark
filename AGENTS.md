@@ -302,3 +302,7 @@ pack fixtures use the pinned read-only source; no transports/services are needed
 
 Final creation regressions: `src/tests/creation-validation.test.ts` (real writer
 and shared preparation with exact pinned native sources).
+
+Open spell management keeps stable Class/tier identity and derives current list/
+progression facts. Retire intent on those facts, preserving search and exact
+original operation receipts. Corrective mounted checks run in CI.

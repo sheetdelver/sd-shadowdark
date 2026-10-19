@@ -150,3 +150,12 @@ native grant data and separates ordinary/fixed/extra spells. Language9/9,
 collection/Generator41/41 and both toolchains' explicit typing pass. R3/native
 acceptance remain open. New local artifacts use `temp/adr0002-corrections/r2-*`;
 no previous archive/installed evidence was replaced or rerun.
+
+## Corrective checkpoint: R3
+
+SD02-R3 is corrected with four mounted SpellsTab/modal cases failing before and
+passing after. Current source facts update both display and submitted intent;
+manual search and original operation receipts survive. Collection41/41 and
+current explicit typing pass. All three findings now have corrective execution
+coverage; integrated validation and a new archive are recorded separately below.
+No native acceptance was performed.

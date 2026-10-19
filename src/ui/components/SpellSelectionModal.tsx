@@ -14,27 +14,33 @@ export interface OwnedSpellOption { itemId: string; name: string; tier: number; 
 interface Props {
     isOpen: boolean; onClose: () => void; onSave: (intent: SpellIntent) => void;
     title: string; tier?: number; classUuid?: string; knownSpells: OwnedSpellOption[];
-    maxSelections?: number; isSaving?: boolean; actor?: any; receipt?: any;
+    intentRevision?: string; maxSelections?: number; isSaving?: boolean; actor?: any; receipt?: any;
     suspended?: boolean; onOpenDocument?: (uuid: string) => void;
 }
 
 /** Ownership and reviewed intent are independent of catalog completeness. */
 export default function SpellSelectionModal({ isOpen, onClose, onSave, title, tier, classUuid, knownSpells,
-    maxSelections, isSaving = false, actor, receipt, suspended = false, onOpenDocument }: Props) {
+    maxSelections, intentRevision, isSaving = false, actor, receipt, suspended = false, onOpenDocument }: Props) {
     const { resolveImageUrl } = useSDK();
     const data = useShadowdarkCollections(['spells'], isOpen);
     const [search, setSearch] = useState('');
-    const [additions, setAdditions] = useState<Set<string>>(new Set());
-    const [removals, setRemovals] = useState<Set<string>>(new Set());
     const [expanded, setExpanded] = useState<Set<string>>(new Set());
     const [changed, setChanged] = useState(false);
     const review = actor ? spellReview(actor) : '';
-    // Retire intent at a changed authority boundary. Harmless collection retry
-    // keeps the generation and manual state; search survives all refreshes.
+    const intentKey = JSON.stringify([data.generation, review, classUuid, tier, maxSelections, intentRevision]);
+    const [intent, setIntent] = useState<{ key: string; additions: Set<string>; removals: Set<string> }>({ key: intentKey, additions: new Set(), removals: new Set() });
+    // Mask stale intent in the render that receives new facts, before effects
+    // run. Search and expanded details are harmless and keep their state.
+    const additions = intent.key === intentKey && !receipt ? intent.additions : new Set<string>();
+    const removals = intent.key === intentKey && !receipt ? intent.removals : new Set<string>();
     useEffect(() => {
-        if (receipt) return;
-        setAdditions(new Set()); setRemovals(new Set()); setChanged(true);
-    }, [data.generation, review, classUuid, tier, receipt]);
+        setIntent({ key: intentKey, additions: new Set(), removals: new Set() }); setChanged(true);
+    }, [intentKey]);
+    const toggleIntent = (kind: 'additions' | 'removals', value: string) => setIntent(previous => {
+        const current = previous.key === intentKey ? previous : { key: intentKey, additions: new Set<string>(), removals: new Set<string>() };
+        const next = new Set(current[kind]); next.has(value) ? next.delete(value) : next.add(value);
+        return { ...current, [kind]: next };
+    });
     const available = useMemo(() => data.ready ? data.collections.spells.filter((doc: any) => doc.type === 'Spell' || !doc.type)
         .filter((doc: any) => Number(doc.system?.tier ?? doc.tier) === tier && (doc.system?.class ?? []).some((uuid: unknown) => canonicalUuid(uuid) === canonicalUuid(classUuid))) : [],
     [data.ready, data.collections.spells, tier, classUuid]);
@@ -44,7 +50,7 @@ export default function SpellSelectionModal({ isOpen, onClose, onSave, title, ti
     const knownLimit = typeof maxSelections === 'number' && Number.isInteger(maxSelections) && maxSelections >= 0;
     const editing = !isSaving && !receipt;
     const uncertain = receipt?.operations?.some((op: any) => op.status === 'uncertain' && op.kind === 'add');
-    const toggle = (setter: typeof setAdditions, value: string) => setter(previous => { const next = new Set(previous); next.has(value) ? next.delete(value) : next.add(value); return next; });
+    const toggle = (setter: typeof setExpanded, value: string) => setter(previous => { const next = new Set(previous); next.has(value) ? next.delete(value) : next.add(value); return next; });
     const details = (key: string, doc: any) => expanded.has(key) && <div className="border-t border-dashed border-neutral-400 p-3 text-sm">
         <p>Range: {RANGE_LABELS[doc.system?.range] ?? doc.system?.range ?? 'Unavailable'} · Duration: {doc.system?.duration ? spellDuration(doc.system.duration) : 'Unavailable'}</p>
         <div className="prose prose-sm mt-2" dangerouslySetInnerHTML={{ __html: presentDescription(doc.system?.description ?? '') }} />
@@ -64,8 +70,9 @@ export default function SpellSelectionModal({ isOpen, onClose, onSave, title, ti
         {knownLimit && count > maxSelections! && <p role="status">Existing inventory exceeds this limit. Nothing is removed automatically.</p>}
         {changed && !receipt && <p className="text-xs my-2">Review current choices before saving. Catalog changes never remove owned spells.</p>}
         {receipt && <div role="status" className="border-2 border-amber-800 bg-amber-50 p-3 my-3">
+            <p>Operation {receipt.requestId} · reviewed list {receipt.listUuid}</p>
             <p>{receipt.state === 'complete' ? 'Changes completed.' : 'Some operations remain incomplete.'}</p>
-            {receipt.operations?.map((op: any, i: number) => <p key={i}>{op.kind} {op.target}: {op.status}{op.error ? ` — ${op.error}` : ''}</p>)}
+            {receipt.operations?.map((op: any, i: number) => <p key={i}>{op.kind} {op.target}: {op.status}{op.itemId ? ` · Item ${op.itemId}` : ''}{op.error ? ` — ${op.error}` : ''}</p>)}
             {receipt.recovery && <p>{receipt.recovery}</p>}
         </div>}
         <section aria-label="Owned spells" className="mt-4 space-y-2">
@@ -75,7 +82,7 @@ export default function SpellSelectionModal({ isOpen, onClose, onSave, title, ti
                     <button type="button" aria-expanded={expanded.has(`owned:${spell.itemId}`)} className="min-h-11 flex-1 text-left" onClick={() => toggle(setExpanded, `owned:${spell.itemId}`)}>{spell.name}</button>
                     <span className="text-xs">{spell.isInnate ? 'Granted' : spell.unresolved ? 'Class unresolved; counted separately' : 'Known'} · Item {spell.itemId}</span>
                     <button type="button" aria-label={`Remove owned ${spell.name} (${spell.itemId})`} aria-pressed={removals.has(spell.itemId)} disabled={!editing || spell.isInnate}
-                        className="min-h-11 border-2 border-black px-3 disabled:opacity-50" onClick={() => toggle(setRemovals, spell.itemId)}>{removals.has(spell.itemId) ? 'Keep' : 'Remove'}</button>
+                        className="min-h-11 border-2 border-black px-3 disabled:opacity-50" onClick={() => toggleIntent('removals', spell.itemId)}>{removals.has(spell.itemId) ? 'Keep' : 'Remove'}</button>
                 </div>{details(`owned:${spell.itemId}`, spell)}
             </div>)}
             {!knownSpells.length && <p>No owned spells in this tier/list.</p>}
@@ -89,7 +96,7 @@ export default function SpellSelectionModal({ isOpen, onClose, onSave, title, ti
                     {onOpenDocument && <button type="button" className="min-h-11 px-2 underline" onClick={() => onOpenDocument(uuid)} aria-label={`${doc.name} resource card`}>Card</button>}
                     <button type="button" aria-label={`Add ${doc.name}`} aria-pressed={selected}
                         disabled={!editing || (!selected && (!knownLimit || count >= maxSelections! || knownSpells.some(spell => spell.unresolved)))}
-                        className="min-h-11 border-2 border-black px-3 disabled:opacity-50" onClick={() => toggle(setAdditions, uuid)}>{selected ? 'Undo add' : 'Add'}</button>
+                        className="min-h-11 border-2 border-black px-3 disabled:opacity-50" onClick={() => toggleIntent('additions', uuid)}>{selected ? 'Undo add' : 'Add'}</button>
                 </div>{details(uuid, doc)}
             </div>; })}
             {data.ready && !filtered.length && <p className="p-3 italic">No spells found matching your filter.</p>}
