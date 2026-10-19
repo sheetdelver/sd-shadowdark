@@ -1071,3 +1071,25 @@ Logs: `temp/adr0002-corrections/r1-{before,tests}.json`,
 The journal has no distributed-atomicity guarantee. Unconfirmed absent writes,
 unrelated changes or stale rules require explicit exact-source remediation;
 there is no name/origin matching, automatic recreate or transaction claim.
+
+### SD02-R2 corrective evidence — October 18, 2026
+
+**Corrected offline; native acceptance remains open.** The final creation
+boundary revalidates current native choices through shared advancement
+preparation and compares the full prepared grant multiset with the submitted
+Actor. There is no trusted client quota or hash-only acceptance. World/source
+changes retire the old plan; ordinary, innate/fixed and extra-Talent spells do
+not substitute for one another. Plan metadata travels through the actual
+Generator/useLevelUp path; prepared native data is copied intact.
+
+`creation-validation.test.ts`: ten groups pass. Eight negative groups fail
+against08997a4 with real Actor-write outcomes; caster/level-zero positive controls
+pass before and after. Coverage includes final-body and plan tampering, missing/
+excess/duplicate/wrong-tier/list, stale same-quota source/progression/revision,
+native fixed-granted spell exclusion, separate native extra spell, and exact
+arrays/effects/unknown fields/source preservation. Original bypass400/zero writes.
+Language9/9 and actual mounted collection/Generator41/41 checks pass; explicit
+module/UI/hook typing passes on both Core toolchains. Artifacts:
+`temp/adr0002-corrections/r2-{before,tests,languages}.json`,
+`r2-{types,floor-types}.log`, `r2-consumers/`.
+No migration, import quota, compatibility change or Core dependency was added.

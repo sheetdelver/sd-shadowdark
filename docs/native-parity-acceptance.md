@@ -55,3 +55,9 @@ restart cases and mounted target-level-before-completion/reopen cases. For
 A02-03/05/07, repeat with actual native embedded-ID allocation and inspect the
 exact confirmed IDs, explicit source-review recovery and final Actor patch.
 No new native case was executed during the corrective task.
+
+R2 offline correction is verified through the final writer, including native
+Wizard three-spell counts, Priest fixed-spell exclusion and extra-Talent choices.
+For A02-03/05/10, submit altered final bodies and changed plans directly and
+independently verify zero Actor creation; compare valid final arrays/effects and
+unknown source fields. Controlled tests do not establish native creation parity.

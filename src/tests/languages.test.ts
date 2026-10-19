@@ -1,3 +1,5 @@
+import { handleFinalizeLevelUp } from '../server/api/level-up';
+import { creationGrants } from '../logic/creation-grants';
 /** SD02-12: field-based rarity, separate native choice pools, and server zero-write refusal. */
 import assert from 'node:assert/strict';
 import { languagePlan, languageRarity, validateLanguageSelections, emptyLanguageSelections } from '../logic/languages';
@@ -55,7 +57,10 @@ try{
     }finally{allowed=true;}
  });
  await check('SD02-12 restored exact source choices create once and preserve unknown source',async()=>{
-    const result=await post({actor:actor(),languageChoices:selected});assert.equal(result.status,200,JSON.stringify(result));assert.equal(writes.length,1);assert.deepEqual(writes[0].data.system.languages,[ref('b'),ref('s'),ref('r'),ref('a')]);assert.deepEqual(writes[0].data.flags,{unknown:{keep:true}});
+    const choices={targetLevel:1,classUuid:cls.uuid,ancestryUuid:ancestry.uuid,hpRoll:3,languageChoices:selected};
+    const prepared=await handleFinalizeLevelUp('new',{runtime,userSession:{userId:'fixture'},json:async()=>choices} as any);assert.equal(prepared.status,200);
+    const plan:any=await prepared.json();const candidate=actor();candidate.items=creationGrants(plan.items) as never[];
+    const result=await post({actor:candidate,languageChoices:selected,creationPlan:plan.creationPlan});assert.equal(result.status,200,JSON.stringify(result));assert.equal(writes.length,1);assert.deepEqual(writes[0].data.system.languages,[ref('b'),ref('s'),ref('r'),ref('a')]);assert.deepEqual(writes[0].data.flags,{unknown:{keep:true}});
  });
  await check('SD02-12 a retired language-plan request returns409 before creation',async()=>{
     const read=runtime.compendium.getById;runtime.compendium.getById=async(...args:any[])=>{revision++;return read(...args);};try{const before=writes.length;assert.equal((await post({actor:actor(),languageChoices:selected})).status,409);assert.equal(writes.length,before);}finally{runtime.compendium.getById=read;}

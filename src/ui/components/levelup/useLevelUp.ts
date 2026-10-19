@@ -29,7 +29,7 @@ export interface LevelUpProps {
     baseline?: string;
     knownLanguages?: any[]; // Passed for new characters (pre-gen selections)
     skipLanguageSelection?: boolean; // For when languages are handled externally (Generator)
-    onComplete: (data: { items: any[], hpRoll: number, gold?: number, languages?: string[], patronUuid?: string }) => void;
+    onComplete: (data: { items: any[], hpRoll: number, gold?: number, languages?: string[], patronUuid?: string, creationPlan?: any }) => void;
     onCancel: () => void;
     foundryUrl?: string;
     actorName?: string;
@@ -859,6 +859,7 @@ export const useLevelUp = (props: LevelUpProps) => {
 
             onComplete({
                 items: json.items || [],
+                creationPlan: json.creationPlan,
                 hpRoll: json.hpRoll ?? hpRoll ?? 0,
                 gold: json.goldRoll ?? goldRoll ?? 0,
                 languages: json.languages ?? selectedLanguages,

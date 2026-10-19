@@ -140,3 +140,13 @@ pass explicit typing; native-alignment61/61 passes. See the active audit's R1
 corrective evidence for scope/artifacts and recovery limitations. R2/R3 and all
 native A02 rows remain open. Earlier archive/installed evidence above is retained;
 it does not identify the corrective source or its future package.
+
+## Corrective checkpoint: R2
+
+SD02-R2 is corrected at the final write boundary. Ten maintained real-handler
+case groups pass (eight negative groups fail before; two positive controls pass
+before/after). The new shared preparation/multiset comparison preserves complete
+native grant data and separates ordinary/fixed/extra spells. Language9/9,
+collection/Generator41/41 and both toolchains' explicit typing pass. R3/native
+acceptance remain open. New local artifacts use `temp/adr0002-corrections/r2-*`;
+no previous archive/installed evidence was replaced or rerun.

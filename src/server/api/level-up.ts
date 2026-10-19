@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+import { creationGrantReview } from '../../logic/creation-grants';
 import { json, error, type ModuleServerRequest } from '@sheet-delver/sdk/server';
 import { getErrorMessage, isSdkError, logger, SdkError } from '@sheet-delver/sdk';
 import { shadowdarkAdapter } from '../../server/ShadowdarkAdapter';
@@ -343,10 +345,14 @@ export async function handleFinalizeLevelUp(actorId: string, req: ModuleServerRe
     const world = req.runtime.world?.snapshot().identity;
     return withActorLock(world ? `${world.instanceId}:${world.worldId}:${actorId}` : `${shadowdarkAdapter.runtimeGeneration}:${actorId}`, () => finalizeLevelUp(actorId, req));
 }
-async function finalizeLevelUp(actorId: string, req: ModuleServerRequest) {
+/** Reused at the final creation boundary; this path prepares and validates, never writes. */
+export function prepareCharacterCreation(req: ModuleServerRequest, choices: any) {
+    return finalizeLevelUp('new', req, choices);
+}
+async function finalizeLevelUp(actorId: string, req: ModuleServerRequest, input?: any) {
     const revision = requestRevision(req.runtime);
     try {
-        const body = await req.json<any>();
+        const body = input ?? await req.json<any>();
         const { gold } = body;
 
         logger.info(`[API] Finalizing Level Up for ${actorId} -> Level ${body.targetLevel || 'Unknown'}`);
@@ -425,6 +431,8 @@ async function finalizeLevelUp(actorId: string, req: ModuleServerRequest) {
         const selected = state.selectedSpells;
         const identities = selected.map((spell: any) => canonicalUuid(spell.uuid));
         const innate = grantedSpellSources(planned.items);
+        if (verified.extraSpells.some((spell: any) => identities.includes(canonicalUuid(spell.uuid)) || innate.has(spell.uuid)))
+            return error('validation', 'Extra spells must be distinct from required ordinary choices and fixed granted spells.');
         if (identities.some((uuid: string | null) => uuid && innate.has(uuid))) return error('validation', 'Granted spells do not fill required ordinary spell choices.');
         if (new Set(identities).size !== identities.length) return error('validation', 'A required spell source may be selected only once.');
         if (selected.some((spell: any) => !Number.isInteger(spell.system?.tier) || spell.system.tier < 1 || spell.system.tier > 5)) return error('validation', 'Selected spell has an invalid native tier.');
@@ -501,6 +509,7 @@ async function finalizeLevelUp(actorId: string, req: ModuleServerRequest) {
         return json({
             success: true,
             actorId,
+            creationPlan: { choices: body, contextRevision: revision, review: createHash('sha256').update(creationGrantReview(finalItems)).digest('hex') },
             items: finalItems,
             updates: actorUpdates,
             hpRoll: state.hpRoll,

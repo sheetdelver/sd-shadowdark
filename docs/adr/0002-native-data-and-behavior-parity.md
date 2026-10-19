@@ -714,3 +714,25 @@ refresh and explicit exact-ID review. New regression suite
 after with network blocked. Module/UI/hook typing passes on0.19.2/0.19.3;
 native-alignment61/61 passes with source-mutating SDK doubles. This is offline
 implementation evidence. R2/R3 and all native A02 rows remain open.
+
+### SD02-R2 correction checkpoint — October 18, 2026
+
+The final level-one creation writer now repeats the same server advancement
+preparation with current exact sources. It requires matching Class/Ancestry,
+current world revision and the earlier plan's canonical grant review, then
+compares every submitted grant (including full native fields/effects/arrays) to
+the freshly prepared multiset. A submitted hash alone grants no authority.
+Missing/excess/duplicate/wrong-tier/wrong-list choices cannot reach Actor create;
+ordinary spells remain separate from exact fixed grants and extra-Talent spells.
+Overlapping ordinary/extra selections are rejected before assembly deduplication.
+Generator forwards that plan and copies prepared grants without another client
+enrichment/discovery pass. Level zero retains its independent flow; ordinary
+inventory management and separately authorized GM imports do not use this quota.
+
+`creation-validation.test.ts` exercises the real final writer/preparer with native
+Wizard/Priest/Spell/Talent sources: eight negative groups fail on08997a4; both
+positive controls pass there; all ten pass after. The original three-talents /
+zero-spells bypass now returns400 and makes zero Actor writes. Valid caster,
+extra-spell and level-zero cases preserve exact source data. Existing language
+regressions9/9 and mounted collection/Generator checks41/41 pass; explicit typing
+passes on0.19.2/0.19.3. This is offline evidence; R3 and native A02 remain open.

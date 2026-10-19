@@ -1,3 +1,6 @@
+import { createHash } from 'node:crypto';
+import { creationGrantReview } from '../../logic/creation-grants';
+import { prepareCharacterCreation } from './level-up';
 import { json, error, type ModuleServerRequest } from '@sheet-delver/sdk/server';
 import { isSdkError, getErrorMessage, SdkError } from '@sheet-delver/sdk';
 import { shadowdarkAdapter } from '../ShadowdarkAdapter';
@@ -47,11 +50,28 @@ export async function handleCreateCharacter(req: ModuleServerRequest) {
         const submitted = actor.system?.languages;
         if (!Array.isArray(submitted) || submitted.length !== choices.languages.length || new Set(submitted).size !== submitted.length || submitted.some(uuid => !choices.languages.includes(uuid)))
             return error('validation', 'Language inventory must match its exact fixed grants and separate reviewed choice pools.');
+        const changed = contextConflict(req.runtime, revision); if (changed) return changed;
         if (classDoc?.system?.spellcasting?.ability && actor.system.level.value === 1) {
             const lookups = await shadowdarkAdapter.callerLookups(actor, callerOf(req));
             const view = prepareShadowdarkView(actor, lookups, requestRules(req.runtime));
             if (!view.spellModel.sources.some(source => source.classUuid === classDoc.uuid)) return error('validation', 'The created character is missing its native casting grant or exact Class dependencies. Review its fixed source talents.');
             if (view.spellModel.owned.some(row => row.classification === 'unresolved')) return error('validation', 'A created Spell has unresolved Class data. Review the exact source before creation.');
+        }
+        if (actor.system.level.value === 1) {
+            const prepared = body.creationPlan;
+            if (!prepared?.choices || prepared.choices.targetLevel !== 1
+                || canonicalUuid(prepared.choices.classUuid) !== classDoc?.uuid
+                || canonicalUuid(prepared.choices.ancestryUuid) !== ancestry.uuid)
+                return error('validation', 'Level-one creation requires its exact reviewed native advancement choices and identities.');
+            if (prepared.contextRevision !== revision) return error('conflict', 'The creation plan belongs to an old world context. Prepare and review it again.');
+            // Repeat the same authoritative advancement validation with current
+            // caller sources. No earlier client check or submitted hash is trusted.
+            const response = await prepareCharacterCreation(req, prepared.choices);
+            if (response.status !== 200) return response;
+            const current: any = await response.json();
+            if (prepared.review !== current.creationPlan.review) return error('conflict', 'Native creation sources or choices changed. Prepare and review a fresh plan.');
+            if (!Array.isArray(actor.items) || createHash('sha256').update(creationGrantReview(actor.items)).digest('hex') !== current.creationPlan.review)
+                return error('validation', 'Submitted creation grants differ from the authoritative plan. Review exact ordinary, granted and extra Spell sources, counts and complete native fields.');
         }
         const conflict = contextConflict(req.runtime, revision); if (conflict) return conflict;
         const created = await req.runtime.documents.create('Actor', { ...actor, system: { ...actor.system, languages: choices.languages } });

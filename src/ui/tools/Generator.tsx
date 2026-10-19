@@ -9,6 +9,7 @@ import { useShadowdarkUI, ShadowdarkUIProvider, useShadowdarkCollections } from 
 import { CollectionStatus } from '../components/CollectionStatus';
 import { enrichItem, resolveSubItems, EnrichmentContext } from '../../logic/actor-enricher';
 import { assertResolvedTalentChoices } from '../../logic/talent-choices';
+import { creationGrants } from '../../logic/creation-grants';
 import { ownedCopy } from '../../logic/identity';
 import { presentDescription } from '../../logic/description';
 import { prepareActorCore } from '../../logic/actor-preparation';
@@ -649,20 +650,13 @@ function GeneratorContent() {
             // Add Level Up Items (Talents, Boons, Spells)
 
 
-            for (const item of extraItems) {
-                // 1. FILTER: Gear for Level 1 Characters
-                if (!formData.level0) {
-                    const type = (String(item.type || "")).toLowerCase();
-                    if (['weapon', 'armor', 'basic', 'potion', 'scroll'].includes(type) || item.type === 'gear') {
-                        continue;
-                    }
-                }
-
-                // 2. Enrich and Add
+            if (!formData.level0) {
+                // Already prepared through the authoritative native choice path.
+                // Keep exact fields/effects; do not enrich or discover more grants.
+                items.push(...structuredClone(creationGrants(extraItems)));
+            } else for (const item of extraItems) {
                 const enriched = await enrichItem(item, enrichmentContext);
-                if (enriched) {
-                    items.push(enriched);
-                }
+                if (enriched) items.push(enriched);
             }
 
             // Add any items discovered via description @UUID links
@@ -765,7 +759,7 @@ function GeneratorContent() {
                     'Content-Type': 'application/json',
                     ...(typeof languageData.plan?.contextRevision === 'number' ? { 'X-SheetDelver-Context-Revision': String(languageData.plan.contextRevision) } : {})
                 },
-                body: JSON.stringify({ actor: actorData, languageChoices: knownLanguages.selected })
+                body: JSON.stringify({ actor: actorData, languageChoices: knownLanguages.selected, creationPlan: extraData.creationPlan })
             });
 
             const result = await res.json();

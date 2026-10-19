@@ -286,7 +286,10 @@ threshold even when observer-visible. Use the shared requireOwnedActor guard to
 retain403 versus concealed404 semantics. Context revalidation preserves mounted
 manual state but retires action callbacks/results; keep both browser regressions.
 Actor creation uses the caller SDK route, never the generic writer that strips
-native Item string arrays.
+native Item string arrays. Level-one creation revalidates the exact native plan
+at the final writer; earlier UI/preparation success never validates a changed
+Actor body. Preserve the complete prepared grant multiset and separate ordinary,
+fixed and extra spells; ordinary inventory/import flows have distinct authority.
 
 World Spell catalog changes use public Item document/detail-directory hints,
 coalesced through the existing shared store; cover loaded and pending consumers.
@@ -296,3 +299,6 @@ explicit failure, not an owned-copy or generic-die fallback.
 Corrective advancement coverage: `src/tests/advancement-recovery.test.ts` and
 `src/tests/parity-corrections.browser.mjs` (offline mounted consumers). Native
 pack fixtures use the pinned read-only source; no transports/services are needed.
+
+Final creation regressions: `src/tests/creation-validation.test.ts` (real writer
+and shared preparation with exact pinned native sources).

@@ -619,3 +619,13 @@ explicit exact-source review. Pending advancement blocks replacement requests.
 Restart continuation requires review; unavailable/changed rules and unrelated
 Actor edits require remediation rather than guessing. The mounted workflow uses
 a completed operation response, never a level-change event, as its success signal.
+
+### Final Generator write validation
+
+Level-one `characters/create` repeats the authoritative new-character advancement
+preparation, checking exact identities, current revision and canonical grant
+review against both the earlier prepared plan and the final submitted Items.
+Counts/lists/tiers and complete native source fields must agree; a client plan
+hash alone is never trusted. Generator copies prepared grants intact and forwards
+the choices/review. Gear keeps its separate creation flow. Level-zero creation,
+ordinary inventory edits and authorized GM imports retain their own contracts.
