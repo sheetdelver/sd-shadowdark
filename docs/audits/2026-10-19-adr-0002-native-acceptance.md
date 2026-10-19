@@ -1,11 +1,12 @@
 # ADR-0002 native acceptance — October 19, 2026
 
-**Current disposition:** The selected A02-01–15 v14 acceptance matrix is complete
-on the final corrected archive. See [v14 completion](#v14-completion-checkpoint--october-19-2026)
-for the executed variants, retained correction evidence and cleanup. The module
-correction is checkpointed at `b962bf0`. All v13 rows, final D6/D7 closeout and
-release remain pending. Earlier partial dispositions below are historical.
-This report supports the [active audit](2026-10-18-spellcasting-and-native-parity.md).
+**Current disposition:** The selected A02-01–15 matrix passes on native 13.351
+and 14.367 with Shadowdark 4.0.6 and isolated Core 0.19.3. D6/final D7 and
+ADR-0002 are complete within their selected scope. See [final v13 closeout](#v13-completion-and-final-closeout--october-19-2026)
+for evidence, the small recovery-layout correction, archive qualification and
+cleanup. Release preparation/publication remains separate. Earlier partial
+results below are historical. This report supports the
+[completed audit](2026-10-18-spellcasting-and-native-parity.md).
 
 ## Identity and authority
 
@@ -241,10 +242,12 @@ the scenarios, expected outcomes and identities without depending on those files
 Fault tests wrap only explicit fixture requests in a copied test Core, delegating
 actual native writes and ID allocation. Original copied Core was restored before
 restart/recovery and restored-world tests. No product Core/runtime or module
-archive was patched. The checked native ability oracle used a controlled1d1 base
-through native roll configuration to obtain a repeatable failure, then compared
-the module at the observed total; the separate default-dice/outcome controls
-retain their own results. Faults do not establish production failure frequency.
+archive was patched. The checked ability comparison records the native result and surviving source.
+Requesting a1d1 base is not proof that native preparation retained that override;
+the native roll generator can replace it. This evidence establishes spend/loss
+ordering and surviving state, not identical roll totals. Separate native RollSD
+controls establish outcome parity. Faults do not establish production failure
+frequency.
 
 Harness errors remain distinguished from product results. An initial launch used
 the previous archive; that run (`71RikU`) was stopped and cleaned before the final
@@ -274,3 +277,113 @@ pending**, so ADR-0002 and release remain open. The next step is the user's swit
 to the disposable v13 instance, then the corresponding native matrix and final
 closeout. Do not reopen completed v14 variants solely because older paragraphs
 above or in the run sheet still describe them as pending.
+
+## V13 completion and final closeout — October 19, 2026
+
+The user switched the previously authorized disposable instance to Foundry
+**13.351**, world **`sd-adr61-v13`**, Shadowdark **4.0.6**. Read-only status,
+full-GM login and actual browser identity confirmed those values. The starting
+world had0 Actors,0 world Items,0 Scenes,1 User and no world packs. The seven
+fixture accounts again separated native GM, Core service GM and caller roles.
+Native pre-generated characters and exact release4.0.6 pack documents supplied
+the fixtures; no operator characters or v14 serialized Actors were reused.
+The native Talent source directly exposed **`effect.changes` with numeric mode**,
+including the Wizard grant's mode2 entry. V13 fixtures and independent source
+oracles use that format; the retained v14 run uses its observed
+`effect.system.changes`/string-type format.
+
+Core remained0.19.3 at `90c13e5e57d88913cd3bae6bf6b9e6f0b995bad1`;
+native static source remained4.0.6 at `9677d16b3903b3b640f00d4efd48249142ac8334`.
+The broad matrix used the276056-byte candidate from checkpoint `b962bf0`,
+SHA256 `7f193292d1e7e0213b922199f7795ec57afb51e235a4bee70136582d72a85469`,
+already accepted on v14. Product source started at documentation checkpoint
+`3637c8b`. The only later product edit is the presentation correction below.
+
+| Row | V13 result and independent evidence | V14 disposition |
+| --- | --- | --- |
+| A02-01 | Pass. Native/installed missing, empty and altered-grant diagnosis; three exact minimal repairs preserve all unrelated fixture source; complete source-less Priest works. | Prior pass retained. |
+| A02-02 | Pass. Fourteen native prepared casting comparisons cover stock classes, Knight's alternate list, missing/disabled/wrong grants, item-only/multiple grants, owned duplicates and exact world Class. NPC controls are separate. | Prior pass retained. |
+| A02-03 | Pass. Native `LevelUpSD` and installed Knight2→3 agree on Witch tier1 choice, XP35→15 and HP8→11. Exact creation/import, required grants and invalid-choice zero writes pass. | Prior pass retained. |
+| A02-04 | Pass. Eight owned variants retain distinct embedded IDs in both layouts/cards. Same-name/different-source, duplicate origin, renamed/custom/missing/lost/granted handling, cancellation and unchanged save preserve source. | Prior pass retained. |
+| A02-05 | Pass. Positive/zero/unavailable limits, wrong list/tier, duplicate/final-body tampering, extra/fixed Spell separation, stale baseline and required language choices reject before invalid writes. | Prior pass retained. |
+| A02-06 | Pass. Mounted level/table/list replacement, pending original-receipt preservation, source filters, ownership-only denial/restoration, held old response, caller/role change and transport reconnect retire unsafe data/intent while preserving authorized search. | Prior pass retained. |
+| A02-07 | Pass. Refused additions/removals, lost acknowledgements, duplicate/concurrent requests and independent GM edits retain exact surviving native source. Zero-write attempts retire; acknowledged Item IDs survive receipt/read failure. Real restart retains uncertainty without duplicate creation; exact-ID reconciliation alone writes nothing, followed by one reviewed completion. Exact final source auto-completes without a player recovery step; unknown IDs or changed source stay fenced. | Prior pass retained. |
+| A02-08 | Pass. Exact world/embedded Class and Spell refs, denied parent, same-name decoy and known-pack reads. OWNER succeeds, OBSERVER reads/write403, LIMITED/NONE404 concealment; warmed private catalog content retires. | Prior pass retained. |
+| A02-09 | Pass. Installed sheets, picker, cards and shared roller at360/768/1024/1440 in both themes; Tab/Shift-Tab, Escape/focus return, nested cleanup, reachable footer and no horizontal overflow. Recovery styling additionally passes16 width/theme/layout cases after correction. | Prior matrix retained; final recovery styling checked on v13 as described below. |
+| A02-10 | Pass. Same archive supports creation/import/management/actions. Eight native migration effects match a literal-key whole-source oracle; real restart is a no-op. Explicit pack lock gates required scope with no writes. Restored legacy data needs fresh approval, rejects old approval409 and completes exactly one verified correction. | Prior pass retained. |
+| A02-11 | Pass. Actual checked/no-check native ability ordering, last/zero/concurrent use, cancellation, refused/uncertain spending, result loss and refused loss consequence. Confirmed spend survives failure; result/receipt replay and restart do not roll/post twice. | Prior pass retained. |
+| A02-12 | Pass. Native Potion swap/effect/chat/delete sequence, distinct alternate text, stack5 and unknown fields. Identification with empty alternate name, grouped effect and deletion refusals preserve surviving source and retry without repeated swap/chat; cancellation writes nothing. | Prior pass retained. |
+| A02-13 | Pass. Player/NPC focus distinction, Spell failure, Scroll consumption and Wand failure; manual totals do not invent natural criticals. Actual native RollSD verifies ordinary and zero/custom thresholds. | Prior pass retained. |
+| A02-14 | Pass. Native Generator custom-rarity, explicit-zero and separate pools; duplicate/denied/wrong-pool creation refusal. Ordinary mounted editing preserves extras, has no creation quota, and cancel/no-op changes nothing. | Prior pass retained. |
+| A02-15 | Pass. Actual native69 slot records,31 weapon grips/dice,9 armor combinations,4 inventories and9 ordinary outcomes, plus3 zero/custom threshold controls. | Prior pass retained. |
+
+### SD02-N13-01: recovery controls lacked visible separation — corrected
+
+Final screenshot review found that recovery inputs and buttons had no explicit
+control styles, so labels, values and actions ran together. Functional receipts
+were correct, but the presentation was unclear. Only
+`src/ui/components/levelup/AdvancementRecovery.tsx` changed: bounded full-width
+fields, spaced action groups/checkbox labels, visible button borders and disabled/
+focus states, and long-text wrapping. No request, state transition, permission or
+native-write logic changed. The previous archive fails the visible-field check;
+the corrected installed archive passes all16 combinations of two layouts, four
+widths and two themes, including expanded restoration controls, reachable actions,
+review gating and unchanged native source. Representative normal/expanded captures
+were visually inspected. Existing16 corrective mounted cases and explicit module/
+UI/hook typing pass; module checks and isolated packaging pass.
+
+Verified UI candidate: **276276 bytes**, SHA256
+`71ffccb44cdb294f6ac515e31d887c13bfde120fe70dd3a38e58d0433ef28dda`, at
+`temp/n13-recovery-layout/package-data/dist/modules/shadowdark-0.9.5.tgz`.
+A member-by-member comparison against the broad native candidate shows exactly
+two changes: `dist/ui.js` and `assets/shadowdark.tailwind.css`. Logic/server bundles,
+all compiled migration hooks/catalog, compatibility and other files are byte-
+identical. Original build paths were retained to avoid comment-only compiler path
+differences. The prior archive is preserved unchanged at its original path.
+This closes the selected acceptance gate using both-generation native runtime
+evidence plus v13 verification of the presentation delta; **no fresh full v14 run
+of the UI-only candidate is claimed**. Release tooling will produce the separately
+versioned distribution; this candidate retains the existing0.9.5 metadata.
+
+### Evidence qualifications and cleanup
+
+Run root: `/tmp/sd-a02-native13-BIAsN5/`; `completion-summary.json` indexes every
+result, provenance, artifact comparison and cleanup. Module-owned harnesses are
+in `temp/native-a02-v13/`. Reports include `acceptance`, `operations`,
+`languages-import`, `action-parity`, `native-matrix`, `completion-data`,
+`completion-quotas`, `completion-owned-ui`, `completion-actions`,
+`completion-cancellation`, `completion-faults`, `operation-faults`,
+`recovery-native`, `replacement-refusals`, `auto-completion`, `completion-restart`,
+`advancement-restart`, `auto-restart`, `migration-results`, `restored-world`,
+`ui/`, `refresh-ui/`, `completion-ui/` and `recovery-layout-after/`.
+This tracked report retains the scenario/oracle details independently of temp files.
+
+V13 native login requires `userid`; the initial v14-style harness login was
+corrected before executing comparisons. Native Light Tracker obscured its own
+cancellation dialog; closing that native window at a supported viewport resolved
+the harness timeout, and fresh cancellation proves unchanged source/messages.
+An initial layout probe used the wrong case for the footer's accessible Cancel
+name; that locator was corrected before the16-case pass. Failed reports remain
+with named passing reruns, not counted as product successes. The native checked
+ability traces observed actual1d20+1 results; requested roll configuration is not
+proof of the effective dice. Spend/loss source checks and the separate RollSD
+outcome oracle have distinct claims.
+
+Controlled faults were limited to explicit fixture requests in copied Core.
+They delegated real native writes and ID allocation; the original Core runtime
+was restored before restart and restored-data checks. No Core product source,
+operator settings or native reference changed. All fixtures, seven accounts,
+two world packs and25 fixture-authored messages were removed. Temporary settings
+were restored. Independent cleanup matches the original **0 Actors,0 world
+Items,0 Scenes,1 User**, original pack membership, selected settings and0 baseline
+ChatMessage IDs, with **zero recorded source differences** excluding `_stats`.
+User comparisons retain credential-free identity/role/character fields. All task
+services stopped; operator Foundry PID1124879 remains on30000.
+
+**Final disposition:** D6, final D7 and ADR-0002 are complete within the selected
+scope. No confirmed blocker or new Core dependency remains. F01–F06, ambiguous
+historical data requiring exact-source GM review, unknown-write fencing and
+separate-write non-atomicity remain explicit limitations. Core0.19.2 retains its
+existing offline/compiled compatibility evidence; native execution used0.19.3.
+Version/compatibility/migration history are unchanged. Local checkpoint/release
+operations follow current scoped authorization; no publication occurred here.

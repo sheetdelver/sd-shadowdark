@@ -1,5 +1,11 @@
 # ADR-0002 implementation validation
 
+**Final acceptance (October 19):** D6/final D7 and ADR-0002 are complete within
+scope. Actual13.351/14.367 acceptance and the final recovery-layout delta are
+recorded in the [native closeout](2026-10-19-adr-0002-native-acceptance.md#v13-completion-and-final-closeout--october-19-2026).
+The retained records below distinguish earlier offline candidates and findings.
+Release metadata/publication remains separate.
+
 SD02-01–13 have implementation checkpoint evidence and passing controlled checks.
 Independent review found SD02-R1–R3 in advancement recovery, final
 creation validation and management-source refresh; their original regressions
@@ -464,3 +470,27 @@ records executed scenarios, current versus retained evidence, explicit harness
 faults/retries and cleanup. Core0.19.3/Foundry14.367/Shadowdark4.0.6 were observed.
 Both final fixture runs restored the baseline; Core/native source remain clean.
 This does not claim v13 acceptance or authorize a release.
+
+## Native closeout and presentation delta — October 19, 2026
+
+Broad native v13 acceptance used the same276056-byte,7f193292… candidate as the
+completed v14 matrix. The [final native ledger](2026-10-19-adr-0002-native-acceptance.md#v13-completion-and-final-closeout--october-19-2026)
+contains exact identities, all15 rows, source oracles, real restart, restored-data
+maintenance, cleanup and harness qualifications.
+
+A final visual review corrected SD02-N13-01 in `AdvancementRecovery.tsx` only.
+New candidate:276276 bytes, SHA256
+`71ffccb44cdb294f6ac515e31d887c13bfde120fe70dd3a38e58d0433ef28dda`,
+`temp/n13-recovery-layout/package-data/dist/modules/shadowdark-0.9.5.tgz`.
+Only `dist/ui.js` and scoped CSS differ; all logic/server/migration/catalog/
+compatibility bytes are identical to the both-generation native candidate.
+The original archive fails the visible-field check;16 installed recovery-layout
+cases pass after correction with no native source change. All16 maintained
+corrective mounted cases, explicit module/UI/hook typing, module checking and
+isolated packaging pass. Earlier17-suite/35-handler/5-lifecycle and dual-toolchain
+compiled evidence remains valid for unchanged code; it was not rerun wholesale
+for a style-only edit. Full v14 repetition of the cosmetic candidate is not claimed.
+
+Module0.9.5 and Core>=0.19.2/API/UI/roll/native ranges remain unchanged. Existing
+Core0.19.2 offline compatibility evidence remains; actual native testing uses
+Core0.19.3. Release tooling/versioning and remote operations remain separate.

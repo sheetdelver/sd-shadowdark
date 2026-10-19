@@ -2,13 +2,13 @@
 
 **Date:** October 18, 2026
 
-**Status (October 19, v14 complete):** Active pending v13 acceptance. Correction
-checkpoint `b962bf0` is committed; the unchanged final archive passes the selected
-A02-01–15 v14 matrix. The [completion ledger](2026-10-19-adr-0002-native-acceptance.md#v14-completion-checkpoint--october-19-2026)
-records remaining-variant execution, native source oracles, restored-world/restart
-checks, both-layout/four-width/two-theme review and baseline restoration. No new
-product defect was confirmed. All v13 rows and final D6/D7/release remain open.
-Core and native source are unchanged.
+**Status (October 19, completed):** The selected findings and corrective reviews
+are complete. Actual native13.351/14.367 acceptance passes on Shadowdark4.0.6 /
+isolated Core0.19.3. The [final ledger](2026-10-19-adr-0002-native-acceptance.md#v13-completion-and-final-closeout--october-19-2026)
+records all15 rows, SD02-N13-01's small recovery-layout correction, artifact
+qualification and verified cleanup. No confirmed blocker/new Core dependency
+remains. Release preparation is separate; F01–F06 remain deferred. Earlier open
+paragraphs below preserve the review history.
 
 **Decision record:** [ADR-0002](../adr/0002-native-data-and-behavior-parity.md)
 
@@ -1573,3 +1573,27 @@ ordinary editing, complete owned inventory, cancellation and action refusals.
 All fixture baselines were restored; no task services remain. No new source fix
 or Core allowance is required by these results. SD02-N14-01/02 remain corrected;
 v13 acceptance is the remaining selected native gate. ADR-0002 stays open.
+
+## Final native review and closeout — October 19, 2026
+
+The [native ledger](2026-10-19-adr-0002-native-acceptance.md#v13-completion-and-final-closeout--october-19-2026)
+closes A02-01–15 and D6/final D7 after actual v13 acceptance, retaining v14's
+completed runtime evidence. It records generation-specific effect shapes,
+minimal repairs, source/receipt comparisons, successful normal workflows,
+permissions/refresh and failure/restart behavior, plus independent cleanup.
+
+**SD02-N13-01 — recovery-control presentation (P2), corrected:** Final screenshots
+showed recovery buttons/inputs without borders or layout separation. Only
+`AdvancementRecovery.tsx` gained explicit styling/wrapping. Existing receipt/action
+behavior is unchanged. The original archive fails the field-visibility assertion;
+16 packaged width/theme/layout checks and16 existing mounted cases pass after
+correction. Server, logic and all compiled migration bytes exactly match the
+both-generation accepted archive. The final ledger distinguishes this UI-only
+candidate's v13 check from retained v14 evidence; no full rerun is invented.
+
+All selected confirmed findings now have implemented/verified or exact-source
+remediation dispositions. This audit is completed at its stable path. F01–F06
+remain proposals outside the accepted scope. Unknown native outcomes still need
+exact-source review; separate document writes retain their documented non-atomic
+boundary. These limitations do not imply a new Core regression. No versions,
+compatibility ranges or migration history changed; publication remains separate.

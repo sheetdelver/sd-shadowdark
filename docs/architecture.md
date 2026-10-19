@@ -11,7 +11,10 @@ world cache. Uncertain/partial/mismatching source remains blocked. A boolean
 leaking another caller's receipts. Review loads its original request directly,
 not a new level's Class/Patron prerequisites. Invalid selection shapes/references
 return typed validation errors. See the [native evidence](audits/2026-10-19-adr-0002-native-acceptance.md#automatic-completion-correction-and-native-recheck).
-Remaining v14 variants and v13 acceptance are still open; Core/SDK are unchanged.
+The selected native13.351/14.367 acceptance is complete; Core/SDK are unchanged.
+Recovery controls now have explicit field/button/focus/disabled styling, spaced
+review actions and long-text wrapping. See the [final closeout](audits/2026-10-19-adr-0002-native-acceptance.md#v13-completion-and-final-closeout--october-19-2026)
+for the UI-only delta and native evidence qualification.
 
 **Corrective implementation (October 19):** R1b's acknowledgement and receipt
 separation and R2/R3 remain covered. SD02-R1a-R1 removes old-source equality from
@@ -19,16 +22,16 @@ proven zero-write retirement, preserving independent Actor edits and requiring
 fresh preparation. CI now invokes all 17 maintained source suites with the pinned
 native reference. The original review and corrective evidence are recorded in
 [SD02-R1a-R1](audits/2026-10-18-spellcasting-and-native-parity.md#sd02-r1a-r1--zero-write-actor-edits-still-block-restart-p1).
-Native D6/final D7 and A02 acceptance remain open; see the newer v14 record above.
+Native D6/final D7 and the selected A02 matrix are complete; see the final ledger above.
 
-**Active follow-up (October 18):** the post-release 0.9.5
+**Completed follow-up (October 19):** the post-release 0.9.5
 [native parity audit](audits/2026-10-18-spellcasting-and-native-parity.md) and
 [ADR-0002](adr/0002-native-data-and-behavior-parity.md) cover newly observed
 actor-data omissions, alternate spell lists, owned-spell accounting and selection
 safety, plus action phases, Potion identification, NPC focus/outcomes and language
 fields (SD02-01–13). The audit includes bounded matching native-method controls,
 a model coverage matrix and separately scoped F01–F06 feature proposals.
-ADR-0002 implementation is in progress. The released0.9.5 gap descriptions below
+ADR-0002 is completed within its selected scope; F01–F06 remain deferred. The released0.9.5 gap descriptions below
 are historical baseline; current corrections are recorded here and in its checkpoint record.
 Independent review of `dbbe93f2` identified SD02-R1–R3. Corrective checkpoints now
 verify durable advancement completion/recovery, final creation spell validation

@@ -4,32 +4,13 @@ Historical entries are reconstructed from [published releases](https://github.co
 
 ## Unreleased
 
-- Automatically settle confirmed advancement
-- Preserve accessible partial-operation review
-- Validate advancement selection shapes
-
-- Preserve independent Actor edits
-- Run complete parity regressions
-
-- Restart proven zero-write advancement attempts; preserve acknowledged grants through receipt failures and exact-source recovery
-
-- Refresh open spell limits/lists and retire stale selections while retaining receipts
-
-- Revalidate exact native creation choices and grants at the final Actor write
-
-- Preserve native advancement order and exact grant receipts through failure, retry and explicit recovery
-
-- Preserve required native grants and exact Class authority
-- Retain open sheet state and retire stale action callbacks during context changes
-- Preserve native creation arrays and precise caller denial responses
-
-- Exact caller spell dependencies, advancement dice and native alternate progression
-- Required advancement spell validation before writes
-- Explicit owned-spell changes, durable receipts and safe partial recovery
-- Reactive caller/world spell catalogs, native source filters and accessible selection dialogs
-- Native ability spending and complete Potion identification before results
-- Safe action receipt recovery, NPC focus loss and disabled critical thresholds
-- Native language rarity and separate validated creation choices
+- Native casting and spell progression
+- Exact owned-spell management
+- Safe advancement completion and recovery
+- Authoritative character-creation validation
+- Reactive spell catalogs and dialogs
+- Native ability and Potion sequencing
+- Correct focus, outcomes and languages
 
 ## 0.9.5
 

@@ -100,7 +100,7 @@ Document consumers must use the route's actual bare-document response shape.
 Use native source and handler comparisons for these rules;
 successful writes alone do not establish parity.
 
-The active post-release plan is [Shadowdark ADR-0002](docs/adr/0002-native-data-and-behavior-parity.md),
+The completed post-release plan is [Shadowdark ADR-0002](docs/adr/0002-native-data-and-behavior-parity.md),
 with findings SD02-01–13 in the [native parity audit](docs/audits/2026-10-18-spellcasting-and-native-parity.md).
 SD02-R1–R3 have corrective implementation and offline regression evidence
 (advancement recovery, final creation validation and management-source refresh).
@@ -121,10 +121,13 @@ caller-safe review indicator, independent of XP. UI never edits receipts directl
 server bookkeeping transitions preserve the original record and never write
 Foundry documents. Recovery opens its saved request without new Class preparation.
 Malformed selection input returns typed validation errors before writes.
-The selected A02-01–15 v14 matrix is complete on the final corrected archive;
-v13 and final D6/D7 closeout remain open. Use the native report’s current ledger
-instead of historical pending paragraphs. Correction checkpoint: `b962bf0`.
-Follow its checkpoints; do not treat its existence as branch, live-write or release authority.
+The selected A02-01–15 matrix and D6/final D7 are complete on native13.351/14.367.
+SD02-N13-01 corrects recovery field/action styling only; the final native report
+records16 packaged layout checks and byte-identical server/migration evidence.
+Use that current ledger instead of historical pending paragraphs. Earlier runtime
+checkpoint: `b962bf0`. Preserve the visible, keyboard-usable controls and exact
+receipt behavior. Release preparation/publication is separate; completed evidence
+does not grant branch, live-write or release authority.
 [ADR-0001](docs/adr/0001-native-alignment-and-resource-cards.md) and the
 [native-alignment audit](docs/audits/2026-10-15-native-alignment.md) remain completed
 within their selected scope. Their released-system baseline, future-version

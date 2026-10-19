@@ -7,14 +7,14 @@ zero-write refusal/context change and exact-ID reconciliation after acknowledged
 creation plus receipt/read failure. R2/R3 retain passing implementation and rerun
 offline regressions; their separate native cases remain required.
 
-**Execution update, October 19:** Correction checkpoint `b962bf0` is committed.
-The final unchanged archive has completed the selected v14 A02-01–15 matrix;
-the [completion ledger](audits/2026-10-19-adr-0002-native-acceptance.md#v14-completion-checkpoint--october-19-2026)
-records every row, artifact, qualification and cleanup. **All v13 rows remain
-pending**. Continue on v13 after the user switches the disposable instance;
-retain current user authorization rather than requesting the same scope again.
-The historical paragraphs below preserve earlier plans/candidate identities;
-they do not reopen completed v14 work. Overall D6/final D7 and ADR remain open.
+**Execution update, October 19 — complete:** The selected A02-01–15 matrix passes
+on actual native13.351/14.367 with Shadowdark4.0.6 / isolated Core0.19.3. The
+[final ledger](audits/2026-10-19-adr-0002-native-acceptance.md#v13-completion-and-final-closeout--october-19-2026)
+records source/receipt oracles, both layouts/themes, cleanup, and the v13-verified
+UI-only recovery correction with byte-identical server/migrations. D6/final D7
+and ADR-0002 are complete. This run sheet now records the accepted scope and
+future regression procedure; historical pending text/candidate hashes below do
+not reopen the gate. A new live run still needs its own scoped authority.
 
 The [SD02-R1–R3 implementation findings](audits/2026-10-18-spellcasting-and-native-parity.md#independent-implementation-review--october-18-2026)
 now have failing-before/passing-after offline regressions. Select only the new

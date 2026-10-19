@@ -16,4 +16,6 @@ shapes are not eligible for automatic bulk migration. Existing effect-key hooks
 cannot reconstruct deleted content. There is no caller/render/bootstrap repair
 and no invented migration parameter UI. Native GM editing/exact source copying is
 the remediation path; retain a before/after source receipt and remove only approved
-disposable fixtures. Actual native A02-01/03 evidence remains required.
+disposable fixtures. These minimal procedures passed A02-01/03 on disposable native13.351 and14.367
+copies with Shadowdark4.0.6; see the [acceptance ledger](audits/2026-10-19-adr-0002-native-acceptance.md#v13-completion-and-final-closeout--october-19-2026).
+This evidence does not authorize edits to another character/world.

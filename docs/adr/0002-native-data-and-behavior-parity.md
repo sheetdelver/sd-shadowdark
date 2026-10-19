@@ -1,6 +1,6 @@
 # ADR-0002: Native data and behavior parity
 
-**Status:** In progress
+**Status:** Completed — selected scope, October 19, 2026
 
 **Date:** October 18, 2026
 
@@ -8,13 +8,15 @@
 
 **Audit:** [Post-release native parity](../audits/2026-10-18-spellcasting-and-native-parity.md)
 
-**Current status (October 19, v14 complete):** Correction checkpoint `b962bf0`
-is committed. SD02-N14-01/02 and the selected A02-01–15 native v14 matrix pass on
-the final unchanged archive with isolated Core0.19.3 / Foundry14.367 /
-Shadowdark4.0.6. Exact-source completion, partial review and typed validation
-remain intact. See the [completion ledger](../audits/2026-10-19-adr-0002-native-acceptance.md#v14-completion-checkpoint--october-19-2026).
-All v13 rows and final D6/D7/ADR closeout remain open; release is pending. No
-product changes, new Core dependency, compatibility or version bump in this pass.
+**Current status (October 19, final closeout):** The selected A02-01–15 matrix
+passes on Foundry13.351 and14.367 / Shadowdark4.0.6 with isolated Core0.19.3.
+D0–D7, including D5a/D5b and the corrective reviews, are complete. The final
+native pass found and corrected SD02-N13-01, a recovery-control layout omission;
+its UI/CSS-only archive delta passes16 installed layout cases and retains byte-
+identical server/migration code. The [final ledger](../audits/2026-10-19-adr-0002-native-acceptance.md#v13-completion-and-final-closeout--october-19-2026)
+records the evidence and limits. Release preparation/publication is separate;
+versions and compatibility remain unchanged. Historical pending statements below
+describe earlier checkpoints and do not reopen completed gates.
 
 **Predecessor:** [ADR-0001](0001-native-alignment-and-resource-cards.md), Completed; its accepted scope and explicit deferrals remain intact.
 
@@ -1136,3 +1138,41 @@ checkpoint. Each final run restored its baseline; all task services stopped.
 Pre-update snapshot: `temp/native-a02-v14/ADR-0002.before-v14-completion.md`,
 SHA-256 `28e85fb220e47aa414604aa9e0a8f8b11ee9db8ad9fc7d4fd231be60ce20a38e`.
 Earlier uncommitted/pending statements describe their historical checkpoints.
+
+### V13 acceptance and final disposition — October 19, 2026
+
+The [final native ledger](../audits/2026-10-19-adr-0002-native-acceptance.md#v13-completion-and-final-closeout--october-19-2026)
+records all15 selected rows on actual13.351/4.0.6 with Core0.19.3, retaining the
+completed14.367 run. Native source directly confirms each generation's effect
+format. Exact source/receipts, both sheets, mounted refresh/privacy, invalid-input
+zero writes, action phases, real restart and restored-data migration pass. Native
+cleanup independently restores the approved disposable baseline; all task services
+stopped and operator Foundry remains running.
+
+SD02-N13-01 was a visual omission in `AdvancementRecovery.tsx`: unstyled controls
+ran together. Explicit field/button/focus/disabled styling and wrapping correct
+it without changing any operation logic. A before-correction visual assertion
+fails;16 installed width/theme/layout cases,16 maintained mounted cases, explicit
+typing, module checking and packaging pass. The new276276-byte candidate hash is
+`71ffccb44cdb294f6ac515e31d887c13bfde120fe70dd3a38e58d0433ef28dda`.
+Only UI/CSS archive members differ from the candidate accepted on both native
+generations. The report explicitly qualifies retained v14 evidence versus the
+new v13 presentation check; a full v14 rerun of that cosmetic delta is not claimed.
+
+| Gate | Final disposition |
+| --- | --- |
+| D0/D1 | Complete. Reproduction, native provenance, shared model and public capability proof retained. No new Core dependency established. |
+| D2/D3/D4 | Complete. Shared exact spell model, validated explicit operations and reactive caller catalog/dialogs; SD02-R1–R3 and R1a/R1b corrections retain regression/native evidence. |
+| D5/D5a/D5b | Complete. Minimal historical-data remediation on disposable copies, native action/outcome phases and language-pool behavior verified. No ambiguous automatic repair introduced. |
+| D6 | Complete. Selected A02-01–15 passes on both native generations; final UI-only delta verified on v13 with unchanged server/hooks. |
+| D7 | Complete. Audit, native/validation records, architecture, README, guidance, remediation/run sheet, changelog and handoff reconciled. Release operations remain separate. |
+
+SD02-01–13, SD02-R1–R3, SD02-R1a-R1/V1, SD02-N14-01/02 and SD02-N13-01 have
+implemented/evidenced dispositions. F01–F06 remain deferred; exact-source GM
+remediation and partial/unknown-write review remain documented policy, not open
+implementation defects. No distributed rollback or future native-version claim
+is made. Application/module versions, API ranges, migration steps/history and
+Core/native source are unchanged.
+
+Pre-closeout snapshot: `temp/native-a02-v13/ADR-0002.before-v13-closeout.md`, SHA256
+`1b6cd1f2ea05d5a5049916e19f498ed47c40274f48a89516c24a4a2b08031c11`.
