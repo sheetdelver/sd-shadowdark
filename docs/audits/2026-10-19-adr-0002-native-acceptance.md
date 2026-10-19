@@ -1,12 +1,11 @@
 # ADR-0002 native acceptance — October 19, 2026
 
-**Current disposition:** SD02-N14-01/02 are corrected with offline and targeted
-native v14 verification in the [later correction record](#automatic-completion-correction-and-native-recheck).
-The original broader pass below found the defect; its exact subcase evidence and
-remaining variants are preserved. Remaining v14 variants and all v13 acceptance
-keep the ADR/release open. This report supports the
-[active audit](2026-10-18-spellcasting-and-native-parity.md); it is not another
-implementation queue.
+**Current disposition:** The selected A02-01–15 v14 acceptance matrix is complete
+on the final corrected archive. See [v14 completion](#v14-completion-checkpoint--october-19-2026)
+for the executed variants, retained correction evidence and cleanup. The module
+correction is checkpointed at `b962bf0`. All v13 rows, final D6/D7 closeout and
+release remain pending. Earlier partial dispositions below are historical.
+This report supports the [active audit](2026-10-18-spellcasting-and-native-parity.md).
 
 ## Identity and authority
 
@@ -184,3 +183,94 @@ source differences excluding transport `_stats`. `cleanup.json` records success.
 All task-owned services stopped; operator Foundry remains running on 30000.
 No commit, remote write, release, version or compatibility change occurred.
 Remaining broader v14 cases listed above and all v13 acceptance remain open.
+
+## V14 completion checkpoint — October 19, 2026
+
+The user authorized the correction checkpoint and continuation. Commit
+`b962bf0` preserves the automatic-completion implementation, regressions and
+preceding native review. This continuation changed no product source, versions,
+compatibility requirements, applied migration history or Core files.
+
+The final **0.9.5** archive is unchanged: **276056 bytes**, SHA-256
+`7f193292d1e7e0213b922199f7795ec57afb51e235a4bee70136582d72a85469`.
+It ran as a managed install in isolated actual **Core 0.19.3**
+(`90c13e5e57d88913cd3bae6bf6b9e6f0b995bad1`) against **Foundry 14.367**,
+world **shadowdark-test**, native **Shadowdark 4.0.6**. The read-only native
+reference remains `9677d16b3903b3b640f00d4efd48249142ac8334`.
+The existing full-GM/disposable fixture/account/setting/cleanup authority applied.
+Native browser, service and player accounts were separate.
+
+| Row | Final v14 evidence | v13 |
+| --- | --- | --- |
+| A02-01 | Pass. Missing casting Talent, empty Spell Class references and altered Knight casting effect repaired only on copies using exact native sources. Independent source comparisons preserve unrelated fields. Source-less Priest remains usable. | Pending |
+| A02-02 | Pass. Fourteen native-browser/installed-view casting controls repeated, covering stock casters, absent/disabled/wrong grants, item-only and multiple grants. NPC controls pass. Actual v14 serialized effects were read directly; legacy-shape offline evidence is not v13 acceptance. | Pending |
+| A02-03 | Pass. Actual native Knight 2→3 and installed module agree on XP35→15, HP8→11 and one exact Witch-list tier1 Spell. Valid creation/import and exact request replay pass. The six-group automatic-completion native record above remains applicable to this identical archive. | Pending |
+| A02-04 | Pass. Eight owned variants retain distinct Actor+Item IDs in both installed layouts: duplicate origin, same name/different exact source, renamed, source-less/custom, missing source, lost and an additional exact Spell. A separate Priest fixture verifies granted classification and protected removal. Cancel/unchanged save preserve source, including excess inventory. | Pending |
+| A02-05 | Pass. Invalid counts, duplicates, tier/list, stale plans and unsupported extra selections make no native writes. Valid exact-list selections independently prove numeric0 and native null both mean zero; an additional grant with no progression owner is unavailable. No invented unlimited quota. | Pending |
+| A02-06 | Pass. Open picker refresh after level/table/list changes, including an intercepted pending save, clears unsafe new intent but preserves search and the original submitted request/list/receipt. Ownership-only revoke/restore, held pre-revocation response, source filters, transport reconnect, role4→1 demotion and OWNER→NONE caller switch retire private data. | Pending |
+| A02-07 | Pass. Existing native advancement zero-write/acknowledgement/restart evidence remains, including the corrected archive's complete/partial distinction. Additional native Spell replacement tests independently refuse addition and removal: old owned Item survives until confirmed, exact retry completes once, terminal replay is unchanged. Lost-create/result receipts survive actual Core restart without repeating writes/results. | Pending |
+| A02-08 | Pass. Exact world and Actor-embedded Class references, declared compendium identities and same-name decoys tested. Revoking the embedded parent removes casting eligibility; restoration returns it. OWNER succeeds, OBSERVER reads/write403, LIMITED/NONE404, denied dependencies do not fall back to copied origins or same-name documents. | Pending |
+| A02-09 | Pass. Final archive at360/768/1024/1440, both themes and both layouts. Screenshots inspected for sheet/card/picker/shared roller, keyboard containment/Escape/focus return, nested cleanup, footer reachability and horizontal bounds. Both layouts also show all eight owned variants. | Pending |
+| A02-10 | Pass. Final archive performs eight native migration writes with an independent whole-source oracle; restart is a no-op. Explicit world-pack lock blocks required scope. Restored legacy data requires a new approval; stale approval409, exact one-write repair and source comparison pass. Creation/import/actions use the same archive. | Pending |
+| A02-11 | Pass. Checked/no-check native ability comparison, last/zero use, concurrent last-use and replay. Native and installed cancellation make no source/message changes. Controlled prerequisite refusal/uncertainty produces no result; result failure retains spending; refused loss consequence retries without another result. | Pending |
+| A02-12 | Pass. Native Potion identification/effect/chat/delete behavior repeated, including distinct active/alternate text, stack quantity5, preserved unknown fields and complete effect group. Identification refusal with empty alternate name, effect refusal and deletion refusal exercise surviving source and exact retry. Native/installed cancellation changes nothing. | Pending |
+| A02-13 | Pass. Player focus, ordinary failure/loss, NPC focus, Scroll consumption, Wand failure and manual-total behavior repeated. Actual native RollSD comparisons include zero/custom thresholds; manual totals do not invent natural criticals. | Pending |
+| A02-14 | Pass. Native Generator explicit-zero/custom-rarity/separate pools and fixed grants repeated. Duplicate cross-pool, wrong-rarity/denied refs and invalid final choices reject before creation. Ordinary mounted editor permits additions without creation quotas, retains custom/unavailable entries and makes no writes for cancel/unchanged save. | Pending |
+| A02-15 | Pass. Actual native69-slot/31-weapon/9-armor/4-inventory/9-outcome comparisons repeated; three zero/custom threshold controls also pass. Existing unsupported-scope labels and F01–F06 deferrals remain. | Pending |
+
+This is acceptance of the selected ADR scenarios, not a guarantee that every
+custom world or future native version is supported. No new module/Core defect
+was confirmed by the completion pass. Core0.19.2 compatibility retains its
+recorded offline/compiled checks; this native execution uses Core0.19.3.
+
+### Evidence and qualifications
+
+Broad final run: `/tmp/sd-a02-native14-jpRgh0/`. Its `completion-summary.json`
+indexes `acceptance`, `operations`, `languages-import`, `action-parity`,
+`native-matrix`, `completion-data`, `completion-embedded`, `completion-quotas`,
+`completion-actions`, `completion-cancellation`, `completion-faults`,
+`operation-faults`, `completion-restart`, `completion-owned-ui`,
+`migration-results`, `restored-world`, `ui/`, `refresh-ui/` and `completion-ui/`.
+Additional native replacement-refusal run: `/tmp/sd-a02-native14-UVtCJB/`,
+`replacement-refusals.json` and `cleanup.json`. The earlier identical-archive
+six-group automatic-completion run remains `/tmp/sd-a02-native14-NwFSwJ/`.
+Local harnesses are in `temp/native-a02-v14/` and
+`temp/n14-auto-completion/refused-removal-native.ts`. This tracked report supplies
+the scenarios, expected outcomes and identities without depending on those files.
+
+Fault tests wrap only explicit fixture requests in a copied test Core, delegating
+actual native writes and ID allocation. Original copied Core was restored before
+restart/recovery and restored-world tests. No product Core/runtime or module
+archive was patched. The checked native ability oracle used a controlled1d1 base
+through native roll configuration to obtain a repeatable failure, then compared
+the module at the observed total; the separate default-dice/outcome controls
+retain their own results. Faults do not establish production failure frequency.
+
+Harness errors remain distinguished from product results. An initial launch used
+the previous archive; that run (`71RikU`) was stopped and cleaned before the final
+archive's fresh run. Later retries corrected native event timing, explicitly
+cleared ownership entries (Foundry merges permission updates), used the actual
+`advanced` view mode and actual Close/Cancel/Drink controls. Failed raw entries
+are superseded only by their named passing reruns, not erased or counted as passes.
+The inspected native Priest template has no `startingSpells` declaration; its two
+ordinary choices and fixed Talents were preserved without inventing a third
+owned Spell. Exact granted-Spell classification and exclusion from ordinary
+quotas were tested separately.
+
+### Cleanup and next gate
+
+All broad-run fixtures, seven accounts and two world packs were removed; all
+recorded temporary settings/permissions were restored. A native welcome message
+was independently attributed to the disposable native-GM account, recorded, then
+removed. The final replacement-refusal run's seven Actors and two accounts were
+also removed. Each completed run independently matches the original **9 Actors,
+0 world Items, 2 Scenes, 4 Users**, original pack membership, selected settings and
+**45 ChatMessage IDs**, with **zero source differences** excluding transport
+`_stats`. All task Core/Next/browser services stopped. Operator Foundry remains
+running on30000; Core and native reference worktrees remain clean.
+
+The v14 side of N14-C6/D6/final D7 is now satisfied. **v13 A02-01–15 remains
+pending**, so ADR-0002 and release remain open. The next step is the user's switch
+to the disposable v13 instance, then the corresponding native matrix and final
+closeout. Do not reopen completed v14 variants solely because older paragraphs
+above or in the run sheet still describe them as pending.

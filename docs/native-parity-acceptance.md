@@ -7,14 +7,14 @@ zero-write refusal/context change and exact-ID reconciliation after acknowledged
 creation plus receipt/read failure. R2/R3 retain passing implementation and rerun
 offline regressions; their separate native cases remain required.
 
-**Execution update, October 19:** The user authorized v14 testing. The
-[native acceptance report](audits/2026-10-19-adr-0002-native-acceptance.md)
-records the original broader pass and the corrected candidate's six-group v14
-recheck. SD02-N14-01/02 pass: exact full advancement settles automatically after
-refresh/restart; partial/unknown outcomes keep review and no replay; malformed
-input returns 400. Finish the remaining v14 variants before requesting the v13
-switch. All v13 rows and overall D6/final D7 remain open. This run sheet itself
-grants no service or write authority.
+**Execution update, October 19:** Correction checkpoint `b962bf0` is committed.
+The final unchanged archive has completed the selected v14 A02-01–15 matrix;
+the [completion ledger](audits/2026-10-19-adr-0002-native-acceptance.md#v14-completion-checkpoint--october-19-2026)
+records every row, artifact, qualification and cleanup. **All v13 rows remain
+pending**. Continue on v13 after the user switches the disposable instance;
+retain current user authorization rather than requesting the same scope again.
+The historical paragraphs below preserve earlier plans/candidate identities;
+they do not reopen completed v14 work. Overall D6/final D7 and ADR remain open.
 
 The [SD02-R1–R3 implementation findings](audits/2026-10-18-spellcasting-and-native-parity.md#independent-implementation-review--october-18-2026)
 now have failing-before/passing-after offline regressions. Select only the new

@@ -2,14 +2,13 @@
 
 **Date:** October 18, 2026
 
-**Status (October 19, automatic completion correction):** Active — SD02-N14-01/02
-are corrected with failing-before/passing-after offline regressions and a
-successful targeted native v14 recheck. Proven complete advancement now settles
-automatically; partial/unknown outcomes remain blocked. Earlier corrections and
-passing native evidence remain. The [native report](2026-10-19-adr-0002-native-acceptance.md#automatic-completion-correction-and-native-recheck)
-records final archive identity, six native groups and verified cleanup. Remaining
-v14 variants and all v13 acceptance keep D6/final D7 and release open. Core is
-unchanged.
+**Status (October 19, v14 complete):** Active pending v13 acceptance. Correction
+checkpoint `b962bf0` is committed; the unchanged final archive passes the selected
+A02-01–15 v14 matrix. The [completion ledger](2026-10-19-adr-0002-native-acceptance.md#v14-completion-checkpoint--october-19-2026)
+records remaining-variant execution, native source oracles, restored-world/restart
+checks, both-layout/four-width/two-theme review and baseline restoration. No new
+product defect was confirmed. All v13 rows and final D6/D7/release remain open.
+Core and native source are unchanged.
 
 **Decision record:** [ADR-0002](../adr/0002-native-data-and-behavior-parity.md)
 
@@ -1562,3 +1561,15 @@ source exclusion, malformed-input 400, and interactive review in both sheets.
 The [final native record](2026-10-19-adr-0002-native-acceptance.md#automatic-completion-correction-and-native-recheck)
 contains archive identity and qualifications. This supersedes N14-01/02's open
 implementation disposition, not the remaining broader acceptance matrix.
+
+## V14 completion review — October 19, 2026
+
+The previously remaining v14 variants have passed on the final corrected archive.
+The [row-by-row native ledger](2026-10-19-adr-0002-native-acceptance.md#v14-completion-checkpoint--october-19-2026)
+is authoritative for executed scope and harness qualifications. It includes exact
+embedded dependencies with denied/read-restored controls, pending same-Class
+list/table changes, caller/role invalidation, final Spell/language tampering,
+ordinary editing, complete owned inventory, cancellation and action refusals.
+All fixture baselines were restored; no task services remain. No new source fix
+or Core allowance is required by these results. SD02-N14-01/02 remain corrected;
+v13 acceptance is the remaining selected native gate. ADR-0002 stays open.

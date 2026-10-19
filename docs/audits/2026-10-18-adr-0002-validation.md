@@ -12,15 +12,10 @@ source suites. R1b retains its acknowledged-write recovery checks. R2/R3 retain 
 and rerun regressions. Historical
 review requirements remain recorded; see the
 [review addendum](2026-10-18-spellcasting-and-native-parity.md#independent-implementation-review--october-18-2026).
-**Native update (October 19):** The [native report](2026-10-19-adr-0002-native-acceptance.md)
-records the broader v14 execution and subsequent N14-01/02 correction. Automatic
-exact-source completion, retained partial review and malformed-input 400 pass
-both offline and a targeted six-group actual v14 recheck. Its final archive
-supersedes earlier candidates below. Remaining broader v14 variants and all v13
-acceptance keep ADR-0002 and D6/final D7 open. This record supplements the
-[active audit](2026-10-18-spellcasting-and-native-parity.md),
-[ADR](../adr/0002-native-data-and-behavior-parity.md) and
-[native run sheet](../native-parity-acceptance.md).
+**Native update (October 19, v14 complete):** Checkpoint `b962bf0` and the
+unchanged final archive pass the selected A02-01–15 v14 matrix. See the
+[completion ledger](2026-10-19-adr-0002-native-acceptance.md#v14-completion-checkpoint--october-19-2026).
+All v13 rows, final D6/D7 and release remain pending.
 
 ## Identity and scope
 
@@ -456,3 +451,16 @@ Source: `advancement-recovery.test.ts`, `parity-corrections.browser.mjs`,
 Native fixtures were confined to the approved disposable world. This does not
 complete the remaining native matrix or authorize publication. Code/docs are
 uncommitted; module/Core versions and migration history remain unchanged.
+
+## V14 completion evidence — October 19, 2026
+
+Product source is unchanged since checkpoint `b962bf0`; the existing17 source
+suites, typing, compiled floor/current checks and final archive evidence remain.
+The same276056-byte archive (SHA-256
+`7f193292d1e7e0213b922199f7795ec57afb51e235a4bee70136582d72a85469`)
+now completes the selected v14 native matrix. The
+[tracked native report](2026-10-19-adr-0002-native-acceptance.md#v14-completion-checkpoint--october-19-2026)
+records executed scenarios, current versus retained evidence, explicit harness
+faults/retries and cleanup. Core0.19.3/Foundry14.367/Shadowdark4.0.6 were observed.
+Both final fixture runs restored the baseline; Core/native source remain clean.
+This does not claim v13 acceptance or authorize a release.

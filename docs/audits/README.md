@@ -2,9 +2,9 @@
 
 | Record | Status |
 | --- | --- |
-| [Spellcasting and native parity](2026-10-18-spellcasting-and-native-parity.md) | **Active.** SD02-N14-01/02 corrected and verified offline/native v14: automatic exact-source completion, retained partial review and validation 400. Remaining native matrix variants keep acceptance open. |
+| [Spellcasting and native parity](2026-10-18-spellcasting-and-native-parity.md) | **Active.** SD02-N14-01/02 corrected and verified offline/native v14: automatic exact-source completion, retained partial review and validation 400. The selected v14 matrix is complete; v13 and final closeout remain open. |
 | [ADR-0002 validation](2026-10-18-adr-0002-validation.md) | Supporting checkpoint, archive and controlled-test evidence, qualified by the active review findings. |
-| [ADR-0002 native acceptance](2026-10-19-adr-0002-native-acceptance.md) | Supporting broader v14 evidence plus corrected-candidate native recheck, unexecuted variants and verified cleanup. v13 remains pending. |
+| [ADR-0002 native acceptance](2026-10-19-adr-0002-native-acceptance.md) | Final corrected-archive v14 completion ledger, retained correction evidence and verified cleanup. All v13 rows remain pending. |
 | [Native alignment and resource cards](2026-10-15-native-alignment.md#final-native-v14-acceptance-and-closeout--october-18-2026) | Completed October18,2026. ADR-0001 acceptance on native13.351/14.367; explicit deferrals and CG-4/6/8 qualifications retained. |
 | [Core/SDK proposal](2026-10-16-core-sdk-world-data-proposal.md) | Historical; superseded by released Core0.19.2 contracts and completed module adoption. |
 

@@ -121,7 +121,10 @@ caller-safe review indicator, independent of XP. UI never edits receipts directl
 server bookkeeping transitions preserve the original record and never write
 Foundry documents. Recovery opens its saved request without new Class preparation.
 Malformed selection input returns typed validation errors before writes.
-Native acceptance remains open. Follow its checkpoints; do not treat its existence as branch, live-write or release authority.
+The selected A02-01–15 v14 matrix is complete on the final corrected archive;
+v13 and final D6/D7 closeout remain open. Use the native report’s current ledger
+instead of historical pending paragraphs. Correction checkpoint: `b962bf0`.
+Follow its checkpoints; do not treat its existence as branch, live-write or release authority.
 [ADR-0001](docs/adr/0001-native-alignment-and-resource-cards.md) and the
 [native-alignment audit](docs/audits/2026-10-15-native-alignment.md) remain completed
 within their selected scope. Their released-system baseline, future-version

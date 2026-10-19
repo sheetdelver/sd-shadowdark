@@ -8,16 +8,13 @@
 
 **Audit:** [Post-release native parity](../audits/2026-10-18-spellcasting-and-native-parity.md)
 
-**Current status (October 19, automatic completion correction):** SD02-N14-01/02
-are corrected and verified offline and on actual Foundry 14.367 / Shadowdark
-4.0.6 with isolated Core 0.19.3. Fully confirmed advancement settles from exact
-primary source on refresh/retry/restart without another Foundry write. Partial
-or unknown outcomes retain their block and accessible saved-request review.
-Malformed selections return validation 400. The user-approved automatic policy
-below supersedes the earlier requirement for manual review of every uncertain
-final receipt. See the [native report](../audits/2026-10-19-adr-0002-native-acceptance.md#automatic-completion-correction-and-native-recheck).
-Remaining v14 matrix variants and all v13 acceptance still keep D6/final D7 and
-ADR-0002 open. No release, compatibility change or new Core dependency.
+**Current status (October 19, v14 complete):** Correction checkpoint `b962bf0`
+is committed. SD02-N14-01/02 and the selected A02-01–15 native v14 matrix pass on
+the final unchanged archive with isolated Core0.19.3 / Foundry14.367 /
+Shadowdark4.0.6. Exact-source completion, partial review and typed validation
+remain intact. See the [completion ledger](../audits/2026-10-19-adr-0002-native-acceptance.md#v14-completion-checkpoint--october-19-2026).
+All v13 rows and final D6/D7/ADR closeout remain open; release is pending. No
+product changes, new Core dependency, compatibility or version bump in this pass.
 
 **Predecessor:** [ADR-0001](0001-native-alignment-and-resource-cards.md), Completed; its accepted scope and explicit deferrals remain intact.
 
@@ -1116,3 +1113,26 @@ history and Core source are unchanged. Current work remains uncommitted.
 The pre-correction ADR snapshot is
 `temp/n14-auto-completion/ADR-0002.before-auto-completion.md`, SHA-256
 `5a0f3d4f2124861db49eecf674e4708ed413e2b859482ec6c612cb3e993b30ae`.
+
+### V14 completion checkpoint — October 19, 2026
+
+Commit `b962bf0` checkpoints the correction before native continuation. The
+[completion ledger](../audits/2026-10-19-adr-0002-native-acceptance.md#v14-completion-checkpoint--october-19-2026)
+records each A02-01–15 row on the final276056-byte archive, SHA-256
+`7f193292d1e7e0213b922199f7795ec57afb51e235a4bee70136582d72a85469`.
+Broader v14 table/list refresh, caller/role and embedded dependency permissions,
+extra/granted Spell validation, language pools/editor, cancellation and action
+failure variants are complete. Both layouts and all four widths in both themes
+were checked on this archive. Native replacement refusals, real restart,
+restored-source migration approval and independent source comparisons pass.
+No additional product defect was confirmed; no implementation change was needed.
+
+**Gate decision:** N14-C6's v14 continuation and the v14 portions of D6/final D7
+are satisfied. The corresponding **v13 matrix remains pending**. Keep ADR-0002
+open until that generation and final review complete. F01–F06 remain deferred;
+no new host contract, release/version or publication action follows from this
+checkpoint. Each final run restored its baseline; all task services stopped.
+
+Pre-update snapshot: `temp/native-a02-v14/ADR-0002.before-v14-completion.md`,
+SHA-256 `28e85fb220e47aa414604aa9e0a8f8b11ee9db8ad9fc7d4fd231be60ce20a38e`.
+Earlier uncommitted/pending statements describe their historical checkpoints.
