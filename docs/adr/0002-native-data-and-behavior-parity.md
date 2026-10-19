@@ -8,9 +8,10 @@
 
 **Audit:** [Post-release native parity](../audits/2026-10-18-spellcasting-and-native-parity.md)
 
-**Current status (October19):** SD02-R1–R3 are corrected with failing-before /
-passing-after offline execution coverage. D3/D4 and the creation-writer part of
-D5 have corrective verification; native D6 and D7 remain open. See the [review addendum](#independent-review-addendum--october-18-2026).
+**Current status (October19, independent corrective review):** The original
+R1–R3 regressions pass. R2/R3 retain offline verification; two reproduced R1
+recovery gaps (SD02-R1a/R1b) leave D3 open. Native D6/D7 remain open. See the
+[corrective review addendum](#independent-corrective-review--october-19-2026).
 
 **Predecessor:** [ADR-0001](0001-native-alignment-and-resource-cards.md), Completed; its accepted scope and explicit deferrals remain intact.
 
@@ -787,3 +788,33 @@ absent write outcomes, unrelated edits and changed rules require exact-source
 operator remediation; receipts are not a distributed transaction. Native testing
 requires separate disposable-world scope; this task requests none. All task-owned
 processes exited, no services were retained, and operator services were untouched.
+
+
+## Independent corrective review — October 19, 2026
+
+Review of `1e91840` independently confirms the original R1–R3 regressions pass,
+all17 suites/current native-method comparisons pass, both toolchains typecheck,
+and the compiled archive passes its five public-SDK cases on each toolchain.
+Two additional real-handler probes leave **SD02-R1a/R1b open** in the
+[active audit](../audits/2026-10-18-spellcasting-and-native-parity.md#independent-corrective-review--october-19-2026).
+
+- **R1a:** implement supported terminal retirement/remediation of a saved plan.
+  A definitely refused first write leaves no source changes, yet a context
+  revision change prevents both recovery and replacement forever. Refusing old
+  rules is correct; requiring operator remediation without a terminal public
+  operation is incomplete. Prove zero-write retirement/new-plan success and
+  preserve uncertain-write, identity, authorization and restart protections.
+- **R1b:** preserve the distinction between an acknowledged Item write and a
+  failed receipt save. Recovery must accept that operation's own retained exact
+  ID while rejecting IDs assigned elsewhere or mismatching source. Prove no
+  duplicate create and durable reconciliation after the injected save failure.
+
+These are focused R1 execution corrections using existing module facilities,
+not new Core allowances or deferred features. Earlier completion statements
+remain checkpoint evidence qualified by this addendum: **D3/R1 remains open**;
+R2/R3, D4 and creation-writer D5 retain their offline results. Native D6/D7 and
+A02-01–15 remain open. No new native/browser/installed-runtime acceptance was
+performed, and no source/versions/commits were changed by this review.
+
+Pre-edit ADR saved as `temp/adr0002-corrective-review/ADR-0002.before-review.md`,
+SHA-256 `a4734f8805cf067ec0a5df70e24485b9473b8a213d80ef7f939fadcf058fb8ba`.

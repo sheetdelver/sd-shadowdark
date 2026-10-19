@@ -1,5 +1,11 @@
 # Shadowdark module architecture
 
+**Corrective review (October19):** original R1–R3 regressions pass, but
+[SD02-R1a/R1b](audits/2026-10-18-spellcasting-and-native-parity.md#independent-corrective-review--october-19-2026)
+remain open: no supported terminal disposition for a context-retired advancement,
+and recovery rejects an uncertain operation's own retained Item ID after receipt
+persistence fails. R2/R3 retain offline verification; D3/R1 recovery remains open.
+
 **Active follow-up (October 18):** the post-release 0.9.5
 [native parity audit](audits/2026-10-18-spellcasting-and-native-parity.md) and
 [ADR-0002](adr/0002-native-data-and-behavior-parity.md) cover newly observed

@@ -2,7 +2,7 @@
 
 **Date:** October 18, 2026
 
-**Status (October19):** Active — SD02-R1–R3 corrected with offline execution regressions. Actual native A02-01–15 remains open. See the [independent review](#independent-implementation-review--october-18-2026).
+**Status (October19):** Active — original R1–R3 regressions pass; independent review confirms two remaining R1 recovery defects, SD02-R1a/R1b. R2/R3 retain offline verification. Actual native A02-01–15 remains open. See the [corrective review](#independent-corrective-review--october-19-2026).
 
 **Decision record:** [ADR-0002](../adr/0002-native-data-and-behavior-parity.md)
 
@@ -1134,3 +1134,106 @@ No live runtime/Foundry was contacted or native case executed; older evidence
 keeps its original scope. Source migrations, applied history and compatibility
 remain unchanged. Compiled migration program comparison excludes only generated
 source-path comments; native/large-inventory tests were not repeated here.
+
+
+## Independent corrective review — October 19, 2026
+
+Reviewed `08997a4..1e91840` on `fix/adr-0002-native-parity`, initially clean.
+The original R1–R3 corrections are present. Grants now precede the frozen final
+Actor patch; completion requires its operation result. Creation repeats shared
+preparation and compares native grant data. Management derives current Class/list/
+limit facts and preserves the original request/receipts. No additional R2/R3
+implementation defect was established by this pass.
+
+Independent verification passes all17 maintained suites and20 controlled native
+method comparisons on current Core0.19.3, explicit module/UI/hook typing on0.19.3
+and the0.19.2 floor, current module checking with zero warnings, and compiled
+archive public-SDK checks5/5 on each host toolchain. The retained archive SHA-256
+matches `2c2625964aa26094fa84ed608f5c2aaad73151ae382804422288e9b97bc7f299`.
+The previously reported58 mounted checks are retained evidence, not a new browser
+run in this review. No installed/Core/Foundry service or live connection was used.
+Core/native checkouts and module commits remain unchanged; only review docs/local
+probe evidence were added.
+
+Two in-memory probes against the real advancement handler expose gaps outside
+its ten maintained recovery cases. Local reproducer/results:
+`temp/adr0002-corrective-review/recovery-probes.ts`, `.log` and `.json`.
+It uses the existing exact native Knight/Witch fixture and controlled SDK writes.
+Exit0 asserts the bugs were reproduced, not corrective success. Inputs/results
+below remain self-contained without the ignored artifacts.
+
+### SD02-R1a — high: stale plans have no supported terminal recovery path
+
+**Open; R1/D3, A02-03/05/07.** In
+[`advancement-operation.ts`](../../src/server/advancement-operation.ts), a saved
+revision mismatch refuses continuation before reconciliation. The active record
+also refuses any replacement until the old advancement is `complete`. There is
+no retire/abandon/remediated terminal state or public route that clears this
+condition. The receipt recommends operator remediation, but editing native Actor
+source cannot resolve the stored revision mismatch or release the active record.
+This blocks this Actor's advancement; it is not whole-world maintenance.
+
+**Reproduction:** first grant is definitely refused with `permission_denied`.
+No Item or Actor source changes: level2,35XP,8HP and original inventory remain.
+Restore write access, advance the mocked world-context revision from1 to2, and
+submit explicit review with the current Actor baseline. Response409 says old
+rules cannot be replayed. A fresh request with the same valid choices/current
+baseline also returns409 because the old request remains incomplete. This case
+has no uncertain native outcome and nothing in Actor source to remediate.
+
+**Required correction:** preserve refusal of stale-rule replay, but provide an
+explicit, authorized terminal resolution. At minimum, a proven zero-write plan
+with an unchanged reviewed source must be safely retireable so fresh preparation
+can proceed. For partial/uncertain or externally remediated plans, specify and
+implement the supported exact-source review/disposition instead of requiring
+private DataStore edits. Keep evidence, caller authorization, active-request
+exclusion and no-duplicate guarantees. Do not simply delete pending records,
+relabel arbitrary outcomes complete, or replay old patches under new rules.
+
+**Acceptance:** reproduce the above without source writes; retire through the
+public operation flow and successfully prepare/complete a new reviewed plan.
+Also demonstrate that uncertain writes cannot use the zero-write escape and that
+terminal disposition/replay remain safe after restart. Preserve the existing
+source/dependency-change protections; this finding does not require weakening
+context checks or adding a Core API.
+
+### SD02-R1b — medium: receipt-save failure makes its own confirmed ID unusable
+
+**Open; R1/D3, A02-07.** The Item create and subsequent receipt persistence share
+a catch block in
+[`advancement-operation.ts`](../../src/server/advancement-operation.ts).
+If create returns its authoritative ID but saving the completed receipt throws,
+`refuse` changes that operation to `uncertain` while retaining `itemId`. During
+explicit recovery, the `used` set includes every stored Item ID, including this
+uncertain operation's own ID. Supplying that exact ID is therefore rejected as
+already used before source comparison can reconcile it.
+
+**Reproduction:** let the first Item create succeed as `confirmed1`; fail only
+the first DataStore save carrying its `complete` status, then restore persistence.
+The returned receipt is `uncertain`, `itemId:confirmed1`. Source contains exactly
+one new grant; level/XP/HP remain unchanged. Submit reviewed recovery mapping
+operation0 to `confirmed1`: response400, `Item 1 needs an unused exact owned ID
+matching its complete planned source.` No additional native write occurs. A
+successful upstream response has thus become a permanent partial operation even
+though the receipt and owned source agree on the exact ID.
+
+**Required correction:** distinguish receipt persistence failures from the
+upstream write outcome and allow the affected operation to reconcile its own
+retained ID. Continue excluding IDs assigned to other operations and verify full
+planned source/parent identity. Persist the resulting state before proceeding;
+never repeat the acknowledged Item creation to repair a ledger failure.
+
+**Acceptance:** inject persistence failure after an acknowledged create and
+recover through the supported flow without another create for that grant.
+Cover the already-stored-ID path, wrong/another-operation ID rejection and
+reloaded receipts. Retain unknown-acknowledgement and final-patch failure cases.
+
+### Review disposition
+
+The original corrections and passing results remain valid within their tested
+scope. D4 and final creation-writer D5 retain offline verification; D3/R1 recovery
+is not complete until SD02-R1a/R1b pass. Actual native D6/D7/A02 acceptance remains
+open. The full-GM archive CLI guard is still an expected offline deployment
+boundary, not a new Core defect. No new migration, SDK/version bump or external
+Core dependency is established. This review changed no application source or Git
+history and did not start services or touch operator data.

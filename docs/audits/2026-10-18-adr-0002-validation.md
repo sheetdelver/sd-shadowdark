@@ -2,10 +2,12 @@
 
 SD02-01–13 have implementation checkpoint evidence and passing controlled checks.
 Independent review found SD02-R1–R3 in advancement recovery, final
-creation validation and management-source refresh; these are now corrected with
-new offline evidence below. Historical review requirements remain recorded; see the
+creation validation and management-source refresh; their original regressions
+pass with new offline evidence below. Independent review of `1e91840` found two
+additional R1 recovery defects, [SD02-R1a/R1b](2026-10-18-spellcasting-and-native-parity.md#independent-corrective-review--october-19-2026).
+R2/R3 retain offline verification. Historical review requirements remain recorded; see the
 [review addendum](2026-10-18-spellcasting-and-native-parity.md#independent-implementation-review--october-18-2026).
-**ADR-0002 stays open: actual native A02-01–15 is outstanding.** This report
+**ADR-0002 stays open: R1 recovery correction and actual native A02-01–15 are outstanding.** This report
 supplements the [active audit](2026-10-18-spellcasting-and-native-parity.md),
 [ADR](../adr/0002-native-data-and-behavior-parity.md) and
 [native run sheet](../native-parity-acceptance.md).
@@ -236,3 +238,20 @@ remain intact. No task services remain; operator services were preserved and
 never contacted. A test file briefly written under Core was moved into this
 module immediately; the Core worktree is clean. Changes are local checkpoints
 on the approved branch, with no remote operation or version bump.
+
+
+## Independent corrective review qualification — October 19, 2026
+
+At `1e91840`, independent offline reruns pass17 suites and20 native-method cases
+on current0.19.3, explicit typing on0.19.2/0.19.3, current module checking and
+compiled archive5/5 per toolchain. The archive hash matches the candidate above.
+The existing58 mounted checks were not rerun; their evidence remains retained.
+
+Two new real-handler probes reproduce SD02-R1a/R1b: a proven zero-write plan
+cannot be retired after context change, and a confirmed Item whose receipt-save
+failed cannot reconcile its own retained ID. See the
+[active review](2026-10-18-spellcasting-and-native-parity.md#independent-corrective-review--october-19-2026)
+for exact inputs, results and required checks. D3/R1 is therefore still open;
+R2/R3 verification is retained. No live/runtime/native testing, application source
+edits or Git mutations occurred. Local logs/probes are under
+`temp/adr0002-corrective-review/` and do not replace the durable findings.
