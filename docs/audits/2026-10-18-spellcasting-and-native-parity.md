@@ -1164,7 +1164,7 @@ below remain self-contained without the ignored artifacts.
 
 ### SD02-R1a — high: stale plans have no supported terminal recovery path
 
-**Open; R1/D3, A02-03/05/07.** In
+**Historical review at1e91840; corrected offline below; native A02-03/05/07 open.** In
 [`advancement-operation.ts`](../../src/server/advancement-operation.ts), a saved
 revision mismatch refuses continuation before reconciliation. The active record
 also refuses any replacement until the old advancement is `complete`. There is
@@ -1199,7 +1199,7 @@ context checks or adding a Core API.
 
 ### SD02-R1b — medium: receipt-save failure makes its own confirmed ID unusable
 
-**Open; R1/D3, A02-07.** The Item create and subsequent receipt persistence share
+**Historical review at1e91840; corrected offline below; native A02-07 open.** The Item create and subsequent receipt persistence share
 a catch block in
 [`advancement-operation.ts`](../../src/server/advancement-operation.ts).
 If create returns its authoritative ID but saving the completed receipt throws,
@@ -1260,3 +1260,38 @@ review reset, terminal closure and no false advancement notification. Both Core
 toolchains pass explicit typing. Artifacts under
 `temp/adr0002-recovery-resolution/r1a-*`. No new native/Core connection, migration
 or R2/R3 runtime change. R1b remains open at this checkpoint; native D6/D7/A02 open.
+
+### R1a/R1b simplified corrective result — October 19, 2026
+
+The user clarified R1a to reject-and-restart for proven zero writes. This replaces
+the intermediate a21375a explicit zero-retirement action. A known first refusal
+or stale saved zero-write attempt now records terminal evidence automatically,
+leaves Actor/Items unchanged and requires a new plan/request against current data.
+Owner/caller/source checks and the Actor queue protect retirement; failed terminal
+persistence cannot release the block. Restart/duplicates return the retained
+terminal receipt. Partial or uncertain outcomes remain active and require exact
+reconciliation/verified independent restoration, never zero-write discard.
+
+R1b keeps SDK acknowledgement/ID distinct from bookkeeping/read failures. Public
+primary reads verify the exact owned Item. Receipt/verification failures stop later
+writes; acknowledged IDs survive reload and reconcile without another creation.
+Own retained IDs are valid, while other grant/operation IDs, another parent,
+rebound IDs and mismatching complete source are refused. Recovery persists before
+continuing. A total storage outage preserves the pre-write fence and returned ID;
+an acknowledgement lost to the caller still requires independently established
+outcome. Failed reads do not establish absence. Final Actor acknowledgement/read/
+receipt failures have the same completion safeguard. No cross-document atomicity
+or rollback is claimed. [Supported controls](../advancement-recovery.md) cover
+partial continuation, receipt-only review and independently restored closure.
+
+27/27 maintained actual-handler groups pass;16 fail against3e8f892 with the same
+input/specifications, while11 defensive/original controls pass before.12/12 actual
+mounted corrective cases pass;6 fail before and6 controls retain passes. New cases
+cover zero-write restart, terminal durability/current authority, in-flight review,
+unknown/partial exclusion, acknowledged Item receipt failures/reload, exact own-ID
+reconciliation, refused recovery persistence, total outage, failed primary reads,
+final Actor outcomes, late review retirement and authoritative UI completion.
+Both toolchains typecheck. `simplified-*` artifacts under
+`temp/adr0002-recovery-resolution/` are new; earlier results remain historical.
+Full suites/archive checks follow. R2/R3 behavior is preserved. No new Core
+contract is needed; native D6/D7 and A02-01–15 remain open on13/14.

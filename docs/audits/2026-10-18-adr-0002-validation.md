@@ -265,3 +265,26 @@ pass explicit typing. These new results use `temp/adr0002-recovery-resolution/`,
 leaving older artifacts intact. Supported zero-write retirement and independently
 restored partial closure preserve journals and record durable terminal evidence.
 R1b and native D6/D7/A02 remain open at this checkpoint.
+
+## Simplified R1a / R1b focused validation — October 19, 2026
+
+The original review docs were checkpointed in3e8f892; a21375a preserves the first
+terminal-resolution implementation and its dated tests. The clarified policy
+supersedes explicit zero-write recovery: prove no writes, durably retire, require
+fresh preparation. Partial/unknown outcomes remain fenced. Acknowledged native
+writes retain IDs/outcomes across bookkeeping failure and require exact primary
+source reconciliation before any further write. See the ADR and supported
+[recovery controls](../advancement-recovery.md).
+
+New verification under `temp/adr0002-recovery-resolution/`:
+
+- `simplified-tests.log`:27/27 handler groups; source, ordering and receipts.
+- `simplified-before.log`: identical specifications on freshly archived3e8f892,
+  16 fail/11 controls pass. Earlier baseline files/logs are preserved.
+- `simplified-browser/results.json`:12/12 mounted corrective cases, network blocked.
+- `simplified-browser-before/results.json`:6 fail/6 retained controls pass.
+- `simplified-{floor-,}types.log`: explicit module/UI/hook typing on0.19.2/0.19.3.
+
+No live runtime, native acceptance, migration or compatibility/pin/version change.
+R2/R3 consumers and creation implementation remain intact. Full integrated checks
+and final archive identity follow; native D6/final D7/A02-01–15 remain open.

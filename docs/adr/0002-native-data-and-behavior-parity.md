@@ -839,3 +839,42 @@ before and pass after, including current revision headers, source review reset,
 restoration evidence and terminal state surviving late refresh without a false
 success. Explicit typing passes Core0.19.2/current. R1b still needs its independent
 receipt-persistence correction; R2/R3 and native D6/D7/A02 status are unchanged.
+
+### Simplified R1a / authoritative R1b correction — October 19, 2026
+
+This supersedes a21375a's intermediate explicit zero-write retirement control.
+A rejected/stale attempt with proven zero document writes now retires automatically
+and requires the player to start advancement again against current data. Current
+caller/owner authority and unchanged reviewed source are checked; no character
+change or recovery workflow is required. The original journal and durable terminal
+disposition remain, and retired requests cannot resume. Active exclusion releases
+only after terminal persistence. Partial, acknowledged, uncertain and in-flight
+outcomes cannot use this restart policy. Review and writes share the Actor queue.
+
+R1b separates the native SDK result, public primary Actor read and module receipt
+save. An acknowledged creation retains its exact ID/`complete` outcome when
+bookkeeping fails; `receiptPending` or `verificationPending` stops further writes.
+Exact-source reconciliation accepts its own retained ID, rejects another grant/
+operation, wrong-parent and mismatching-source IDs, and persists before continuing.
+The acknowledged grant is never recreated. Lost acknowledgements and failed reads
+are not zero-write evidence. A total persistence outage leaves a durable started
+fence; the exact response ID can be reviewed later. Completion requires every grant
+and the final frozen Actor update, not a target-level event. Separate writes are
+not atomic and no rollback is promised. Partial recovery remains concrete in the
+[supported procedure](../advancement-recovery.md), including verified independent
+restoration when a stale partial plan cannot continue.
+
+The preserved pre-simplification ADR is
+`temp/adr0002-recovery-resolution/ADR-0002.before-simplification.md`, SHA-256
+`c25cefc2484b14ccb63a1375f71e1fbe0d2f5c25133bcbefbbcef7b116404fd3`.
+Earlier snapshot/evidence and implementation commits remain intact.
+
+Focused verification:27/27 actual-handler source/receipt/order groups and12/12
+mounted corrective consumers pass. The same specifications against3e8f892 fail16
+source groups and6 mounted cases;11 source/6 mounted controls already pass.
+Both toolchains pass explicit module/UI/hook typing. New artifacts are
+`temp/adr0002-recovery-resolution/simplified-*`; intermediate `r1a-*`/`r1b-*`
+results above are retained, not substituted for the simplified policy checks.
+R2/R3 runtime implementation remains intact. Integrated packaging/full validation
+follows this checkpoint. R1a/R1b are corrected offline; native D6, final D7 and
+all A02-01–15 on13/14 remain open. No new Core dependency is established.

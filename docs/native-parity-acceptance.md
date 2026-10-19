@@ -89,3 +89,16 @@ repeat zero-write context-change retirement/fresh advancement, failure to save
 terminal evidence, restart/duplicate retirement, uncertain-write exclusion and
 independent exact-source restoration using the supported recovery controls.
 These remain unexecuted on actual Foundry13/14.
+
+R1a's final clarified policy is automatic retirement/restart for proven zero
+writes, superseding the earlier explicit zero-retirement button. A02-03/05/07
+must verify stale/refused unchanged attempts require a new plan, with durable
+terminal evidence and no character writes/recovery review; partial/unknown
+outcomes must remain blocked. R1b repeats SDK-confirmed exact-ID creation followed
+by receipt-save and primary-read failures: preserve the acknowledgement, stop
+later writes, reconcile the same owned source and never create that grant again.
+Include reloaded receipts, unavailable persistence, wrong-parent/other-operation
+IDs, late review responses and final Actor-patch outcomes. Completion requires all
+confirmed changes. No rollback/all-or-nothing promise applies. The27 handler and12
+mounted offline groups do not execute any native A02 row; every native row stays
+open on13/14 pending separate scoped acceptance.

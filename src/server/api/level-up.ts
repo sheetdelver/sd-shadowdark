@@ -75,6 +75,14 @@ function requirePositiveRollTotal(value: unknown, label: string): number {
  * Fetch level-up data for the modal.
  */
 export async function handleGetLevelUpData(actorId: string | undefined, req: ModuleServerRequest) {
+    const world = req.runtime.world?.snapshot().identity;
+    // Retirement must not race a write-ahead receipt or an in-flight grant.
+    // Use the same Actor queue as finalization, including read-only reviews.
+    if (actorId && !['undefined', 'null', 'new'].includes(actorId))
+        return withActorLock(world ? `${world.instanceId}:${world.worldId}:${actorId}` : `${shadowdarkAdapter.runtimeGeneration}:${actorId}`, () => getLevelUpData(actorId, req));
+    return getLevelUpData(actorId, req);
+}
+async function getLevelUpData(actorId: string | undefined, req: ModuleServerRequest) {
     logger.info(`[API] handleGetLevelUpData | actorId: ${actorId} | url: ${req.url}`);
     try {
         const url = new URL(req.url, 'http://localhost');

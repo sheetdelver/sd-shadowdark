@@ -4,7 +4,7 @@ Historical entries are reconstructed from [published releases](https://github.co
 
 ## Unreleased
 
-- Add verified terminal retirement/restoration for blocked advancement plans
+- Restart proven zero-write advancement attempts; preserve acknowledged grants through receipt failures and exact-source recovery
 
 - Refresh open spell limits/lists and retire stale selections while retaining receipts
 

@@ -620,8 +620,9 @@ Actual native A02-01–15 acceptance remains open on both generations.
 
 `server/advancement-operation.ts` persists a bounded advancement plan/receipt,
 not world data. Grants run before the frozen Actor patch. Exact confirmed IDs
-survive retries; refused operations can resume, uncertain operations stop for
-explicit exact-source review. Pending advancement blocks replacement requests.
+survive retries. A proven zero-write refusal/stale attempt retires durably and
+requires fresh preparation; partial refusals can resume, while uncertain outcomes
+stop for explicit exact-source review. Pending partial advancement blocks replacement requests.
 Restart continuation requires review; unavailable/changed rules and unrelated
 Actor edits require remediation rather than guessing. The mounted workflow uses
 a completed operation response, never a level-change event, as its success signal.
@@ -649,10 +650,22 @@ SDK test runtime, independently of source-route tests. Advancement responses
 expose operation receipts rather than saved grant payloads. This offline contract
 evidence does not satisfy deployment's full-GM guard or native acceptance.
 
-Advancement terminal resolution is a separate receipt operation. It can retire
-proven zero-write plans or verify independently restored partial source, with
-current caller/owner/review checks, without replaying stale rules or rolling back
-documents. Journals are retained; only a durable terminal disposition releases
-active exclusion. Receipt-only reconciliation permits source review across a
-context change. The recovery UI uses the current review revision and protects
-terminal state from older pending refreshes. See [recovery](advancement-recovery.md).
+Proven zero-write attempts retire automatically after current owner/caller and
+unchanged-source verification. Only a durable terminal disposition releases the
+active block; retained journals can never replay after retirement. Operation
+reviews share the Actor queue with writes, so review cannot retire in-flight work.
+Partial operations retain explicit reconciliation and independently verified
+restoration controls, without module rollback or stale-rule replay.
+
+Native SDK acknowledgements, primary-source verification and journal persistence
+are separate outcomes. Returned Item IDs remain authoritative after a receipt
+save fails. Acknowledged grants reconcile their own exact IDs, full planned
+source and Actor parent; other grant/operation IDs are excluded. Receipt or
+verification failure stops later writes and cannot downgrade an acknowledged
+creation to an uncertain outcome or authorize another creation. Reconciliation
+must persist first. Lost acknowledgements/failed reads never establish zero writes.
+A total journal outage leaves the durable started fence; an exact response ID
+must be retained for later review. No distributed transaction/CAS is implied.
+The mounted workflow retires old review reads across write attempts, preserves
+known receipts on errors, uses the current review revision and reports completion
+only from the confirmed full-operation response. See [recovery](advancement-recovery.md).

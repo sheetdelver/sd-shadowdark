@@ -9,10 +9,11 @@ import { operationProcess } from './operation-lock';
 
 const hash = (value: any) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 type Status = 'pending' | 'started' | 'complete' | 'failed' | 'uncertain';
-type Grant = { item: any; status: Status; itemId?: string; error?: string };
+type WriteState = { status: Status; error?: string; acknowledged?: boolean; sourceVerified?: boolean; verificationPending?: boolean; receiptPending?: boolean; persistenceError?: string };
+type Grant = WriteState & { item: any; itemId?: string };
 type Terminal = { disposition: 'zero-write' | 'restored'; baseline: string; revision: number; callerId: string; at: string; note: string };
-type Journal = { terminal?: Terminal; initialPatch?: { path: string; value?: unknown; absent: boolean }[]; requestId: string; fingerprint: string; process: string; revision: number; review: string; initialReview: string; finalReview?: string;
-    targetLevel: number; grants: Grant[]; patch: any; advancement: { status: Status; error?: string };
+type Journal = { actorScope?: string; terminal?: Terminal; initialPatch?: { path: string; value?: unknown; absent: boolean }[]; requestId: string; fingerprint: string; process: string; revision: number; review: string; initialReview: string; finalReview?: string;
+    targetLevel: number; grants: Grant[]; patch: any; advancement: WriteState;
     dependencies: { uuid: string; hash: string }[]; result: any };
 function scope(req: ModuleServerRequest, actorId: string) {
     const world = req.runtime.world?.snapshot().identity;
@@ -25,29 +26,45 @@ const activeKey = (req: ModuleServerRequest, actorId: string) => {
 };
 const keyFor = (scope: string, id: string) => `advancement-${scope}-${id}`;
 const fingerprint = (body: any) => { const { recovery: _recovery, ...intent } = body; return hash(intent); };
-const settledWithoutWrite = (op: { status: Status; itemId?: string }) => ['pending', 'failed'].includes(op.status) && !op.itemId;
-const unsettled = (journal: Journal) => [...journal.grants, journal.advancement].some(op => ['started', 'uncertain'].includes(op.status));
-const isTerminal = (journal: Journal) => !!journal.terminal || journal.advancement.status === 'complete';
+const settledWithoutWrite = (op: WriteState & { itemId?: string }) => ['pending', 'failed'].includes(op.status) && !op.itemId && !op.acknowledged;
+const unsettled = (journal: Journal) => [...journal.grants, journal.advancement].some(op => ['started', 'uncertain'].includes(op.status) || op.receiptPending || op.verificationPending);
+const isComplete = (journal: Journal) => journal.advancement.status === 'complete' && !journal.advancement.receiptPending && !journal.advancement.verificationPending
+    && journal.grants.every(op => op.status === 'complete' && !op.receiptPending && !op.verificationPending);
+const isTerminal = (journal: Journal) => !!journal.terminal || isComplete(journal);
 function receipt(journal: Journal, actor: any, revision: number | null) {
     const originalSource = reviewToken(actor) === journal.initialReview;
     const zeroWrite = journal.grants.every(settledWithoutWrite) && settledWithoutWrite(journal.advancement);
     return { requestId: journal.requestId, targetLevel: journal.targetLevel,
-        state: journal.terminal ? 'retired' : journal.advancement.status === 'complete' ? 'complete' : 'partial', terminal: journal.terminal,
+        state: journal.terminal ? 'retired' : isComplete(journal) ? 'complete' : 'partial', terminal: journal.terminal,
         contextRevision: revision, planRevision: journal.revision,
-        canRetireZeroWrite: !isTerminal(journal) && zeroWrite && originalSource,
         canResolveRestored: !isTerminal(journal) && !zeroWrite && !unsettled(journal) && originalSource
             && journal.grants.every(op => !op.itemId || !(actor.items ?? []).some((item: any) => documentId(item) === op.itemId)),
         restoration: { values: journal.initialPatch ?? null,
             instructions: 'To close a partial operation after independent restoration: first reconcile every uncertain write to an exact owned ID or the exact final Actor outcome. Using ordinary authorized document controls, remove only the confirmed grants listed here and restore the original Actor values/source from your reviewed export. Refresh this review, record the restoration evidence, then verify and close the restored operation. This control performs no document writes. Unknown absent/in-flight outcomes cannot be declared restored.' },
-        baseline: reviewToken(actor), operations: [...journal.grants.map((op, index) => ({ index, kind: 'item', name: op.item.name, status: op.status, itemId: op.itemId, error: op.error })),
+        baseline: reviewToken(actor), operations: [...journal.grants.map((op, index) => ({ index, kind: 'item', name: op.item.name, status: op.status, itemId: op.itemId, error: op.error, acknowledged: op.acknowledged, receiptPending: op.receiptPending, verificationPending: op.verificationPending, persistenceError: op.persistenceError })),
             { kind: 'advancement', ...journal.advancement }],
-        recovery: journal.terminal ? `Operation retired (${journal.terminal.disposition}). Its saved plan can never resume. Close this review and prepare a fresh advancement.`
-            : 'Retry known refusals under the same rules. Review exact IDs to reconcile uncertain writes; they are never recreated automatically. Changed rules block replay. A proven zero-write plan can be retired; a settled partial plan can be closed after verified restoration using the controls below.' };
+        recovery: journal.terminal?.disposition === 'zero-write' ? 'Advancement was not applied. No document writes occurred. Start advancement again against current data; this saved request can never resume.'
+            : journal.terminal ? 'Independent restoration verified. This saved request can never resume. Close this review and prepare a fresh advancement.'
+            : 'Retry known refusals under the same rules. Review exact IDs to reconcile uncertain writes; they are never recreated automatically. Changed rules block replay. Zero-write rejections restart automatically; a settled partial plan can be closed after verified restoration using the controls below.' };
+}
+async function retireUnchanged(req: ModuleServerRequest, journal: Journal, key: string, actor: any, revision: number | null) {
+    if (isTerminal(journal) || !journal.grants.every(settledWithoutWrite) || !settledWithoutWrite(journal.advancement)) return false;
+    const current = await requireOwnedActor(req.runtime, documentId(actor));
+    if (reviewToken(current) !== journal.initialReview || contextConflict(req.runtime, revision)) return false;
+    journal.terminal = { disposition: 'zero-write', baseline: reviewToken(current), revision: revision!,
+        callerId: (req.userSession?.userId ?? req.getAccessContext?.().userId)!, at: new Date().toISOString(),
+        note: 'Native writes were not attempted or were definitely refused; primary source unchanged. Start advancement again with current data.' };
+    await req.runtime.dataStore.set(key, journal);
+    return true;
 }
 export async function pendingAdvancement(req: ModuleServerRequest, actor: any) {
     const id = scope(req, documentId(actor)); if (!id) return null;
     const active = await req.runtime.dataStore.get<{ requestId: string; key: string }>(activeKey(req, documentId(actor)));
     const journal = active && await req.runtime.dataStore.get<Journal>(active.key);
+    if (journal && active!.key === keyFor(id, journal.requestId)) {
+        const retired = await retireUnchanged(req, journal, active!.key, actor, req.runtime.world!.snapshot().identity.contextRevision);
+        if (retired) return receipt(journal, actor, req.runtime.world!.snapshot().identity.contextRevision);
+    }
     return journal && !isTerminal(journal) ? receipt(journal, actor, req.runtime.world!.snapshot().identity.contextRevision) : null;
 }
 
@@ -63,9 +80,11 @@ export async function resumeAdvancement(req: ModuleServerRequest, actor: any, bo
     if (journal && body.targetLevel !== undefined && journal.fingerprint !== fingerprint(body)) return error('conflict', 'This requestId already identifies a different advancement plan.');
     const result = async () => { actor = await requireOwnedActor(req.runtime, documentId(actor)); return json({ success: true, ...journal!.result, ...receipt(journal!, actor, revision) }); };
     if (journal && isTerminal(journal)) return result();
+    if (journal && await retireUnchanged(req, journal, key, actor, revision)) return result();
     const active = await store.get<{ requestId: string; key: string }>(activeKey(req, documentId(actor)));
     if (active && active.key !== key) {
         const prior = await store.get<Journal>(active.key);
+        if (prior && active.key === keyFor(id, prior.requestId)) await retireUnchanged(req, prior, active.key, actor, revision);
         if (prior && !isTerminal(prior)) return error('conflict', `Advancement ${prior.requestId} is incomplete. Reopen and review its receipts before any new advancement.`);
     }
     if (!journal) {
@@ -76,7 +95,7 @@ export async function resumeAdvancement(req: ModuleServerRequest, actor: any, bo
             if (!doc) return error('conflict', `Required advancement source ${uuid} is unavailable.`);
             dependencies.push({ uuid, hash: hash(doc) });
         }
-        journal = { requestId: body.requestId, fingerprint: fingerprint(body), revision, process: operationProcess, review: reviewToken(actor), initialReview: reviewToken(actor),
+        journal = { actorScope: activeKey(req, documentId(actor)), requestId: body.requestId, fingerprint: fingerprint(body), revision, process: operationProcess, review: reviewToken(actor), initialReview: reviewToken(actor),
             targetLevel: plan!.result.targetLevel, grants: plan!.items.map(item => ({ item, status: 'pending' })), patch: plan!.patch,
             advancement: { status: 'pending' }, dependencies, result: plan!.result,
             initialPatch: Object.keys(plan!.patch).map(path => { const value = path.split('.').reduce((obj, key) => obj?.[key], actor); return { path, absent: value === undefined, ...(value !== undefined ? { value: structuredClone(value) } : {}) }; }) };
@@ -85,9 +104,9 @@ export async function resumeAdvancement(req: ModuleServerRequest, actor: any, bo
 
     for (const op of [...journal.grants, journal.advancement]) if (op.status === 'started') op.status = 'uncertain';
     const recovery = body.recovery;
-    if (recovery?.action && !['retire-zero-write', 'resolve-restored', 'reconcile'].includes(recovery.action)) return error('validation', 'Unknown advancement recovery action.');
+    if (recovery?.action && !['resolve-restored', 'reconcile'].includes(recovery.action)) return error('validation', 'Unknown advancement recovery action.');
     const reviewed = recovery?.reviewed === true && recovery.baseline === reviewToken(actor);
-    if (['retire-zero-write', 'resolve-restored'].includes(recovery?.action)) {
+    if (recovery?.action === 'resolve-restored') {
         if (!reviewed) return error('conflict', 'Refresh and explicitly review the current Actor before retiring this operation.');
         const current = await requireOwnedActor(req.runtime, documentId(actor));
         const conflict = contextConflict(req.runtime, revision); if (conflict) return conflict;
@@ -95,14 +114,13 @@ export async function resumeAdvancement(req: ModuleServerRequest, actor: any, bo
             return error('conflict', 'Retirement requires the exact original Actor source, independently restored when necessary. Refresh the review.');
         const zeroWrite = journal.grants.every(settledWithoutWrite) && settledWithoutWrite(journal.advancement);
         if (unsettled(journal)) return error('conflict', 'An uncertain or in-flight outcome remains. Reconcile its exact receipt before terminal resolution.');
-        if (recovery.action === 'retire-zero-write' && !zeroWrite) return error('conflict', 'This operation has acknowledged writes. Use verified restoration, never the zero-write escape.');
-        if (recovery.action === 'resolve-restored' && (zeroWrite || journal.grants.some(op => op.itemId && current.items?.some((item: any) => documentId(item) === op.itemId))))
+        if (zeroWrite || journal.grants.some(op => op.itemId && current.items?.some((item: any) => documentId(item) === op.itemId)))
             return error('conflict', 'Verify removal of every exact confirmed grant and restoration of the original Actor before closing this partial operation.');
-        if (recovery.action === 'resolve-restored' && (typeof recovery.note !== 'string' || !recovery.note.trim() || recovery.note.length > 1000))
+        if (typeof recovery.note !== 'string' || !recovery.note.trim() || recovery.note.length > 1000)
             return error('validation', 'Record the independent restoration evidence (1–1000 characters).');
-        journal.terminal = { disposition: recovery.action === 'retire-zero-write' ? 'zero-write' : 'restored', baseline: recovery.baseline, revision: revision!,
+        journal.terminal = { disposition: 'restored', baseline: recovery.baseline, revision: revision!,
             callerId: (req.userSession?.userId ?? req.getAccessContext?.().userId)!, at: new Date().toISOString(),
-            note: recovery.action === 'retire-zero-write' ? 'Verified original source and no confirmed, uncertain or in-flight write.' : recovery.note.trim() };
+            note: recovery.note.trim() };
         // Keep the original journal and pointer. A replacement reads the durable
         // terminal disposition before releasing exclusion; no delete/save gap.
         await store.set(key, journal);
@@ -114,21 +132,41 @@ export async function resumeAdvancement(req: ModuleServerRequest, actor: any, bo
     if (reviewed) {
         const confirmations = recovery.items ?? {};
         const used = new Set(journal.grants.map(op => op.itemId).filter(Boolean));
-        const uncertain = journal.grants.filter(op => op.status === 'uncertain');
-        const withoutIds = (value: any): any => Array.isArray(value) ? value.map(withoutIds) : value && typeof value === 'object'
-            ? Object.fromEntries(Object.entries(value).filter(([key]) => !['_id', 'id', 'uuid'].includes(key)).map(([key, val]) => [key, key === '_stats' ? { compendiumSource: (val as any)?.compendiumSource } : withoutIds(val)])) : value;
+        const uncertain = journal.grants.filter(op => op.status === 'uncertain' || op.receiptPending || op.verificationPending);
+        const withoutIds = (value: any): any => {
+            const doc = structuredClone(value);
+            delete doc._id; delete doc.id; delete doc.uuid;
+            if (doc._stats) doc._stats = { compendiumSource: doc._stats.compendiumSource };
+            if (Array.isArray(doc.effects)) doc.effects = doc.effects.map(withoutIds);
+            return doc;
+        };
         const includes = (actual: any, expected: any): boolean => Array.isArray(expected) ? Array.isArray(actual) && actual.length === expected.length && expected.every((val, i) => includes(actual[i], val))
             : expected && typeof expected === 'object' ? actual && Object.entries(expected).every(([key, val]) => includes(actual[key], val)) : actual === expected;
         for (const op of uncertain) {
-            const index = journal.grants.indexOf(op), itemId = confirmations[index];
+            const index = journal.grants.indexOf(op), itemId = confirmations[index] ?? (op.acknowledged ? op.itemId : undefined);
             if (!itemId) continue;
             const owned = actor.items?.find((item: any) => documentId(item) === itemId);
-            if (!owned || used.has(itemId) || !includes(withoutIds(owned), withoutIds(op.item))) return error('validation', `Item ${index + 1} needs an unused exact owned ID matching its complete planned source.`);
-            op.itemId = itemId; op.status = 'complete'; delete op.error; used.add(itemId);
+            const ownUuid = `Actor.${documentId(actor)}.Item.${itemId}`;
+            if ((op.itemId && op.itemId !== itemId) || journal.grants.some((other, otherIndex) => otherIndex !== index && other.itemId === itemId)
+                || !owned || (typeof owned.uuid === 'string' && owned.uuid.startsWith('Actor.') && owned.uuid !== ownUuid)
+                || !includes(withoutIds(owned), withoutIds(op.item)))
+                return error('validation', `Item ${index + 1} requires its own exact owned ID matching the complete planned source and Actor parent.`);
+            // Receipt history is not world data. Check IDs already assigned to
+            // another operation via the public DataStore contract. Legacy
+            // journals can be identified exactly within this caller's scope.
+            for (const otherKey of await store.keys('advancement-')) {
+                if (otherKey === key || otherKey.startsWith('advancement-active-')) continue;
+                const other = await store.get<Journal>(otherKey);
+                const sameActor = other?.actorScope === activeKey(req, documentId(actor))
+                    || (!other?.actorScope && otherKey.startsWith(`advancement-${id}-`));
+                if (sameActor && other?.grants?.some(grant => grant.itemId === itemId))
+                    return error('validation', 'That exact Item ID is assigned to another advancement operation.');
+            }
+            op.itemId = itemId; op.status = 'complete'; op.sourceVerified = true; op.receiptPending = false; op.verificationPending = false; delete op.error; used.add(itemId);
         }
-        if (journal.advancement.status === 'uncertain') {
+        if (journal.advancement.status === 'uncertain' || journal.advancement.receiptPending || journal.advancement.verificationPending) {
             if (journal.grants.every(op => op.status === 'complete') && journal.finalReview === reviewToken(actor)) {
-                journal.advancement.status = 'complete'; delete journal.advancement.error;
+                journal.advancement.status = 'complete'; journal.advancement.sourceVerified = true; journal.advancement.receiptPending = false; journal.advancement.verificationPending = false; delete journal.advancement.error;
                 await store.set(key, journal);
             }
             return result();
@@ -146,7 +184,7 @@ export async function resumeAdvancement(req: ModuleServerRequest, actor: any, bo
         const doc = await shadowdarkAdapter.resolveDocumentFor(dependency.uuid, callerOf(req));
         if (!doc || hash(doc) !== dependency.hash) return error('conflict', `Advancement source ${dependency.uuid} changed or became unavailable. Review the saved plan before remediation.`);
     }
-    if (journal.grants.some(op => op.status === 'uncertain') || journal.advancement.status === 'uncertain') return result();
+    if (journal.grants.some(op => op.status === 'uncertain' || op.receiptPending || op.verificationPending) || journal.advancement.status === 'uncertain' || journal.advancement.receiptPending || journal.advancement.verificationPending) return result();
     if (reviewToken(actor) !== journal.review) return result();
     const apply = (source: any) => {
         const copy = structuredClone(source);
@@ -156,7 +194,18 @@ export async function resumeAdvancement(req: ModuleServerRequest, actor: any, bo
     };
     const refuse = async (op: Grant | Journal['advancement'], e: unknown) => {
         op.status = isSdkError(e) && ['permission_denied', 'validation', 'not_found'].includes(e.code) ? 'failed' : 'uncertain';
-        op.error = getErrorMessage(e); await store.set(key, journal); return result();
+        op.error = getErrorMessage(e); await store.set(key, journal);
+        await retireUnchanged(req, journal!, key, actor, revision); return result();
+    };
+    const persistAcknowledgement = async (op: WriteState) => {
+        try { await store.set(key, journal); return true; }
+        catch (e) {
+            // The upstream result is already known. A storage error must never
+            // relabel it refused/unknown or authorize another document write.
+            op.receiptPending = true; op.persistenceError = getErrorMessage(e);
+            try { await store.set(key, journal); } catch { /* durable started fence remains; exact client ID can reconcile after recovery */ }
+            return false;
+        }
     };
     for (const op of journal.grants) {
         if (op.status === 'complete') continue;
@@ -164,24 +213,40 @@ export async function resumeAdvancement(req: ModuleServerRequest, actor: any, bo
         const current = await requireOwnedActor(req.runtime, documentId(actor));
         if (reviewToken(current) !== journal.review) return result();
         actor = current; op.status = 'started'; delete op.error; await store.set(key, journal);
+        let created: any;
+        try { created = await req.runtime.documents.items.create({ type: 'Actor', id: documentId(actor) }, op.item); }
+        catch (e) { return refuse(op, e); }
+        op.acknowledged = true;
+        const itemId = documentId(created);
+        if (!itemId) {
+            op.status = 'uncertain'; op.error = 'Item creation was acknowledged without an authoritative embedded ID.';
+            await persistAcknowledgement(op); return result();
+        }
+        op.itemId = itemId; op.status = 'complete';
+        const expected = reviewToken({ ...actor, items: [...(actor.items ?? []), created] });
+        journal.review = expected;
         try {
-            const created = await req.runtime.documents.items.create({ type: 'Actor', id: documentId(actor) }, op.item);
-            const itemId = documentId(created); if (!itemId) throw new Error('Item creation returned no authoritative embedded ID.');
-            op.itemId = itemId; op.status = 'complete';
-            actor = { ...actor, items: [...(actor.items ?? []), created] }; journal.review = reviewToken(actor);
-            await store.set(key, journal);
-        } catch (e) { return refuse(op, e); }
+            const primary = await requireOwnedActor(req.runtime, documentId(actor));
+            if (!primary.items?.some((item: any) => documentId(item) === itemId) || reviewToken(primary) !== expected)
+                throw new Error(`Acknowledged Item ${itemId} needs exact primary-source review; creation will not repeat.`);
+            actor = primary; op.sourceVerified = true;
+        } catch (e) { op.verificationPending = true; op.error = getErrorMessage(e); }
+        if (!await persistAcknowledgement(op) || op.verificationPending) return result();
     }
     const current = await requireOwnedActor(req.runtime, documentId(actor)); actor = current;
     if (reviewToken(actor) !== journal.review) return result();
     const conflict = contextConflict(req.runtime, revision); if (conflict) return conflict;
     journal.advancement.status = 'started'; journal.finalReview = reviewToken(apply(actor)); await store.set(key, journal);
+    try { await req.runtime.documents.patch('Actor', documentId(actor), journal.patch); }
+    catch (e) { return refuse(journal.advancement, e); }
+    journal.advancement.acknowledged = true;
     try {
-        await req.runtime.documents.patch('Actor', documentId(actor), journal.patch);
         actor = await requireOwnedActor(req.runtime, documentId(actor));
         if (reviewToken(actor) !== journal.finalReview) throw new Error('Final Actor source does not match the complete planned advancement.');
-        journal.advancement.status = 'complete'; delete journal.advancement.error; await store.set(key, journal); return result();
+        journal.advancement.status = 'complete'; journal.advancement.sourceVerified = true; delete journal.advancement.error;
     } catch (e) {
-        return refuse(journal.advancement, e);
+        journal.advancement.status = 'complete'; journal.advancement.verificationPending = true; journal.advancement.error = getErrorMessage(e);
     }
+    await persistAcknowledgement(journal.advancement);
+    return result();
 }

@@ -817,6 +817,9 @@ export const useLevelUp = (props: LevelUpProps) => {
         const authority = authorityKey;
         if (!submission.current && needsMastery && !masteryData.ready) return;
         if (!submission.current && extraSpellSelection.active && !extraSpellData.ready) return;
+        // A review fetched before this attempt cannot replace newer write
+        // receipts after its response arrives late.
+        dataSequence.current++;
         submitting.current = true;
         setIsSubmitting(true);
         setStatuses(prev => ({ ...prev, class: 'LOADING' }));
@@ -851,6 +854,7 @@ export const useLevelUp = (props: LevelUpProps) => {
             if (!mounted.current || authority !== authorityRef.current) return;
             if (!res.ok || !json.success) throw new Error(json.error?.message ?? json.error ?? 'Failed to finalize level-up');
             if (actorId && actorId !== 'new' && json.state !== 'complete') {
+                dataSequence.current++;
                 setOperation(json); setError(json.state === 'retired' ? null : 'Advancement is incomplete. Review the exact receipts below before continuing.');
                 setStatuses(prev => ({ ...prev, class: 'READY' }));
                 return;

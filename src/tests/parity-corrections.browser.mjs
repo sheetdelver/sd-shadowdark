@@ -19,12 +19,13 @@ import {useLevelUp} from '${root}/src/ui/components/levelup/useLevelUp';
 import {AdvancementRecovery} from '${root}/src/ui/components/levelup/AdvancementRecovery';
 import Spells from '${root}/src/ui/SpellsTab';
 let ids=0;Object.defineProperty(window.crypto,'randomUUID',{value:()=> 'offline-request-'+(++ids)});
-window.calls=[];window.pending=[];window.notices=[];window.completions=[];
+window.calls=[];window.pending=[];window.pendingReviews=[];window.notices=[];window.completions=[];
 const cls={_id:'class',uuid:'Item.class',type:'Class',name:'Wizard',system:{hitPoints:'d4',talents:[],patron:{required:false}}};
 window.sdk={isConnected:true,worldId:'offline',currentUser:{id:'owner',role:1},resolveImageUrl:x=>x||'',addNotification:(...v)=>window.notices.push(v),events:{on:()=>()=>{}},
 fetchWithAuth:async(url,options={})=>{window.calls.push({url,headers:options.headers,body:options.body?JSON.parse(options.body):null});
  if(url.endsWith('/finalize')||url.endsWith('/manage'))return new Promise(resolve=>window.pending.push(resolve));
  if(url.includes('/document/'))return Response.json(url.endsWith('Actor.actor')?window.actorContext.actor:cls);
+ if(url.includes('/level-up/data')&&window.holdReview)return new Promise(resolve=>window.pendingReviews.push(resolve));
  if(url.includes('/level-up/data'))return Response.json({success:true,data:{progressionReady:true,isSpellcaster:false,spellsToChoose:{},availableSpells:[],advancementOperation:window.initial.operation||null}});
  if(url.endsWith('/index'))return Response.json({nameIndex:{}});
  if(url.endsWith('/classes'))return Response.json([cls]);
@@ -76,18 +77,20 @@ await test('R1 reopened advancement presents durable receipts and retries origin
  await p.evaluate(()=>window.answer(0,{success:true,state:'partial',requestId:'saved-request',operations:[]}));assert.deepEqual(await p.evaluate(()=>window.completions),[]);
 });
 const zeroReceipt={requestId:'saved-retirement',targetLevel:2,state:'partial',baseline:'reviewed-original',contextRevision:2,planRevision:1,canRetireZeroWrite:true,canResolveRestored:false,operations:[{kind:'item',index:0,name:'Required grant',status:'failed',error:'Definitely refused'},{kind:'advancement',status:'pending'}]};
-await test('R1a mounted zero-write retirement uses current context and terminal state never reports level-up success',{which:'advance',actor:{...actor,worldContextRevision:1},operation:zeroReceipt},async p=>{
- await p.getByRole('button',{name:'Open advancement'}).click();await p.getByText(/World rules changed. The old plan cannot replay/).waitFor();
- const retire=p.getByRole('button',{name:'Retire verified zero-write plan',exact:true});assert.equal(await retire.isDisabled(),true);
- await p.getByRole('checkbox').check();await retire.click();await p.waitForFunction(()=>window.pending.length===1);
- const call=await p.evaluate(()=>window.calls.find(c=>c.url.endsWith('/finalize')));assert.equal(call.headers['X-SheetDelver-Context-Revision'],'2');
- assert.equal(call.body.requestId,'saved-retirement');assert.equal(call.body.recovery.action,'retire-zero-write');assert.equal(call.body.recovery.baseline,'reviewed-original');
- await p.evaluate(()=>window.answer(0,{success:true,...window.initial.operation,state:'retired',terminal:{disposition:'zero-write',note:'Verified no writes'},recovery:'Operation retired. Its saved plan can never resume.'}));
- await p.getByText('Advancement operation retired',{exact:true}).waitFor();assert.equal(await p.getByRole('button',{name:'Retry same request',exact:true}).count(),0);
+await test('R1a mounted zero-write refusal requires restart without recovery and never reports advancement success',{which:'advance',actor:{...actor,worldContextRevision:1}},async p=>{
+ await p.getByRole('button',{name:'Open advancement'}).click();await p.getByRole('button',{name:'Confirm advancement'}).click();await p.waitForFunction(()=>window.pending.length===1);
+ const original=await p.evaluate(()=>window.calls.find(c=>c.url.endsWith('/finalize')).body.requestId);
+ await p.evaluate(id=>window.answer(0,{success:true,requestId:id,state:'retired',terminal:{disposition:'zero-write',note:'Definitely refused; no native writes'},operations:[{kind:'item',index:0,name:'Required grant',status:'failed'}],recovery:'Advancement was not applied. No document writes occurred. Start advancement again against current data.'}),original);
+ await p.getByText('Advancement was not applied',{exact:true}).waitFor();assert.equal(await p.getByRole('button',{name:'Retry same request',exact:true}).count(),0);assert.equal(await p.getByRole('checkbox').count(),0);
  assert.deepEqual(await p.evaluate(()=>window.completions),[]);assert.deepEqual(await p.evaluate(()=>window.notices),[]);
- await p.getByRole('button',{name:'Close and prepare fresh plan',exact:true}).click();await p.getByRole('region',{name:'Advancement dialog'}).waitFor({state:'detached'});
- await p.evaluate(()=>{window.initial.operation=null;});await p.getByRole('button',{name:'Open advancement'}).click();await p.getByRole('button',{name:'Confirm advancement'}).click();await p.waitForFunction(()=>window.pending.length===2);
- assert.notEqual(await p.evaluate(()=>window.calls.filter(c=>c.url.endsWith('/finalize')).at(-1).body.requestId),'saved-retirement');
+ await p.getByRole('button',{name:'Start advancement again',exact:true}).click();await p.getByRole('region',{name:'Advancement dialog'}).waitFor({state:'detached'});
+ await p.getByRole('button',{name:'Open advancement'}).click();await p.getByRole('button',{name:'Confirm advancement'}).click();await p.waitForFunction(()=>window.pending.length===2);
+ assert.notEqual(await p.evaluate(()=>window.calls.filter(c=>c.url.endsWith('/finalize')).at(-1).body.requestId),original);
+ await p.evaluate(()=>window.answer(1,{success:true,state:'complete'}));await p.waitForFunction(()=>window.completions.length===1);assert.equal((await p.evaluate(()=>window.notices)).length,1);
+});
+await test('R1a reopened automatically retired stale operation offers restart with no recovery controls',{which:'advance',actor,operation:{...zeroReceipt,state:'retired',terminal:{disposition:'zero-write',note:'No confirmed, unresolved or in-flight writes'},recovery:'Start advancement again against current data.'}},async p=>{
+ await p.getByRole('button',{name:'Open advancement'}).click();await p.getByRole('button',{name:'Start advancement again',exact:true}).waitFor();
+ assert.equal(await p.getByRole('checkbox').count(),0);assert.equal(await p.getByRole('button',{name:'Reconcile receipts without replay',exact:true}).count(),0);assert.deepEqual(await p.evaluate(()=>window.completions),[]);
 });
 await test('R1a mounted partial restoration shows exact evidence and resets review before terminal closure',{which:'advance',actor,operation:{...zeroReceipt,canRetireZeroWrite:false,canResolveRestored:false,operations:[{kind:'item',index:0,name:'Grant',status:'complete',itemId:'confirmed1'},{kind:'advancement',status:'pending'}],restoration:{instructions:'Remove only confirmed1 and independently restore reviewed source; no automatic rollback.',values:[{path:'system.level.xp',value:15,absent:false}]}}},async p=>{
  await p.getByRole('button',{name:'Open advancement'}).click();await p.getByText('Resolve a partially applied operation after restoration',{exact:true}).click();
@@ -101,9 +104,29 @@ await test('R1a mounted partial restoration shows exact evidence and resets revi
  await p.getByText(/Terminal disposition: restored/).waitFor();await p.getByText('Grant: complete · Item confirmed1',{exact:true}).waitFor();assert.deepEqual(await p.evaluate(()=>window.completions),[]);
 });
 await test('R1a mounted uncertain outcome blocks retirement and supports receipt-only exact-ID review',{which:'advance',actor,operation:{...zeroReceipt,canRetireZeroWrite:false,operations:[{kind:'item',index:0,name:'Uncertain grant',status:'uncertain'},{kind:'advancement',status:'pending'}]}},async p=>{
- await p.getByRole('button',{name:'Open advancement'}).click();await p.getByRole('checkbox').check();assert.equal(await p.getByRole('button',{name:'Retire verified zero-write plan',exact:true}).isDisabled(),true);
+ await p.getByRole('button',{name:'Open advancement'}).click();await p.getByRole('checkbox').check();assert.equal(await p.getByRole('button',{name:'Start advancement again',exact:true}).count(),0);
  await p.getByLabel('Exact owned Item ID after source review').fill('reviewed-owned-id');await p.getByRole('button',{name:'Reconcile receipts without replay',exact:true}).click();await p.waitForFunction(()=>window.pending.length===1);
  const body=await p.evaluate(()=>window.calls.find(c=>c.url.endsWith('/finalize')).body);assert.equal(body.recovery.action,'reconcile');assert.deepEqual(body.recovery.items,{'0':'reviewed-owned-id'});assert.deepEqual(await p.evaluate(()=>window.completions),[]);
+});
+await test('R1b mounted acknowledged-ID reconciliation preserves receipts on storage failure and completes only after authoritative response',{which:'advance',actor,operation:{...zeroReceipt,operations:[{kind:'item',index:0,name:'Confirmed grant',status:'complete',itemId:'confirmed1',acknowledged:true,receiptPending:true,persistenceError:'Receipt storage unavailable'},{kind:'advancement',status:'pending'}]}},async p=>{
+ await p.getByRole('button',{name:'Open advancement'}).click();await p.getByText('Upstream write acknowledged as Item confirmed1; receipt storage needs reconciliation. No write will be repeated.',{exact:true}).waitFor();
+ const input=p.getByLabel('Exact owned Item ID after source review');assert.equal(await input.inputValue(),'confirmed1');await p.getByRole('checkbox').check();await p.getByRole('button',{name:'Reconcile receipts without replay',exact:true}).click();await p.waitForFunction(()=>window.pending.length===1);
+ const first=await p.evaluate(()=>window.calls.filter(c=>c.url.endsWith('/finalize')).at(-1));assert.equal(first.headers['X-SheetDelver-Context-Revision'],'2');assert.equal(first.body.requestId,'saved-retirement');assert.equal(first.body.recovery.action,'reconcile');
+ await p.evaluate(()=>window.answer(0,{error:'Receipt storage unavailable'},500));await p.getByText(/Receipt storage unavailable/).first().waitFor();assert.equal(await input.inputValue(),'confirmed1');assert.deepEqual(await p.evaluate(()=>window.completions),[]);
+ await p.getByRole('button',{name:'Continue reviewed operation',exact:true}).click();await p.waitForFunction(()=>window.pending.length===2);
+ const next=await p.evaluate(()=>window.calls.filter(c=>c.url.endsWith('/finalize')).at(-1).body);assert.equal(next.requestId,'saved-retirement');assert.equal(next.recovery.reviewed,true);
+ await p.evaluate(()=>{window.setActor({...window.actorContext.actor,system:{...window.actorContext.actor.system,level:{value:2,xp:0}}});window.initial.operation={success:true,...window.initial.operation,operations:[{kind:'item',name:'Confirmed grant',status:'complete',itemId:'confirmed1',acknowledged:true},{kind:'advancement',status:'complete',acknowledged:true,verificationPending:true}],state:'partial'};window.answer(1,window.initial.operation);});
+ await p.getByText('Acknowledged write needs primary-source review; it will not repeat.',{exact:true}).waitFor();assert.deepEqual(await p.evaluate(()=>window.completions),[]);
+ await p.getByRole('button',{name:'Continue reviewed operation',exact:true}).click();await p.waitForFunction(()=>window.pending.length===3);await p.evaluate(()=>window.answer(2,{success:true,state:'complete'}));await p.waitForFunction(()=>window.completions.length===1);
+});
+await test('R1b late pre-write review cannot erase a newer acknowledged ID',{which:'advance',actor,operation:{...zeroReceipt,operations:[{kind:'item',index:0,name:'Grant',status:'uncertain'},{kind:'advancement',status:'pending'}]}},async p=>{
+ await p.getByRole('button',{name:'Open advancement'}).click();await p.getByRole('region',{name:'Advancement recovery'}).waitFor();
+ await p.evaluate(()=>{window.holdReview=true;});await p.getByRole('button',{name:'Refresh operation review',exact:true}).click();await p.waitForFunction(()=>window.pendingReviews.length>=1);
+ await p.getByRole('button',{name:'Retry same request',exact:true}).click();await p.waitForFunction(()=>window.pending.length===1);
+ await p.evaluate(()=>{window.initial.operation={...window.initial.operation,operations:[{kind:'item',index:0,name:'Grant',status:'complete',itemId:'confirmed1',acknowledged:true,receiptPending:true},{kind:'advancement',status:'pending'}]};window.answer(0,{success:true,...window.initial.operation});});
+ await p.getByText(/Grant: complete · Item confirmed1/).first().waitFor();
+ await p.evaluate(()=>{for(const resolve of window.pendingReviews)resolve(Response.json({success:true,data:{advancementOperation:{requestId:'saved-retirement',state:'partial',operations:[{kind:'item',name:'Grant',status:'uncertain'}]},progressionReady:false}}));window.holdReview=false;});
+ await p.waitForTimeout(100);await p.getByText(/Grant: complete · Item confirmed1/).first().waitFor();assert.equal(await p.getByLabel('Exact owned Item ID after source review').inputValue(),'confirmed1');assert.deepEqual(await p.evaluate(()=>window.completions),[]);
 });
 for(const changeLevel of [true,false])await test(`R3 same-Class ${changeLevel?'level':'progression-only'} refresh updates limit and retires intent`,{actor:casting(),catalog},async p=>{
  await openManager(p);await p.getByPlaceholder('Filter spells by name...').fill('List');await p.getByRole('button',{name:'Add List A new',exact:true}).click();
