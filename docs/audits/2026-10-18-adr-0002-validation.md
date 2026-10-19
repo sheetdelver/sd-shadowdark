@@ -4,7 +4,8 @@
 scope. Actual13.351/14.367 acceptance and the final recovery-layout delta are
 recorded in the [native closeout](2026-10-19-adr-0002-native-acceptance.md#v13-completion-and-final-closeout--october-19-2026).
 The retained records below distinguish earlier offline candidates and findings.
-Release metadata/publication remains separate.
+Release preparation for 0.9.6 is recorded [below](#096-release-preparation--october-19-2026);
+publication is a separate tag-triggered operation.
 
 SD02-01–13 have implementation checkpoint evidence and passing controlled checks.
 Independent review found SD02-R1–R3 in advancement recovery, final
@@ -18,10 +19,11 @@ source suites. R1b retains its acknowledged-write recovery checks. R2/R3 retain 
 and rerun regressions. Historical
 review requirements remain recorded; see the
 [review addendum](2026-10-18-spellcasting-and-native-parity.md#independent-implementation-review--october-18-2026).
-**Native update (October 19, v14 complete):** Checkpoint `b962bf0` and the
+**Historical native update (October 19, before v13 completion):** Checkpoint `b962bf0` and the
 unchanged final archive pass the selected A02-01–15 v14 matrix. See the
 [completion ledger](2026-10-19-adr-0002-native-acceptance.md#v14-completion-checkpoint--october-19-2026).
-All v13 rows, final D6/D7 and release remain pending.
+At that checkpoint, v13 rows and final D6/D7 remained pending. The final acceptance
+above supersedes that status.
 
 ## Identity and scope
 
@@ -494,3 +496,28 @@ for a style-only edit. Full v14 repetition of the cosmetic candidate is not clai
 Module0.9.5 and Core>=0.19.2/API/UI/roll/native ranges remain unchanged. Existing
 Core0.19.2 offline compatibility evidence remains; actual native testing uses
 Core0.19.3. Release tooling/versioning and remote operations remain separate.
+
+## 0.9.6 release preparation — October 19, 2026
+
+Checkpoint `f1b8167` preserves the final recovery-control styling and completed
+native acceptance records. The user subsequently authorized point-release
+preparation and PR/squash merge. `info.json` advances from 0.9.5 to 0.9.6 and the
+existing Unreleased notes become its changelog. Core>=0.19.2, API/UI/roll ranges,
+native read range, both required migration steps and workflow pins are unchanged.
+
+The pinned Core0.19.2 packager validates the module and produces a release-tagged
+archive and schema-v2 manifest for v0.9.6. Local archive:276578 bytes, SHA-256
+`29c6ffbc6a9438546cea775b136f99e5460d313d10efe368b90e7d38ad6175d7`.
+Retained local path: `temp/release-0.9.6/package-data/dist/modules/shadowdark-0.9.6.tgz`.
+All nine compiled public-route regression cases pass on both Core0.19.2 and0.19.3.
+This is offline archive verification; the completed native evidence above is
+retained rather than described as a new native run.
+
+Compared with the final native-tested layout candidate, all compiled JS/hook
+content matches after normalizing compiler source-path labels and the version
+literal. CSS, migration catalog and definitions are byte-identical. Packaged
+metadata differs only in version; README contains the completed-scope summary.
+No runtime correction, migration or compatibility change was added for release.
+The workflow rebuilds on GitHub, so its archive checksum must be recorded from
+the published asset rather than equated to this local build. Publication is not
+established by local packaging or PR merge.

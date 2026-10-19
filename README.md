@@ -35,8 +35,8 @@ Incomplete historical characters require [exact-source GM review](docs/native-so
 Unknown write outcomes remain blocked until reviewed; separate writes have no
 rollback guarantee. Broader automation/catalog proposals F01–F06 remain deferred.
 The [validation record](docs/audits/2026-10-18-adr-0002-validation.md) identifies
-verified candidates and checkpoints. These corrections await the next separately
-prepared release; compatibility remains unchanged.
+verified candidates and checkpoints. Version 0.9.6 includes these corrections;
+compatibility remains unchanged.
 
 ## Third-party license
 

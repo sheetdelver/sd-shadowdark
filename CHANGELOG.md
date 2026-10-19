@@ -4,6 +4,8 @@ Historical entries are reconstructed from [published releases](https://github.co
 
 ## Unreleased
 
+## 0.9.6
+
 - Native casting and spell progression
 - Exact owned-spell management
 - Safe advancement completion and recovery

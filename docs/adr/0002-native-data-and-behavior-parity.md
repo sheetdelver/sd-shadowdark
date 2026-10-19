@@ -14,9 +14,12 @@ D0–D7, including D5a/D5b and the corrective reviews, are complete. The final
 native pass found and corrected SD02-N13-01, a recovery-control layout omission;
 its UI/CSS-only archive delta passes16 installed layout cases and retains byte-
 identical server/migration code. The [final ledger](../audits/2026-10-19-adr-0002-native-acceptance.md#v13-completion-and-final-closeout--october-19-2026)
-records the evidence and limits. Release preparation/publication is separate;
-versions and compatibility remain unchanged. Historical pending statements below
-describe earlier checkpoints and do not reopen completed gates.
+records the evidence and limits. Release preparation is authorized for 0.9.6;
+the [release validation](../audits/2026-10-18-adr-0002-validation.md#096-release-preparation--october-19-2026)
+records the packaged checks. Compatibility and migration history remain unchanged.
+Publication follows the tag-triggered module workflow after review/merge.
+Historical pending statements below describe earlier checkpoints and do not
+reopen completed gates.
 
 **Predecessor:** [ADR-0001](0001-native-alignment-and-resource-cards.md), Completed; its accepted scope and explicit deferrals remain intact.
 
