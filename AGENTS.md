@@ -89,6 +89,10 @@ block the affected write before creation.
 Advancement follows native `LevelUpSD._finalizeLevelUp`, including XP carryover
 above level zero and first-level HP from the hit die plus prepared CON (minimum1).
 Generator and server share `logic/advancement.ts`; prepare grants before HP.
+Advancement completion requires all grant receipts and the final Actor patch;
+a target-level event is not completion. Keep exact confirmed IDs, frozen HP/XP
+and request identity through retries. Uncertain writes need explicit exact-source
+review; never recreate based on a name/origin or silently start a replacement.
 Document consumers must use the route's actual bare-document response shape.
 Use native source and handler comparisons for these rules;
 successful writes alone do not establish parity.
@@ -288,3 +292,7 @@ World Spell catalog changes use public Item document/detail-directory hints,
 coalesced through the existing shared store; cover loaded and pending consumers.
 Advancement HP dice come from the exact selected Class; missing source is an
 explicit failure, not an owned-copy or generic-die fallback.
+
+Corrective advancement coverage: `src/tests/advancement-recovery.test.ts` and
+`src/tests/parity-corrections.browser.mjs` (offline mounted consumers). Native
+pack fixtures use the pinned read-only source; no transports/services are needed.

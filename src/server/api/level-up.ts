@@ -4,7 +4,7 @@ import { shadowdarkAdapter } from '../../server/ShadowdarkAdapter';
 import { assembleFinalItems } from './level-up-engine';
 import * as levelUpEngine from './level-up-engine';
 import { TALENT_HANDLERS, extraSpellClassName } from '../../logic/talent-handlers';
-import { canonicalUuid } from '../../logic/identity';
+import { canonicalUuid, sourceRef, formatUuid } from '../../logic/identity';
 import { callerOf, requestRules, requestRevision, contextConflict, requireOwnedActor } from '../access';
 import { hitPointRollFormula } from '../../logic/actions';
 import { prepareActorCore } from '../../logic/actor-preparation';
@@ -14,6 +14,7 @@ import { callerLanguagePlan } from '../languages';
 import { validateLanguageSelections } from '../../logic/languages';
 import { spellReview } from '../../logic/spell-review';
 import { withActorLock } from '../operation-lock';
+import { pendingAdvancement, resumeAdvancement } from '../advancement-operation';
 
 /**
  * Rolled talents/boons and chosen spells are re-read from their exact source.
@@ -83,9 +84,11 @@ export async function handleGetLevelUpData(actorId: string | undefined, req: Mod
             actor = await requireOwnedActor(req.runtime, actorId);
         }
 
+        const pending = actor ? await pendingAdvancement(req, actor) : null;
+        if (pending) return json({ success: true, data: { advancementOperation: pending, progressionReady: false } });
         const data = await shadowdarkAdapter.getLevelUpData(actor, classId || undefined, patronId || undefined, callerOf(req));
 
-        return json({ success: true, data });
+        return json({ success: true, data: { ...data, advancementOperation: actor ? await pendingAdvancement(req, actor) : null } });
 
     } catch (e: unknown) {
         if (isSdkError(e)) return error(e.code, e.message);
@@ -351,6 +354,8 @@ async function finalizeLevelUp(actorId: string, req: ModuleServerRequest) {
         let actor: any = null;
         if (actorId && actorId !== 'new') {
             actor = await requireOwnedActor(req.runtime, actorId);
+            const replay = body.requestId ? await resumeAdvancement(req, actor, body, revision) : null;
+            if (replay) return replay;
         }
 
         // Server assembly resolves every source by exact identity through the
@@ -454,7 +459,7 @@ async function finalizeLevelUp(actorId: string, req: ModuleServerRequest) {
                 // Native adds grants before calculating HP. Prepare their effects
                 // without writing so an unresolved choice still cannot mutate data.
                 const prepared = prepareActorCore({ ...actor, items: [...(actor.items ?? []), ...finalItems] },
-                    shadowdarkAdapter.lookups(), requestRules(req.runtime));
+                    lookups, requestRules(req.runtime));
                 const hp = advancementHitPoints(prepared, targetLevel, state.hpRoll);
                 actorUpdates['system.attributes.hp.max'] = hp.max;
                 actorUpdates['system.attributes.hp.value'] = hp.value;
@@ -485,22 +490,12 @@ async function finalizeLevelUp(actorId: string, req: ModuleServerRequest) {
                 if (ancestry) actorUpdates['system.ancestry'] = ancestry.uuid;
             }
 
-            if (Object.keys(actorUpdates).length > 0) {
-                logger.info(`[API] Updating actor ${actorId} with: ${JSON.stringify(actorUpdates)}`);
-                await req.runtime.documents.patch('Actor', actorId, actorUpdates);
-            }
-
-            // Multi-document writes are sequential, not atomic: report exactly what
-            // was written if a later write fails.
-            const created: string[] = [];
-            for (const item of finalItems) {
-                try {
-                    await req.runtime.documents.items.create({ type: 'Actor', id: actorId }, item);
-                    created.push(item.name);
-                } catch (e) {
-                    return error('internal', `Level-up partially applied: Actor updated and ${created.length} of ${finalItems.length} items created (${created.join(', ') || 'none'}). ${getErrorMessage(e)}`);
-                }
-            }
+            const dependencies = [classObj?.uuid, ancestry?.uuid, background?.uuid, patron?.uuid,
+                ...finalItems.flatMap(item => { const ref = sourceRef(item); return ref ? [formatUuid(ref)] : []; }),
+                ...finalItems.flatMap(item => item.type === 'Spell' ? item.system?.class ?? [] : [])].filter(Boolean);
+            const applied = await resumeAdvancement(req, actor, body, revision, { items: finalItems, patch: actorUpdates, dependencies,
+                result: { actorId, targetLevel, items: finalItems, updates: actorUpdates, hpRoll: state.hpRoll, goldRoll: gold, languages: state.selectedLanguages } });
+            return applied ?? error('internal', 'Advancement plan could not be recorded.');
         }
 
         return json({

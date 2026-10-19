@@ -18,6 +18,7 @@ import { LevelUpFooter } from './levelup/sections/LevelUpFooter';
 import { ExtraSpellSelectionSection } from './levelup/sections/ExtraSpellSelectionSection';
 import { useSDK } from '@sheet-delver/sdk/react';
 import { presentDescription } from '../../logic/description';
+import { AdvancementRecovery } from './levelup/AdvancementRecovery';
 import { CollectionStatus } from './CollectionStatus';
 
 export const LevelUpModal = (props: LevelUpProps) => {
@@ -79,7 +80,8 @@ export const LevelUpModal = (props: LevelUpProps) => {
                 {/* Main Scrollable Content */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
 
-                    {!state.loadingPatrons && (
+                    {state.operation && <AdvancementRecovery operation={state.operation} busy={state.isSubmitting} refresh={actions.refreshOperation} resume={actions.handleConfirm} />}
+                    {!state.operation && !state.loadingPatrons && (
                         <>
                             {ClassCard}
 
@@ -210,8 +212,8 @@ export const LevelUpModal = (props: LevelUpProps) => {
 
                 <LevelUpFooter
                     onCancel={props.onCancel}
-                    onConfirm={actions.handleConfirm}
-                    isComplete={actions.isComplete()}
+                    onConfirm={() => actions.handleConfirm()}
+                    isComplete={!state.operation && actions.isComplete()}
                     loading={state.loading}
                     targetLevel={props.targetLevel}
                 />

@@ -609,3 +609,13 @@ owned copy or an unavailable-source fallback.
 Final controlled evidence and package identity are recorded in the
 [ADR-0002 validation record](audits/2026-10-18-adr-0002-validation.md).
 Actual native A02-01–15 acceptance remains open on both generations.
+
+### Advancement operation completion
+
+`server/advancement-operation.ts` persists a bounded advancement plan/receipt,
+not world data. Grants run before the frozen Actor patch. Exact confirmed IDs
+survive retries; refused operations can resume, uncertain operations stop for
+explicit exact-source review. Pending advancement blocks replacement requests.
+Restart continuation requires review; unavailable/changed rules and unrelated
+Actor edits require remediation rather than guessing. The mounted workflow uses
+a completed operation response, never a level-change event, as its success signal.

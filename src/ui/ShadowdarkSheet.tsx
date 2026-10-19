@@ -449,6 +449,7 @@ export default function ShadowdarkSheet(props: ShadowdarkSheetProps) {
                         ancestry={levelUpData.ancestry}
                         classObj={levelUpData.classObj}
                         classUuid={levelUpData.classUuid}
+                        baseline={levelUpData.baseline}
                         patron={levelUpData.patron}
                         patronUuid={levelUpData.patronUuid}
                         abilities={levelUpData.abilities}

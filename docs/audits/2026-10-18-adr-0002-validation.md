@@ -131,3 +131,12 @@ Operator Foundry PID3644622 remained running and was never contacted. Core and
 native reference checkout status stayed clean. Local outputs and ADR snapshot
 are retained; no operator fixtures/settings required cleanup because no native
 world was touched. Changes remain on the approved branch in local commits.
+
+## Corrective checkpoint: R1
+
+SD02-R1 is corrected with ten real-handler source/receipt regressions and two
+mounted-hook regressions (all fail on08997a4, all pass after). Both Core toolchains
+pass explicit typing; native-alignment61/61 passes. See the active audit's R1
+corrective evidence for scope/artifacts and recovery limitations. R2/R3 and all
+native A02 rows remain open. Earlier archive/installed evidence above is retained;
+it does not identify the corrective source or its future package.

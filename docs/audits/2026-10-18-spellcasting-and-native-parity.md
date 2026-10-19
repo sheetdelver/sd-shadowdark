@@ -1048,3 +1048,26 @@ D3/D4 and the final creation-writer part of D5 need corrections before claiming
 implementation completion. D6 actual native and D7 closeout remain open on both
 generations. No new migration/Core blocker was established; no SDK/version bump
 is justified by these findings. F01–F06 and accepted ADR-0001 scope are unchanged.
+
+### SD02-R1 corrective evidence — October 18, 2026
+
+**Corrected offline; native acceptance remains open.** Maintained
+`advancement-recovery.test.ts` calls the real finalizer with pinned native Knight
+and Witch sources. Ten previously failing cases now pass: first/later refusal,
+confirmed-ID continuation, lost create acknowledgement/exact-ID review, final
+patch refusal/lost acknowledgement, duplicate concurrent/replayed requests,
+restart and interrupted-started records, reopened receipts, replacement-operation
+blocking and unrelated-edit rejection. The Knight2/35XP/8HP fixture stays
+2/35XP/8HP after grant refusal; completion creates exactly two grants, then
+publishes3/15XP/11HP once. Frozen patch retry never repeats grants or XP/HP math.
+
+Two actual mounted-hook cases fail against08997a4 and pass after: an Actor event
+at the target level before the response cannot close or notify; partial results
+and reopen retain exact request/confirmed IDs. Only `state:complete` completes
+UI. Controlled SDK boundary, all browser network blocked. Explicit typing passes
+on both Core toolchains; updated native-alignment source-outcome tests pass61/61.
+Logs: `temp/adr0002-corrections/r1-{before,tests}.json`,
+`r1-browser{,-before}/results.json`, `r1-{floor-types,types,alignment}.log`.
+The journal has no distributed-atomicity guarantee. Unconfirmed absent writes,
+unrelated changes or stale rules require explicit exact-source remediation;
+there is no name/origin matching, automatic recreate or transaction claim.

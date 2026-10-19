@@ -26,6 +26,7 @@ export interface LevelUpProps {
     availableLanguages?: any[];
     languageChoices?: LanguageSelections;
     contextRevision?: number;
+    baseline?: string;
     knownLanguages?: any[]; // Passed for new characters (pre-gen selections)
     skipLanguageSelection?: boolean; // For when languages are handled externally (Generator)
     onComplete: (data: { items: any[], hpRoll: number, gold?: number, languages?: string[], patronUuid?: string }) => void;
@@ -110,6 +111,11 @@ export const useLevelUp = (props: LevelUpProps) => {
     });
 
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [operation, setOperation] = useState<any>(null);
+    const submission = useRef<any>(null);
+    const submitting = useRef(false);
+    const mounted = useRef(true);
+    useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
 
     const [error, setError] = useState<string | null>(null);
     const [confirmReroll, setConfirmReroll] = useState(false);
@@ -285,6 +291,10 @@ export const useLevelUp = (props: LevelUpProps) => {
 
             if (json.success && json.data) {
                 const apiData = json.data;
+                if (apiData.advancementOperation && !submitting.current) {
+                    setOperation(apiData.advancementOperation);
+                    submission.current ??= { requestId: apiData.advancementOperation.requestId };
+                }
                 setLevelData({ key, ready: apiData.progressionReady !== false });
                 if (apiData.diagnostics?.length) setError(apiData.diagnostics.join(' '));
                 const isCaster = apiData.isSpellcaster;
@@ -802,9 +812,12 @@ export const useLevelUp = (props: LevelUpProps) => {
         setRolledBoons(prev => prev.filter((_, i) => i !== index));
     };
 
-    const handleConfirm = async () => {
-        if (needsMastery && !masteryData.ready) return;
-        if (extraSpellSelection.active && !extraSpellData.ready) return;
+    const handleConfirm = async (recovery?: any) => {
+        if (submitting.current) return;
+        const authority = authorityKey;
+        if (!submission.current && needsMastery && !masteryData.ready) return;
+        if (!submission.current && extraSpellSelection.active && !extraSpellData.ready) return;
+        submitting.current = true;
         setIsSubmitting(true);
         setStatuses(prev => ({ ...prev, class: 'LOADING' }));
         try {
@@ -812,10 +825,8 @@ export const useLevelUp = (props: LevelUpProps) => {
             const revision = props.contextRevision ?? languageData.plan?.contextRevision;
             if (typeof revision === 'number') headers['X-SheetDelver-Context-Revision'] = String(revision);
 
-            const res = await fetchWithAuth(`/api/modules/shadowdark/actors/${actorId || 'new'}/level-up/finalize`, {
-                method: 'POST',
-                headers,
-                body: JSON.stringify({
+            submission.current ??= {
+                    ...(actorId && actorId !== 'new' ? { requestId: globalThis.crypto.randomUUID(), baseline: props.baseline } : {}),
                     targetLevel,
                     classUuid: targetClassUuid,
                     ancestryUuid: ancestry?.uuid,
@@ -832,13 +843,19 @@ export const useLevelUp = (props: LevelUpProps) => {
                     weaponMasterySelection,
                     armorMasterySelection,
                     extraSpellSelection
-                })
+            };
+            const res = await fetchWithAuth(`/api/modules/shadowdark/actors/${actorId || 'new'}/level-up/finalize`, {
+                method: 'POST', headers, body: JSON.stringify({ ...submission.current, ...(recovery ? { recovery } : {}) })
             });
-
             const json = await res.json();
-            if (!res.ok) {
-                throw new Error(json.error || 'Failed to finalize level-up');
+            if (!mounted.current || authority !== authorityRef.current) return;
+            if (!res.ok || !json.success) throw new Error(json.error?.message ?? json.error ?? 'Failed to finalize level-up');
+            if (actorId && actorId !== 'new' && json.state !== 'complete') {
+                setOperation(json); setError('Advancement is incomplete. Review the exact receipts below before continuing.');
+                setStatuses(prev => ({ ...prev, class: 'READY' }));
+                return;
             }
+            setOperation(null);
 
             onComplete({
                 items: json.items || [],
@@ -849,9 +866,13 @@ export const useLevelUp = (props: LevelUpProps) => {
             });
 
         } catch (error: unknown) {
-            setError(getErrorMessage(error));
-            setStatuses(prev => ({ ...prev, class: 'ERROR' }));
+            if (mounted.current && authority === authorityRef.current) {
+                setError(`${getErrorMessage(error)}. Reconcile this same request; do not submit replacement grants.`);
+                setOperation((previous: any) => previous ?? { requestId: submission.current?.requestId, state: 'partial', operations: [], recovery: 'No authoritative completion response. Retry the same request to obtain saved receipts.' });
+                setStatuses(prev => ({ ...prev, class: 'READY' }));
+            }
         } finally {
+            submitting.current = false;
             setIsSubmitting(false);
         }
     };
@@ -1356,6 +1377,7 @@ export const useLevelUp = (props: LevelUpProps) => {
             statuses,
             error,
             isSubmitting,
+            operation,
             activeClassObj,
             rolledTalents,
             rolledBoons,
@@ -1403,6 +1425,7 @@ export const useLevelUp = (props: LevelUpProps) => {
             talentTable
         },
         actions: {
+            refreshOperation: () => fetchLevelUpData(targetClassUuid),
             handleRollHP,
             handleRollGold,
             handleRollTalent,

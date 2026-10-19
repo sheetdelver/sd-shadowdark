@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useShadowdarkUI } from '../context/ShadowdarkUIContext';
 import { formatUuid } from '../../logic/identity';
+import { spellReview } from '../../logic/spell-review';
 
 /**
  * Shared hook to manage the Shadowdark Level-Up process.
@@ -14,15 +15,6 @@ export function useShadowdarkLevelUp(
     const [showLevelUpModal, setShowLevelUpModal] = useState(false);
     const [levelUpData, setLevelUpData] = useState<any>(null);
     const [isFetching, setIsFetching] = useState(false);
-
-    // Auto-close Level Up Modal when level effectively changes in the background
-    useEffect(() => {
-        if (showLevelUpModal && levelUpData && actor.system?.level?.value === levelUpData.targetLevel) {
-            setShowLevelUpModal(false);
-            setLevelUpData(null);
-            addNotification('Level Up Complete!', 'success');
-        }
-    }, [actor.system?.level?.value, showLevelUpModal, levelUpData, addNotification]);
 
     /**
      * Prepares level-up data and opens the modal.
@@ -58,6 +50,7 @@ export function useShadowdarkLevelUp(
 
         const data = {
             currentLevel,
+            baseline: actor.spellReviewToken ?? spellReview(actor),
             contextRevision: actor.worldContextRevision ?? actor.derived?.ruleInputs?.contextRevision,
             targetLevel,
             classObj: actor.items?.find((item: any) => item.type === 'Class') ?? null,

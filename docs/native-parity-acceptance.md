@@ -49,3 +49,9 @@ this run, restore permission/setting snapshots, and verify source restoration.
 Stop task-owned services only; retain operator services. Mark each row per native
 generation with executed/pass/fail/blocked, exact artifact and limitations. Leave
 ADR-0002 open while any required native evidence is unproven.
+
+R1 offline correction is verified with real-handler refusal/uncertainty/replay/
+restart cases and mounted target-level-before-completion/reopen cases. For
+A02-03/05/07, repeat with actual native embedded-ID allocation and inspect the
+exact confirmed IDs, explicit source-review recovery and final Actor patch.
+No new native case was executed during the corrective task.

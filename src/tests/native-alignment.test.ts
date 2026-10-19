@@ -1,3 +1,4 @@
+import { spellReview } from '../logic/spell-review';
 import assert from 'node:assert/strict';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -425,12 +426,16 @@ async function levelUpExperience() {
                 const actor: any = primLike(); actor.items.push({ ...structuredClone(fighter), _id: 'ownedClass', _stats: { compendiumSource: fighter.uuid } });
                 actor.system.level = { value: currentLevel, xp };
                 const before = structuredClone(actor);
+                const records = new Map<string, any>();
+                const dataStore = { get: async (key: string) => structuredClone(records.get(key) ?? null), set: async (key: string, value: any) => { records.set(key, structuredClone(value)); } };
+                const patchSource = (updates: any) => { for (const [path, value] of Object.entries(updates)) { const parts = path.split('.'); let target = actor; for (const part of parts.slice(0,-1)) target = target[part] ??= {}; target[parts.at(-1)!] = value; } };
                 const patches: any[] = [];
                 const response = await handleFinalizeLevelUp(actor._id, {
-                    json: async () => ({ targetLevel, hpRoll: 3 }),
-                    runtime: { documents: {
-                        get: async () => actor,
-                        patch: async (type: string, id: string, updates: any) => { patches.push({ type, id, updates }); },
+                    userSession: { userId: 'offline' },
+                    json: async () => ({ requestId: 'native-xp', baseline: spellReview(actor), targetLevel, hpRoll: 3 }),
+                    runtime: { world: { snapshot: () => worldSnapshot(1), assertRevision() {} }, dataStore, documents: {
+                        get: async () => structuredClone(actor),
+                        patch: async (type: string, id: string, updates: any) => { patches.push({ type, id, updates }); patchSource(updates); },
                         items: { create: async () => { assert.fail('No item grants in this advancement case'); } },
                     } },
                 } as any);
@@ -439,7 +444,7 @@ async function levelUpExperience() {
                 assert.equal(body.updates['system.level.xp'], expectedXp);
                 assert.equal(body.updates['system.level.value'], targetLevel);
                 assert.deepEqual(patches, [{ type: 'Actor', id: actor._id, updates: body.updates }]);
-                assert.deepEqual(actor, before, 'advancement must not mutate its read source');
+                assert.equal(actor.system.level.xp, expectedXp); assert.equal(actor.system.level.value, targetLevel); assert.equal(before.system.level.value, currentLevel);
             });
         }
     } finally { shadowdarkAdapter.getChoiceCatalog = catalog; shadowdarkAdapter.resolveDocumentFor = resolve; }
@@ -459,15 +464,19 @@ async function levelUpHitPoints() {
                 const actor: any = primLike(); actor.items.push({ ...structuredClone(fighter), _id: 'ownedClass', _stats: { compendiumSource: fighter.uuid } }); actor.system.level = { value: level, xp: 20 };
                 actor.system.abilities.con = { value: con };
                 const before = structuredClone(actor);
+                const records = new Map<string, any>();
+                const dataStore = { get: async (key: string) => structuredClone(records.get(key) ?? null), set: async (key: string, value: any) => { records.set(key, structuredClone(value)); } };
+                const patchSource = (updates: any) => { for (const [path, value] of Object.entries(updates)) { const parts = path.split('.'); let target = actor; for (const part of parts.slice(0,-1)) target = target[part] ??= {}; target[parts.at(-1)!] = value; } };
                 const response = await handleFinalizeLevelUp(actor._id, {
-                    json: async () => ({ targetLevel: level + 1, hpRoll: roll }),
-                    runtime: { documents: { get: async () => actor, patch: async () => {}, items: { create: async () => {} } } },
+                    userSession: { userId: 'offline' },
+                    json: async () => ({ requestId: 'native-hp', baseline: spellReview(actor), targetLevel: level + 1, hpRoll: roll }),
+                    runtime: { world: { snapshot: () => worldSnapshot(1), assertRevision() {} }, dataStore, documents: { get: async () => structuredClone(actor), patch: async (_type: string, _id: string, updates: any) => { patchSource(updates); }, items: { create: async () => {} } } },
                 } as any);
                 assert.equal(response.status, 200);
                 const body: any = await response.json();
                 assert.equal(body.updates['system.attributes.hp.max'], expected);
                 assert.equal(body.updates['system.attributes.hp.value'], expected);
-                assert.deepEqual(actor, before);
+                assert.equal(actor.system.attributes.hp.max, expected); assert.equal(before.system.level.value, level);
             });
         }
     } finally { shadowdarkAdapter.getChoiceCatalog = catalog; shadowdarkAdapter.resolveDocumentFor = resolve; }

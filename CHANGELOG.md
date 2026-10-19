@@ -4,6 +4,8 @@ Historical entries are reconstructed from [published releases](https://github.co
 
 ## Unreleased
 
+- Preserve native advancement order and exact grant receipts through failure, retry and explicit recovery.
+
 - Preserve required native grants and exact Class authority
 - Retain open sheet state and retire stale action callbacks during context changes
 - Preserve native creation arrays and precise caller denial responses

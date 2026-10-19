@@ -690,3 +690,27 @@ passing-after cases. D6 native, D7 and A02-01–15 remain open; this offline rev
 provides no new live/browser/native acceptance. Follow the existing scoped
 checkpoint process during remediation; this review itself authorizes no Git,
 release or live operations.
+
+### SD02-R1 correction checkpoint — October 18, 2026
+
+Advancement now journals one caller/world/Actor/request plan through public SDK
+DataStore. Native grants precede the frozen final level/XP/HP patch; HP still
+prepares all planned bonuses. Confirmed Item IDs survive refused later writes,
+replay and restart. Refusals can continue; unknown acknowledgements never repeat.
+An explicit reviewed recovery can bind an uncertain grant only to an exact owned
+ID whose complete planned fields match, then verify the original Actor after
+subtracting confirmed grants. A lost final-patch acknowledgement requires review
+of its exact full-source expectation. Unrelated edits, changed dependencies or
+context need exact-source remediation. Incomplete operations block replacement
+advancement, including another caller; these are bounded receipts, not a
+transaction or distributed CAS.
+
+The mounted workflow no longer closes on a target-level Actor event. Only a
+completed server operation closes/announces success. Reopening exposes durable
+receipts and the original request; the recovery panel provides retry, source
+refresh and explicit exact-ID review. New regression suite
+`advancement-recovery.test.ts`: ten cases fail against08997a4, ten pass after.
+`parity-corrections.browser.mjs --only=R1`: two mounted cases fail before, pass
+after with network blocked. Module/UI/hook typing passes on0.19.2/0.19.3;
+native-alignment61/61 passes with source-mutating SDK doubles. This is offline
+implementation evidence. R2/R3 and all native A02 rows remain open.
