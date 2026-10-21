@@ -22,6 +22,7 @@ export default function DetailsTab({}: DetailsTabProps) {
     const { ConfirmationModal } = useSDKComponents();
     const {
         actor,
+        refreshActor,
         updateActor,
         deleteItem,
         createItem,
@@ -270,6 +271,7 @@ export default function DetailsTab({}: DetailsTabProps) {
                             </div>
                             <button
                                 onClick={() => openSelection('system.deity', 'Deity', 'deities')}
+                                aria-label="Edit Deity"
                                 className="bg-white text-black px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider border border-black hover:bg-neutral-200 transition-colors shadow-[2px_2px_0px_0px_rgba(255,255,255,0.2)]"
                             >
                                 Edit
@@ -292,6 +294,7 @@ export default function DetailsTab({}: DetailsTabProps) {
                                 </div>
                                 <button
                                     onClick={() => openSelection('system.patron', 'Patron', 'patrons')}
+                                    aria-label="Edit Patron"
                                     className="bg-white text-black px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider border border-black hover:bg-neutral-200 transition-colors shadow-[2px_2px_0px_0px_rgba(255,255,255,0.2)]"
                                 >
                                     Edit
@@ -323,6 +326,7 @@ export default function DetailsTab({}: DetailsTabProps) {
                                             </div>
                                         </div>
                                         <button
+                                            aria-label="Edit Languages"
                                             onClick={() => setIsLanguageModalOpen(true)}
                                             className="bg-white text-black px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider border border-black hover:bg-neutral-200 transition-colors shadow-[2px_2px_0px_0px_rgba(255,255,255,0.2)]"
                                         >
@@ -481,10 +485,9 @@ export default function DetailsTab({}: DetailsTabProps) {
                 <LanguageSelectionModal
                     isOpen={true}
                     onClose={() => setIsLanguageModalOpen(false)}
-                    onSelect={(langs) => {
-                        setIsLanguageModalOpen(false);
-                        updateActor('system.languages', langs, { immediate: true });
-                    }}
+                    actorId={actor.id ?? actor._id}
+                    actor={actor}
+                    onSelect={async () => { await refreshActor(); }}
                     currentLanguages={languageIds}
                     currentLabels={Object.fromEntries(languageEntries.map(entry => [entry.ref ? formatUuid(entry.ref) : entry.value, entry.label ?? entry.value ?? 'Unavailable language']))}
                 />

@@ -183,19 +183,19 @@ await test('R1b late pre-write review cannot erase a newer acknowledged ID',{whi
 });
 for(const changeLevel of [true,false])await test(`R3 same-Class ${changeLevel?'level':'progression-only'} refresh updates limit and retires intent`,{actor:casting(),catalog},async p=>{
  await openManager(p);await p.getByPlaceholder('Filter spells by name...').fill('List');await p.getByRole('button',{name:'Add List A new',exact:true}).click();
- await p.getByText('Selected: 2 / 3',{exact:true}).waitFor();
+ await p.getByText('Spells known: 2 / 3',{exact:true}).waitFor();
  await p.evaluate(level=>{const next=structuredClone(window.actorContext.actor);if(level)next.system.level.value=2;next.derived.spellModel.sources[0].limits[1].value=4;window.setActor(next);},changeLevel);
- await p.getByText('Selected: 1 / 4',{exact:true}).waitFor();assert.equal(await p.getByRole('button',{name:'Add List A new',exact:true}).getAttribute('aria-pressed'),'false');
+ await p.getByText('Spells known: 1 / 4',{exact:true}).waitFor();assert.equal(await p.getByRole('button',{name:'Add List A new',exact:true}).getAttribute('aria-pressed'),'false');
  assert.equal(await p.getByPlaceholder('Filter spells by name...').inputValue(),'List');
  await p.getByRole('button',{name:'Add List A new',exact:true}).click();await p.getByRole('button',{name:'SAVE CHANGES',exact:true}).click();await p.waitForFunction(()=>window.pending.length===1);
  const body=await p.evaluate(()=>window.calls.find(c=>c.url.endsWith('/manage')).body);assert.equal(body.listUuid,A);assert.deepEqual(body.additions,['Item.addA']);assert.deepEqual(body.removals,[]);
 });
 await test('R3 same-Class alternate list refreshes owned/catalog/request identity and retires stale additions/removals',{actor:casting(),catalog},async p=>{
- await openManager(p);await p.getByPlaceholder('Filter spells by name...').fill('List');await p.getByRole('button',{name:'Remove owned Owned List A (ownedA)',exact:true}).click();await p.getByRole('button',{name:'Add List A new',exact:true}).click();
+ await openManager(p);await p.getByPlaceholder('Filter spells by name...').fill('List');await p.getByRole('button',{name:'Remove Owned List A',exact:true}).click();await p.getByRole('button',{name:'Add List A new',exact:true}).click();
  await p.evaluate(()=>{const next=structuredClone(window.actorContext.actor);next.derived.spellModel.sources[0].listUuid='Item.listB';next.derived.spellModel.sources[0].limits[1].value=2;window.setActor(next);});
  await p.getByRole('button',{name:'Add List B new',exact:true}).waitFor();assert.equal(await p.getByRole('button',{name:'Add List A new',exact:true}).count(),0);
- await p.getByRole('button',{name:'Remove owned Owned List B (ownedB)',exact:true}).waitFor();assert.equal(await p.getByRole('button',{name:'Remove owned Owned List A (ownedA)',exact:true}).count(),0);
- assert.equal(await p.getByPlaceholder('Filter spells by name...').inputValue(),'List');await p.getByText('Selected: 1 / 2',{exact:true}).waitFor();
+ await p.getByRole('button',{name:'Remove Owned List B',exact:true}).waitFor();assert.equal(await p.getByRole('button',{name:'Remove Owned List A',exact:true}).count(),0);
+ assert.equal(await p.getByPlaceholder('Filter spells by name...').inputValue(),'List');await p.getByText('Spells known: 1 / 2',{exact:true}).waitFor();
  await p.getByRole('button',{name:'Add List B new',exact:true}).click();await p.getByRole('button',{name:'SAVE CHANGES',exact:true}).click();await p.waitForFunction(()=>window.pending.length===1);
  const body=await p.evaluate(()=>window.calls.find(c=>c.url.endsWith('/manage')).body);assert.equal(body.listUuid,B);assert.equal(body.baseline,'current-source');assert.deepEqual(body.additions,['Item.addB']);assert.deepEqual(body.removals,[]);
 });
@@ -203,10 +203,10 @@ await test('R3 source change during an operation preserves original request and 
  await openManager(p);await p.getByRole('button',{name:'Add List A new',exact:true}).click();await p.getByRole('button',{name:'SAVE CHANGES',exact:true}).click();await p.waitForFunction(()=>window.pending.length===1);
  const body=await p.evaluate(()=>window.calls.find(c=>c.url.endsWith('/manage')).body);
  await p.evaluate(()=>{const next=structuredClone(window.actorContext.actor);next.derived.spellModel.sources[0].listUuid='Item.listB';window.setActor(next);window.answer(0,{success:true,state:'partial',operations:[{kind:'add',target:'Item.addA',status:'complete',itemId:'confirmedA'},{kind:'remove',target:'old',status:'failed'}]});});
- await p.getByText('add Item.addA: complete · Item confirmedA',{exact:true}).waitFor();await p.getByText(`Operation ${body.requestId} · reviewed list ${A}`,{exact:true}).waitFor();
+ await p.getByText('Learn spell: saved',{exact:true}).waitFor();assert.doesNotMatch(await p.getByRole('dialog').innerText(),/Item\.addA|confirmedA|Operation /);
  await p.getByRole('button',{name:'Retry remaining operations',exact:true}).click();await p.waitForFunction(()=>window.pending.length===2);
  assert.deepEqual(await p.evaluate(()=>window.calls.filter(c=>c.url.endsWith('/manage')).map(c=>c.body)),[body,body]);
- await p.evaluate(()=>window.answer(1,{error:'Current list changed'},409));await p.getByText('add Item.addA: complete · Item confirmedA',{exact:true}).waitFor();await p.getByText(/No complete response: Current list changed/).waitFor();
+ await p.evaluate(()=>window.answer(1,{error:'Current list changed'},409));await p.getByText('Learn spell: saved',{exact:true}).waitFor();await p.getByText(/No complete response: Current list changed/).waitFor();
 });
 }finally{await browser.close();fs.writeFileSync(path.join(out,'results.json'),JSON.stringify({scope:'Actual React consumers, controlled SDK; all network blocked; no native acceptance',baseline,results},null,2));}
 console.log(JSON.stringify(results,null,2));if(results.some(r=>!r.pass))process.exitCode=1;

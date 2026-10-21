@@ -246,7 +246,7 @@ async function execute(actorId: string, body: ActionBody, req: ModuleServerReque
             record.warnings.push(`Prerequisites remain applied. The result call failed or has no confirmed receipt (${getErrorMessage(e)}); this request will not spend, post or roll again.`);
             await persist(record); return;
         }
-        if (body.focus && !action.focusAllowed) record.warnings.push('This action has no native Player focus exemption. NPC and item loss rules still apply.');
+        if (body.focus && !action.focusAllowed) record.warnings.push('Focus is unavailable for this action. Its normal failure rules apply.');
         const writes = planConsequences(action, triggering, outcome, { focus: body.focus === true && action.focusAllowed });
         record.writes.push(...writes); record.statuses.push(...writes.map(() => ({ status: 'pending' as const })));
         record.phase = 'consequences'; await persist(record);

@@ -370,7 +370,7 @@ export function prepareSpellAction(core: PreparedActorCore, triggering: any, sou
     action.dc = tier !== null ? tier + 10 : null;
     if (action.dc === null) action.diagnostics.push('The spell has no tier, so its DC is unavailable.');
     const triggerType = triggering?.type;
-    action.focusAllowed = core.kind === 'Player' && triggerType === 'Spell';
+    action.focusAllowed = core.kind === 'Player' && triggerType === 'Spell' && spell.system?.duration?.type === 'focus';
     if (triggerType === 'Wand' && triggering?.system?.broken) return unavailable(action, 'The wand is broken.');
     if (spell.system?.lost === true || source.lost) unavailable(action, 'The spell is lost.');
     const rollData = buildRoll(core);
@@ -415,7 +415,7 @@ export function prepareSpellAction(core: PreparedActorCore, triggering: any, sou
     mergeSituational(action, advantage.situational);
     action.advantage = numericKey(advantage, 'advantage') ?? 0;
     criticalConfig(core, rollData, 'spell', keyItem, action, config);
-    if (triggerType === 'Spell') action.consequences.push({ when: 'failure', description: 'On failure the spell is lost unless this is a focus check.' });
+    if (triggerType === 'Spell') action.consequences.push({ when: 'failure', description: action.focusAllowed ? 'On failure the spell is lost unless this is a focus check.' : 'On failure the spell is lost.' });
     else if (triggerType === 'Scroll') action.consequences.push({ when: 'always', description: 'The scroll is consumed whatever the result.' });
     else if (triggerType === 'Wand') {
         action.consequences.push({ when: 'failure', description: 'On failure this wand spell is lost.' });

@@ -4,6 +4,10 @@ Read this file, then `temp/AGENT-HANDOFF.md` when present and the module-owned
 ADR/audit it names. Read [module architecture](docs/architecture.md) for technical
 context. The Core handoff is not this repository's work queue.
 
+Current presentation work is [ADR-0003](docs/adr/0003-preserve-module-presentation.md)
+and its [whole-UI audit](docs/audits/2026-10-20-presentation-regressions.md).
+ADR-0001/0002 remain closed for their agreed native behavior scope.
+
 ## Scope and repository ownership
 
 This is an independent SheetDelver system-module repository. Keep its code,
@@ -90,6 +94,12 @@ use temporary Git fixtures. No Core checkout is needed to run the helper.
   the handoff. Update documentation and tests with the implementation.
 
 ## Shadowdark rules and current design constraints
+
+Behavior refactoring does not authorize redesign. Preserve the module's paper
+layout, serif headings, heavy borders, square controls and shadows across every
+affected sheet, tool and dialog. Style working shared shells without discarding
+focus/host-overlay behavior. Verify the declared stylesheet in an installed
+archive as well as local source; record any deliberately retained visual change.
 
 Use the native item/template's actual damage, properties, formulas and actions.
 Keep Player and NPC schemas distinct, including NPC explicit ability modifiers
@@ -298,6 +308,10 @@ before/after transient transport loss. `--server-disconnect` selects an explicit
 native session kick instead; keep that diagnostic result separate from ordinary
 reconnect and never add automatic relogin to make it pass. Resource dialog tests
 also cover floating-tool clearance and yielding to shared SDK dialogs.
+The current presentation pass is qualified on Core 0.19.5. Its
+`--presentation-only` option runs the complete surface/width/theme matrix and
+explicitly skips the separately retained behavioral follow-ups; it never implies
+native acceptance or changes the declared minimum Core version.
 
 ADR-0002 regressions additionally run `src/tests/native-parity.test.ts` and
 `node --import tsx src/tests/native-parity.oracles.mjs` from the configured Core
@@ -322,8 +336,12 @@ thresholds belong to the shared action model.
 Language rarity comes only from system.rarity; unknown remains unclassified.
 Creation uses native Class/Ancestry fixed/common/rare/select fields with separate
 restricted pools and server validation. No implicit Common/INT or Background
-allowance is added. Ordinary inventory editing has no creation quota and retains
-custom/unreadable entries. Source filters constrain browsing, not fixed grants.
+allowance is added. ADR-0003's user-selected guided sheet editor now applies
+those native source allowances; this supersedes the previous unrestricted UI
+policy, not the historical finding about native's ordinary editor. Retain current
+extras/custom/unreadable entries unless explicitly removed and validate through
+`languages/manage` before the one primary patch. Source
+filters constrain browsing, not fixed grants. Do not show UUIDs as routine labels.
 
 For owner-bound operations, SDK strict get reads can return null at a higher
 threshold even when observer-visible. Use the shared requireOwnedActor guard to
@@ -357,3 +375,17 @@ compiled public apiRoutes with `@sheet-delver/sdk/testing`, not a live host. Cor
 archive preview must retain its full-GM deployment guard when no service account
 is configured; do not invent credentials or bypass it to label an offline install
 passed. Source suites, compiled contracts and native acceptance are distinct.
+
+### ADR-0003 review follow-up (2026-10-21)
+
+Inventory language editing always loads all caller-readable source-filtered rows,
+even for fixed-only characters. `languageEditingPlan` permits replacing classified
+fixed defaults and homogeneous choices within Common/Rare totals; creation keeps
+its exact grants/pools. Do not hide catalog rows when capacity is full or restore
+fixed-choice locks in the ordinary editor. Mixed/unclassified pools are explicit.
+Shared `prepareSpellAction.focusAllowed` requires native duration `focus` as well
+as a Player-owned Spell; UI and server use the same predicate.
+Card artwork is a full-width faded background; the visible title is an inset
+centered black panel below the modal Close bar, type is a property, and Data notes
+belong below the divider above actions. Preserve accessible dialog naming,
+keyboard/overlay behavior and source-preserving action paths.

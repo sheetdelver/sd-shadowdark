@@ -68,7 +68,7 @@ export default function CustomBoonModal({ isOpen, onClose, onCreate, onUpdate, i
         if (ok) onClose(); else setError('The boon was not saved. Check the notification for details.');
     };
 
-    const field = 'w-full bg-white border-2 border-black px-2 py-2 text-sm outline-none focus:bg-neutral-50';
+    const field = 'sd-form-field w-full bg-white border-2 border-black px-2 py-2 text-sm outline-none focus:bg-neutral-50';
     return (
         <ModuleDialog open title={editing ? 'Edit Boon' : 'Create Custom Boon'} onClose={onClose} size="lg" footer={
             <div className="flex justify-between gap-2">
@@ -78,7 +78,7 @@ export default function CustomBoonModal({ isOpen, onClose, onCreate, onUpdate, i
                 </button>
             </div>
         }>
-            <form onSubmit={submit} className="space-y-4">
+            <form onSubmit={submit} className="sd-editor-form space-y-4">
                 {error && <p role="alert" className="border-2 border-red-700 bg-red-50 text-red-800 p-2 text-sm font-bold">{error}</p>}
                 <label className="block"><span className="block text-xs uppercase tracking-widest font-bold mb-1">Name</span>
                     <input className={field} value={name} data-autofocus onChange={event => setName(event.target.value)} /></label>

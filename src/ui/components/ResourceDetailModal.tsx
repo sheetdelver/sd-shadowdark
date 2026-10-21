@@ -41,18 +41,20 @@ export function CardBody({ card, onLink, onRollCheck, onRollFormula }: {
         if (button.dataset.action === 'roll-formula' && onRollFormula && button.dataset.formula) onRollFormula(button.dataset.formula);
     };
     return (
-        <div className="space-y-3">
+        <div className="sd-card-content">
+            {card.img && <div key={card.img} className="sd-card-art" aria-hidden="true"><img key={card.img} src={resolveImageUrl(card.img)} alt="" onError={event => { event.currentTarget.parentElement!.hidden = true; }} /></div>}
+            <div className="sd-card-title" aria-hidden="true">{card.title}</div>
+            <div className="sd-card-copy space-y-3">
             <div className="flex gap-3 items-start">
-                {card.img && <img src={resolveImageUrl(card.img)} alt="" className="w-11 h-11 object-cover border-2 border-black bg-neutral-200 shrink-0" />}
                 <div className="min-w-0 flex-1">
                     {card.states.length > 0 && (
                         <ul className="flex flex-wrap gap-1 mb-2" aria-label="State">
                             {card.states.map(state => <li key={state} className="text-[10px] font-bold uppercase tracking-widest border border-black px-1.5 py-0.5">{state}</li>)}
                         </ul>
                     )}
-                    {card.facts.length > 0 && (
+                    {(card.subtitle || card.facts.length > 0) && (
                         <dl className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-0.5 text-sm">
-                            {card.facts.map((fact, index) => (
+                            {[...(card.subtitle ? [{ label: 'Type', value: card.subtitle, detail: undefined }] : []), ...card.facts].map((fact, index) => (
                                 <div key={`${fact.label}-${index}`} className="contents">
                                     <dt className="font-bold uppercase text-[11px] tracking-widest text-neutral-600 pt-0.5">{fact.label}</dt>
                                     <dd className="break-words" title={fact.detail}>{fact.value}{fact.detail && <span className="block text-xs text-amber-800">{fact.detail}</span>}</dd>
@@ -81,14 +83,18 @@ export function CardBody({ card, onLink, onRollCheck, onRollFormula }: {
                     </ul>
                 </section>
             ))}
-            {card.diagnostics.length > 0 && (
-                <details className="text-xs text-amber-900 border border-amber-700 bg-amber-50 p-2">
-                    <summary className="cursor-pointer font-bold">Data notes ({card.diagnostics.length})</summary>
-                    <ul className="list-disc pl-4 mt-1 space-y-0.5">{[...new Set(card.diagnostics)].map(message => <li key={message}>{message}</li>)}</ul>
-                </details>
-            )}
+            </div>
         </div>
     );
+}
+
+/** Notes share the action footer, including read-only preview/bestiary cards. */
+export function CardNotes({ card }: { card: ResourceCard }) {
+    if (!card.diagnostics.length) return null;
+    return <details className="sd-card-notes text-xs text-amber-900 border border-amber-700 bg-amber-50 p-2">
+        <summary className="cursor-pointer font-bold">Data notes ({new Set(card.diagnostics).size})</summary>
+        <ul className="list-disc pl-4 mt-1 space-y-0.5">{[...new Set(card.diagnostics)].map(message => <li key={message}>{message}</li>)}</ul>
+    </details>;
 }
 
 export default function ResourceDetailModal() {
@@ -140,7 +146,7 @@ export default function ResourceDetailModal() {
     const run = (entry: CardAction) => {
         setResult(null);
         startAction(entry.action, {
-            focus,
+            focus: focus && entry.action.focusAllowed,
             onSettled: (response: ActionResponse | null) => {
                 if (!response?.outcome) return;
                 const outcome = response.outcome;
@@ -154,8 +160,9 @@ export default function ResourceDetailModal() {
     const ownedItemId = target.kind === 'item' && loaded.state === 'ready' ? target.itemId : null;
     const hasControls = !!ownedItemId && itemControls(actor.derived?.items ?? [], actor.items ?? [], ownedItemId).length > 0;
     const hasActions = loaded.state === 'ready' && loaded.card.actions.length > 0;
-    const footer = loaded.state === 'ready' && (hasActions || hasControls) ? (
+    const footer = loaded.state === 'ready' && (hasActions || hasControls || loaded.card.diagnostics.length > 0) ? (
         <div className="space-y-2">
+            <CardNotes card={loaded.card} />
             {hasControls && <ItemStateControls itemId={ownedItemId!} />}
             {loaded.card.kind === 'spell' && loaded.card.itemId && loaded.card.actions.some(entry => entry.action.focusAllowed) && (
                 <label className="flex items-center gap-2 text-sm min-h-11">

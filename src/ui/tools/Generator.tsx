@@ -935,16 +935,17 @@ function GeneratorContent() {
                                 </button>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-y-4 gap-x-6">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-y-4 gap-x-6">
                                 {['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'].map(stat => {
                                     // @ts-ignore
                                     const st = formData.stats[stat];
                                     return (
-                                        <div key={stat} className="flex items-center justify-between">
+                                        <div key={stat} data-stat={stat} className="flex min-w-0 items-center justify-between gap-2">
                                             <span className="font-bold text-neutral-500 text-sm tracking-widest">{stat}</span>
                                             <div className="flex items-center gap-2">
                                                 <input
                                                     type="number"
+                                                    aria-label={`${stat} score`}
                                                     value={st.value}
                                                     onChange={(e) => handleStatChange(stat, e.target.value)}
                                                     className={`w-12 text-center bg-transparent border-b border-neutral-300 focus:border-black outline-none font-serif text-2xl font-bold ${st.value >= 15 ? 'text-amber-600' : 'text-black'} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}

@@ -6,9 +6,9 @@ import { languagePlan, languageRarity } from '../logic/languages';
 import { readSourceFilters, sourceAllowed } from '../logic/world-settings';
 
 /** Caller-local language inputs. Restricted/fixed exact refs are not discovery. */
-export async function callerLanguagePlan(caller: Caller, ancestry: any, classDoc: any, existing: readonly string[] = []) {
+export async function callerLanguagePlan(caller: Caller, ancestry: any, classDoc: any, existing: readonly string[] = [], mode?: 'inventory') {
     const configs = [ancestry, classDoc].map(doc => doc?.system?.languages ?? {});
-    const needsCatalog = configs.some(data => (typeof data.common === 'number' && data.common > 0) || (typeof data.rare === 'number' && data.rare > 0));
+    const needsCatalog = mode === 'inventory' || configs.some(data => (typeof data.common === 'number' && data.common > 0) || (typeof data.rare === 'number' && data.rare > 0));
     let catalog: any[] = [], readError: string | null = null;
     if (needsCatalog) {
         const filters = readSourceFilters(caller.runtime.world?.snapshot());

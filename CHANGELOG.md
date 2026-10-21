@@ -7,6 +7,14 @@ Historical entries are reconstructed from [published releases](https://github.co
 - Clarify release workflow titles
 - Reuse validated release artifacts
 
+- Restore module dialog styling
+- Clarify spell picker labels
+- Allow bounded language customization
+- Limit focus to focus spells
+- Illustrate resource card backgrounds
+- Widen tablet character name
+- Fix narrow generator controls
+
 ## 0.9.6
 
 - Native casting and spell progression

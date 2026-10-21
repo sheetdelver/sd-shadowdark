@@ -68,14 +68,14 @@ export default function ShadowdarkPaperSheet({ onToggleView }: ShadowdarkPaperSh
         <div className="relative w-full h-full bg-black p-2 sm:p-4 md:p-8 flex justify-center items-start font-serif text-sm">
             <div className="bg-white text-black w-full max-w-[1200px] border-[3px] border-black shadow-2xl p-3 sm:p-4 md:p-6 relative flex flex-col gap-4 mb-8">
                 <div className="flex flex-col md:grid md:grid-cols-12 gap-4 items-start mb-4">
-                    <div className="w-full md:col-span-8 flex flex-col items-center gap-2 text-center pt-2">
+                    <div className="w-full md:col-span-6 xl:col-span-8 flex flex-col items-center gap-2 text-center pt-2">
                         <h1 className="text-[clamp(2rem,5vw,3.75rem)] font-black tracking-tighter uppercase leading-none">ShadowDark</h1>
                         <button type="button" onClick={onToggleView}
                             className="print:hidden text-xs font-bold uppercase tracking-widest border-2 border-black px-3 py-2 hover:bg-black hover:text-white shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
                             Manage Character Sheet
                         </button>
                     </div>
-                    <div className={`w-full md:col-span-4 ${box} p-2 pt-6 h-24 flex flex-col`}>
+                    <div className={`w-full md:col-span-6 xl:col-span-4 ${box} p-2 pt-6 h-24 flex flex-col`}>
                         <span className={tag}>Name</span>
                         <label className="sr-only" htmlFor="sd-paper-name">Name</label>
                         <input id="sd-paper-name" key={actor.name} type="text" defaultValue={actor.name}

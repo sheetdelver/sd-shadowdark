@@ -204,9 +204,21 @@ async function actions() {
             const result = await statusOf(await handleActorAction('w1', request(failed.runtime, { requestId: 'req-fail-0001', kind: 'spell', itemId: 'mm' }) as any));
             assert.equal(result.body.outcome.success, false);
             assert.deepEqual(failed.writes.find(write => write[0] === 'item.update'), ['item.update', { type: 'Actor', id: 'w1' }, 'mm', { 'system.lost': true }]);
-            const focus = fakeRuntime(wizardActor(), { rolls: [3] });
+            const focusActor = wizardActor(); focusActor.items.find((item: any) => item._id === 'mm').system.duration = { type: 'focus' };
+            const focus = fakeRuntime(focusActor, { rolls: [3] });
             await handleActorAction('w1', request(focus.runtime, { requestId: 'req-focus-001', kind: 'spell', itemId: 'mm', focus: true }) as any);
             assert.equal(focus.writes.filter(write => write[0] === 'item.update').length, 0);
+        });
+        await check('SD-UI10', 'only native focus duration enables Player focus and its loss exemption', async () => {
+            for (const duration of ['instant', 'rounds', 'permanent', undefined, 'focus']) {
+                const actor = wizardActor(); const spell = actor.items.find((item: any) => item._id === 'mm');
+                spell.system.duration = duration ? { type: duration } : undefined;
+                const action = prepareRequestedAction(prepareActorCore(actor, lookups), actor, lookups, { kind: 'spell', itemId: 'mm' })!;
+                assert.equal(action.focusAllowed, duration === 'focus', String(duration));
+                const trial = fakeRuntime(actor, { rolls: [3] });
+                await handleActorAction('w1', request(trial.runtime, { requestId: `req-duration-${duration ?? 'missing'}`, kind: 'spell', itemId: 'mm', focus: true }) as any);
+                assert.equal(trial.writes.filter(write => write[0] === 'item.update').length, duration === 'focus' ? 0 : 1);
+            }
         });
         await check('C4', 'scroll is consumed even on success', async () => {
             const { runtime, writes } = fakeRuntime(wizardActor(), { rolls: [18] });

@@ -1,5 +1,13 @@
 # Shadowdark module architecture
 
+`module/ui.tsx` declares `assets/presentation.css` through the public stylesheet
+contract. Scoped management-dialog rules restore the established paper/serif/
+border treatment around `ModuleDialog`; compact cards retain their proportions.
+Picker width and tablet header sizing are presentation-only.
+See [ADR-0003](adr/0003-preserve-module-presentation.md) and the
+[whole-UI review](audits/2026-10-20-presentation-regressions.md). Shared focus,
+overlay suspension, current preparation and persistence remain authoritative.
+
 **Automatic completion correction (October 19):** SD02-N14-01/02 pass offline
 and targeted native v14 checks. The existing caller Actor projection now joins
 the shared Actor queue and refreshes only that caller's owned advancement
@@ -147,9 +155,26 @@ rows. Generator and advancement use it with the shared generation lifecycle and
 accessible choice controls. The module creation route validates assignments before
 public SDK Actor creation; advancement validates before HP/XP/items and checks its
 Actor source/context again. Existing languages survive advancement.
-Details and the ordinary inventory picker impose no creation quota, classify by
-source field only, retain custom/unreadable entries and make unchanged saves a
-no-op. Actor identity exposes current caller-readable language rarity/labels.
+The guided Details picker uses these allowances under the user-selected
+[ADR-0003 policy](adr/0003-preserve-module-presentation.md), superseding its
+previous unrestricted editing. Common/Rare headers include fixed and homogeneous
+restricted grants; mixed pools retain independent counts. `allocateLanguageInventory`
+matches each UUID to one slot. Inventory mode always browses the full authorized
+catalog, even for fixed-only characters. `languageEditingPlan` permits replacement
+of fixed defaults and homogeneous pools within their native Common/Rare totals.
+Mixed/unknown-rarity grants retain explicit allocation rather than guessed quotas.
+Custom, unreadable and excess existing languages survive unless explicitly removed.
+Effects are displayed separately. This differs from native's unrestricted ordinary
+editor; it does not claim native inventory quotas.
+
+`languages/plan` with `mode: inventory` returns the owner-authorized Actor's current
+inventory and a stable review of its exact source/allowances. `languages/manage`
+rechecks owner, context and review under the Actor queue, then validates and sends
+one primary Actor patch. The UI submits exact UUIDs; IDs are not routine labels.
+Unchanged saves are no-ops. Changed context/source retires draft intent; an
+unconfirmed write requires refresh, never automatic replay. External native edits
+are not made atomic with the final patch. Actor identity exposes current
+caller-readable language rarity/labels.
 
 ## Released0.9.5 action and language baseline before ADR-0002
 
@@ -306,7 +331,8 @@ lease expiry. No automatic claim resolves a lost upstream acknowledgement.
 The Actor provider retains the exact request for explicit recovery. Its dialog
 suspends the resource card and distinguishes pending prerequisites, uncertain
 results and outstanding consequences. Actor/unmount changes retire UI results.
-Player owned-spell actions alone allow focus to exempt loss; NPC cards hide it
+Player owned-spell actions with `system.duration.type === "focus"` alone allow
+focus to exempt loss; NPC cards hide it
 and the server applies NPC loss even to a crafted focus request. Scroll/Wand
 rules remain distinct. Zero disables critical thresholds, missing thresholds
 retain native defaults, and manual totals establish no natural critical.
@@ -425,6 +451,15 @@ references first and asks for confirmation before creating unresolved or custom
 items. Existing Actors are not repaired.
 
 ## Sheets, cards and bestiary
+
+ADR-0003's illustrated resource cards use the same `CardBody` for owned resources,
+previews and bestiary entries: absolute full-width artwork behind an inset black
+centered title and property/description content, with top/bottom fades. The modal
+bar contains Close; the accessible dialog name remains available without a duplicate
+visible title or subtype. Type is a property. Missing artwork collapses its space.
+`CardNotes` belongs in the divided footer before controls/actions, also on read-only
+cards. The existing responsive shell, scrolling and host-overlay lifecycle remain.
+
 
 Both layouts read the prepared view. Edits are Actor-scoped drafts with
 debounced writes cancelled on Actor change, sequenced responses, optimistic

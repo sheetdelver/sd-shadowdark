@@ -28,6 +28,8 @@ import SpellPicker from '${moduleRoot}/src/ui/components/SpellSelectionModal';
 import LanguagePicker from '${moduleRoot}/src/ui/components/LanguageSelectionModal';
 import {useLevelUp} from '${moduleRoot}/src/ui/components/levelup/useLevelUp';
 import ModuleDialog from '${moduleRoot}/src/ui/components/ModuleDialog';
+import ResourceDetailModal from '${moduleRoot}/src/ui/components/ResourceDetailModal';
+import {prepareShadowdarkView} from '${moduleRoot}/src/logic/prepared-view';
 import {WeaponSelectionSection} from '${moduleRoot}/src/ui/components/levelup/sections/WeaponSelectionSection';
 import {ArmorSelectionSection} from '${moduleRoot}/src/ui/components/levelup/sections/ArmorSelectionSection';
 const listeners=new Map();const emit=(event,payload)=>listeners.get(event)?.forEach(fn=>fn(payload)); window.calls=[]; window.pending=[];
@@ -40,9 +42,10 @@ window.sdk={isConnected:true,worldId:'w',currentUser:{id:'p',role:1},foundryUrl:
   const reference=url.includes('/document/')?decodeURIComponent(url.split('/document/')[1]):url.includes('uuid=')?decodeURIComponent(url.split('uuid=')[1]):null;
   if(reference&&window.initial.documents)return Response.json(window.initial.documents[reference]||{error:'Not found'},{status:window.initial.documents[reference]?200:404});
   const p=window.policy[key]||{};
+  const emptyPlan={fixed:[],groups:[],errors:[],rows:[],current:window.initial.current||[],review:'review1',contextRevision:1};
   if(p.hold)return new Promise(resolve=>window.pending.push({call,resolve}));
   if(p.network)throw new TypeError('Connection interrupted');
-  return Response.json(p.body??(key==='index'?{nameIndex:{}}:key==='data'?{success:true,data:{isSpellcaster:false,spellsToChoose:{},availableSpells:[],progressionReady:true}}:key==='gear'?[rope]:[]),{status:p.status||200});
+  return Response.json(p.body??(key==='index'?{nameIndex:{}}:key==='data'?{success:true,data:{isSpellcaster:false,spellsToChoose:{},availableSpells:[],progressionReady:true}}:key==='gear'?[rope]:key==='plan'?emptyPlan:key==='manage'?{success:true}:[]),{status:p.status||200});
  }};
 window.actorContext={actor:window.initial.actor||{id:'a',items:[],derived:{actions:[],items:[],spellcasting:{classes:[]}}},isActionBusy:()=>false,getDraftValue:(_,value)=>value};
 const root=createRoot(document.getElementById('root')); let mounted=true, show=true;
@@ -51,13 +54,20 @@ const advancementProps={actorId:'',currentLevel:0,targetLevel:1,classObj:advance
 function Advancement(){const {state,actions}=useLevelUp(advancementProps);window.completeAdvancement=()=>{actions.setHpRoll(4);actions.setGoldRoll(60);actions.setRolledTalents([{name:'Native rolled talent',type:'Talent',system:{},effects:[]}]);};return <><output>{state.error||'No error'}</output><button disabled={!actions.isComplete()}>Finish advancement</button></>;}
 function ParityPicker(){const [open,setOpen]=React.useState(false);return <><button onClick={()=>setOpen(true)}>Open spell manager</button><SpellPicker isOpen={open} onClose={()=>setOpen(false)} onSave={intent=>window.saved=intent} title="Manage spells" tier={1} classUuid="Compendium.shadowdark.classes.Item.wizard" knownSpells={window.initial.owned||[]} maxSelections={window.initial.limit} actor={window.initial.actor}/></>;}
 function Consumer(){switch(window.initial.which){
+case 'resource-card': {
+ const source=window.initial.actor;
+ const derived=prepareShadowdarkView(source,{classDocument:()=>({name:'Wizard',type:'Class',system:{spellcasting:{ability:'int'}}})});
+ derived.items.find(item=>item.id==='spell').diagnostics=['Fixture source note'];
+ window.actorContext={actor:{...source,derived},card:{kind:'item',itemId:'spell'},rollDialog:{open:false},isActionBusy:()=>false,startAction:(action,options)=>window.lastAction={action,options},closeCard:()=>{},openCard:()=>{},performRoll:()=>{}};
+ return <ResourceDetailModal/>;
+}
 case 'parity-picker':return <ParityPicker/>;
 case 'advancement':return <Advancement/>;
 case 'dialog':return <><button style={{position:'fixed',bottom:0,left:0,width:'100%',height:80,zIndex:150}}>Host tools</button><ModuleDialog open title="Resource card" suspended={!!window.suspendDialog} onClose={()=>{}} footer={<button onClick={()=>window.cardClicked=true}>Use resource</button>}>Resource details</ModuleDialog>{window.suspendDialog&&<div style={{position:'fixed',inset:0,zIndex:100}}><button onClick={()=>window.hostClicked=true}>Shared host action</button></div>}</>;
 case 'gear':return <Gear isOpen onClose={()=>{}} onCreate={async()=>{}}/>;
 case 'spell-picker':return <SpellPicker isOpen onClose={()=>{}} onSave={()=>{}} title="Manage spells" tier={1} classUuid="Compendium.shadowdark.classes.Item.wizard" knownSpells={[]}/>;
-case 'native-language-edit':return <LanguagePicker isOpen onClose={()=>{}} onSelect={selected=>window.savedLanguages=selected} currentLanguages={window.initial.current||[]} maxCommon={0} maxRare={0}/>;
-case 'languages':return <LanguagePicker isOpen onClose={()=>{}} onSelect={()=>{}} currentLanguages={[]} maxCommon={1} maxRare={1}/>;
+case 'native-language-edit':return <LanguagePicker isOpen onClose={()=>{}} onSelect={selected=>window.savedLanguages=selected} currentLanguages={window.initial.current||[]} actorId="a"/>;
+case 'languages':return <LanguagePicker isOpen onClose={()=>{}} onSelect={()=>{}} currentLanguages={[]} actorId="a"/>;
 case 'mastery':return <><WeaponSelectionSection required={1} selected={[]} onSelectionChange={()=>{}}/><ArmorSelectionSection required={1} selected={[]} onSelectionChange={()=>{}}/></>;
 case 'details':return <Details/>;
 default:return <Spells/>;}}
@@ -78,6 +88,7 @@ window.render();
 const browser = await chromium.launch({ ...(process.env.SHADOWDARK_CHROME ? { executablePath: process.env.SHADOWDARK_CHROME } : {}), headless: true, args: ['--no-sandbox', '--disable-background-networking'] });
 const results = [];
 async function test(name, initial, run) {
+    if(process.argv.includes('--cards-only')&&!name.startsWith('SD-UI10/11'))return;
     if(providerBaseline&&!name.startsWith('SD02-06') )return;
     if((languageBaseline||process.argv.includes('--language-only'))&&!name.startsWith('SD02-12'))return;
     if(parityOnly&&!name.startsWith('SD02'))return;
@@ -85,7 +96,8 @@ async function test(name, initial, run) {
     const page = await browser.newPage(); const errors = []; page.setDefaultTimeout(3000);
     page.on('pageerror', e => errors.push(e.message)); await page.route('**/*', r => r.abort());
     try {
-        await page.setContent('<div id="root"></div>'); await page.evaluate(x => window.initial = x, initial);
+        await page.setContent('<div id="root" class="sdk-module--shadowdark"></div>');
+        if(initial.which==='resource-card') { await page.setViewportSize({width:initial.width,height:900}); if(process.env.SHADOWDARK_CARD_TAILWIND)await page.addStyleTag({path:process.env.SHADOWDARK_CARD_TAILWIND});await page.addStyleTag({path:path.join(moduleRoot,'assets/presentation.css')}); } await page.evaluate(x => window.initial = x, initial);
         await page.addScriptTag({ content: bundled.outputFiles[0].text });
         await run(page); assert.deepEqual(errors, []); results.push({ name, ok: true }); console.log(`✓ ${name}`);
     } catch (e) {
@@ -204,10 +216,10 @@ try {
         await p.getByPlaceholder('Filter spells by name...').fill('Light'); await p.evaluate(() => window.retire()); await text(p, 'Light');
         assert.equal(await p.getByPlaceholder('Filter spells by name...').inputValue(), 'Light'); assert.equal(await count(p, 'spells'), 3);
     });
-    await test('RV-11: language picker denial and recovery keep save gated', { which: 'languages', policy: { languages: { status: 403 } } }, async p => {
+    await test('RV-11: language picker denial and recovery keep save gated', { which: 'languages', policy: { plan: { status: 403 } } }, async p => {
         await p.getByRole('alert').waitFor(); assert.equal(await p.getByRole('button', { name: 'Save Languages' }).isDisabled(), true);
         await p.evaluate(() => window.policy = {}); await p.getByRole('button', { name: 'Retry', exact: true }).click();
-        await text(p, 'No languages matched.'); assert.equal(await p.getByRole('button', { name: 'Save Languages' }).isDisabled(), false);
+        await text(p, 'No matching common languages.'); assert.equal(await p.getByRole('button', { name: 'Save Languages' }).isDisabled(), false);
     });
     await test('RV-11: mastery consumers share failed reads, expose retry and accept valid empty options', { which: 'mastery', policy: { gear: { status: 503 } } }, async p => {
         await p.getByRole('alert').first().waitFor(); assert.equal(await count(p, 'gear'), 1);
@@ -240,8 +252,9 @@ try {
     const owned = [{itemId:'customA',name:'Source-less spell',tier:1,uuid:null},{itemId:'customB',name:'Source-less spell',tier:1,uuid:null}];
     await test('SD02-04/05 loaded picker preserves source-less duplicate Item IDs and unchanged save has empty intent', {which:'parity-picker',owned,limit:3,policy:{spells:{body:[]}}},async p=>{
         await p.getByRole('button',{name:'Open spell manager'}).click();
-        await p.getByRole('button',{name:'Remove owned Source-less spell (customA)',exact:true}).waitFor();
-        await p.getByRole('button',{name:'Remove owned Source-less spell (customB)',exact:true}).waitFor();
+        await p.getByRole('button',{name:'Remove Source-less spell (copy 1 of 2)',exact:true}).waitFor();
+        await p.getByRole('button',{name:'Remove Source-less spell (copy 2 of 2)',exact:true}).waitFor();
+        assert.doesNotMatch(await p.locator('body').innerText(),/customA|customB|Spell choices changed/);
         await p.getByRole('button',{name:'SAVE CHANGES',exact:true}).click();
         assert.deepEqual(await p.evaluate(()=>window.saved),{additions:[],removals:[]});
     });
@@ -249,7 +262,7 @@ try {
         await p.getByRole('button',{name:'Open spell manager'}).click();await p.getByRole('alert').waitFor();
         assert.equal(await p.getByRole('button',{name:'SAVE CHANGES',exact:true}).isDisabled(),true);
         await p.evaluate(()=>window.policy={spells:{body:[]}});await p.getByRole('button',{name:'Retry',exact:true}).click();
-        await p.getByRole('button',{name:'Remove owned Source-less spell (customB)',exact:true}).click();
+        await p.getByRole('button',{name:'Remove Source-less spell (copy 2 of 2)',exact:true}).click();
         await p.getByRole('button',{name:'SAVE CHANGES',exact:true}).click();
         assert.deepEqual(await p.evaluate(()=>window.saved),{additions:[],removals:['customB']});
     });
@@ -265,7 +278,7 @@ try {
     });
     await test('SD02-06/08 partial source failure remains explicit with owned rows and working recovery', {which:'parity-picker',owned,limit:3,policy:{spells:{body:{rows:[spell],state:'partial',sources:[{source:'world Items',status:'failed',reason:'permission denied'}]}}}},async p=>{
         await p.getByRole('button',{name:'Open spell manager'}).click();await p.getByText(/Partial catalog/).waitFor();
-        await p.getByRole('button',{name:'Remove owned Source-less spell (customA)',exact:true}).waitFor();
+        await p.getByRole('button',{name:'Remove Source-less spell (copy 1 of 2)',exact:true}).waitFor();
         await p.evaluate(()=>window.policy={spells:{body:[]}});await p.getByRole('button',{name:'Retry unavailable sources',exact:true}).click();
         await p.getByText('No spells found matching your filter.',{exact:true}).waitFor();
         assert.equal(await count(p,'spells'),2);
@@ -277,22 +290,79 @@ try {
         await p.evaluate(spell=>window.answer(0,[spell]),spell);
         assert.equal(await p.getByPlaceholder('Filter spells by name...').inputValue(),'Light');
         assert.equal(await p.getByRole('button',{name:'Add Light',exact:true}).count(),0);
-        await p.getByRole('button',{name:'Remove owned Source-less spell (customA)',exact:true}).waitFor();
+        await p.getByRole('button',{name:'Remove Source-less spell (copy 1 of 2)',exact:true}).waitFor();
         await p.getByRole('button',{name:'SAVE CHANGES',exact:true}).click();assert.deepEqual(await p.evaluate(()=>window.saved),{additions:[],removals:[]});
     });
     const rare={_id:'r',uuid:'Compendium.shadowdark.languages.Item.r',name:'Star Tongue',type:'Language',system:{rarity:'rare'}};
     const common={_id:'c',uuid:'Compendium.shadowdark.languages.Item.c',name:'Draconic',type:'Language',system:{rarity:'common'}};
     const unknown={_id:'u',uuid:'Compendium.shadowdark.languages.Item.u',name:'Celestial',type:'Language',system:{rarity:'invalid'}};
-    await test('SD02-12 ordinary picker uses source rarity and retains unavailable/custom extras without creation quotas',{which:'native-language-edit',current:['Item.unreadable','Old custom tongue'],policy:{languages:{body:[rare,common,unknown]}}},async p=>{
+    await test('SD02-12 ordinary picker uses source rarity and retains unavailable/custom extras with reviewed native allowances',{which:'native-language-edit',current:['Item.unreadable','Old custom tongue'],policy:{languages:{body:[rare,common,unknown]},plan:{body:{fixed:[],groups:[{id:'rare',label:'Rare Languages',count:1,options:[rare.uuid]}],errors:[],rows:[rare,common,unknown],current:['Item.unreadable','Old custom tongue'],review:'review1',contextRevision:1}}}},async p=>{
         await p.getByRole('region',{name:'rare languages',exact:true}).getByRole('button',{name:'Star Tongue',exact:true}).waitFor();
         await p.getByRole('region',{name:'common languages',exact:true}).getByRole('button',{name:'Draconic',exact:true}).waitFor();
         await p.getByRole('region',{name:'Unclassified languages',exact:true}).getByRole('button',{name:'Celestial',exact:true}).waitFor();
-        await p.getByRole('button',{name:'Star Tongue',exact:true}).click();await p.getByRole('button',{name:'Save Languages',exact:true}).click();
-        assert.deepEqual(await p.evaluate(()=>window.savedLanguages),['Item.unreadable','Old custom tongue',rare.uuid]);
+        assert.equal(await p.getByRole('button',{name:'Draconic',exact:true}).isDisabled(),true);assert.equal(await p.getByRole('button',{name:'Celestial',exact:true}).isDisabled(),true);
+        await p.getByRole('heading',{name:'rare (0/1)',exact:true}).waitFor();await p.getByRole('button',{name:'Star Tongue',exact:true}).click();await p.getByRole('heading',{name:'rare (1/1)',exact:true}).waitFor();await p.getByRole('button',{name:'Save Languages',exact:true}).click();
+        await p.waitForFunction(()=>!!window.savedLanguages);assert.deepEqual(await p.evaluate(()=>window.savedLanguages),['Item.unreadable','Old custom tongue',rare.uuid]);
+        assert.deepEqual(await p.evaluate(()=>JSON.parse(window.calls.find(c=>c.key==='manage').body)),{actorId:'a',languages:['Item.unreadable','Old custom tongue',rare.uuid],review:'review1',contextRevision:1});
     });
     await test('SD02-12 unchanged language inventory save is a genuine no-op',{which:'native-language-edit',current:['Item.unreadable','Old custom tongue'],policy:{languages:{body:[]}}},async p=>{
-        await p.getByRole('button',{name:'Save Languages',exact:true}).waitFor();await p.waitForFunction(()=>!document.querySelector('button:last-child')?.disabled);
+        await p.waitForFunction(()=>Array.from(document.querySelectorAll('button')).some(b=>b.textContent==='Save Languages'&&!b.disabled));
         await p.getByRole('button',{name:'Save Languages',exact:true}).click();assert.equal(await p.evaluate(()=>window.savedLanguages),undefined);
+    });
+    await test('SD-UI09 fixed defaults can be replaced from the complete catalog without adding slots',{which:'native-language-edit',current:[common.uuid],policy:{plan:{body:{fixed:[],suggested:[common.uuid],groups:[{id:'common',label:'Common Languages',count:1,options:[common.uuid,'Item.alternative']},{id:'rare',label:'Rare Languages',count:0,options:[rare.uuid]}],errors:[],rows:[common,{uuid:'Item.alternative',name:'Alternative tongue',type:'Language',system:{rarity:'common'}},rare],current:[common.uuid],review:'review1',contextRevision:1}}}},async p=>{
+        await p.getByRole('heading',{name:'common (1/1)',exact:true}).waitFor();
+        const alternative=p.getByRole('button',{name:'Alternative tongue',exact:true});
+        assert.equal(await alternative.isVisible(),true);assert.equal(await alternative.isDisabled(),true);
+        assert.equal(await p.getByRole('button',{name:'Star Tongue',exact:true}).isVisible(),true);
+        assert.equal(await p.getByRole('button',{name:'Star Tongue',exact:true}).isDisabled(),true);
+        await p.getByRole('button',{name:/Draconic.*default/}).click();
+        await alternative.click();await p.getByRole('heading',{name:'common (1/1)',exact:true}).waitFor();
+        await p.getByRole('button',{name:'Save Languages',exact:true}).click();await p.waitForFunction(()=>!!window.savedLanguages);
+        assert.deepEqual(await p.evaluate(()=>window.savedLanguages),['Item.alternative']);
+    });
+    for (const width of [360,768,1024,1440]) for(const duration of ['instant','focus']) {
+        const art='data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600"><rect width="800" height="600" fill="#ddd"/><path d="M0 600 L200 30 L400 500 L600 10 L800 600" fill="#222"/></svg>');
+        const cardActor={_id:'a',type:'Player',system:{abilities:{int:{value:14}},level:{value:1}},effects:[{_id:'grant',changes:[{key:'system.spellcasting.classes',mode:2,value:'wizard'}]}],items:[{_id:'spell',type:'Spell',name:'Fixture spell',img:art,system:{tier:1,class:['Item.wizard'],duration:{type:duration},description:'<p>Readable spell description across faded artwork.</p>'},effects:[]}]};
+        await test(`SD-UI10/11 ${width} ${duration}: native focus, artwork, notes footer and missing-image fallback`,{which:'resource-card',width,actor:cardActor},async p=>{
+            const dialog=p.getByRole('dialog');await dialog.waitFor();
+            const focus=dialog.getByRole('checkbox',{name:/Focus check/});assert.equal(await focus.count(),duration==='focus'?1:0);
+            if(duration==='focus')await focus.check();
+            const action=dialog.getByRole('button',{name:'Cast Fixture spell',exact:true});await action.click();
+            assert.equal(await p.evaluate(()=>window.lastAction.options.focus),duration==='focus');
+            assert.equal(await dialog.locator('.sd-dialog-body .sd-card-notes').count(),0);
+            assert.equal(await dialog.locator('.sd-card-title').innerText(),'FIXTURE SPELL');
+            assert.equal(await dialog.locator('.sd-dialog-header p').count(),0);
+            assert.equal(await dialog.locator('dt').filter({hasText:/^Type$/}).count(),1);
+            assert.equal(await dialog.locator('.sd-dialog-footer .sd-card-notes').count(),1);
+            await dialog.getByText('Data notes (1)',{exact:true}).click();await dialog.getByText('Fixture source note',{exact:true}).waitFor();
+            if(process.env.SHADOWDARK_CARD_TAILWIND){
+                const metrics=await dialog.evaluate(el=>{const body=el.querySelector('.sd-dialog-body'),art=el.querySelector('.sd-card-art'),copy=el.querySelector('.sd-card-copy'),notes=el.querySelector('.sd-card-notes'),button=Array.from(el.querySelectorAll('button')).find(b=>b.textContent==='Cast Fixture spell');return{bodyWidth:body.clientWidth,artWidth:art.getBoundingClientRect().width,fade:getComputedStyle(art,'::after').backgroundImage,padding:parseFloat(getComputedStyle(copy).paddingTop),notesBottom:notes.getBoundingClientRect().bottom,buttonTop:button.getBoundingClientRect().top,scroll:document.documentElement.scrollWidth,width:innerWidth};});
+                assert.ok(Math.abs(metrics.bodyWidth-metrics.artWidth)<=1);assert.match(metrics.fade,/linear-gradient/);assert.ok(metrics.padding>=150);assert.ok(metrics.notesBottom<=metrics.buttonTop);assert.ok(metrics.scroll<=metrics.width+1);
+                await p.screenshot({path:path.join(out,`card-${width}-${duration}.png`)});
+            }
+            await p.evaluate(()=>{window.initial.actor.items[0].system.duration={type:'instant'};window.render()});
+            assert.equal(await focus.count(),0);await action.click();assert.equal(await p.evaluate(()=>window.lastAction.options.focus),false,'retired focus cannot affect instant casting');
+            await p.evaluate(()=>{window.initial.actor.items[0].img='https://blocked.invalid/missing.webp';window.render()});
+            await p.waitForFunction(()=>document.querySelector('.sd-card-art')?.hidden===true);
+            assert.equal(await action.isEnabled(),true);
+            if(process.env.SHADOWDARK_CARD_TAILWIND)assert.ok(await dialog.locator('.sd-card-copy').evaluate(el=>parseFloat(getComputedStyle(el).paddingTop)<30));
+        });
+    }
+    const editorPlan={fixed:[common.uuid],groups:[{id:'class',label:'Class Languages',count:1,options:[rare.uuid]}],errors:[],rows:[common,rare,unknown],current:[common.uuid],review:'review1',contextRevision:1};
+    await test('SD03 language counts and fixed grants stay intact through context refresh',{which:'native-language-edit',current:[common.uuid],policy:{plan:{body:editorPlan}}},async p=>{
+        await p.getByRole('heading',{name:'common (1/1)',exact:true}).waitFor();
+        assert.equal(await p.getByRole('button',{name:/Draconic.*Granted/}).isDisabled(),true);
+        await p.getByRole('button',{name:'Star Tongue',exact:true}).click();
+        await p.getByRole('heading',{name:'rare (1/1)',exact:true}).waitFor();
+        await p.evaluate(()=>window.retire());await p.getByRole('heading',{name:'rare (0/1)',exact:true}).waitFor();
+        assert.equal(await p.getByRole('button',{name:'Star Tongue',exact:true}).getAttribute('aria-pressed'),'false');
+    });
+    await test('SD03 a failed language write requires review and never retries automatically',{which:'native-language-edit',current:[common.uuid],policy:{plan:{body:editorPlan},manage:{network:true}}},async p=>{
+        await p.getByRole('button',{name:'Star Tongue',exact:true}).click();await p.getByRole('button',{name:'Save Languages',exact:true}).click();
+        await p.getByRole('button',{name:'Refresh languages',exact:true}).waitFor();assert.equal(await count(p,'manage'),1);
+        assert.equal(await p.getByRole('button',{name:'Save Languages',exact:true}).isDisabled(),true);
+        await p.getByRole('button',{name:'Refresh languages',exact:true}).click();await p.getByRole('heading',{name:'rare (0/1)',exact:true}).waitFor();
+        assert.equal(await count(p,'manage'),1);
     });
     const ancestry={_id:'ancestry',uuid:'Compendium.shadowdark.ancestries.Item.ancestry',type:'Ancestry',name:'Controlled ancestry',system:{languages:{common:0,rare:0,select:1,selectOptions:[rare.uuid],fixed:[]},talents:[],talentChoiceCount:0}};
     const groups=[{id:'ancestry',label:'Ancestry Languages',count:1,options:[rare.uuid]},{id:'class',label:'Class Languages',count:0,options:[]},{id:'common',label:'Common Languages',count:0,options:[]},{id:'rare',label:'Rare Languages',count:0,options:[]}];

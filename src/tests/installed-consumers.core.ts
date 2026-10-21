@@ -15,6 +15,7 @@
  *   npx tsx <module>/src/tests/installed-consumers.core.ts --run-isolated
  *     --out=<new-dir> --archive=<tgz> [--generation=13|14] [--production]
  *     [--focus-only] (omits the width/theme matrix; recorded separately)
+ *     [--presentation-only] (runs the full surface matrix without behavioral follow-ups)
  */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -37,7 +38,7 @@ const PLAYWRIGHT = process.env.SHADOWDARK_PLAYWRIGHT_MODULE || 'playwright';
 const mod = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const production = args.has('production');
 const core = { version: JSON.parse(fs.readFileSync(path.join(CORE, 'package.json'), 'utf8')).version, commit: spawnSync('git', ['-C',CORE,'rev-parse','HEAD'], {encoding:'utf8'}).stdout.trim() };
-assert.ok(['0.19.2','0.19.3'].includes(core.version));
+assert.ok(['0.19.2','0.19.3','0.19.5','0.19.6','0.19.8'].includes(core.version));
 if (!core.commit && fs.existsSync(path.join(CORE,'.source-provenance.json'))) core.commit = JSON.parse(fs.readFileSync(path.join(CORE,'.source-provenance.json'),'utf8')).commit;
 fs.mkdirSync(path.join(out, 'shots'), { recursive: true });
 const evidence: Record<string, any> = { native: false, generation, core, mode: production ? 'production' : 'development', archive: { file: archive, sha256: createHash('sha256').update(fs.readFileSync(archive)).digest('hex') }, checks: [], cases: [], pageErrors: [], consoleErrors: [] };
@@ -198,6 +199,31 @@ async function main() {
             const dialog = page.getByRole('dialog').last();
             await dialog.waitFor({ timeout: 30_000 });
             await page.waitForTimeout(100);
+            if (label.endsWith('effect editor')) {
+                await dialog.getByRole('combobox', {name:/^template$/i}).selectOption('custom');
+                await dialog.getByRole('textbox', {name:/^name$/i}).fill('Custom effect');
+            }
+            if (label.endsWith('boon editor')) {
+                await dialog.getByRole('textbox', {name:/^name$/i}).fill('Custom boon');
+                await dialog.locator('fieldset select').selectOption('custom');
+            }
+            if (label.endsWith('language editor')) await dialog.getByRole('heading', {name:/^Common \(/i}).waitFor();
+            if (label.endsWith('spell card')) {
+                const title = await dialog.locator('h2').innerText();
+                const spell = WIZARD.items.find((item:Doc) => item.name.toUpperCase() === title.toUpperCase());
+                assert.ok(spell, 'card title resolves to exact fixture Item');
+                assert.equal(await dialog.getByRole('checkbox', { name: /Focus check/ }).count(), spell.system?.duration?.type === 'focus' ? 1 : 0);
+            }
+            if (await dialog.locator('.sd-resource-card').count() || await dialog.evaluate((el:Element)=>el.classList.contains('sd-resource-card'))) {
+                assert.equal(await dialog.locator('.sd-dialog-body .sd-card-notes').count(), 0, 'data notes belong below the body divider');
+            }
+            if (label.endsWith('effect editor') || label.endsWith('boon editor')) {
+                const styles = await dialog.locator('.sd-editor-form select').evaluateAll((selects: Element[]) => selects.map(select => {
+                    const style=getComputedStyle(select), rect=select.getBoundingClientRect();
+                    return {size:style.fontSize,weight:Number(style.fontWeight),transform:style.textTransform,shadow:style.boxShadow,inside:rect.left>=0&&rect.right<=innerWidth+1};
+                }));
+                assert.ok(styles.length>0 && styles.every((style:any)=>style.size==='12px'&&style.weight>=800&&style.transform==='uppercase'&&style.shadow!=='none'&&style.inside),`${label}: restored select typography and control bounds`);
+            }
             const inside = () => page.evaluate(() => !!document.activeElement?.closest('dialog,[role="dialog"]'));
             const result: Record<string, unknown> = { focusEntered: await inside() };
             await shot(page,`${label.replace(/[^a-z0-9-]/gi,'-')}-dialog`);
@@ -230,6 +256,15 @@ async function main() {
             const label = `${width}-${theme}`;
             const context = await browser.newContext({ viewport: { width, height: 900 }, storageState: storage });
             try {
+            // Static native artwork is served only in this isolated test. Never
+            // contact an operator Foundry instance or ship these assets in the module.
+            const nativeAssets = path.resolve(process.env.SHADOWDARK_NATIVE_REFERENCE || path.join(CORE, 'temp/shadowdark'), 'system');
+            await context.route('**/systems/shadowdark/**', async (route: any) => {
+                const relative = decodeURIComponent(new URL(route.request().url()).pathname.split('/systems/shadowdark/')[1] || '');
+                const file = path.resolve(nativeAssets, relative);
+                if (file.startsWith(nativeAssets + path.sep) && fs.existsSync(file) && fs.statSync(file).isFile()) await route.fulfill({ path: file });
+                else await route.abort();
+            });
             await context.addInitScript(([appearance]: string[]) => { localStorage.setItem('sheetdelver-player-appearance', appearance); localStorage.setItem('shadowdark_view_mode', 'simple'); }, [theme]);
             const page = await context.newPage();
             watch(page, label);
@@ -281,11 +316,30 @@ async function main() {
                 }
                 await page.waitForTimeout(150);
                 await noOverflow(page, `${label} tab ${tab}`);
-                if (width === 390 || width === 1440) await shot(page, `tab-${tab}-${label}`);
+                await shot(page, `tab-${tab}-${label}`);
                 tabs.push(tab);
             }
             record.tabs = tabs;
             assert.ok(tabs.length >= 6, `${label}: tabs reviewed ${tabs.join(',')}`);
+            // Presentation review extends to the editors, not just the tab
+            // containers and resource card. Open/close only; no fixture writes.
+            const selectTab = async (name: string) => {
+                const direct = page.getByRole('button', { name, exact: true }).first();
+                if (await direct.isVisible().catch(() => false)) await direct.click();
+                else {
+                    await page.getByRole('button', { name: 'More sections' }).click();
+                    await page.getByRole('button', { name, exact: true }).last().click();
+                }
+            };
+            await selectTab('Effects');
+            record.effectEditor = await dialogKeyboard(page, page.getByRole('button', { name: 'Add Effect', exact: true }), `${label} effect editor`);
+            await selectTab('Details');
+            record.boonEditor = await dialogKeyboard(page, page.getByTitle('Add Boon', { exact: true }), `${label} boon editor`);
+            record.languageEditor = await dialogKeyboard(page, page.getByRole('button', { name: 'Edit Languages', exact: true }), `${label} language editor`);
+            await page.getByRole('button', { name: 'Edit Deity', exact: true }).click();
+            const deityHeading = page.getByRole('heading', {name:'Select Deity',exact:true});
+            await deityHeading.waitFor(); await noOverflow(page,`${label} deity picker`); await shot(page,`deity-picker-${label}`);
+            await deityHeading.locator('..').getByRole('button').click();
             await page.getByRole('button',{name:'Spells',exact:true}).first().click().catch(async()=>{
                 await page.getByRole('button',{name:'More sections'}).click(); await page.getByRole('button',{name:'Spells',exact:true}).last().click(); });
             record.spellPicker = await dialogKeyboard(page,page.getByRole('button',{name:/TIER 1/}).first(),`${label} spell picker`);
@@ -294,6 +348,13 @@ async function main() {
                 await page.getByRole('button', { name: 'More sections' }).click(); await page.getByRole('button', { name: 'Inventory', exact: true }).last().click(); });
             await page.locator('button[aria-expanded="false"]', { hasText: 'Torch' }).first().click();
             record.inventoryCard = await dialogKeyboard(page, page.getByRole('button', { name: 'Open details' }).first(), `${label} inventory card`);
+            record.gearPicker = await dialogKeyboard(page,page.getByRole('button',{name:'Add gear',exact:true}),`${label} gear picker`);
+            await page.getByRole('button',{name:'Gem Bag',exact:true}).click();
+            const gemHeading=page.getByRole('heading',{name:'Gem Bag',exact:true});
+            await gemHeading.waitFor(); await noOverflow(page,`${label} gem bag`); await shot(page,`gem-bag-${label}`);
+            await page.getByRole('button',{name:'Add New Gem',exact:true}).click();
+            await noOverflow(page,`${label} gem form`);await shot(page,`gem-form-${label}`);
+            await gemHeading.locator('..').getByRole('button').click();
             // Core HUD: dice tray and chat over the module sheet.
             await page.getByRole('button', { name: 'Open dice tray' }).first().click();
             await page.waitForTimeout(300);
@@ -321,6 +382,18 @@ async function main() {
             await shot(page, `bestiary-${label}`);
             const monsterButton = page.getByRole('button', { name: /Centipede, Giant/ }).first();
             if (await monsterButton.count()) record.monsterCard = await dialogKeyboard(page, monsterButton, `${label} monster card`);
+            await page.goto(`${origin}/tools/shadowdark/importer`,{timeout:300000});
+            await page.getByLabel('Paste Character JSON').waitFor({timeout:60000});
+            await noOverflow(page,`${label} importer`);await shot(page,`importer-${label}`);
+            await page.goto(`${origin}/tools/shadowdark/generator`,{timeout:300000});
+            await page.getByRole('button',{name:'Create Character',exact:true}).waitFor({timeout:60000});
+            const statRows = await page.locator('[data-stat]').evaluateAll((rows: Element[]) => rows.map(row => {
+                const cells=[...row.children].map(child=>child.getBoundingClientRect());
+                return {stat:row.getAttribute('data-stat'), separated:cells[0].right<=cells[1].left,inside:cells[1].right<=row.getBoundingClientRect().right+1};
+            }));
+            assert.equal(statRows.length,6);
+            assert.ok(statRows.every((row:any)=>row.separated&&row.inside),`${label} generator stats: ${JSON.stringify(statRows)}`);
+            await noOverflow(page,`${label} generator`);await shot(page,`generator-${label}`);
             evidence.cases.push(record);
             pass(`${label}: paper + ${tabs.length} tabs, Core roll dialog, cards, HUD, bestiary; no overflow; dialogs keep and return focus`);
             } catch (error) {
@@ -331,6 +404,12 @@ async function main() {
                 }
                 throw error;
             } finally { await context.close(); }
+        }
+        if(args.has('presentation-only')){
+            assert.deepEqual(evidence.pageErrors, [], 'no page errors');
+            evidence.skipped=['behavioral follow-ups (--presentation-only); retained separate full run'];
+            pass('complete presentation matrix without uncaught page errors');
+            return;
         }
 
         // Live world-setting change reaches open sheets, both layouts.

@@ -157,7 +157,7 @@ export default function SpellsTab() {
                 </div>
             </section>
 
-            {manage && !managedSource && (submission || receipt) && <section role="status">
+            {manage && !managedSource && (submission || receipt) && <section role="status" className="sd-operation-review">
                 <p>The casting source is unavailable. Saved operation {submission?.requestId} still belongs to list {submission?.listUuid}; review actual inventory before another request.</p>
                 {receipt?.operations?.map((op: any, index: number) => <p key={index}>{op.kind} {op.itemId ?? op.target}: {op.status}</p>)}
                 <button type="button" disabled={saving} onClick={() => saveSelection({ additions: [], removals: [] })}>Retry saved operation</button>
@@ -173,7 +173,7 @@ export default function SpellsTab() {
                     classUuid={managedSource.listUuid}
                     knownSpells={knownFor(managedSource, manage.tier).map((row: any) => ({
                         itemId: row.itemId, name: row.name, tier: row.tier, uuid: row.source ? formatUuid(row.source) : null,
-                        isInnate: row.innate, unresolved: row.classification === 'unresolved', system: itemById(row.itemId)?.system,
+                        isInnate: row.innate, unresolved: row.classification === 'unresolved', system: itemById(row.itemId)?.system, img: itemById(row.itemId)?.img,
                     }))}
                     onSave={saveSelection}
                     onClose={() => { if (!saving) { setManage(null); setSubmission(null); setReceipt(null); } }}

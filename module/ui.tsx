@@ -6,6 +6,7 @@ const info = infoJson as ModuleInfo;
 
 const uiManifest: UIModuleManifest = {
     info,
+    stylesheet: 'assets/presentation.css',
     componentStyles: shadowdarkTheme,
     theme: shadowdarkTheme.colors,
     sheet: () => import('../src/ui/ShadowdarkSheet'),

@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useSDK } from '@sheet-delver/sdk/react';
 import ModuleDialog from '../components/ModuleDialog';
-import { CardBody } from '../components/ResourceDetailModal';
+import { CardBody, CardNotes } from '../components/ResourceDetailModal';
 import { formatUuid, type DocumentRef } from '../../logic/identity';
 import type { ResourceCard } from '../../logic/resource-cards';
 
@@ -108,7 +108,8 @@ export default function Bestiary() {
                 {entries && visible.length === 0 && !error && <p className="italic">No creatures match.</p>}
             </div>
             <ModuleDialog open={!!selected} title={selected?.name ?? ''} subtitle={card?.state === 'ready' ? card.card.subtitle : undefined}
-                onClose={() => { seq.current++; setSelected(null); setCard(null); }} size="card">
+                onClose={() => { seq.current++; setSelected(null); setCard(null); }} size="card"
+                footer={card?.state === 'ready' && card.card.diagnostics.length > 0 ? <CardNotes card={card.card} /> : undefined}>
                 {card?.state === 'loading' && <p role="status" className="italic">Loading…</p>}
                 {card?.state === 'error' && <p role="alert" className="text-red-800">{card.message}</p>}
                 {card?.state === 'ready' && <CardBody card={card.card} />}

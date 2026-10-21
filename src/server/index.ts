@@ -7,7 +7,7 @@ import { handleEffects } from './api/effects';
 import { handleActorAction } from './api/actions';
 import { handleActorView } from './api/actor-view';
 import { handleManageSpells } from './api/manage-spells';
-import { handleLanguagePlan, handleCreateCharacter } from './api/languages';
+import { handleLanguagePlan, handleManageLanguages, handleCreateCharacter } from './api/languages';
 import { handleLuck } from './api/luck';
 import { handleBestiaryCard, handleBestiaryList } from './api/bestiary';
 import { getErrorMessage, isSdkError } from '@sheet-delver/sdk';
@@ -35,6 +35,7 @@ async function effectRoute(run: () => Promise<unknown>) {
 
 export const apiRoutes = {
     'languages/plan': handleLanguagePlan,
+    'languages/manage': handleManageLanguages,
     'characters/create': handleCreateCharacter,
     'index': handleIndex,
     'custom-maps': handleGetCustomMaps,

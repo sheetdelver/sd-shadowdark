@@ -71,3 +71,72 @@ export function validateLanguageSelections(plan: LanguagePlan, input: unknown, e
     return { valid: errors.length === 0, errors: [...new Set(errors)], selections,
         languages: [...new Set([...existing, ...plan.fixed, ...selections.ancestry, ...selections.class, ...selections.common, ...selections.rare])] };
 }
+
+/** Ordinary editing permits customization within native rarity totals. Creation
+ * retains exact grants/pools. Mixed or unknown-rarity pools remain explicit so
+ * one flexible choice cannot invent one slot in each rarity. */
+export function languageEditingPlan(plan: LanguagePlan, rows: any[]): LanguagePlan & { suggested: string[] } {
+    const rarity = (uuid: string) => languageRarity(rows.find(row => canonicalUuid(row.uuid) === uuid));
+    const groups = plan.groups.map(group => ({ ...group, options: [...group.options] }));
+    const fixed = plan.fixed.filter(uuid => rarity(uuid) === null);
+    for (const kind of ['common', 'rare'] as const) {
+        const matching = groups.filter(group => group.id === kind ||
+            (group.options.length > 0 && group.options.every(uuid => rarity(uuid) === kind)));
+        const count = plan.fixed.filter(uuid => rarity(uuid) === kind).length + matching.reduce((total, group) => total + group.count, 0);
+        for (const group of matching) group.count = 0;
+        const options = rows.filter(row => languageRarity(row) === kind).map(row => canonicalUuid(row.uuid)).filter((uuid): uuid is string => !!uuid);
+        const index = groups.findIndex(group => group.id === kind);
+        const group: LanguageGroup = { id: kind, label: `${kind === 'common' ? 'Common' : 'Rare'} Languages`, count, options };
+        if (index >= 0) groups[index] = group; else groups.push(group);
+    }
+    return { fixed, groups, errors: [...plan.errors], suggested: [...plan.fixed] };
+}
+
+/** Match each selected Language to at most one native choice slot. Restricted
+ * ancestry/class pools must not become an unrestricted common/rare allowance. */
+export function allocateLanguageInventory(plan: LanguagePlan, selected: readonly string[]) {
+    const slots = plan.groups.flatMap(group => Array.from({ length: Math.min(group.count, group.options.length) }, () => group));
+    const assigned = new Map<number, string>();
+    const place = (uuid: string, seen: Set<number>): boolean => {
+        for (let index = 0; index < slots.length; index++) {
+            if (seen.has(index) || !slots[index].options.includes(uuid)) continue;
+            seen.add(index);
+            const previous = assigned.get(index);
+            if (!previous || place(previous, seen)) { assigned.set(index, uuid); return true; }
+        }
+        return false;
+    };
+    for (const uuid of selected) if (!plan.fixed.includes(uuid)) place(uuid, new Set());
+    const accepted = new Set([...plan.fixed, ...assigned.values()]);
+    return { assigned, slots, extra: selected.filter(uuid => !accepted.has(uuid)) };
+}
+
+/** SheetDelver's guided editor uses native creation allowances. Existing extras
+ * may be retained/removed, but cannot create additional choice slots. */
+export function validateLanguageInventory(plan: LanguagePlan, existing: readonly string[], input: unknown) {
+    const errors = [...plan.errors];
+    if (!Array.isArray(input) || input.some(value => typeof value !== 'string') || new Set(input).size !== input.length)
+        return { valid: false, errors: ['Choose each language only once.'], languages: [] as string[] };
+    const languages = input as string[];
+    if (plan.fixed.some(uuid => existing.includes(uuid) && !languages.includes(uuid))) errors.push('An ancestry or class language grant cannot be removed here.');
+    const added = languages.filter(uuid => !existing.includes(uuid));
+    const allocation = allocateLanguageInventory(plan, languages);
+    if (added.some(uuid => allocation.extra.includes(uuid))) errors.push('A selected language exceeds its allowance or is outside its ancestry/class choices.');
+    if (added.length && allocation.extra.some(uuid => plan.groups.some(group => group.options.includes(uuid))))
+        errors.push('Remove excess selections before adding another language.');
+    return { valid: errors.length === 0, errors: [...new Set(errors)], languages };
+}
+
+export function languageInventorySections(plan: LanguagePlan, rows: any[], selected: readonly string[]) {
+    const rarity = (uuid: string) => languageRarity(rows.find(row => canonicalUuid(row.uuid) === uuid));
+    return (['common', 'rare'] as const).map(kind => {
+        const groups = plan.groups.filter(group => group.id === kind ||
+            (['ancestry', 'class'].includes(group.id) && group.options.length > 0 && group.options.every(uuid => rarity(uuid) === kind)));
+        const fixed = plan.fixed.filter(uuid => rarity(uuid) === kind);
+        // A mixed restricted pool cannot be counted as a full allowance in both rarities.
+        const mixed = plan.groups.some(group => ['ancestry', 'class'].includes(group.id) && group.count > 0
+            && group.options.some(uuid => rarity(uuid) === kind) && !group.options.every(uuid => rarity(uuid) === kind));
+        return { kind, count: selected.filter(uuid => rarity(uuid) === kind).length,
+            limit: mixed ? null : fixed.length + groups.reduce((total, group) => total + group.count, 0) };
+    });
+}

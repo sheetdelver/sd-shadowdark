@@ -1,0 +1,103 @@
+/* Shadowdark's paper, heavy rules and serif headings. Keep resource-card
+ * compactness while giving management forms the established picker styling.
+ * Declared in module/ui.tsx so local and installed UI use the same stylesheet. */
+.sdk-module--shadowdark .sd-dialog-panel:not(.sd-resource-card) { font-family: var(--font-sans, Arial, sans-serif); }
+.sdk-module--shadowdark .sd-dialog-panel:not(.sd-resource-card) {
+    border-width: 4px; background: #f5f5f5;
+    box-shadow: 8px 8px 0 #000;
+}
+.sdk-module--shadowdark .sd-dialog-title {
+    font-family: Georgia, "Times New Roman", serif; font-weight: 900; text-transform: uppercase; letter-spacing: .06em;
+}
+.sdk-module--shadowdark .sd-dialog-panel:not(.sd-resource-card) .sd-dialog-title { font-size: 1.5rem; }
+.sdk-module--shadowdark .sd-dialog-panel:not(.sd-resource-card) .sd-dialog-header { padding: 1rem 1.5rem; }
+.sdk-module--shadowdark .sd-dialog-panel:not(.sd-resource-card) .sd-dialog-body { padding: 1.5rem; }
+.sdk-module--shadowdark .sd-dialog-panel:not(.sd-resource-card) .sd-dialog-footer {
+    padding: 1rem 1.5rem; border-top: 4px solid #000; background: #e5e5e5;
+}
+.sdk-module--shadowdark .sd-dialog-footer button {
+    min-height: 48px; padding: .6rem 1.5rem; border: 2px solid #000;
+    font-family: Georgia, "Times New Roman", serif; font-size: .875rem; font-weight: 900; text-transform: uppercase; letter-spacing: .08em;
+    box-shadow: 4px 4px 0 #000; cursor: pointer;
+}
+.sdk-module--shadowdark .sd-dialog-footer button:active:not(:disabled) { box-shadow: none; transform: translate(2px, 2px); }
+.sdk-module--shadowdark .sd-dialog-footer button:disabled { opacity: .5; cursor: not-allowed; }
+.sdk-module--shadowdark .sd-dialog-panel button:focus-visible,
+.sdk-module--shadowdark .sd-dialog-panel input:focus-visible,
+.sdk-module--shadowdark .sd-dialog-panel select:focus-visible,
+.sdk-module--shadowdark .sd-dialog-panel textarea:focus-visible {
+    outline: 2px solid #a16207; outline-offset: 3px;
+}
+.sdk-module--shadowdark .sd-dialog-body input:not([type="checkbox"]):not([type="radio"]),
+.sdk-module--shadowdark .sd-dialog-body select,
+.sdk-module--shadowdark .sd-dialog-body textarea {
+    color: #111; background: #fff; border: 2px solid #000; min-height: 44px;
+}
+.sdk-module--shadowdark .sd-dialog-body > label {
+    text-transform: uppercase; font-size: .8rem; font-weight: 900; letter-spacing: .06em;
+}
+.sdk-module--shadowdark .sd-dialog-body > label input {
+    margin-top: .5rem; padding: .75rem; font-size: 1rem; font-family: Georgia, "Times New Roman", serif; font-weight: normal;
+    text-transform: none; letter-spacing: normal; box-shadow: 4px 4px 0 #000;
+}
+.sdk-module--shadowdark .sd-dialog-body section > h3 {
+    margin: 1.25rem 0 .75rem; padding-bottom: .5rem;
+    border-bottom: 2px solid #000; font-weight: 900; text-transform: uppercase;
+    font-family: Georgia, "Times New Roman", serif; font-size: 1rem; letter-spacing: .08em;
+}
+.sdk-module--shadowdark .sd-dialog-body button[aria-expanded] {
+    font-family: Georgia, "Times New Roman", serif; font-weight: bold; text-transform: uppercase; font-size: 1rem;
+    overflow-wrap: anywhere; min-width: 0;
+}
+.sdk-module--shadowdark .sd-dialog-body button[aria-pressed] { font-family: Georgia, "Times New Roman", serif; font-weight: bold; text-transform: uppercase; }
+.sdk-module--shadowdark .sd-dialog-body .sd-choice-action { font-family: Georgia, "Times New Roman", serif; font-weight: bold; font-size: .875rem; text-transform: uppercase; flex-shrink: 0; }
+.sdk-module--shadowdark .sd-choice-note { display: block; font-family: var(--font-sans, Arial, sans-serif); font-size: .75rem; font-weight: normal; text-transform: none; }
+.sdk-module--shadowdark .sd-language-choice:disabled:not([aria-pressed="true"]) { opacity: .4; }
+.sdk-module--shadowdark .sd-form-help, .sdk-module--shadowdark .sd-empty { font-size: .875rem; line-height: 1.5; margin-top: .75rem; color: #525252; }
+.sdk-module--shadowdark .sd-form-notice { margin-top: 1rem; padding: .75rem; border: 2px solid #000; font-size: .875rem; line-height: 1.5; background: #fff; }
+.sdk-module--shadowdark .sd-editor-form label > span:not(.sr-only),
+.sdk-module--shadowdark .sd-editor-form legend,
+.sdk-module--shadowdark .sd-field-label { font-family: var(--font-sans, Arial, sans-serif); font-size: .75rem; font-weight: 900; text-transform: uppercase; letter-spacing: .12em; color: #525252; }
+.sdk-module--shadowdark .sd-editor-form .sd-form-field { padding: .75rem; font-size: 1rem; font-family: Georgia, "Times New Roman", serif; box-shadow: 4px 4px 0 #000; }
+.sdk-module--shadowdark .sd-editor-form select.sd-form-field { font-family: var(--font-sans, Arial, sans-serif); font-weight: 800; font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; }
+.sdk-module--shadowdark .sd-editor-form .sd-form-field.font-mono { font-family: monospace; font-size: .75rem; }
+.sdk-module--shadowdark .sd-editor-form legend { margin-bottom: .5rem; }
+.sdk-module--shadowdark .sd-spell-row { background: #fff; }
+.sdk-module--shadowdark .sd-spell-row[data-selected="true"] { background: #fffbeb; }
+.sdk-module--shadowdark .sd-spell-row[data-removing="true"] { background: #fef2f2; }
+.sdk-module--shadowdark .sd-spell-row img { border: 1px solid #000; background: #000; }
+.sdk-module--shadowdark .sd-spell-row button[aria-pressed="true"] { background: #000; color: #fff; }
+.sdk-module--shadowdark .sd-operation-review {
+    background: #fffbeb; color: #111; border: 2px solid #92400e; padding: 1rem;
+    overflow-wrap: anywhere;
+}
+.sdk-module--shadowdark .sd-operation-review button {
+    display: inline-block; margin: .75rem .75rem 0 0; padding: .6rem 1rem;
+    min-height: 44px; border: 2px solid #000; background: #fff; color: #111;
+    font-weight: bold; text-transform: uppercase; box-shadow: 3px 3px 0 #000;
+}
+@media (max-width: 639px) {
+    .sdk-module--shadowdark .sd-spell-line { flex-wrap: wrap; }
+    .sdk-module--shadowdark .sd-spell-line > button[aria-expanded] { flex-basis: calc(100% - 4rem); }
+    .sdk-module--shadowdark .sd-dialog-panel:not(.sd-resource-card) .sd-dialog-header,
+    .sdk-module--shadowdark .sd-dialog-panel:not(.sd-resource-card) .sd-dialog-body,
+    .sdk-module--shadowdark .sd-dialog-panel:not(.sd-resource-card) .sd-dialog-footer { padding: .85rem; }
+    .sdk-module--shadowdark .sd-dialog-footer button { padding: .6rem .85rem; }
+}
+
+.sdk-module--shadowdark .sd-editor-form input.sd-form-field:not(.font-mono) { font-size: 1.125rem; font-weight: bold; }
+.sdk-module--shadowdark .sd-editor-form .sd-form-field { min-width: 0; max-width: 100%; }
+
+/* Artwork belongs behind the inset title and properties, clipped to the body.
+ * The modal's separate top bar owns Close; its title stays available to AT. */
+.sdk-module--shadowdark .sd-resource-card .sd-dialog-body { padding: 0; }
+.sdk-module--shadowdark .sd-card-content { position: relative; isolation: isolate; overflow: hidden; background: #fff; }
+.sdk-module--shadowdark .sd-card-art { position: absolute; inset: 0 0 auto; width: 100%; height: min(100%, 30rem); z-index: 0; overflow: hidden; pointer-events: none; }
+.sdk-module--shadowdark .sd-resource-card .sd-card-art img { position: absolute; inset: 0; display: block; width: 100%; max-width: none; height: 100%; object-fit: cover; object-position: center 25%; }
+.sdk-module--shadowdark .sd-card-art::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to bottom, #fff 0%, rgba(255,255,255,.2) 18%, rgba(255,255,255,.1) 36%, rgba(255,255,255,.94) 63%, #fff 90%); }
+.sdk-module--shadowdark .sd-card-title { position: relative; z-index: 1; margin: 1rem 1.5rem 0; padding: .6rem .8rem; background: #000; color: #fff; text-align: center; font-family: Georgia, "Times New Roman", serif; font-size: 1.2rem; line-height: 1.25; font-weight: 900; text-transform: uppercase; overflow-wrap: anywhere; }
+.sdk-module--shadowdark .sd-card-copy { position: relative; z-index: 1; padding: 1rem; overflow-wrap: anywhere; }
+.sdk-module--shadowdark .sd-card-art:not([hidden]) ~ .sd-card-copy { padding-top: 10rem; }
+.sdk-module--shadowdark .sd-card-notes { overflow-wrap: anywhere; }
+.sdk-module--shadowdark .sd-resource-card .sd-dialog-footer { max-height: 38dvh; overflow-y: auto; flex-shrink: 0; }
+.sdk-module--shadowdark .sd-resource-card .sd-dialog-header { flex-shrink: 0; }
