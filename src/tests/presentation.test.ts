@@ -15,8 +15,10 @@ const moduleInfo = JSON.parse(fs.readFileSync(new URL('../../info.json', import.
 assert.equal(manifest.info.version, moduleInfo.version, 'published UI uses the authoritative module version');
 assert.match(fs.readFileSync(new URL('../../.github/workflows/ci-shadowdark.yaml', import.meta.url), 'utf8'), /ref: v0\.19\.2\b/);
 const releaseWorkflow = fs.readFileSync(new URL('../../.github/workflows/release-shadowdark.yaml', import.meta.url), 'utf8');
-assert.match(releaseWorkflow, /module-release\.yml@v0\.19\.2\b/);
-assert.match(releaseWorkflow, /core_ref: 'v0\.19\.2'/);
+assert.match(releaseWorkflow, /CI_CORE_REF: 'v0\.19\.2'/);
+assert.match(releaseWorkflow, /node scripts\/release\.mjs --verify-tag-ci/);
+assert.match(releaseWorkflow, /node scripts\/publish-release\.mjs/);
+assert.doesNotMatch(releaseWorkflow, /npm ci|module:package/, 'publication consumes the validated package');
 assert.equal(manifest.info.compatibility?.apiContracts?.['ui-extension-api'], '>=3.2.0 <4.0.0');
 assert.equal(manifest.info.compatibility?.apiContracts?.['module-api'], '>=1.6.0 <2.0.0');
 assert.equal(manifest.info.compatibility?.apiContracts?.['roll-engine-api'], '>=1.0.0 <2.0.0');

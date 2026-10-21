@@ -138,3 +138,8 @@ Tests use temporary Git repositories/local remotes and simulated GitHub response
 they never contact Foundry, publish real releases or mutate the module repository.
 See GitHub's [manual workflow documentation](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow)
 for the default-branch requirement and dispatch operation.
+
+October 21 CI follow-up: the presentation suite's historical reusable-workflow
+assertion was updated to the already-adopted module-owned publisher, exact-tag
+validation and unchanged Core0.19.2 toolchain identity. It also rejects packaging
+or dependency installation in publication. No presentation/runtime source changed.
