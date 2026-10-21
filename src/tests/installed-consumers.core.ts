@@ -18,6 +18,7 @@
  *     [--presentation-only] (runs the full surface matrix without behavioral follow-ups)
  */
 import assert from 'node:assert/strict';
+import express from 'express';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
@@ -39,6 +40,14 @@ const mod = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const production = args.has('production');
 const core = { version: JSON.parse(fs.readFileSync(path.join(CORE, 'package.json'), 'utf8')).version, commit: spawnSync('git', ['-C',CORE,'rev-parse','HEAD'], {encoding:'utf8'}).stdout.trim() };
 assert.ok(['0.19.2','0.19.3','0.19.5','0.19.6','0.19.8'].includes(core.version));
+// Include uncommitted Core source in provenance: this harness copies the working
+// tree, so HEAD alone would not identify the implementation under review.
+const sourceHash = createHash('sha256');
+for (const name of fs.readdirSync(path.join(CORE,'src'),{recursive:true}).map(String).sort()) {
+    const file=path.join(CORE,'src',name);
+    if(fs.statSync(file).isFile()) sourceHash.update(name).update('\0').update(fs.readFileSync(file));
+}
+Object.assign(core,{sourceTreeSha256:sourceHash.digest('hex')});
 if (!core.commit && fs.existsSync(path.join(CORE,'.source-provenance.json'))) core.commit = JSON.parse(fs.readFileSync(path.join(CORE,'.source-provenance.json'),'utf8')).commit;
 fs.mkdirSync(path.join(out, 'shots'), { recursive: true });
 const evidence: Record<string, any> = { native: false, generation, core, mode: production ? 'production' : 'development', archive: { file: archive, sha256: createHash('sha256').update(fs.readFileSync(archive)).digest('hex') }, checks: [], cases: [], pageErrors: [], consoleErrors: [] };
@@ -67,6 +76,23 @@ const state: WorldState = {
 const parity = parityFixtures(packs, WIZARD); state.actors.push(parity.actor); state.items.push(parity.worldClass, parity.spell);
 const catalogWorldSpell = { ...structuredClone(WIZARD.items.find((item:Doc)=>item.type==='Spell' && item.system?.tier===1)), _id:'sd02CatalogWorldSpell', name:'SD02 catalog spell', ownership:{default:0,player:2} }; state.items.push(catalogWorldSpell);
 const upstream = new ControlledUpstream(state);
+if (args.has('artwork-only')) {
+    const assetRoot = args.get('community-art-root');
+    assert.ok(assetRoot, '--community-art-root must select a read-only installed asset directory');
+    const manifest = JSON.parse(fs.readFileSync(path.join(assetRoot, 'module.json'), 'utf8'));
+    state.game.modules = [{ ...manifest, active: true }];
+    state.users.find(row=>row._id==='player')!.role=3; // Synthetic Assistant for manager review.
+    const artMonster=structuredClone(packs['shadowdark.monsters'].find(row=>row._id==='sgVqRuCaadRK1P7R')!);
+    artMonster._id='artMonster';artMonster._stats={...artMonster._stats,compendiumSource:'Compendium.shadowdark.monsters.Actor.sgVqRuCaadRK1P7R'};
+    state.actors.push(artMonster);
+    state.scenes.push({_id:'artScene',name:'Art fixture',tokens:[{_id:'artToken',actorId:'artMonster',actorLink:true,texture:{src:artMonster.img}}]});
+    state.combats=[{_id:'artCombat',scene:null,active:true,round:1,turn:0,combatants:[{_id:'artRow',actorId:'artMonster',sceneId:'artScene',tokenId:'artToken',name:'Artwork encounter creature',initiative:10,hidden:false}],flags:{world:{sheetDelverCombat:{schemaVersion:1,mode:'tokenless',label:'Artwork review',status:'active',keepHistory:true,folderId:'artCopies',copyIds:[]}}}}];
+    state.folders=[{_id:'artCopies',name:'Art copies',type:'Actor',flags:{world:{sheetDelverCombatFolder:{combatId:'artCombat'}}}}];
+
+    upstream.app.use(`/modules/${manifest.id}`, express.static(assetRoot));
+    upstream.app.get(['/systems/shadowdark/assets/tokens/cowled_token_red.webp','/systems/shadowdark/assets/tokens/cowled_token.webp'], (_req, res) => res.type('svg').send('<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect width="32" height="32" fill="red"/></svg>'));
+    evidence.artworkFixture = { package: manifest.id, version: manifest.version, enabled: 'synthetic fixture, not observed native enabled state' };
+}
 const root = path.join(out, 'run'); fs.rmSync(root, { recursive: true, force: true }); fs.mkdirSync(root, { recursive: true });
 const workspace = prepareWorkspace(root, production);
 const data = path.join(root, 'data');
@@ -136,6 +162,116 @@ async function main() {
         await loginContext.close();
         pass('player logged in through Core\'s real login view');
 
+        if (args.has('artwork-only')) {
+            evidence.skipped = ['unrelated sheet/action matrix (--artwork-only)'];
+            const context = await browser.newContext({storageState:storage, viewport:{width:1440,height:1000}});
+            const request = async (route: string) => {
+                const response = await context.request.get(`${api}/api/${route}`);
+                assert.equal(response.status(),200,await response.text()); return response.json();
+            };
+            const uuid = 'Compendium.shadowdark.monsters.Actor.sgVqRuCaadRK1P7R';
+            const snapshot = await request('module-packages');
+            assert.equal(snapshot.status,'ready');
+            assert.equal(snapshot.modules.find((row: Doc)=>row.id==='shadowdark-community-tokens').enabled,true);
+            assert.ok(snapshot.system.packs.some((row: Doc)=>row.id==='shadowdark.monsters'));
+            const art = await request(`module-artwork?uuid=${uuid}`);
+            assert.equal(art.status,'resolved'); assert.match(art.src,/portraits\/aboleth.webp$/);
+            assert.equal((await context.request.get(art.src)).status(),200);
+            pass('real protected SDK routes expose allowed package metadata and installed exact-ID portrait');
+            const card = await request(`modules/shadowdark/bestiary/${uuid}`);
+            assert.equal(card.card.img,art.src); assert.match(card.card.fallbackImg,/cowled_token/);
+            const page = await context.newPage();
+            page.on('pageerror',(error: Error)=>evidence.pageErrors.push(error.message));
+            for (const width of [360,1440]) {
+                await page.setViewportSize({width,height:1000});
+                await page.goto(`${origin}/tools/shadowdark/bestiary`,{timeout:300000});
+                await page.getByRole('searchbox').fill('Aboleth');
+                const row = page.getByRole('list',{name:'Creatures'}).getByRole('button').first();
+                await row.waitFor({timeout:120000});
+                await row.click();
+                const dialog=page.getByRole('dialog').last();
+                await dialog.locator('img').waitFor();
+                await page.waitForFunction(()=>Array.from(document.querySelectorAll('[role="dialog"] img')).some(node=>(node as HTMLImageElement).naturalWidth>0));
+                assert.match(await dialog.locator('img').getAttribute('src')??'',/portraits\/aboleth.webp$/);
+                assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+                await page.screenshot({path:path.join(out,'shots',`artwork-${width}.png`)});
+                await page.keyboard.press('Escape');
+            }
+            pass('installed bestiary thumbnail/card render mapped art at mobile and desktop widths');
+            // Synthetic native setting change must refresh the mounted list and
+            // retire an open card without restarting world preparation.
+            await page.getByRole('list',{name:'Creatures'}).getByRole('button').first().click();
+            await page.getByRole('dialog').last().locator('img').waitFor();
+            upstream.setSetting('core.compendiumArtConfiguration',{'shadowdark-community-tokens':{portraits:false}});
+            await until('portrait preference refreshed',async()=>(await request(`module-artwork?uuid=${uuid}`)).status==='none',manager);
+            await page.getByRole('dialog').waitFor({state:'hidden',timeout:30000});
+            await page.getByRole('list',{name:'Creatures'}).locator('img').first().waitFor();
+            assert.match(await page.getByRole('list',{name:'Creatures'}).locator('img').first().getAttribute('src')??'',/cowled_token/);
+            assert.equal(await page.getByRole('searchbox').inputValue(),'Aboleth');
+            assert.equal((await request('status')).initialized,true);
+            pass('live portrait preference retires card, preserves filter and restores original without maintenance');
+            upstream.setSetting('core.compendiumArtConfiguration',{});
+            await until('art restored',async()=>(await request(`module-artwork?uuid=${uuid}`)).status==='resolved',manager);
+            // A missing optional image falls back in the real installed browser.
+            await page.route('**/modules/shadowdark-community-tokens/**/*.webp',(route: any)=>route.abort());
+            await page.reload({timeout:300000}); await page.getByRole('searchbox').fill('Aboleth');
+            await page.getByRole('list',{name:'Creatures'}).getByRole('button').first().click();
+            await page.waitForFunction(()=>Array.from(document.querySelectorAll('[role="dialog"] img')).some(node=>(node as HTMLImageElement).src.includes('cowled_token')&&(node as HTMLImageElement).naturalWidth>0));
+            pass('missing optional image restores the original portrait in the installed card');
+            await page.unroute('**/modules/shadowdark-community-tokens/**/*.webp');
+            const target='combatId=artCombat&combatantId=artRow';
+            const managerArt=await request(`display-artwork?purpose=combat-portrait&${target}`);
+            assert.equal(managerArt.status,'resolved');assert.match(managerArt.src,/portraits\/aboleth.webp$/);
+            const hudArt=await request(`display-artwork?purpose=combat-token&${target}`);
+            assert.equal(hudArt.status,'resolved');assert.match(hudArt.src,/tokens\/aboleth.webp$/);
+            await page.goto(`${origin}/tools/combat`,{timeout:300000});
+            await page.getByRole('combobox',{name:'Encounter',exact:true}).selectOption('artCombat');
+            await page.getByText('Artwork encounter creature',{exact:true}).first().scrollIntoViewIfNeeded();
+            await page.waitForFunction(()=>Array.from(document.images).some(img=>img.src.endsWith('/portraits/aboleth.webp')&&img.naturalWidth>0));
+            await page.screenshot({path:path.join(out,'shots','combat-artwork.png')});
+            await page.goto(origin,{timeout:300000});
+            await page.waitForFunction(()=>Array.from(document.querySelectorAll('[data-combat-hud] img')).some(node=>(node as HTMLImageElement).src.endsWith('/tokens/aboleth.webp')&&(node as HTMLImageElement).naturalWidth>0));
+            pass('installed manager portrait and HUD token invoke the optional module policy');
+            upstream.externalUpdate('Actor',[{_id:'artMonster',img:'systems/shadowdark/assets/tokens/custom.webp'}]);
+            await until('custom actor image wins',async()=>(await request(`display-artwork?purpose=combat-portrait&${target}`)).status==='none',manager);
+            upstream.externalUpdate('Token',[{_id:'artToken','texture.src':'systems/shadowdark/assets/tokens/custom-token.webp'}],{parentUuid:'Scene.artScene'});
+            await until('custom token image wins',async()=>(await request(`display-artwork?purpose=combat-token&${target}`)).status==='none',manager);
+            pass('current custom Actor and Token images remain unchanged by hook adoption');
+            assert.equal(upstream.writes.length,0); assert.deepEqual(evidence.pageErrors,[]);
+            pass('artwork discovery and rendering never write native documents');
+            // Exercise the actual copy writer, which strips native _stats and
+            // records origin in Core's encounter-copy metadata instead.
+            upstream.externalUpdate('Combat',[{_id:'artCombat',round:0,turn:null}]);
+            const copied=await context.request.post(`${api}/api/combat-manager/artCombat/pack-actors`,{
+                headers:{Origin:origin,'X-SheetDelver-Runtime':(await request('status')).runtimeToken},
+                data:{packId:'shadowdark.monsters',actorId:'sgVqRuCaadRK1P7R',quantity:1}});
+            assert.equal(copied.status(),200,await copied.text());
+            const body=await copied.json();
+            const copiedRow=body.encounter.participants.find((row:Doc)=>row.source==='compendium-copy');
+            assert.ok(copiedRow,'public copy writer returns an encounter-owned Actor');
+            const copiedActor=state.actors.find(row=>row._id===copiedRow.actorId)!;
+            assert.equal(copiedActor._stats?.compendiumSource,undefined);
+            assert.equal(copiedActor.flags.world.sheetDelverCombatCopy.sourceUuid,uuid);
+            const sourceBefore=structuredClone(copiedActor),writesBefore=upstream.writes.length;
+            const copyTarget=`combatId=artCombat&combatantId=${copiedRow.id}`;
+            assert.equal((await request(`display-artwork?purpose=combat-portrait&${copyTarget}`)).src,art.src);
+            await page.goto(`${origin}/tools/combat`,{timeout:300000});
+            await page.getByRole('combobox',{name:'Encounter',exact:true}).selectOption('artCombat');
+            await page.getByText(copiedRow.name,{exact:true}).first().scrollIntoViewIfNeeded();
+            await page.waitForFunction(()=>Array.from(document.images).some(img=>img.src.endsWith('/portraits/aboleth.webp')&&img.naturalWidth>0));
+            await page.screenshot({path:path.join(out,'shots','combat-copy-artwork.png')});
+            assert.deepEqual(copiedActor,sourceBefore);assert.equal(upstream.writes.length,writesBefore);
+            pass('public Compendium copy displays mapped portrait before initiative without source writes');
+            await manager.stop();manager=new Manager(workspace,data,path.join(root,'manager-copy-restarted.log'),production?'start':'dev');
+            await until('copy survives Core restart',async()=>(await(await admin.request('/api/status')).json()).initialized===true||false,manager,300000);
+            assert.equal((await request(`display-artwork?purpose=combat-portrait&${copyTarget}`)).src,art.src);
+            assert.deepEqual(state.actors.find(row=>row._id===copiedRow.actorId),sourceBefore);
+            assert.equal(upstream.writes.length,writesBefore);
+            pass('existing compendium copy resolves after Core restart without repair or recopy');
+            evidence.artworkCopyWrites={fixtureSetup:writesBefore,artworkWrites:upstream.writes.length-writesBefore};
+
+            await context.close(); return;
+        }
         if (args.has('contracts-only')) {
             evidence.skipped = ['width/theme and legacy UI matrix (--contracts-only)'];
             const context = await browser.newContext({storageState:storage});

@@ -3,6 +3,8 @@
 Historical entries are reconstructed from [published releases](https://github.com/sheetdelver/sd-shadowdark/releases), their tags, and merged changes. Version numbers follow the published tags; the Unreleased section collects notes for the next authorized release.
 
 ## Unreleased
+- Use installed monster artwork
+- Share optional combat artwork
 - Reuse merge validation checks
 - Clarify release workflow titles
 - Reuse validated release artifacts

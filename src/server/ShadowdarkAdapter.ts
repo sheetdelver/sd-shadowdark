@@ -1,3 +1,4 @@
+import { resolveDisplayArtwork } from './community-artwork';
 import { BaseSystemAdapter, logger } from '@sheet-delver/sdk';
 import type {
     ActorPreparationContext,
@@ -111,6 +112,9 @@ export class ShadowdarkAdapter extends BaseSystemAdapter {
     getInitiativeFormula(actor: PreparedActorData): string {
         return getInitiativeFormula(actor);
     }
+
+    /** Optional SDK display hook, structurally typed to retain the older host floor. */
+    resolveDisplayArtwork = resolveDisplayArtwork;
 
     getActorCardData(actor: PreparedActorData): any {
         const derived = (actor.derived ?? {}) as any;

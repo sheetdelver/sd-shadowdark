@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useSDK } from '@sheet-delver/sdk/react';
 import ModuleDialog from '../components/ModuleDialog';
+import ArtworkImage from '../components/ArtworkImage';
 import { CardBody, CardNotes } from '../components/ResourceDetailModal';
 import { formatUuid, type DocumentRef } from '../../logic/identity';
 import type { ResourceCard } from '../../logic/resource-cards';
@@ -13,10 +14,12 @@ import type { ResourceCard } from '../../logic/resource-cards';
  * the server returns through their own visibility. Creatures with the same name
  * stay separate entries. There is no spawn, encounter or sharing action.
  */
-interface Entry { ref: DocumentRef; name: string; img?: string; source: 'compendium' | 'world'; level: number; alignment: string | null; ac: number | null; hp: number | null }
+interface Entry { ref: DocumentRef; name: string; img?: string; fallbackImg?: string; source: 'compendium' | 'world'; level: number; alignment: string | null; ac: number | null; hp: number | null }
 
 export default function Bestiary() {
-    const { fetchWithAuth, navigate, resolveImageUrl, isConnected } = useSDK();
+    const { fetchWithAuth, navigate, isConnected, worldId, currentUser, events } = useSDK();
+    const scope = JSON.stringify([worldId, currentUser?.id, currentUser?.role, isConnected]);
+    const [refresh, setRefresh] = useState(0);
     const [entries, setEntries] = useState<Entry[] | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [compendiumAvailable, setCompendiumAvailable] = useState(false);
@@ -25,20 +28,32 @@ export default function Bestiary() {
     const [selected, setSelected] = useState<Entry | null>(null);
     const [card, setCard] = useState<{ state: 'loading' } | { state: 'ready'; card: ResourceCard } | { state: 'error'; message: string } | null>(null);
     const seq = useRef(0);
+    const [loadedScope, setLoadedScope] = useState<string | null>(null);
 
     useEffect(() => {
+        const reload = () => { seq.current++; setSelected(null); setCard(null); setEntries(null); setLoadedScope(null); setRefresh(value => value + 1); };
+        // Optional newer SDK signal: older hosts simply never emit it.
+        const offPackages = events.on('world:packagesChanged' as Parameters<typeof events.on>[0], reload);
+        const offContext = events.on('world:contextChanged', reload);
+        return () => { offPackages(); offContext(); };
+    }, [events]);
+
+    useEffect(() => {
+        seq.current++; setSelected(null); setCard(null); setEntries(null); setLoadedScope(null);
         if (!isConnected) return;
         let cancelled = false;
+        const controller = new AbortController();
         setError(null);
-        fetchWithAuth('/api/modules/shadowdark/bestiary').then(async res => {
+        fetchWithAuth('/api/modules/shadowdark/bestiary', { signal: controller.signal }).then(async res => {
             const data = await res.json().catch(() => null);
             if (cancelled) return;
+            setLoadedScope(scope);
             if (!res.ok || !data?.success) { setError(data?.error ?? 'The bestiary is unavailable.'); setEntries([]); return; }
             setEntries(data.entries.filter((entry: any) => entry.ref));
             setCompendiumAvailable(data.compendiumAvailable === true);
         }).catch(() => { if (!cancelled) { setError('The bestiary is unavailable.'); setEntries([]); } });
-        return () => { cancelled = true; };
-    }, [fetchWithAuth, isConnected]);
+        return () => { cancelled = true; controller.abort(); seq.current++; };
+    }, [fetchWithAuth, isConnected, scope, refresh]);
 
     const open = (entry: Entry) => {
         const current = ++seq.current;
@@ -57,7 +72,7 @@ export default function Bestiary() {
         for (const entry of entries ?? []) counts.set(entry.name, (counts.get(entry.name) ?? 0) + 1);
         return counts;
     }, [entries]);
-    const visible = (entries ?? []).filter(entry => (source === 'all' || entry.source === source)
+    const visible = (loadedScope === scope ? entries ?? [] : []).filter(entry => (source === 'all' || entry.source === source)
         && entry.name.toLowerCase().includes(query.trim().toLowerCase()));
 
     return (
@@ -90,7 +105,7 @@ export default function Bestiary() {
                         <li key={formatUuid(entry.ref)}>
                             <button type="button" onClick={() => open(entry)}
                                 className="w-full text-left bg-white border-2 border-black p-3 flex gap-3 items-center hover:bg-neutral-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-600 shadow-[3px_3px_0_0_rgba(0,0,0,1)] min-h-11">
-                                {entry.img && <img src={resolveImageUrl(entry.img)} alt="" className="w-12 h-12 object-cover border border-black bg-neutral-200 shrink-0" />}
+                                {entry.img && <ArtworkImage key={`${entry.img}:${entry.fallbackImg ?? ''}`} src={entry.img} fallback={entry.fallbackImg} className="w-12 h-12 object-cover border border-black bg-neutral-200 shrink-0" />}
                                 <span className="min-w-0">
                                     <span className="block font-bold text-lg leading-tight break-words">{entry.name}</span>
                                     <span className="block text-xs uppercase tracking-widest text-neutral-700">
@@ -107,9 +122,9 @@ export default function Bestiary() {
                 </ul>
                 {entries && visible.length === 0 && !error && <p className="italic">No creatures match.</p>}
             </div>
-            <ModuleDialog open={!!selected} title={selected?.name ?? ''} subtitle={card?.state === 'ready' ? card.card.subtitle : undefined}
+            <ModuleDialog open={loadedScope === scope && !!selected} title={selected?.name ?? ''} subtitle={card?.state === 'ready' ? card.card.subtitle : undefined}
                 onClose={() => { seq.current++; setSelected(null); setCard(null); }} size="card"
-                footer={card?.state === 'ready' && card.card.diagnostics.length > 0 ? <CardNotes card={card.card} /> : undefined}>
+                footer={card?.state === 'ready' && (card.card.diagnostics.length > 0 || card.card.artworkCredit) ? <CardNotes card={card.card} /> : undefined}>
                 {card?.state === 'loading' && <p role="status" className="italic">Loading…</p>}
                 {card?.state === 'error' && <p role="alert" className="text-red-800">{card.message}</p>}
                 {card?.state === 'ready' && <CardBody card={card.card} />}

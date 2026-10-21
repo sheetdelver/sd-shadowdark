@@ -267,7 +267,7 @@ host version before running compatibility checks. Tools may run from Core,
 but module work does not authorize changing Core files or generated settings.
 CI checks out `Muttley/foundryvtt-shadowdark` at
 `9677d16b3903b3b640f00d4efd48249142ac8334` (release-4.0.6) into the isolated
-toolchain's `temp/shadowdark`. All 17 source suites run against that static
+toolchain's `temp/shadowdark`. All 18 source suites run against that static
 reference; missing required native fixtures fail rather than silently skip.
 This is source-only testing and does not require a running Foundry service.
 
@@ -389,3 +389,17 @@ Card artwork is a full-width faded background; the visible title is an inset
 centered black panel below the modal Close bar, type is a property, and Data notes
 belong below the divider above actions. Preserve accessible dialog naming,
 keyboard/overlay behavior and source-preserving action paths.
+
+Optional monster artwork uses the public caller-bound SDK artwork resolver.
+Preserve custom images and canonical source identity; do not add native manifest
+fetches or name matching. `community-artwork.test.ts` is the eighteenth source
+suite. Installed checks support `--artwork-only --community-art-root=<read-only
+installed-package>`; this fixture marks the provider enabled synthetically and
+never claims actual native activation. Add `--production` for build/start.
+
+Core combat artwork adoption implements optional `resolveDisplayArtwork` using
+the caller-bound read-only argument and the shared exact-origin/default policy.
+Preserve custom displayed Combatant/Token images, not just custom Actor images.
+Verify real session `_id` shapes and managed production rendering; a successful
+resolver response alone does not prove the UI applied it. Never raise the minimum
+host version for this optional fallback-compatible presentation feature.

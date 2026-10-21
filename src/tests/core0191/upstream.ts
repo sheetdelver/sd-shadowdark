@@ -20,6 +20,8 @@ export interface WorldState {
     scenes: Doc[];
     settings: Doc[];
     chat: Doc[];
+    combats?: Doc[];
+    folders?: Doc[];
     packs: Record<string, Doc[]>;
     packMetadata: Doc[];
 }
@@ -140,7 +142,7 @@ export class ControlledUpstream {
     collection(type: string, operation: Doc): Doc[] {
         const roots = (name: string): Doc[] => operation.pack ? (this.state.packs[operation.pack] ??= [])
             : name === 'Actor' ? this.state.actors : name === 'Item' ? this.state.items : name === 'Scene' ? this.state.scenes
-            : name === 'User' ? this.state.users : name === 'Setting' ? this.state.settings : name === 'ChatMessage' ? this.state.chat : [];
+            : name === 'Folder' ? (this.state.folders ??= []) : name === 'Combat' ? (this.state.combats ??= []) : name === 'User' ? this.state.users : name === 'Setting' ? this.state.settings : name === 'ChatMessage' ? this.state.chat : [];
         if (!operation.parentUuid) return roots(type);
         const parts = String(operation.parentUuid).split('.');
         let offset = parts[0] === 'Compendium' ? 3 : 0;
@@ -153,7 +155,7 @@ export class ControlledUpstream {
         }
         if (!parent) throw new Error(`Unknown parent ${operation.parentUuid}`);
         if (type === 'ActorDelta') return [parent.delta];
-        const field = type === 'Item' ? 'items' : type === 'ActiveEffect' ? 'effects' : type === 'Token' ? 'tokens' : null;
+        const field = type === 'Item' ? 'items' : type === 'ActiveEffect' ? 'effects' : type === 'Token' ? 'tokens' : type === 'Combatant' ? 'combatants' : null;
         if (!field) throw new Error(`Unsupported embedded ${type}`);
         return (parent[field] ??= []);
     }

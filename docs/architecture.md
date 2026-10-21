@@ -727,3 +727,41 @@ must be retained for later review. No distributed transaction/CAS is implied.
 The mounted workflow retires old review reads across write attempts, preserves
 known receipts on errors, uses the current review revision and reports completion
 only from the confirmed full-operation response. See [recovery](advancement-recovery.md).
+
+### Optional native monster artwork
+
+`logic/community-artwork.ts` recognizes exact native NPC placeholder paths and
+canonical Actor origins. `server/community-artwork.ts` calls optional public
+`runtime.artwork.resolve`; it never fetches native manifests or maintains an art
+cache. The bestiary reads through the caller runtime and rechecks scope/access
+around optional resolution. Source/prepared Actor values are unchanged. Responses
+carry original fallback and optional credit, rendered through `ArtworkImage` and
+card notes. Original/custom artwork remains usable on older hosts or failure.
+Mounted consumers retire stale cards on package/context changes and keep manual
+search/filter state. See ADR-0003 SD-UI12 and Core ADR-0067; other module catalog
+expansion remains separate.
+
+### Optional Core combat artwork policy
+
+`ShadowdarkAdapter.resolveDisplayArtwork` opts in to Core ADR-0067's generic
+read-only display hook. It shares `monsterPortraitRef` with bestiary artwork: only
+NPCs with exact canonical Actor origins and either verified cowled placeholder
+qualify. The currently displayed image is checked, preserving custom Combatant
+and Token images even when the Actor portrait is a default. Combat manager
+portraits use portrait art; HUD images sourced from a Token/Combatant request token
+art. Actor fallback requests portrait art. Missing capability/provider/origin or
+an aborted request returns null, retaining the original. No source is mutated.
+
+The supplied caller runtime is used; the initialization runtime is not used for
+artwork authority. Older supported hosts simply omit invocation of the optional
+hook. Module version and compatibility declarations remain unchanged. Core owns
+caller authorization, image precedence, deadlines and stale-result retirement.
+Dashboard cards are not automatically covered by this hook. No Shadowdark package
+IDs, default-image paths or rules are added to Core.
+
+The display-artwork policy also consumes optional host-verified
+`context.compendiumSourceUuid`. Core encounter copies intentionally lack native
+origin stamps; the SDK field supplies their exact recorded source after Core
+checks encounter registration and folder agreement. The module does not inspect
+Core-private flags or match monster names. Existing copies require no repair or
+recreation; custom current images still decline replacement.

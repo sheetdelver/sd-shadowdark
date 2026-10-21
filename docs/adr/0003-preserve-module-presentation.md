@@ -150,3 +150,74 @@ Reference remains native release-4.0.6 at
 floor change. No migration, version, dependency, Core or release changes.
 See the active audit for exact final checks and archive identity. User visual
 approval remains open; isolated fixtures do not claim fresh native acceptance.
+
+## Addendum: installed native monster artwork — 2026-10-21
+
+The user accepted the background-card treatment and authorized its checkpoint
+`f1da5eb53930fe2772c9117aeb6de1ee41ecd388`. The subsequent selected scope is
+optional community monster artwork, implemented through the separately approved
+Core ADR-0067 SDK capability. Existing card layout, native rules, migrations,
+version0.9.6 and compatibility floors remain unchanged.
+
+The module first reads an authorized NPC and exact compendium identity. Only the
+two native placeholder portraits are eligible: `cowled_token_red.webp` from the
+native4.0.6 NPC default and `cowled_token.webp` retained in its bundled monster
+pack. `monsterPortraitRef` accepts a canonical compendium Actor reference or
+preserved `_stats.compendiumSource`/legacy source reference on a world NPC. It
+never matches names. Custom portraits, PCs and missing/ambiguous origins remain
+unchanged. The first installed check caught the older placeholder and a regression
+now covers it alongside the current default.
+
+`resolveMonsterArtwork` uses optional `runtime.artwork.resolve`. Core owns native
+package discovery, activation, preferences, priority, asset fetching and caller
+visibility. Shadowdark never fetches the native module manifest/mapping itself.
+It adopts Core SDK3.5.0/module-api1.7.0 structurally and optionally: older supported
+hosts preserve the original artwork. No new minimum or hard dependency on the
+community package is declared. Unknown/disabled/inaccessible/failed providers
+leave the original view usable. No Actor or prototype Token is rewritten.
+
+Bestiary list/cards carry a view-only image and original fallback, and display
+provided credit with Data notes below the content divider. `ArtworkImage` retries
+the original image once if optional art fails. Native package-preference/context
+changes retire pending cards and reload the mounted list, preserving search and
+source filters. World/user/role/connection changes retire stale results.
+
+The installed package1.3 supplies mappings for `shadowdark.monsters` and community
+content monsters. This adoption does not add the community compendium to the
+bestiary's source catalog: existing readable native monsters and world NPCs with
+canonical origins are the selected scope. Core can resolve other readable mapped
+packs for later module workflows. Runtime use of installed artwork does not grant
+redistribution rights. No community assets are copied into Shadowdark archives.
+See the [upstream project](https://github.com/PrototypeESBU/foundryvtt-shadowdark-community-tokens)
+for provider provenance and its asset-specific licensing information.
+
+SD-UI12 in the presentation audit records source comparisons, isolated installed
+checks and limitations. Actual local package installation was observed; its active
+native-world state is unconfirmed. The acceptance fixture explicitly enables the
+package in a synthetic upstream. Native/operator acceptance and publication are
+not implied by those checks.
+
+### Optional Core combat artwork policy
+
+`ShadowdarkAdapter.resolveDisplayArtwork` opts in to Core ADR-0067's generic
+read-only display hook. It shares `monsterPortraitRef` with bestiary artwork: only
+NPCs with exact canonical Actor origins and either verified cowled placeholder
+qualify. The currently displayed image is checked, preserving custom Combatant
+and Token images even when the Actor portrait is a default. Combat manager
+portraits use portrait art; HUD images sourced from a Token/Combatant request token
+art. Actor fallback requests portrait art. Missing capability/provider/origin or
+an aborted request returns null, retaining the original. No source is mutated.
+
+The supplied caller runtime is used; the initialization runtime is not used for
+artwork authority. Older supported hosts simply omit invocation of the optional
+hook. Module version and compatibility declarations remain unchanged. Core owns
+caller authorization, image precedence, deadlines and stale-result retirement.
+Dashboard cards are not automatically covered by this hook. No Shadowdark package
+IDs, default-image paths or rules are added to Core.
+
+The display-artwork policy also consumes optional host-verified
+`context.compendiumSourceUuid`. Core encounter copies intentionally lack native
+origin stamps; the SDK field supplies their exact recorded source after Core
+checks encounter registration and folder agreement. The module does not inspect
+Core-private flags or match monster names. Existing copies require no repair or
+recreation; custom current images still decline replacement.

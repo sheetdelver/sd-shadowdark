@@ -27,6 +27,9 @@ export interface ResourceCard {
     title: string;
     subtitle: string;
     img?: string;
+    /** Original portrait if an optional installed artwork asset cannot load. */
+    fallbackImg?: string;
+    artworkCredit?: string;
     facts: CardFact[];
     states: string[];
     description: unknown;

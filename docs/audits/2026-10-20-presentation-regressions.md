@@ -268,3 +268,155 @@ archive; version, compatibility and migration sources are unchanged.
 The [portable follow-up record](evidence/2026-10-21-language-focus-cards.json)
 contains counts, provenance and limitations. All task services stopped; operator
 Core/Foundry listeners remained untouched. Changes remain uncommitted.
+
+## SD-UI12 — Optional installed monster artwork (October21)
+
+Status: implemented; isolated verification, operator review pending.
+Previous presentation work was checkpointed as `f1da5eb53930fe2772c9117aeb6de1ee41ecd388`.
+This follow-up remains uncommitted on `fix/restore-module-presentation` and uses
+Core's authorized `feat/sdk-foundry-package-context` branch (ADR-0067).
+
+Native reference: Shadowdark4.0.6 at
+`9677d16b3903b3b640f00d4efd48249142ac8334`, `system/src/config.mjs` and
+`data/packs/monsters.db`. Community tokens1.3 local manifest SHA256
+`d3cff72bf52b1612fc996747c48b55d879ffdb7d855b552fd5e02f839591b3ec`, mapping SHA256
+`319492804585c00992a2f79bfeb37427707e9fc645eb6386ac574d5aa10fef4f`.
+The default-only eligibility policy initially recognized the red NPC default but
+missed the older bundled placeholder. The installed archive reproduced this;
+the added exact-path regression failed before correction and passes afterward.
+
+Changes: `logic/community-artwork.ts::monsterPortraitRef`,
+`server/community-artwork.ts::resolveMonsterArtwork`, bestiary list/card request
+handlers, `ArtworkImage`, `ResourceDetailModal` and the mounted Bestiary lifecycle.
+No data migration, artwork distribution, guessed-name lookup or native document
+write. Absent older-host capability, custom image, inaccessible pack, malformed
+mapping, revoked access and optional image failure retain the original source.
+
+Verification commands are in AGENTS.md. New `community-artwork.test.ts` has six
+groups covering eligibility, exact identity, old-host/failure fallback, request
+routes, changed source/visibility and world/pack retirement. All18 maintained
+module suites pass. Explicit module/UI/hook typing and isolated check/package
+pass. The final archive SHA256 is
+`1a185c0cab0b7cb8fb3e0e83a96862d09521c172ecfdfcb67ad3023b2a82d3f1`.
+
+`installed-consumers.core.ts --run-isolated --artwork-only
+--community-art-root=<read-only-installed-package> --archive=<archive>
+--out=<new-directory> --generation=14` uses copied real Core, public managed
+installation, real SDK/routes and a synthetic native upstream. The package's
+actual local assets are served inside that fixture, never copied into the archive.
+Seven development-host checks pass: no-op managed install, player login, protected
+package/art routes, desktop/mobile bestiary images, live preferences, broken-image
+fallback, and zero upstream writes (some assertions share a check group).
+Screenshots at360/1440 were inspected; card fades, title bar and clipping remain.
+The source hash recorded in newer runs identifies uncommitted copied Core code,
+not merely its HEAD. These checks are not actual Foundry-world acceptance.
+
+Core's maintained source comparison runs12 cases against each native v13/v14
+artwork class. It records the generation distinction for partial preference
+objects; Item artwork is v14-only. The default/priority result is qualified;
+external maps, browser scripts and failed-provider fallback are not full native
+parity claims. Installed local package presence is verified, native enabled state
+remains unknown. User review and any release are separate.
+
+Final installed production result: build/start plus the same seven checks pass,
+with zero uncaught page errors and zero upstream writes. Final archive282785bytes;
+SHA256 unchanged from above. Production Core source-tree SHA256
+`20d07087cd113b97a90913ff1bcf363c8b03c05bb047b4e6a493b7cf13ddb93f` identifies the
+copied implementation. Maintained mounted consumers also pass52/52 with the final
+archive's stylesheet. All task services stopped; new artwork work is uncommitted.
+
+## Combat artwork verification — 2026-10-21
+
+The optional display hook adds generic policy without Core system-specific logic.
+Core contract suite passes 9 groups: omitted/declined hooks, alternate module-owned
+assets, bad URLs/errors, stale scope, deadline/abort, manager/HUD precedence, empty
+Actor portrait fallback, caller/Actor access, and hidden/unstarted rows. The mounted
+actual consumer passes six controlled request transitions covering both `_id` and
+`id` session shapes, original-first display, broken replacement/original, settings,
+source mismatch, caller/world change, reconnect and unmount. Shadowdark's artwork
+suite passes 7 groups; all 18 module source suites pass.
+
+An initial installed production check found the new consumer only accepted `id`;
+the actual native User shape uses `_id`. Corrected to the shared `_id || id`
+precedence and expanded the mounted fixture. The final copied Core production
+build/start and managed archive run passes **9/9**: protected discovery, installed
+bestiary/card at 360/1440 widths, preference refresh, broken-image fallback, manager
+portrait, HUD token, custom Actor/Token preservation, zero native writes. No page
+or console errors. The manager screenshot was inspected. The earlier failed run
+is retained as a diagnostic, not passing acceptance.
+
+Final archive: `shadowdark-0.9.6.tgz`, 283460 bytes; SHA-256
+`948eda06fcf4b82a69c18a045f66bd80cee22d74106821530d67ed6b61d32ab3`.
+Core 0.19.8 base commit `9ae8442d18445a0472a1be4236c8f6b973e7008b`, tested working
+`src` tree SHA-256 `5f16940f7b7369bd867cff237ac4b7c7742d6d728e6cb43b2152521596a5fc35`.
+This supersedes earlier artifact identities for the combat-hook extension. The
+archive was created before subsequent documentation/harness-only edits; runtime
+module code is identical. Core unit/client/integration, explicit Core/module types,
+lint and whitespace checks pass. The authoring guide's actual TypeScript example
+was separately compiled against SDK exports.
+
+Reproduction uses the maintained installed harness with `--run-isolated
+--archive=<tgz> --out=<new-directory> --generation=14 --production --artwork-only
+--community-art-root=<read-only-installed-package>`, configured temporary browser
+tooling as documented in module AGENTS. Core checks use `npm run test:unit`,
+`npm run test:client`, `npm run test:integration`, `npx tsc --noEmit`, `npm run lint`,
+and `node src/tests/acceptance/display-artwork.browser.mjs`. Module typing uses
+`node data/local/modules/shadowdark/src/tests/verify-types.mjs` from Core.
+
+This is isolated real-host acceptance with synthetic native data and actual
+read-only installed artwork; it is not fresh live native acceptance. Prior static
+v13/v14 mapping comparisons remain applicable. Actual operator world activation
+of the installed provider has not been independently observed. Dashboard cards
+have not adopted this hook. No native data, app versions or module minima changed.
+All test-owned services stop in cleanup. Operator Core 8000/8001 and Foundry 30000
+remain running and untouched. No commit, push or release was performed.
+
+## Compendium-copy correction verification — 2026-10-21
+
+User's live screenshot showed default images for encounter-owned pack copies.
+The initial installed artwork fixture supplied a native origin on a world Actor
+and missed the real copy writer, which strips `_stats` while retaining its own
+exact source marker. Added `DisplayArtworkContext.compendiumSourceUuid`, derived
+by Core only after copy registration, encounter/folder agreement and typed Actor
+UUID checks. Shadowdark consumes that public context before native origins.
+No private Core flag parsing is added to the module. Existing sources remain
+unchanged; custom images and caller pack permissions still apply.
+
+Core and module regressions both failed before correction (missing origin and
+missing replacement respectively), then passed. Core artwork suite: 10 groups;
+Shadowdark artwork suite: 8 groups. Full Core unit suite, explicit Core/module
+typing, lint, module check/package and the revised authoring example pass. The
+previous full client/integration results remain retained; those unchanged suites
+were not rerun for this server provenance correction.
+
+Final isolated production build/managed acceptance passes **11/11**, including
+the actual public `combat-manager/:id/pack-actors` operation, rendered copy before
+initiative, and existing-copy resolution after Core restart. The controlled
+fixture recorded three copy-creation writes and zero artwork/repair writes.
+No page errors. The copied-participant screenshot was inspected. An intermediate
+harness run omitted the normal mutation runtime header and correctly received
+409; the final run sends the current public status token like the real UI.
+
+Archive SHA-256:
+`7b9cdbe334d2a4c244a4394b410246c707cbcdb26905cd0a5d1da5924898f585`.
+Core working `src` tree SHA-256:
+`837dc0c4cf7de7cd751d30088da2e81d7da2f5c7827a1e5fc754982547e80ee1`.
+Core base/version remain `9ae8442d`/0.19.8; module remains0.9.6. Maintained harness
+command is the previous production artwork command with a fresh corrected archive
+and output directory. Local outputs: `/tmp/art-copy-production-final` and
+`/tmp/art-copy-final/data/dist/modules/shadowdark-0.9.6.tgz`. Runtime code matches
+the archive; later edits are documentation/harness-only.
+
+Read-only inspection of installed package1.3 mappings confirms exact native4.0.6
+IDs for Elephant, Demon/Dretch, Naga/Bone, Manta Ray/Giant and Assassin all have
+portrait/token mappings. This does not independently establish live world enable
+state. Test services stopped; operator ports8000/8001/30000 untouched. All
+corrections remain uncommitted; no live native data changes or release operations.
+
+### Operator confirmation and artwork checkpoint
+
+On 2026-10-21 the user confirmed that combat artwork looks and works as expected
+and authorized local Core/module checkpoints. Earlier isolated results remain
+qualified as recorded. This confirmation covers the current artwork correction;
+it does not implement the separately discussed generic Core NPC viewer. No push
+or release is authorized by this checkpoint.

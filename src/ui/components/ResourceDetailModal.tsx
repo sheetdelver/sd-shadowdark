@@ -5,6 +5,7 @@ import React from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSDK } from '@sheet-delver/sdk/react';
 import ModuleDialog from './ModuleDialog';
+import ArtworkImage from './ArtworkImage';
 import ItemStateControls from './ItemStateControls';
 import { itemControls } from '../../logic/inventory-controls';
 import { useShadowdarkActor, type ActionResponse, type CardTarget } from '../context/ShadowdarkActorContext';
@@ -22,13 +23,20 @@ import { canonicalUuid, formatUuid, parseUuid } from '../../logic/identity';
  */
 type Loaded = { state: 'loading' } | { state: 'ready'; card: ResourceCard } | { state: 'error'; message: string };
 
+function CardArtwork({ card }: { card: ResourceCard }) {
+    const [unavailable, setUnavailable] = useState(false);
+    return <div className="sd-card-art" aria-hidden="true" hidden={unavailable}>
+        <ArtworkImage src={card.img!} fallback={card.fallbackImg} onUnavailable={() => setUnavailable(true)} />
+    </div>;
+}
+
 export function CardBody({ card, onLink, onRollCheck, onRollFormula }: {
     card: ResourceCard;
     onLink?: (uuid: string) => void;
     onRollCheck?: (stat: string, dc: number) => void;
     onRollFormula?: (formula: string) => void;
 }) {
-    const { foundryUrl, resolveImageUrl } = useSDK();
+    const { foundryUrl } = useSDK();
     const html = useMemo(() => presentDescription(card.description, foundryUrl), [card.description, foundryUrl]);
     const onClick = (event: React.MouseEvent) => {
         const target = event.target as HTMLElement;
@@ -42,7 +50,7 @@ export function CardBody({ card, onLink, onRollCheck, onRollFormula }: {
     };
     return (
         <div className="sd-card-content">
-            {card.img && <div key={card.img} className="sd-card-art" aria-hidden="true"><img key={card.img} src={resolveImageUrl(card.img)} alt="" onError={event => { event.currentTarget.parentElement!.hidden = true; }} /></div>}
+            {card.img && <CardArtwork key={`${card.img}:${card.fallbackImg ?? ''}`} card={card} />}
             <div className="sd-card-title" aria-hidden="true">{card.title}</div>
             <div className="sd-card-copy space-y-3">
             <div className="flex gap-3 items-start">
@@ -90,11 +98,12 @@ export function CardBody({ card, onLink, onRollCheck, onRollFormula }: {
 
 /** Notes share the action footer, including read-only preview/bestiary cards. */
 export function CardNotes({ card }: { card: ResourceCard }) {
-    if (!card.diagnostics.length) return null;
-    return <details className="sd-card-notes text-xs text-amber-900 border border-amber-700 bg-amber-50 p-2">
+    if (!card.diagnostics.length && !card.artworkCredit) return null;
+    return <>{card.artworkCredit && <p className="text-xs text-neutral-600">Artwork: {card.artworkCredit}</p>}
+    {card.diagnostics.length > 0 && <details className="sd-card-notes text-xs text-amber-900 border border-amber-700 bg-amber-50 p-2">
         <summary className="cursor-pointer font-bold">Data notes ({new Set(card.diagnostics).size})</summary>
         <ul className="list-disc pl-4 mt-1 space-y-0.5">{[...new Set(card.diagnostics)].map(message => <li key={message}>{message}</li>)}</ul>
-    </details>;
+    </details>}</>;
 }
 
 export default function ResourceDetailModal() {
