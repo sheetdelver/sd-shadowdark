@@ -12,4 +12,3 @@ export function monsterPortraitRef(doc: any, ref: DocumentRef | null): DocumentR
     const origin = ref?.kind === 'compendium' ? ref : sourceRef(doc);
     return origin?.kind === 'compendium' && origin.documentType === 'Actor' ? origin : null;
 }
-

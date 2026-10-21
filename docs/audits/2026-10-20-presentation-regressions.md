@@ -420,3 +420,7 @@ and authorized local Core/module checkpoints. Earlier isolated results remain
 qualified as recorded. This confirmation covers the current artwork correction;
 it does not implement the separately discussed generic Core NPC viewer. No push
 or release is authorized by this checkpoint.
+
+Local feature checkpoints: Core `e41c4b48` and Shadowdark `defb07b`. Application
+versions remain unchanged; Core SDK3.5/module-api1.7/UI3.3 declarations are in the
+Core checkpoint. Shadowdark retains its optional older-host fallback.
