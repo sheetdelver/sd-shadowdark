@@ -221,3 +221,22 @@ origin stamps; the SDK field supplies their exact recorded source after Core
 checks encounter registration and folder agreement. The module does not inspect
 Core-private flags or match monster names. Existing copies require no repair or
 recreation; custom current images still decline replacement.
+
+
+### Release compatibility amendment — 2026-10-22
+
+The user explicitly requested raising Shadowdark's requirements as part of Core
+SDK closeout. This supersedes the earlier unchanged-floor instruction for the
+next module release: Core>=0.20.0, module-api>=1.7.0<2.0.0 and UI>=3.3.0<4.0.0.
+Both validation and publication workflows pin v0.20.0. SDK3.5.0 and those API
+versions were already assigned to the unreleased Core package/artwork/reference
+contracts; no additional SDK increment is required. Roll-engine-api is unchanged.
+Core must publish before module CI/release. Module version0.9.6 remains until its
+release helper runs. No new native testing is implied, and this Core closeout does
+not close unrelated module functional review. Optional native-art fallback and
+original-source reference authorization remain unchanged.
+
+Compatibility closeout verification: presentation assertions pass, migration hooks19/19,
+release-tool regressions49/49, parsed workflow pin agreement and real Core
+compatibility acceptance/rejection checks pass. No hosted CI or new-floor install
+was claimed before Core publication.

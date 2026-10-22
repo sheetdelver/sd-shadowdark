@@ -477,3 +477,25 @@ and a hidden/unrolled participant added after start. All six controls retain two
 rows, intact stat pills and Damage icon; isolated run12/12 passed. No module runtime
 change was needed for that row adjustment. Further combat-manager UI cleanup is
 next; no remote/release operation or version change is included in this checkpoint.
+
+
+## Core closeout and release floor — 2026-10-22
+
+The user closed Core ADR0067–0069 and explicitly selected Shadowdark requirement
+alignment. Module ADR0003's release-compatibility amendment records the new
+Core0.20.0/module-api1.7.0/UI3.3.0 floor and coordinated CI pins. Earlier tests
+against older supported hosts are historical evidence for their original
+manifests, not admission evidence for the new floor. This does not close unrelated
+module functional review or change native rules, migrations, artwork fallback or
+reference authorization.
+
+The real Core compatibility resolver accepts the proposed0.20.0/current API set
+and rejects0.19.8/older APIs; parsed validation/release pins match. Updated
+presentation assertions pass; migration suite19/19 passes. Core publication must
+precede the updated module CI/package/release; no unavailable tag was fetched,
+no real release helper or native service was run. Module version remains0.9.6.
+
+Compatibility closeout verification: presentation assertions pass, migration hooks19/19,
+release-tool regressions49/49, parsed workflow pin agreement and real Core
+compatibility acceptance/rejection checks pass. No hosted CI or new-floor install
+was claimed before Core publication.

@@ -401,5 +401,16 @@ Core combat artwork adoption implements optional `resolveDisplayArtwork` using
 the caller-bound read-only argument and the shared exact-origin/default policy.
 Preserve custom displayed Combatant/Token images, not just custom Actor images.
 Verify real session `_id` shapes and managed production rendering; a successful
-resolver response alone does not prove the UI applied it. Never raise the minimum
-host version for this optional fallback-compatible presentation feature.
+resolver response alone does not prove the UI applied it. The October22 user instruction explicitly raises the next release floor to
+Core0.20.0/module-api1.7.0/UI3.3.0. This supersedes the earlier keep-floor policy
+for this release; do not infer further floor changes. Runtime absence of a native
+art package still preserves original images.
+
+
+### Coordinated Core release floor — 2026-10-22
+
+The current manifest and validation/release workflow pins target Core v0.20.0,
+SDK3.5.0/module-api1.7.0/UI3.3.0. Publish Core before running those workflows or
+releasing this module. Historical0.19.2/0.19.5 test results below/above remain
+historical; they do not certify the new manifest on the older host. No module
+version bump or release is authorized by compatibility/documentation closeout.

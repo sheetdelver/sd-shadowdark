@@ -9,18 +9,18 @@ import ShadowdarkImportPage from '../ui/tools/ShadowdarkImportPage';
 import Bestiary from '../ui/tools/Bestiary';
 
 assert.equal(manifest.componentStyles, theme, 'UI manifest must own shared styles');
-// Core v0.19.2 includes the selected lock, ownership-event, SDK error and shared UI corrections.
-assert.equal(manifest.info.compatibility?.coreVersion, '>=0.19.2');
+// The selected next release requires the Core v0.20.0 package/artwork/reference contracts.
+assert.equal(manifest.info.compatibility?.coreVersion, '>=0.20.0');
 const moduleInfo = JSON.parse(fs.readFileSync(new URL('../../info.json', import.meta.url), 'utf8'));
 assert.equal(manifest.info.version, moduleInfo.version, 'published UI uses the authoritative module version');
-assert.match(fs.readFileSync(new URL('../../.github/workflows/ci-shadowdark.yaml', import.meta.url), 'utf8'), /ref: v0\.19\.2\b/);
+assert.match(fs.readFileSync(new URL('../../.github/workflows/ci-shadowdark.yaml', import.meta.url), 'utf8'), /ref: v0\.20\.0\b/);
 const releaseWorkflow = fs.readFileSync(new URL('../../.github/workflows/release-shadowdark.yaml', import.meta.url), 'utf8');
-assert.match(releaseWorkflow, /CI_CORE_REF: 'v0\.19\.2'/);
+assert.match(releaseWorkflow, /CI_CORE_REF: 'v0\.20\.0'/);
 assert.match(releaseWorkflow, /node scripts\/release\.mjs --verify-tag-ci/);
 assert.match(releaseWorkflow, /node scripts\/publish-release\.mjs/);
 assert.doesNotMatch(releaseWorkflow, /npm ci|module:package/, 'publication consumes the validated package');
-assert.equal(manifest.info.compatibility?.apiContracts?.['ui-extension-api'], '>=3.2.0 <4.0.0');
-assert.equal(manifest.info.compatibility?.apiContracts?.['module-api'], '>=1.6.0 <2.0.0');
+assert.equal(manifest.info.compatibility?.apiContracts?.['ui-extension-api'], '>=3.3.0 <4.0.0');
+assert.equal(manifest.info.compatibility?.apiContracts?.['module-api'], '>=1.7.0 <2.0.0');
 assert.equal(manifest.info.compatibility?.apiContracts?.['roll-engine-api'], '>=1.0.0 <2.0.0');
 assert.equal((manifest.info as any).sdkVersion, undefined, 'no invented SDK manifest field');
 assert.deepEqual((manifest.info.worldSettings ?? []).map(row => [row.key, row.scope, row.systemVersion, row.schema.type, row.default?.value, row.affectsPreparation, row.exposure]), [

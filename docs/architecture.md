@@ -499,7 +499,7 @@ is outside the supported baseline.
 
 `info.json` declares the module version, API compatibility and world settings.
 CI checkout, the reusable release workflow and its `core_ref` all use the
-Core `v0.19.2` toolchain. CI also runs on `migration.json` and
+Core `v0.20.0` toolchain (publication pending). CI also runs on `migration.json` and
 `migrations/**` changes. Release assets include the package archive, checksum,
 catalog manifest and release history. A module release tag identifies the
 matching manifest version. With the root `migration.json`, packaging compiles
@@ -509,9 +509,9 @@ derives from the packaged catalog.
 
 Repository workflow and verification commands live in [AGENTS.md](../AGENTS.md).
 The shared contracts are described in Core's
-[module authoring guide](https://github.com/sheetdelver/sheetdelver/blob/v0.19.2/docs/MODULE_AUTHORING.md),
-[world context and migrations](https://github.com/sheetdelver/sheetdelver/blob/v0.19.2/docs/MODULE_MIGRATIONS.md)
-and [release process](https://github.com/sheetdelver/sheetdelver/blob/v0.19.2/docs/RELEASING.md).
+[module authoring guide](https://github.com/sheetdelver/sheetdelver/blob/main/docs/MODULE_AUTHORING.md),
+[world context and migrations](https://github.com/sheetdelver/sheetdelver/blob/main/docs/MODULE_MIGRATIONS.md)
+and [release process](https://github.com/sheetdelver/sheetdelver/blob/main/docs/RELEASING.md).
 
 ## Effect-key migration
 
@@ -796,3 +796,16 @@ modified copy HP vs original facts, both typed routes, desktop/mobile rendering,
 focus return, native ownership-setting revoke/restore and existing-copy restart.
 These are isolated production/development tests with controlled upstream data,
 not a new live Foundry acceptance claim.
+
+
+## Selected release compatibility — 2026-10-22
+
+The user requested alignment with the completed Core SDK work. The next module
+release requires Core>=0.20.0, module-api>=1.7.0<2.0.0 and
+ui-extension-api>=3.3.0<4.0.0; roll-engine-api remains>=1.0.0<2.0.0. CI checkout,
+CI_CORE_REF and release validation fingerprint all target v0.20.0. Core must be
+published first. The current Core source checkout's0.19.8 metadata intentionally
+fails the new floor; no bypass or runtime metadata change is introduced here.
+Historical older-host acceptance remains valid only for its tested manifests.
+Native-art installation and per-source reference availability remain optional;
+no artwork replacement occurs when a provider is absent/disabled/unavailable.

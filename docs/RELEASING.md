@@ -143,3 +143,13 @@ October 21 CI follow-up: the presentation suite's historical reusable-workflow
 assertion was updated to the already-adopted module-owned publisher, exact-tag
 validation and unchanged Core0.19.2 toolchain identity. It also rejects packaging
 or dependency installation in publication. No presentation/runtime source changed.
+
+
+October22 compatibility closeout supersedes the earlier toolchain pin: the next
+release requires Core>=0.20.0/module-api>=1.7.0/UI>=3.3.0, and validation checkout
+plus both workflow fingerprints use v0.20.0. Publish Core first; until then the
+module's remote validation cannot resolve the planned toolchain tag. Current
+local Core0.19.8 metadata also fails the raised application floor. Release version
+metadata remains0.9.6; use the module release helper only after Core publication,
+merged module changes and successful validation. The source-only presentation and
+migration assertions now check the new floor without changing migration behavior.

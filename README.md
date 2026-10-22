@@ -15,7 +15,10 @@ Character sheets and tools for playing Shadowdark RPG with SheetDelver.
 <img src="https://github.com/sheetdelver/sheetdelver/blob/main/images/sheets/shadowdark/sd-character-sheet.png" alt="Shadowdark character sheet" width="25%">
 <img src="https://github.com/sheetdelver/sheetdelver/blob/main/images/sheets/shadowdark/sd-paper-view.png" alt="Shadowdark paper-style sheet" width="25%">
 
-Requires **SheetDelver Core 0.19.2 or later**.
+Requires **SheetDelver Core 0.20.0 or later**, with module-api1.7.0 and
+ui-extension-api3.3.0. Core0.20.0 publication is pending; publish Core before this
+module's next validation/release. The module version remains0.9.6 until release
+preparation. Optional native art packages are not required.
 
 Verified with native Shadowdark4.0.6 on Foundry13.351 and14.367. Core owns
 world maintenance approval; the module does not repair data from player sheets.
