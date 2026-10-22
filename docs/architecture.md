@@ -809,3 +809,17 @@ fails the new floor; no bypass or runtime metadata change is introduced here.
 Historical older-host acceptance remains valid only for its tested manifests.
 Native-art installation and per-source reference availability remain optional;
 no artwork replacement occurs when a provider is absent/disabled/unavailable.
+
+
+### Shared page canvas
+
+Generator, importer and bestiary keep transparent outer canvases and opaque paper
+content panels. Core owns world artwork and theme fallback (Core ADR0070); no
+module status fetch or private background hook is used. Shadowdark leaves
+`--sd-module-page-background` unset to follow Core's current player theme when
+world artwork is unavailable. See module ADR0003 / SD-UI13 for rollout and checks.
+
+Core's final ADR0070 design applies the same canvas through SDK SurfaceHost to
+module actor pages and tools. The player layout also hosts dashboard, combat and
+future routes with one image loader and shared viewport-fixed CSS. Modules may
+configure the documented fallback color; no module background hook is needed.

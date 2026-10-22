@@ -76,7 +76,7 @@ export default function Bestiary() {
         && entry.name.toLowerCase().includes(query.trim().toLowerCase()));
 
     return (
-        <main className="min-h-screen bg-neutral-100 text-black font-serif pb-24">
+        <main className="min-h-screen font-serif pb-24">
             <nav className="bg-neutral-900 border-b border-neutral-800 px-4 py-3 flex items-center justify-between">
                 <button type="button" onClick={() => navigate('/')} className="text-neutral-200 hover:text-amber-400 font-semibold text-sm uppercase tracking-wide min-h-11">← Back to Dashboard</button>
                 <h1 className="text-white font-bold uppercase tracking-widest text-sm">Bestiary</h1>
@@ -86,11 +86,11 @@ export default function Bestiary() {
                     <label className="flex-1">
                         <span className="sr-only">Search creatures</span>
                         <input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Search creatures…"
-                            className="w-full border-2 border-black px-3 min-h-11 bg-white" />
+                            className="w-full border-2 border-black px-3 min-h-11 bg-white text-black" />
                     </label>
                     <label className="flex items-center gap-2">
                         <span className="text-xs uppercase font-bold tracking-widest">Source</span>
-                        <select value={source} onChange={event => setSource(event.target.value as any)} className="border-2 border-black min-h-11 px-2 bg-white">
+                        <select value={source} onChange={event => setSource(event.target.value as any)} className="border-2 border-black min-h-11 px-2 bg-white text-black">
                             <option value="all">All</option>
                             {compendiumAvailable && <option value="compendium">Shadowdark monsters</option>}
                             <option value="world">World NPCs</option>
@@ -98,13 +98,13 @@ export default function Bestiary() {
                     </label>
                 </div>
                 {!compendiumAvailable && entries && <p className="text-sm">Compendium monsters are shown to GMs. You can browse the world NPCs visible to you.</p>}
-                {error && <p role="alert" className="text-red-800 font-bold">{error}</p>}
+                {error && <p role="alert" className="bg-white border-2 border-black p-3 text-red-800 font-bold">{error}</p>}
                 {entries === null && <p role="status" className="italic">Loading creatures…</p>}
                 <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3" aria-label="Creatures">
                     {visible.map(entry => (
                         <li key={formatUuid(entry.ref)}>
                             <button type="button" onClick={() => open(entry)}
-                                className="w-full text-left bg-white border-2 border-black p-3 flex gap-3 items-center hover:bg-neutral-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-600 shadow-[3px_3px_0_0_rgba(0,0,0,1)] min-h-11">
+                                className="w-full text-left bg-white text-black border-2 border-black p-3 flex gap-3 items-center hover:bg-neutral-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-600 shadow-[3px_3px_0_0_rgba(0,0,0,1)] min-h-11">
                                 {entry.img && <ArtworkImage key={`${entry.img}:${entry.fallbackImg ?? ''}`} src={entry.img} fallback={entry.fallbackImg} className="w-12 h-12 object-cover border border-black bg-neutral-200 shrink-0" />}
                                 <span className="min-w-0">
                                     <span className="block font-bold text-lg leading-tight break-words">{entry.name}</span>

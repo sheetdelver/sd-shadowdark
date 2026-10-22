@@ -782,8 +782,8 @@ function GeneratorContent() {
     // 3. Main Render
     if (data.error) {
         return (
-            <div className="flex min-h-screen items-center justify-center bg-neutral-100 p-4 text-black">
-                <CollectionStatus state={data} label="Loading character creation data…" />
+            <div className="flex min-h-screen items-center justify-center p-4">
+                <div className="bg-white p-6 border-2 border-black text-black"><CollectionStatus state={data} label="Loading character creation data…" /></div>
             </div>
         );
     }
@@ -808,7 +808,7 @@ function GeneratorContent() {
     }
 
     return (
-        <div className={`flex flex-col min-h-screen font-crimson font-inter font-sans bg-neutral-100 text-black pb-24`}>
+        <div className={`flex flex-col min-h-screen font-crimson font-inter font-sans text-black pb-24`}>
 
             {/* Top Navigation Bar */}
             <nav className="relative bg-neutral-900 border-b border-neutral-800 px-4 py-3 shadow-md flex items-center justify-between backdrop-blur-sm bg-opacity-95">

@@ -3,6 +3,30 @@
 Status: User review corrections implemented and isolated-verified; target card layout confirmed, remaining functional review open
 Date: 2026-10-20
 
+## Current review status — 2026-10-22
+
+The user explicitly confirmed that additional Shadowdark review remains. Core's
+ADR closeout and published0.20.0 release do **not** close this module ADR or
+authorize its release. Implemented changes are checkpointed through `fc593c4`;
+remaining work is the user's review and correction of any further findings.
+
+- Confirmed by the user: the illustrated background-card layout, optional monster
+  artwork and informational reference-card behavior.
+- Implemented and isolated-tested, awaiting completion of module review: restored
+  dialog styling (spell/language/Boon/Effect and other inspected surfaces), spell
+  picker labels, bounded language customization/full catalog, focus eligibility,
+  responsive sheets/tools and their interaction with the retained rule/recovery
+  paths. Do not infer blanket acceptance from the separate artwork confirmations.
+- Compatibility: Core0.20.0 is now published; the required SDK3.5.0/module-api1.7.0/
+  UI3.3.0 baseline is available. This removes the publication dependency only.
+- Release is held for user review. ADR0001/0002 remain closed for their previously
+  accepted native behavior scope; new findings belong in this active audit.
+
+The [whole-UI audit](../audits/2026-10-20-presentation-regressions.md) remains the
+current inventory and verification record, including all42 changed UI paths and
+later user corrections. The subsequent SD-UI13 background finding below is implemented; it does not
+close the remaining operator review.
+
 ## Context
 
 The user reported visibly inconsistent dialogs after native alignment and spell
@@ -240,3 +264,37 @@ Compatibility closeout verification: presentation assertions pass, migration hoo
 release-tool regressions49/49, parsed workflow pin agreement and real Core
 compatibility acceptance/rejection checks pass. No hosted CI or new-floor install
 was claimed before Core publication.
+
+
+## 2026-10-22 amendment: tool canvas backgrounds (SD-UI13)
+
+The user reported white tool-page surroundings where sheets correctly showed the
+Core theme canvas. Generator (including its failure state), importer and bestiary
+now leave their outer canvas transparent. Existing white paper panels remain;
+bestiary cards/inputs explicitly retain black text while outside labels and status
+text inherit the host foreground. Generator errors stay in a readable white panel.
+
+Core owns the world-image/color precedence (Core ADR0070), including loading and
+missing-tool states. Shadowdark does not set a custom page color. Its transparent
+tools therefore use world artwork when present, otherwise the current Core theme.
+A module can opt into the documented scoped CSS fallback color without importing
+Core state. Core0.20.0 alone restores theme-colored surroundings with this module
+patch; the new Core repair is needed for tool world artwork. No module version or
+compatibility change is made here. Release and full operator review remain open.
+
+Verification: presentation regression failed before the opaque importer root was
+removed and passes afterward. Seven real-component browser checks pass at390px
+and1280px with compiled module CSS and Core preflight, including the generator's
+failed-collection panel. Core's separate browser test covers world-image/color
+precedence and lifecycle. See the owning audit for commands and limits.
+
+SD-UI13 universal-host clarification: Core ADR0070 now centralizes the canvas in
+the player layout/shared CSS, including dashboard, combat and future routes. SDK
+SurfaceHost applies it to both actorPage and tools. The optional module color is
+a documented SDK-host CSS contract; no per-module hook or settings UI is needed.
+This supersedes the intermediate tool-only background wrapper.
+
+SD-UI13 acceptance — 2026-10-22: the user verified the final shared background
+behavior, including the universal Core/SDK host correction, and authorized this
+local checkpoint. SD-UI13 is accepted. Remaining ADR0003 review is not implicitly
+closed; publication, pushes and merges remain user-owned.

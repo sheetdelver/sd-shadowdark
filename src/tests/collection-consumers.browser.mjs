@@ -23,6 +23,8 @@ import {ShadowdarkUIProvider} from '${moduleRoot}/src/ui/context/ShadowdarkUICon
 import Gear from '${moduleRoot}/src/ui/components/GearSelectionModal';
 import Spells from '${moduleRoot}/src/ui/SpellsTab';
 import Generator from '${moduleRoot}/src/ui/tools/Generator';
+import Importer from '${moduleRoot}/src/ui/tools/ShadowdarkImportPage';
+import Bestiary from '${moduleRoot}/src/ui/tools/Bestiary';
 import Details from '${moduleRoot}/src/ui/DetailsTab';
 import SpellPicker from '${moduleRoot}/src/ui/components/SpellSelectionModal';
 import LanguagePicker from '${moduleRoot}/src/ui/components/LanguageSelectionModal';
@@ -54,6 +56,8 @@ const advancementProps={actorId:'',currentLevel:0,targetLevel:1,classObj:advance
 function Advancement(){const {state,actions}=useLevelUp(advancementProps);window.completeAdvancement=()=>{actions.setHpRoll(4);actions.setGoldRoll(60);actions.setRolledTalents([{name:'Native rolled talent',type:'Talent',system:{},effects:[]}]);};return <><output>{state.error||'No error'}</output><button disabled={!actions.isComplete()}>Finish advancement</button></>;}
 function ParityPicker(){const [open,setOpen]=React.useState(false);return <><button onClick={()=>setOpen(true)}>Open spell manager</button><SpellPicker isOpen={open} onClose={()=>setOpen(false)} onSave={intent=>window.saved=intent} title="Manage spells" tier={1} classUuid="Compendium.shadowdark.classes.Item.wizard" knownSpells={window.initial.owned||[]} maxSelections={window.initial.limit} actor={window.initial.actor}/></>;}
 function Consumer(){switch(window.initial.which){
+case 'importer':return <Importer/>;
+case 'bestiary':return <Bestiary/>;
 case 'resource-card': {
  const source=window.initial.actor;
  const derived=prepareShadowdarkView(source,{classDocument:()=>({name:'Wizard',type:'Class',system:{spellcasting:{ability:'int'}}})});
@@ -88,6 +92,7 @@ window.render();
 const browser = await chromium.launch({ ...(process.env.SHADOWDARK_CHROME ? { executablePath: process.env.SHADOWDARK_CHROME } : {}), headless: true, args: ['--no-sandbox', '--disable-background-networking'] });
 const results = [];
 async function test(name, initial, run) {
+    if(process.argv.includes('--backgrounds-only')&&!name.startsWith('SD-UI13'))return;
     if(process.argv.includes('--cards-only')&&!name.startsWith('SD-UI10/11'))return;
     if(providerBaseline&&!name.startsWith('SD02-06') )return;
     if((languageBaseline||process.argv.includes('--language-only'))&&!name.startsWith('SD02-12'))return;
@@ -97,6 +102,7 @@ async function test(name, initial, run) {
     page.on('pageerror', e => errors.push(e.message)); await page.route('**/*', r => r.abort());
     try {
         await page.setContent('<div id="root" class="sdk-module--shadowdark"></div>');
+        if(name.startsWith('SD-UI13')) { assert.ok(process.env.SHADOWDARK_HOST_CSS, 'Core CSS including preflight is required'); await page.addStyleTag({path:process.env.SHADOWDARK_HOST_CSS}); await page.addStyleTag({path:path.join(moduleRoot,'assets/presentation.css')}); }
         if(initial.which==='resource-card') { await page.setViewportSize({width:initial.width,height:900}); if(process.env.SHADOWDARK_CARD_TAILWIND)await page.addStyleTag({path:process.env.SHADOWDARK_CARD_TAILWIND});await page.addStyleTag({path:path.join(moduleRoot,'assets/presentation.css')}); } await page.evaluate(x => window.initial = x, initial);
         await page.addScriptTag({ content: bundled.outputFiles[0].text });
         await run(page); assert.deepEqual(errors, []); results.push({ name, ok: true }); console.log(`✓ ${name}`);
@@ -109,6 +115,35 @@ const text = (p, value) => p.getByText(value, { exact: true }).waitFor({ timeout
 const count = (p, key) => p.evaluate(k => window.calls.filter(c => c.key === k).length, key);
 const settled = p => p.waitForTimeout(100);
 try {
+    if(process.argv.includes('--backgrounds-only') || process.env.SHADOWDARK_HOST_CSS) {
+    for (const which of ['generator', 'importer', 'bestiary']) for (const width of [390, 1280]) {
+        await test(`SD-UI13: ${which} exposes host canvas at ${width}px`, {which, policy:{bestiary:{body:{success:true,entries:[{ref:{documentType:'Actor',id:'npc'},name:'Visible monster',source:'world',level:1,ac:10,hp:4}],compendiumAvailable:true}}}}, async p=>{
+            await p.setViewportSize({width,height:900});
+            assert.ok(process.env.SHADOWDARK_CARD_TAILWIND, 'compiled module CSS is required');
+            await p.addStyleTag({path:process.env.SHADOWDARK_CARD_TAILWIND});
+            await p.addStyleTag({content:'#root{min-height:100vh;background:rgb(16,32,55);color:rgb(241,245,251)}'});
+            await p.getByText('Back to Dashboard',{exact:false}).waitFor();
+            const pageRoot=p.locator('#root > :first-child');
+            assert.equal(await pageRoot.evaluate(e=>getComputedStyle(e).backgroundColor),'rgba(0, 0, 0, 0)');
+            assert.ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth), 'tool must fit the viewport');
+            if(which==='bestiary') {
+                const card=p.getByRole('button',{name:/Visible monster/});
+                assert.equal(await card.evaluate(e=>getComputedStyle(e).color),'rgb(0, 0, 0)');
+                assert.equal(await card.evaluate(e=>getComputedStyle(e).backgroundColor),'rgb(255, 255, 255)');
+            }
+            await p.screenshot({path:path.join(out,`background-${which}-${width}.png`),animations:'disabled'});
+            await p.addStyleTag({content:'#root{background:rgb(234,241,248);color:rgb(23,41,63)}'});
+            assert.equal(await pageRoot.evaluate(e=>getComputedStyle(e).backgroundColor),'rgba(0, 0, 0, 0)');
+        });
+    }
+    await test('SD-UI13: generator failure keeps the canvas and a readable error panel', {which:'generator',policy:{classes:{status:503}}},async p=>{
+        await p.getByRole('alert').first().waitFor();
+        assert.ok(process.env.SHADOWDARK_CARD_TAILWIND);
+        await p.addStyleTag({path:process.env.SHADOWDARK_CARD_TAILWIND});
+        assert.equal(await p.locator('#root > :first-child').evaluate(e=>getComputedStyle(e).backgroundColor),'rgba(0, 0, 0, 0)');
+        assert.equal(await p.locator('#root > :first-child > :first-child').evaluate(e=>getComputedStyle(e).backgroundColor),'rgb(255, 255, 255)');
+    });
+    }
     await test('RV-16: advancement consumes a bare document response and completes native fixed grants', {which:'advancement',documents:{'Compendium.shadowdark.talents.Item.backstab':{_id:'backstab',name:'Backstab',type:'Talent',system:{},effects:[]}}}, async p=>{
         await p.waitForFunction(()=>typeof window.completeAdvancement==='function');
         await p.evaluate(()=>window.completeAdvancement());

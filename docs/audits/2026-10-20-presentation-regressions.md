@@ -2,6 +2,16 @@
 
 Date: 2026-10-20. Active scope: [ADR-0003](../adr/0003-preserve-module-presentation.md).
 
+## Current disposition — 2026-10-22
+
+**Open for user review; Shadowdark release held.** The user clarified that more
+module surfaces/behavior still need review. Core0.20.0 publication and completed
+Core ADR0067–0069 do not establish full Shadowdark acceptance. Implementations
+through `fc593c4` are checkpointed, including compatibility alignment. Card layout,
+artwork and informational reference behavior have specific user confirmations;
+other implemented changes retain their recorded automated/isolated results without
+being labelled blanket operator acceptance. See ADR0003's current review summary.
+
 ## Provenance and scope
 
 - Reviewed release tree: `60b9c63`, module 0.9.6; native-parity merge `bd03ab4`,
@@ -499,3 +509,68 @@ Compatibility closeout verification: presentation assertions pass, migration hoo
 release-tool regressions49/49, parsed workflow pin agreement and real Core
 compatibility acceptance/rejection checks pass. No hosted CI or new-floor install
 was claimed before Core publication.
+
+
+### Released-Core compatibility check — 2026-10-22
+
+Core v0.20.0 is published at560f26e0222760bd9a69531ce6cd22d6b81cbec4. An
+isolated copy of that exact Core tree with committed Shadowdark fc593c4 passes
+module:check: compatibility, TypeScript, scoped Tailwind and logic/UI/server dry
+bundles. This removes the planned-release compatibility blocker, not the user's
+remaining review. The initial root-workspace attempt encountered an unrelated
+D&D source type error and missing external-copy dependency resolution; the
+corrected run excludes sibling checkouts and supplies shared installed toolchain
+dependencies. No module runtime fix was required. No native/installed UI or
+hosted CI acceptance is claimed. Module release remains held for user review.
+
+
+## SD-UI13 — Tool canvases obscure the world/theme background (2026-10-22)
+
+User report: character-sheet surroundings correctly show the blue Core theme,
+but generator/importer/bestiary show a white/light page canvas. Confirmed roots in
+`src/ui/tools/Generator.tsx`, `src/ui/components/ShadowdarkImportForm.tsx` and
+`src/ui/tools/Bestiary.tsx` used `bg-neutral-100`. Core0.20.0's tool host also lacked
+world artwork. The module roots are now transparent; inner paper styling remains.
+Bestiary outside text inherits the host foreground; its white controls/cards keep
+black text. Generator errors have a bounded white panel rather than a white page.
+
+Core's approved repair branch `fix/module-tool-backgrounds` supplies world artwork
+→ optional module CSS color → current Core theme color (Core ADR0070). Shadowdark
+leaves the optional color unset. This requires both repairs for artwork; the
+module-only patch still exposes Core0.20.0's theme canvas. No API minimum bumped.
+
+Checks from the Core toolchain:
+
+- `npx tsx data/local/modules/shadowdark/src/tests/presentation.test.ts`: fails on
+  the old importer canvas, passes after correction.
+- `collection-consumers.browser.mjs /tmp/output --backgrounds-only`: seven pass,
+  covering all three real tools at390/1280px, readable bestiary cards and generator
+  collection failure. Set `SHADOWDARK_PLAYWRIGHT_MODULE`, `SHADOWDARK_CHROME`,
+  `SHADOWDARK_CARD_TAILWIND` (compiled via Core `compileModuleTailwind`) and
+  `SHADOWDARK_HOST_CSS` (Core globals compiled with its PostCSS/Tailwind toolchain).
+  The first fixture omitted Core preflight and falsely reported mobile overflow;
+  the corrected installed-style fixture passes. Screenshots use settled transitions.
+- `module:check -- shadowdark --data-dir <isolated-data>` passes compatibility,
+  typing, scoped CSS and logic/UI/server dry bundles with the updated Core copy.
+
+Browser requests are blocked, data is synthetic and Foundry icons are not loaded.
+This verifies backgrounds/layout, not live content or creation/import writes.
+No task service remains; operator review, commit and release remain pending.
+
+SD-UI13 follow-up: the user confirmed the inherited backgrounds but found long
+pages enlarged the world image excessively. Core ADR0070 now anchors tool cover
+sizing to the viewport instead of page height. The actual host browser check
+fails before and passes after for short,5000px and scrolled content at390/1280px.
+This follow-up changes Core hosting only; the module's transparent roots remain.
+
+Final hosting adjustment: the user requested universal behavior and module
+configuration. Core now uses one player-layout image loader and shared CSS, not a
+tool-specific wrapper. SDK actorPage/tools hosts inherit it and accept the scoped
+module fallback-color variable. Core browser checks cover dashboard, combat
+access view, module sheet and a new page with no background code; route changes
+do not create additional loaders. Shadowdark still leaves custom color unset.
+
+SD-UI13 acceptance — 2026-10-22: the user verified the final shared background
+behavior, including the universal Core/SDK host correction, and authorized this
+local checkpoint. SD-UI13 is accepted. Remaining ADR0003 review is not implicitly
+closed; publication, pushes and merges remain user-owned.

@@ -126,7 +126,7 @@ export default function ShadowdarkImportForm({ onCancel, onImportSuccess }: Shad
     };
 
     return (
-        <main className="flex min-h-screen flex-col bg-neutral-100 pb-24 font-crimson font-inter font-sans text-black">
+        <main className="flex min-h-screen flex-col pb-24 font-crimson font-inter font-sans text-black">
             <nav className="relative bg-neutral-900 border-b border-neutral-800 px-4 py-3 shadow-md flex items-center justify-between backdrop-blur-sm bg-opacity-95">
                 <button
                     type="button"

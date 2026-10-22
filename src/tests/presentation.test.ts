@@ -44,6 +44,7 @@ assert.equal(typeof manifest.tools?.importer, 'function');
 const importerPage = renderToStaticMarkup(
     createElement(MockSDKProvider, null, createElement(ShadowdarkImportPage))
 );
+assert.doesNotMatch(importerPage.match(/<main[^>]*>/)?.[0] ?? '', /bg-neutral-100/, 'importer canvas must expose the host background');
 assert.match(importerPage, /Import Character/);
 assert.match(importerPage, /Shadowdarklings\.net Importer/);
 assert.match(importerPage, /Back to Dashboard/);
@@ -55,6 +56,7 @@ assert.doesNotMatch(importerPage, /fixed top-0|sticky top-\[45px\]|mt-\[45px\]/,
     'importer navigation flows below the Core HUD');
 assert.match(importerPage, /Paste Character JSON/);
 const bestiaryPage = renderToStaticMarkup(createElement(MockSDKProvider, null, createElement(Bestiary)));
+assert.doesNotMatch(bestiaryPage.match(/<main[^>]*>/)?.[0] ?? '', /bg-neutral-100/, 'bestiary canvas must expose the host background');
 assert.match(bestiaryPage, /Bestiary/);
 assert.match(bestiaryPage, /Back to Dashboard/);
 assert.match(bestiaryPage, /Loading creatures/, 'bestiary shows an explicit loading state before authorized data arrives');
