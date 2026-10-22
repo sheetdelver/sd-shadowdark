@@ -1,3 +1,4 @@
+import { prepareReferenceView } from './reference-view';
 import { resolveDisplayArtwork } from './community-artwork';
 import { BaseSystemAdapter, logger } from '@sheet-delver/sdk';
 import type {
@@ -115,6 +116,8 @@ export class ShadowdarkAdapter extends BaseSystemAdapter {
 
     /** Optional SDK display hook, structurally typed to retain the older host floor. */
     resolveDisplayArtwork = resolveDisplayArtwork;
+    prepareReferenceView = (context: Parameters<typeof prepareReferenceView>[0], runtime: Parameters<typeof prepareReferenceView>[1]) =>
+        prepareReferenceView(context, runtime, this.lookups());
 
     getActorCardData(actor: PreparedActorData): any {
         const derived = (actor.derived ?? {}) as any;

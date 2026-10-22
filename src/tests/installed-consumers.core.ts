@@ -252,6 +252,23 @@ async function main() {
             const copiedActor=state.actors.find(row=>row._id===copiedRow.actorId)!;
             assert.equal(copiedActor._stats?.compendiumSource,undefined);
             assert.equal(copiedActor.flags.world.sheetDelverCombatCopy.sourceUuid,uuid);
+            if (args.has('roster-layout')) {
+                const stats=(await request('combat-manager/stat-preferences')).preferences.attributes;
+                const saved=await context.request.put(`${api}/api/combat-manager/stat-preferences`,{
+                    headers:{Origin:origin,'X-SheetDelver-Runtime':(await request('status')).runtimeToken},
+                    data:{attributes:stats.map((field:Doc)=>field.key==='hp'?{...field,editable:true,health:true}:field)}});
+                assert.equal(saved.status(),200,await saved.text());
+                assert.equal((await saved.json()).preferences.attributes.find((field:Doc)=>field.key==='hp')?.health,true);
+                upstream.externalUpdate('Combat',[{_id:'artCombat',round:1,turn:0}]);
+                const added=await context.request.post(`${api}/api/combat-manager/artCombat/pack-actors`,{
+                    headers:{Origin:origin,'X-SheetDelver-Runtime':(await request('status')).runtimeToken},
+                    data:{packId:'shadowdark.monsters',actorId:'sgVqRuCaadRK1P7R',quantity:1}});
+                assert.equal(added.status(),200,await added.text());
+                const addedRow=(await added.json()).encounter.participants.find((row:Doc)=>row.source==='compendium-copy'&&row.id!==copiedRow.id);
+                assert.ok(addedRow);
+                upstream.externalUpdate('Combatant',[{_id:addedRow.id,hidden:true,initiative:null}],{parentUuid:'Combat.artCombat'});
+                evidence.rosterAddedAfterStart=addedRow.id;
+            }
             const sourceBefore=structuredClone(copiedActor),writesBefore=upstream.writes.length;
             const copyTarget=`combatId=artCombat&combatantId=${copiedRow.id}`;
             assert.equal((await request(`display-artwork?purpose=combat-portrait&${copyTarget}`)).src,art.src);
@@ -260,14 +277,84 @@ async function main() {
             await page.getByText(copiedRow.name,{exact:true}).first().scrollIntoViewIfNeeded();
             await page.waitForFunction(()=>Array.from(document.images).some(img=>img.src.endsWith('/portraits/aboleth.webp')&&img.naturalWidth>0));
             await page.screenshot({path:path.join(out,'shots','combat-copy-artwork.png')});
+            if (args.has('roster-layout')) {
+                for (const width of [360,820,1440]) {
+                    await page.setViewportSize({width,height:1000});
+                    const hide=page.getByRole('button',{name:/Reveal Aboleth #2 in player combat HUD/});
+                    await hide.waitFor();
+                    const row=hide.locator('..').locator('..');
+                    await row.scrollIntoViewIfNeeded();
+                    const dimensions=await row.evaluate((node:HTMLElement)=>{
+                        const actions=node.querySelector('.grid.grid-cols-3')!;
+                        const buttons=[...actions.querySelectorAll('button')];
+                        return {width:node.clientWidth,scroll:node.scrollWidth,rows:new Set(buttons.map(button=>Math.round(button.getBoundingClientRect().top))).size,
+                            controls:buttons.length,text:node.innerText,damageIcon:actions.querySelector('svg')?.getBoundingClientRect().width,
+                            pills:[...node.querySelectorAll('[title^="HP:"],[title^="AC:"]')].map(pill=>({width:pill.getBoundingClientRect().width,text:pill.textContent}))};
+                    });
+                    assert.ok(dimensions.scroll<=dimensions.width+1,JSON.stringify(dimensions));
+                    assert.equal(dimensions.controls,6);assert.equal(dimensions.rows,2);
+                    assert.ok((dimensions.damageIcon??0)>=14,JSON.stringify(dimensions));
+                    assert.doesNotMatch(dimensions.text,/world link|pack copy/);
+                    assert.ok(dimensions.pills.every((pill:{width:number})=>pill.width>30),JSON.stringify(dimensions));
+                    await page.screenshot({path:path.join(out,'shots',`roster-layout-${width}.png`)});
+                }
+                pass('active encounter addition: hidden/unrolled identity and whole stat pills, six controls in two rows at360/820/1440px');
+            }
+
             assert.deepEqual(copiedActor,sourceBefore);assert.equal(upstream.writes.length,writesBefore);
-            pass('public Compendium copy displays mapped portrait before initiative without source writes');
+            pass(args.has('roster-layout') ? 'public Compendium copy displays mapped portrait during active combat without presentation writes' : 'public Compendium copy displays mapped portrait before initiative without source writes');
+            if (args.has('reference-views')) {
+                const reference = await request(`compendium-reference?${copyTarget}`);
+                assert.equal(reference.status,'resolved'); assert.equal(reference.reference.uuid,uuid);
+                assert.equal(reference.title,'Aboleth'); assert.deepEqual(reference.model.actions,[]);
+                assert.deepEqual(reference.model.facts,card.card.facts,'reference uses original bestiary facts');
+                const available=await request(`compendium-reference?${copyTarget}&availability=1`);
+                assert.equal(available.model,undefined,'availability does not disclose the model');
+                assert.equal((await request(`compendium-reference?uuid=${uuid.replace('.Actor.','.Item.')}`)).status,'none','wrong document type cannot masquerade as an Item');
+                assert.equal((await request('compendium-reference?uuid=Compendium.shadowdark.monsters.Actor.missing')).status,'none');
+                const itemDoc=packs['shadowdark.gear'][0];
+                assert.equal((await request(`compendium-reference?uuid=Compendium.shadowdark.gear.Item.${itemDoc._id}`)).status,'resolved');
+                const instanceBefore=structuredClone(copiedActor);
+                upstream.externalUpdate('Actor',[{_id:copiedActor._id,'system.attributes.hp.value':1,'system.attributes.hp.max':1}]);
+                await until('reference remains original after instance change',async()=>{
+                    const value=await request(`compendium-reference?${copyTarget}`);
+                    return value.status==='resolved'&&JSON.stringify(value.model.facts)===JSON.stringify(card.card.facts);
+                },manager);
+                for (const width of [360,1440]) {
+                    await page.setViewportSize({width,height:1000});
+                    const row=page.locator('div').filter({has:page.getByText(copiedRow.name,{exact:true})}).filter({has:page.getByRole('button',{name:'View reference',exact:true})}).last();
+                    const link=row.getByRole('button',{name:'View reference',exact:true});
+                    await link.click();
+                    const dialog=page.getByRole('dialog',{name:'Aboleth',exact:true});
+                    await dialog.waitFor();
+                    assert.equal(await dialog.locator('button').count(),1,'only host Close button, no actions');
+                    assert.equal(await dialog.locator('[data-action],a[data-uuid]').count(),0);
+                    await page.screenshot({path:path.join(out,'shots',`reference-${width}.png`)});
+                    await page.keyboard.press('Escape'); await dialog.waitFor({state:'hidden'});
+                    assert.equal(await link.evaluate((node:HTMLElement)=>document.activeElement===node),true,'focus returns to link');
+                }
+                // Actual native ownership setting change must retire an open view.
+                await page.getByRole('button',{name:'View reference',exact:true}).last().click();
+                await page.getByRole('dialog',{name:'Aboleth',exact:true}).waitFor();
+                upstream.setSetting('core.compendiumConfiguration', {'shadowdark.monsters':{ownership:{}}});
+                await page.getByRole('status').filter({hasText:'no longer current'}).waitFor({timeout:60000});
+                assert.equal(await page.locator('.sd-card-title').count(),0);
+                await until('reference link removed after revocation',async()=>(await page.getByRole('button',{name:'View reference',exact:true}).count())===0,manager);
+                assert.equal((await request(`compendium-reference?${copyTarget}`)).status,'none');
+                await page.keyboard.press('Escape');
+                upstream.setSetting('core.compendiumConfiguration', {});
+                await page.getByRole('button',{name:'View reference',exact:true}).first().waitFor({timeout:60000});
+                upstream.externalUpdate('Actor',[instanceBefore]);
+                assert.equal(upstream.writes.length,writesBefore,'viewing never writes native sources');
+                pass('reference Actor/Item routing, original vs altered instance, read-only desktop/mobile card, focus and real ownership revoke/restore');
+            }
             await manager.stop();manager=new Manager(workspace,data,path.join(root,'manager-copy-restarted.log'),production?'start':'dev');
             await until('copy survives Core restart',async()=>(await(await admin.request('/api/status')).json()).initialized===true||false,manager,300000);
             assert.equal((await request(`display-artwork?purpose=combat-portrait&${copyTarget}`)).src,art.src);
             assert.deepEqual(state.actors.find(row=>row._id===copiedRow.actorId),sourceBefore);
             assert.equal(upstream.writes.length,writesBefore);
             pass('existing compendium copy resolves after Core restart without repair or recopy');
+            if(args.has('reference-views')) assert.equal((await request(`compendium-reference?${copyTarget}`)).reference.uuid,uuid);
             evidence.artworkCopyWrites={fixtureSetup:writesBefore,artworkWrites:upstream.writes.length-writesBefore};
 
             await context.close(); return;

@@ -5,10 +5,10 @@ import { monsterPortraitRef } from '../logic/community-artwork';
 /** Structural optional capability keeps this module buildable against its older
  * SDK floor. Core owns discovery, native preferences, asset loading and access.
  */
-type ArtworkRuntime = ModuleRequestRuntime & { artwork?: {
+export type ArtworkRuntime = { artwork?: {
     resolve(uuid: string, kind?: 'image' | 'token'): Promise<{ status: string; src?: string; credit?: string }>;
 } };
-export async function resolveMonsterArtwork(runtime: ModuleRequestRuntime, doc: any, ref: DocumentRef | null): Promise<{ img?: string; fallbackImg?: string; artworkCredit?: string }> {
+export async function resolveMonsterArtwork(runtime: ArtworkRuntime | ModuleRequestRuntime, doc: any, ref: DocumentRef | null): Promise<{ img?: string; fallbackImg?: string; artworkCredit?: string }> {
     const origin = monsterPortraitRef(doc, ref);
     const reader = (runtime as ArtworkRuntime).artwork;
     if (!origin || !reader) return { img: doc?.img };

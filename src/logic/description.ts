@@ -46,3 +46,14 @@ export function enrichDescription(raw: unknown): string {
 export function presentDescription(raw: unknown, baseUrl?: string): string {
     return String(processHtmlContent(enrichDescription(raw), baseUrl));
 }
+
+/** Informational reference cards keep labels/formulas, never inline controls.
+ * Sanitize first, then turn links/buttons into text containers (also covers
+ * source-authored controls rather than just generated Foundry enrichers). */
+export function presentReferenceDescription(raw: unknown, baseUrl?: string): string {
+    return presentDescription(raw, baseUrl)
+        .replace(/<(a|button)\b[^>]*>/gi, '<span>')
+        .replace(/<\/(a|button)>/gi, '</span>')
+        .replace(/<(?:input|select|textarea|form)\b[^>]*>[\s\S]*?<\/(?:select|textarea|form)>/gi, '')
+        .replace(/<(?:input|form)\b[^>]*\/?>/gi, '');
+}

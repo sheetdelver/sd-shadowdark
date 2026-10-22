@@ -765,3 +765,34 @@ origin stamps; the SDK field supplies their exact recorded source after Core
 checks encounter registration and folder agreement. The module does not inspect
 Core-private flags or match monster names. Existing copies require no repair or
 recreation; custom current images still decline replacement.
+
+### Optional compendium reference viewer
+
+Core ADR-0068 owns the optional shared contract. `ShadowdarkAdapter.prepareReferenceView`
+delegates to `server/reference-view.ts`, preparing exact original NPC Actor or Item
+sources with the same `buildNpcCard`/`buildDocumentCard` models as existing cards.
+Player Actors and unsupported origins decline. Core owns source reads, pack type,
+caller access, lifecycle and deadline checks. The module never inspects encounter
+flags, substitutes a current Actor or matches names. Optional artwork uses the
+existing caller-bound artwork reader.
+
+`module/ui.tsx::referenceViews` registers Actor and Item content. The Core combat
+manager consumes Actor views; Item-consuming Core links remain deferred. The
+structural declaration preserves the existing older-host floor. No module version,
+compatibility or workflow Core pin changes are needed for optional adoption.
+
+`ResourceCardBody.tsx` is the shared card body extracted from ResourceDetailModal;
+existing interactive cards retain their default behavior. The reference component
+uses `informational` mode, and `presentReferenceDescription` sanitizes and renders
+inline links/roll controls as text. Card actions are empty; the component mounts
+no Actor/action context. Core provides the sole frame, close button and keyboard
+behavior. Artwork fades, inset black title, paper typography and notes remain.
+The reference is informational original content, not live HP or an encounter sheet.
+
+Maintained `reference-view.test.ts` verifies exact NPC/Item sources, frozen-source
+preservation, actions omitted, aborted work and inert rich text. The installed
+`--artwork-only --reference-views` suite checks real Core public copy creation,
+modified copy HP vs original facts, both typed routes, desktop/mobile rendering,
+focus return, native ownership-setting revoke/restore and existing-copy restart.
+These are isolated production/development tests with controlled upstream data,
+not a new live Foundry acceptance claim.

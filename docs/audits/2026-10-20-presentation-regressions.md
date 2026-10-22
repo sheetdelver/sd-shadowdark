@@ -424,3 +424,56 @@ or release is authorized by this checkpoint.
 Local feature checkpoints: Core `e41c4b48` and Shadowdark `defb07b`. Application
 versions remain unchanged; Core SDK3.5/module-api1.7/UI3.3 declarations are in the
 Core checkpoint. Shadowdark retains its optional older-host fallback.
+
+
+### Optional original-source reference cards — Core ADR-0068 (2026-10-21)
+
+Authorized follow-up to the artwork checkpoint; uncommitted on the existing repair
+branch. No version/floor changes. Core's optional `prepareReferenceView`/
+`referenceViews` contract is adopted structurally in `server/reference-view.ts`,
+`ShadowdarkAdapter` and `module/ui.tsx`. NPC Actor and Item sources share existing
+card models; Core's combat manager consumes Actor references only. Player Actors,
+unknown origins and denied/unavailable compendium entries have no reference link.
+
+`ResourceCardBody.tsx` extracts the established content/notes presentation from
+ResourceDetailModal. Existing interactive cards retain their controller and
+behavior. The informational component uses sanitized inert descriptions and empty
+actions, with one Core-owned dialog and its Close control. It never mounts an
+Actor action context or shows live encounter fields. Art/fades/inset title/paper
+styles and optional community-artwork resolution are retained.
+
+Verification: all19 maintained module suites, explicit module source typing,
+Core unit/client/integration suites,9 new Core contract groups,14 mounted browser
+requests, isolated check/package and12-check development/production installed
+runs passed. The actual public copy writer establishes provenance without native
+_stats; copied HP/max is then changed to1 while reference facts still match the
+original Aboleth fixture. Both typed Actor and Item endpoints, wrong-type/missing
+references, mobile360/desktop1440, Escape/focus restoration, ownership-setting
+revoke/restore and existing-copy Core restart are exercised. Viewer-triggered
+native writes:0; the3 writes from creating the synthetic encounter fixture are
+separately counted. Existing source and instance fixtures are preserved/restored.
+This is controlled upstream/real Core evidence, not a new native Foundry run.
+
+Maintained tests: `src/tests/reference-view.test.ts`,
+`src/tests/installed-consumers.core.ts --artwork-only --reference-views` and the
+unchanged existing card/presentation suites. Core's ADR-0068 and authoring/API/
+manifest docs contain public signatures and reproduction instructions.
+Archive SHA-256:
+`43ede0a724e5c15fcefa524e1b6fc447d9f7156c2e25876d7314e848ad7891b1`.
+Local `/tmp/reference-view-package/data/dist/modules/shadowdark-0.9.6.tgz`;
+acceptance outputs `/tmp/reference-view-development` and
+`/tmp/reference-view-production-final`. No Core-private import, source repair,
+competing modal or Item link in other Core UI is introduced. Operator review and
+commits/releases remain separate.
+
+
+### Reference-view checkpoint approval
+
+The user confirmed the reference presentation and Core's revised combat rows,
+then authorized local Core/Shadowdark checkpoint commits. This is operator-reported
+acceptance additional to the isolated results. The Core roster-only follow-up has
+an installed `--roster-layout` scenario at360/820/1440px, with health controls enabled
+and a hidden/unrolled participant added after start. All six controls retain two
+rows, intact stat pills and Damage icon; isolated run12/12 passed. No module runtime
+change was needed for that row adjustment. Further combat-manager UI cleanup is
+next; no remote/release operation or version change is included in this checkpoint.

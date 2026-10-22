@@ -4,7 +4,21 @@ import infoJson from '../info.json';
 
 const info = infoJson as ModuleInfo;
 
-const uiManifest: UIModuleManifest = {
+// Optional declaration uses structural types to preserve the released SDK floor.
+const referenceViewer = {
+    load: () => import('../src/ui/components/CompendiumReferenceView'),
+    dialog: {
+        overlay: 'absolute inset-0 bg-black/70 backdrop-blur-[2px]',
+        container: 'sd-dialog-panel sd-resource-card relative flex w-full sm:max-w-[34rem] flex-col bg-white text-black border-2 border-black shadow-[8px_8px_0_0_black] outline-none',
+        header: 'sd-dialog-header flex justify-end bg-black text-white pl-3 pr-1 py-1.5',
+        title: 'sr-only',
+        closeBtn: 'p-1 text-white hover:opacity-70',
+        body: 'sd-dialog-body p-3',
+        footer: 'hidden',
+    },
+};
+const uiManifest: UIModuleManifest & { referenceViews?: Record<'Actor' | 'Item', typeof referenceViewer> } = {
+    referenceViews: { Actor: referenceViewer, Item: referenceViewer },
     info,
     stylesheet: 'assets/presentation.css',
     componentStyles: shadowdarkTheme,

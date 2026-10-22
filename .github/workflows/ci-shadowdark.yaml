@@ -95,6 +95,7 @@ jobs:
           npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/actor-enricher.test.ts"
           npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/presentation.test.ts"
           npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/community-artwork.test.ts"
+          npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/reference-view.test.ts"
           npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/roll-feedback.test.ts"
           npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/importer-mapping.test.ts"
           npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/native-alignment.test.ts"
