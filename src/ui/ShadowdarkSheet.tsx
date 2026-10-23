@@ -23,6 +23,7 @@ import ResourceDetailModal from './components/ResourceDetailModal';
 
 import ShadowdarkPaperSheet from './ShadowdarkPaperSheet';
 import { logger } from '@sheet-delver/sdk';
+import { useSheetViewPreference, type SheetViewMode } from './settings/sheet-view-preference';
 
 interface ShadowdarkSheetProps {
     onToggleDiceTray?: () => void;
@@ -61,19 +62,13 @@ export default function ShadowdarkSheet(props: ShadowdarkSheetProps) {
     const [menuOpen, setMenuOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 
-    const [viewMode, setViewMode] = useState<'simple' | 'advanced'>(() => {
-        if (typeof window !== 'undefined') {
-            const saved = localStorage.getItem('shadowdark_view_mode') as 'simple' | 'advanced';
-            if (saved === 'simple' || saved === 'advanced') return saved;
-        }
-        return 'simple';
-    });
-
-    const handleToggleView = (mode: 'simple' | 'advanced') => {
-        setViewMode(mode);
-        if (typeof window !== 'undefined') {
-            localStorage.setItem('shadowdark_view_mode', mode);
-        }
+    const preference = useSheetViewPreference();
+    const viewMode = preference.mode;
+    useEffect(() => {
+        if (preference.error) addNotification(preference.error.message, 'error');
+    }, [preference.error, addNotification]);
+    const handleToggleView = (mode: SheetViewMode) => {
+        try { preference.set(mode); } catch { /* Shared error snapshot supplies the notification. */ }
     };
 
     // Session state for active tab and menu

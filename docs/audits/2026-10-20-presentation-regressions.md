@@ -1,5 +1,31 @@
 # Shadowdark presentation regression review
 
+## SD-UI24 — Optional HUD sheet settings, October23
+
+Checkpoint authorized October23 after the Core-theme and panel-cache corrections.
+Release preparation remains user-owned; no version/floor change. Final operator
+review is separate from the isolated verification below.
+
+The user approved the narrow pilot in [ADR0004](../adr/0004-optional-hud-sheet-settings.md).
+One optional module-owned panel controls the existing Single page/Tabbed preference;
+the actual sheet and its older view button share a reactive helper. The original
+browser/site key, account/world sharing, default, release floors and versions are
+preserved. Core themes the semantic settings content and controls. Reset is isolated
+to that key; read/write errors are visible and failed writes preserve the mode.
+
+Explicit module typing, isolated module check/package and the archived ESM/CSS
+browser runner pass. The runner mounts the actual Core host and archived Actor
+page under controlled SDK providers, covering two-way changes, reload, reset,
+storage denial, scope, keyboard and320px dark/light appearance. Screenshots were
+inspected. The single packaged UI ESM file defers initialization/mount, not network
+download. Operator acceptance is pending; ADR0003's remaining review stays open.
+
+Operator correction (Core R72-02): removed the initial paper wrapper and settings
+CSS; renamed the tab Shadowdark. The archive was rebuilt and the mounted pilot
+passed again, checking Core control colors/font in both themes, absence of module
+CSS scope, and retained sheet preference behavior. The 320px dark/light captures
+were visually inspected. Operator recheck remains pending.
+
 Date: 2026-10-20. Active scope: [ADR-0003](../adr/0003-preserve-module-presentation.md).
 
 ## Current disposition — 2026-10-22

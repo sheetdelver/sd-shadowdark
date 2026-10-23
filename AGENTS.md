@@ -7,6 +7,10 @@ context. The Core handoff is not this repository's work queue.
 Current presentation work is [ADR-0003](docs/adr/0003-preserve-module-presentation.md)
 and its [whole-UI audit](docs/audits/2026-10-20-presentation-regressions.md).
 ADR-0001/0002 remain closed for their agreed native behavior scope.
+Settings panels supply semantic controls and content; Core owns their appearance.
+Do not mount module theme wrappers or paper styling in settings tabs.
+The optional HUD sheet-view pilot is [ADR-0004](docs/adr/0004-optional-hud-sheet-settings.md).
+Preserve its existing browser-wide storage key and older sheet-button entry point.
 
 ## Scope and repository ownership
 

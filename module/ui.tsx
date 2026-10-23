@@ -19,7 +19,12 @@ const referenceViewer = {
 };
 // Placement is an optional enhancement: older supported Core hosts keep this in Tools.
 const bestiaryAction = { id: 'bestiary', label: 'Bestiary', section: 'gm' as const, kind: 'tool' as const, toolId: 'bestiary' };
-const uiManifest: UIModuleManifest & { referenceViews?: Record<'Actor' | 'Item', typeof referenceViewer> } = {
+const settingsTabs = [{ id: 'sheet', label: 'Shadowdark', load: () => import('../src/ui/settings/SheetSettings') }];
+const uiManifest: UIModuleManifest & {
+    referenceViews?: Record<'Actor' | 'Item', typeof referenceViewer>;
+    settingsTabs?: typeof settingsTabs;
+} = {
+    settingsTabs,
     referenceViews: { Actor: referenceViewer, Item: referenceViewer },
     info,
     stylesheet: 'assets/presentation.css',

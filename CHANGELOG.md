@@ -3,6 +3,8 @@
 Historical entries are reconstructed from [published releases](https://github.com/sheetdelver/sd-shadowdark/releases), their tags, and merged changes. Version numbers follow the published tags; the Unreleased section collects notes for the next authorized release.
 
 ## Unreleased
+- Match Core settings appearance
+- Expose sheet view settings
 - Group Bestiary with GM tools
 - Recognize legacy spell wands
 - Roll spellcasting mishap tables

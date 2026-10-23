@@ -1,5 +1,22 @@
 # Shadowdark module architecture
 
+## Optional HUD sheet settings
+
+`module/ui.tsx.settingsTabs` optionally exposes the existing Single page/Tabbed
+preference through Core SDK3.7/UI3.5. The module owns semantic `SheetSettings`
+content and behavior; Core owns presentation, controls, modal/tab navigation,
+lifecycle and error handling. The tab is labeled Shadowdark.
+`ui/settings/sheet-view-preference.ts` retains `shadowdark_view_mode`, shared
+across worlds/accounts in this browser/site, and makes the actual sheet and panel
+reactive consumers of the same persisted value. Reset removes only that key;
+failures keep the old mode and present errors. The panel checks its abort signal.
+The original sheet button remains on older Core, so no floor/version/workflow
+change is needed. See [ADR0004](adr/0004-optional-hud-sheet-settings.md) for archive
+verification and pending operator acceptance. Existing native world settings stay
+read-only under their current contracts.
+
+## Existing presentation and rules
+
 `module/ui.tsx` declares `assets/presentation.css` through the public stylesheet
 contract. Scoped management-dialog rules restore the established paper/serif/
 border treatment around `ModuleDialog`; compact cards retain their proportions.
@@ -954,3 +971,9 @@ Legacy schema-safe state lives in `flags.shadowdark.sheetDelver.wand`; modern
 Wands retain native fields. Existing authorized item controls provide explicit
 Restore after rest, clearing loss only for unbroken wands. See the
 [scroll/wand policy](rules/scrolls.md) for casting and native-UI boundaries.
+
+The settings pilot now uses the tab label **Shadowdark** and semantic controls
+without module panel CSS. Core supplies settings typography/colors/widgets and
+retains SDK identity without the module stylesheet scope (Core ADR0072 R72-02).
+The sheet itself keeps its paper styling. This supersedes the initial pilot's
+paper-panel presentation, not its preference storage behavior.
