@@ -1,6 +1,6 @@
 # ADR-0005: Character Creator for paper-sheet transcription
 
-Status: Accepted — header/UI correction accepted; native creation and remaining functional gates open  
+Status: Accepted — header/UI correction accepted; native creation and remaining functional gates open
 Date: 2026-10-23
 
 ## Current operator disposition — October 23

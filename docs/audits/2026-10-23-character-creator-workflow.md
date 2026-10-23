@@ -1,7 +1,7 @@
 # Character Creator workflow audit
 
-Date: 2026-10-23  
-Status: UI correction in progress after operator rejection; new feature work stopped  
+Date: 2026-10-23
+Status: Header/UI correction accepted; remaining Creator gates open
 Decision: [ADR-0005](../adr/0005-character-creator.md)
 
 ## Scope and evidence
