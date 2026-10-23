@@ -486,7 +486,9 @@ tracker are not run. Cards show
 the current identified presentation only, never the alternate identification
 fields. Descriptions go through `logic/description.ts` and the SDK sanitizer.
 
-The Bestiary dashboard tool lists world NPCs visible to the caller and, when the
+The Bestiary dashboard action declares GM Tools placement (Core UI3.4.0+).
+Older supported hosts retain the Tools placement; this optional enhancement
+does not change data access or the compatibility floor. The tool lists world NPCs visible to the caller and, when the
 caller's pack capability allows it, the declared monster pack (the
 `server/access.ts` policy above).
 It is read-only: no spawn, encounter or sharing action.

@@ -17,6 +17,8 @@ const referenceViewer = {
         footer: 'hidden',
     },
 };
+// Placement is an optional enhancement: older supported Core hosts keep this in Tools.
+const bestiaryAction = { id: 'bestiary', label: 'Bestiary', section: 'gm' as const, kind: 'tool' as const, toolId: 'bestiary' };
 const uiManifest: UIModuleManifest & { referenceViews?: Record<'Actor' | 'Item', typeof referenceViewer> } = {
     referenceViews: { Actor: referenceViewer, Item: referenceViewer },
     info,
@@ -33,7 +35,7 @@ const uiManifest: UIModuleManifest & { referenceViews?: Record<'Actor' | 'Item',
     dashboardActions: [
         { id: 'generator', label: 'Character Generator', kind: 'tool', toolId: 'generator' },
         { id: 'importer', label: 'Import From Shadowdarklings.net', kind: 'tool', toolId: 'importer' },
-        { id: 'bestiary', label: 'Bestiary', kind: 'tool', toolId: 'bestiary' },
+        bestiaryAction,
     ],
     actorPage: () => import('../src/ui/pages/ActorPage')
 };

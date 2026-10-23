@@ -492,3 +492,12 @@ types; modern fields remain unchanged. Restore after rest clears lost spells on
 unbroken wands without repairing breakage. No source migration or automatic curse
 application is introduced. The active audit records verification; user review
 remains open, and this correction does not close the ADR.
+
+### SD-UI23: Bestiary dashboard placement
+
+User requested moving Bestiary to GM Tools. The action opts into Core's additive
+UI3.4.0 `section: 'gm'` declaration (Core ADR0071). Supporting hosts place it beside
+Combat Manager for GMs/Assistants. Older supported Core versions ignore the
+optional metadata and keep it under Tools. A separate structurally typed action
+keeps the released-Core build compatible; no floor/version bump. Caller-bound
+Bestiary reads and informational reference cards remain unchanged.

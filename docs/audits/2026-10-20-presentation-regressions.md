@@ -1016,3 +1016,14 @@ acceptance of languages, text/formulas and spell selection/level-up grants remai
 recorded above. This does not assert exhaustive manual coverage of every mishap,
 curse, class or historical data variant. The user has another item to address;
 ADR0003 remains open. Version and compatibility metadata are unchanged.
+
+### SD-UI23 — Bestiary under GM Tools
+
+User requested GM Tools placement. The module declares `section: 'gm'` using
+Core UI3.4.0 (ADR0071). Supporting hosts show it beside Combat Manager for GMs and
+Assistants; general player Tools omits it. This is optional presentation metadata:
+older supported Core ignores the field and keeps Bestiary in Tools. Structural
+typing preserves compilation against the released SDK. Existing read permissions,
+reference viewers, version/floors and workflow pins remain unchanged. Presentation
+suite and explicit module typing pass; the Core fixture verifies GM/Assistant/
+player placement and role changes. Operator verification remains pending.
