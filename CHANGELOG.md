@@ -4,7 +4,7 @@ Historical entries are reconstructed from [published releases](https://github.co
 
 ## Unreleased
 - Match Core settings appearance
-- Expose sheet view settings
+- Add optional SDK 3.7.0/UI 3.5.0 settings
 - Group Bestiary with GM tools
 - Recognize legacy spell wands
 - Roll spellcasting mishap tables
