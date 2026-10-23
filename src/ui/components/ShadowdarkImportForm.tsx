@@ -1,4 +1,5 @@
 'use client';
+import ModulePageHeader from './ModulePageHeader';
 
 import React, { useState } from 'react';
 import { logger } from '@sheet-delver/sdk';
@@ -127,31 +128,8 @@ export default function ShadowdarkImportForm({ onCancel, onImportSuccess }: Shad
 
     return (
         <main className="flex min-h-screen flex-col pb-24 font-crimson font-inter font-sans text-black">
-            <nav className="relative bg-neutral-900 border-b border-neutral-800 px-4 py-3 shadow-md flex items-center justify-between backdrop-blur-sm bg-opacity-95">
-                <button
-                    type="button"
-                    onClick={handleCancel}
-                    className="flex items-center gap-2 text-neutral-400 hover:text-amber-500 transition-colors font-semibold group text-sm uppercase tracking-wide"
-                >
-                    <span className="group-hover:-translate-x-1 transition-transform">←</span>
-                    Back to Dashboard
-                </button>
-                <div className="text-xs text-neutral-600 font-mono hidden md:block">Importing Character</div>
-            </nav>
-
-            <header className="bg-neutral-900 text-white shadow-md relative flex items-center justify-between px-6 border-b-4 border-black h-24">
-                <div className="flex items-center gap-6">
-                    <div className="w-16 h-16 bg-neutral-800 border-2 border-white/10 flex items-center justify-center rounded">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-8 h-8 opacity-50" aria-hidden="true">
-                            <path d="M12 3a.75.75 0 0 1 .75.75v9.69l2.72-2.72a.75.75 0 1 1 1.06 1.06l-4 4a.75.75 0 0 1-1.06 0l-4-4a.75.75 0 0 1 1.06-1.06l2.72 2.72V3.75A.75.75 0 0 1 12 3ZM4.75 15a.75.75 0 0 1 .75.75v3.5h13v-3.5a.75.75 0 0 1 1.5 0V20a.75.75 0 0 1-.75.75H4.75A.75.75 0 0 1 4 20v-4.25a.75.75 0 0 1 .75-.75Z" />
-                        </svg>
-                    </div>
-                    <div className="py-2">
-                        <h1 className="text-3xl font-serif font-bold leading-none tracking-tight">Import Character</h1>
-                        <p className="text-xs text-neutral-400 font-sans tracking-widest uppercase mt-1">Shadowdark RPG</p>
-                    </div>
-                </div>
-            </header>
+            <ModulePageHeader title="Import Character" context="Importing Character" onBack={handleCancel}
+                icon={<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v12m-4-4 4 4 4-4M4 16v5h16v-5" fill="none" stroke="currentColor" strokeWidth="2" /></svg>} />
 
             <div className="flex-1 px-4 max-w-5xl mx-auto w-full pt-6 mb-20 space-y-8">
                 <section className="bg-white p-6 border-2 border-black shadow-sm">

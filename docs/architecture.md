@@ -1,5 +1,50 @@
 # Shadowdark module architecture
 
+## Character Creator
+
+[ADR-0005](adr/0005-character-creator.md) implements a separate player tool for
+transcribing paper characters at levels 0–20, with optional rolls and a final
+prepared review. Its
+[workflow audit](audits/2026-10-23-character-creator-workflow.md) maps reuse of
+existing creation/advancement, grant, language, inventory and preparation helpers.
+The creator keeps source values distinct from paper totals, does not extrapolate
+native spell progression beyond available rows, and creates the completed Actor
+through one reviewed dispatch with outcome recovery. Existing creation routes
+remain limited to levels0/1 for Generator compatibility. The original creator implementation had no SDK/floor/version change; the
+subsequent shared-header adoption below raises the UI requirement.
+
+The Creator's presentation is under operator correction in ADR-0005; new feature
+work is stopped pending UI acceptance. `ui/components/ModulePageHeader.tsx`
+supplies content and theme tokens to Core SDK3.8/UI3.6 `PageHeader`. All four
+dashboard tools and the sheet container use it; sheets omit the tool heading.
+Core owns both rows and responsive layout. Creator/Importer Back confirmations
+and Generator actions retain their existing handlers. No per-page navigation
+markup or mutable header registry is needed. The UI floor rises3.3→3.6; Core
+application floor remains>=0.20.0, and CI/release target plannedv0.22.0 publication.
+
+`logic/character-creation.ts` owns bounded draft/wire contracts and numeric
+reconciliation; `logic/creator-awards.ts` supplies shared source requirements and
+exact table groups. The request-local server planner resolves readable sources,
+validates independent choices, prepares final numbers and fingerprints the entire
+intent/source/context. The wizard reuses collection lifecycle, selectors, stat
+allocation and SDK confirmation. Its compendium selector opts into ModuleDialog.
+
+Public routes are `characters/creator/prepare`, `roll`, `hp`, `create` and `status`.
+Prepare/HP never write documents; optional dice use the request roll runtime.
+`creation-operation.ts` persists caller/world-bound bookkeeping before one Actor
+create with all Items. Exact positive primary-source marker evidence can settle
+uncertain receipts without writes; absent/ambiguous/changed evidence cannot.
+Generated document IDs, native defaults and canonical legacy/modern effect
+migration are the permitted source-comparison normalizations; nested native
+references and array order remain significant. Queues serialize one process;
+no distributed CAS or public SDK idempotency guarantee is claimed.
+
+See [creator rules and limitations](rules/character-creator.md). Native/operator
+acceptance is pending, including native13/14 marker/default normalization. The
+public tool SDK lacks a shell navigation dirty-state hook; creator-owned Dashboard
+navigation uses confirmation, while shell discard protection remains an external
+CC-04 dependency. Persistent editable drafts and arbitrary effects remain excluded.
+
 ## Optional HUD sheet settings
 
 `module/ui.tsx.settingsTabs` optionally exposes the existing Single page/Tabbed

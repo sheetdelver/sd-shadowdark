@@ -11,7 +11,7 @@
         "coreVersion": ">=0.20.0",
         "apiContracts": {
             "module-api": ">=1.7.0 <2.0.0",
-            "ui-extension-api": ">=3.3.0 <4.0.0",
+            "ui-extension-api": ">=3.6.0 <4.0.0",
             "roll-engine-api": ">=1.0.0 <2.0.0"
         }
     },

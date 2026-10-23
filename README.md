@@ -8,6 +8,7 @@ Character sheets and tools for playing Shadowdark RPG with SheetDelver.
 - Equipment browsing, inventory slots, treasure and wealth management.
 - Ability rolls, formatted chat cards and a guided level-up wizard.
 - Character generation and Shadowdarklings.net JSON import.
+- Manual [Character Creator](docs/rules/character-creator.md) for paper characters at levels0–20, with optional rolls and prepared review.
 - Mobile-friendly gear browsing and Combat HUD initiative rolling.
 - Spell, item and monster detail cards.
 - Live world settings and admin-managed effect migrations.
@@ -20,7 +21,9 @@ ui-extension-api3.3.0. Core0.20.0 publication is pending; publish Core before th
 module's next validation/release. The module version remains0.9.6 until release
 preparation. Optional native art packages are not required.
 
-Verified with native Shadowdark4.0.6 on Foundry13.351 and14.367. Core owns
+Existing sheet behavior is verified with native Shadowdark4.0.6 on Foundry13.351
+and14.367. Character Creator has offline evidence; its native/operator acceptance
+remains pending under ADR-0005. Core owns
 world maintenance approval; the module does not repair data from player sheets.
 
 See the [releases](https://github.com/sheetdelver/sd-shadowdark/releases),
@@ -50,3 +53,11 @@ This product is an independent product published under the Shadowdark RPG Third-
 Use this repository’s independent `npm run release:tag` command. It prepares the
 numbered changelog release, pushes its tag for validation, and asks separately
 before publication. See [module release instructions](docs/RELEASING.md).
+
+### Pending shared-header dependency
+
+Current development adopts Core SDK3.8/UI API3.6 page headers. The UI requirement
+is now>=3.6.0 (previously>=3.3.0); module release0.9.6 and Core>=0.20.0 remain
+unchanged. UI contract validation excludes older hosts. Supporting Core0.22.0
+publication must precede this module's CI/release toolchain pins and release.
+Creator visual/native acceptance remains open; see ADR-0005.

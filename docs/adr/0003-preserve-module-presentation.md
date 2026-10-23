@@ -566,3 +566,13 @@ Shared fact weights are800/600. NPC primary facts occupy two paired rows; Abilit
 Move and Senses span full rows with aligned values. The visible-art gap is now
 10rem+3.5em; the no-art fallback is unchanged. Mounted360/768px geometry/weight
 checks and the other catalog checks pass6/6; explicit module typing passes.
+
+### SD-UI23 operator checkpoint — October 23
+
+The user confirmed that the apparent artwork issue was resolved, possibly after
+loading the latest change, and requested a checkpoint. Monster Stats source-aware
+rows/filtering, optional community catalog, removal of invented NPC type and the
+paired/bold fact layout are committed in `5ea2bc3`. No additional artwork repair
+was needed after that report. This records user acceptance for this checkpoint,
+not exhaustive native coverage or closure of the broader presentation ADR.
+The subsequent Character Creator request has its own [ADR-0005](0005-character-creator.md).

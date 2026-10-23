@@ -1,0 +1,38 @@
+import assert from 'node:assert/strict';
+import { creatorRows as rows, creatorSources as sources, CREATOR_NATIVE } from './fixtures/creator';
+import { emptyCharacterDraft, validateCharacterDraft, reconcileCreatorNumbers, creatorCanonical } from '../logic/character-creation';
+import { creatorLevelRequirements, creatorTableOutcome, NONREPEATABLE_CREATOR_AWARDS } from '../logic/creator-awards';
+import { calculateAdvancement } from '../server/api/level-up-engine';
+import { ownedCopy } from '../logic/identity';
+import { ruleInputsFrom } from '../logic/world-settings';
+import { worldSnapshot } from './fixtures/native-406';
+const cls = rows.find(d => d.name === 'Warlock' && d.type === 'Class');
+const human = sources.get('Compendium.shadowdark.talents.Item.DYWFJu5XeazJYc0P');
+assert.ok(human && cls); assert.equal(human.name,'Ambitious');
+for (const level of [0,1,2,3,10,20]) { const d=emptyCharacterDraft();d.level=level;validateCharacterDraft(d); }
+for (const value of [-1,21,NaN,Infinity,1.5,'1']) { const d=emptyCharacterDraft();(d as any).level=value;assert.throws(()=>validateCharacterDraft(d)); }
+assert.equal(creatorLevelRequirements(1,cls,[]).requiredBoons,cls.system.patron.startingBoons);
+assert.equal(creatorLevelRequirements(1,cls,[ownedCopy(human)]).requiredTalents,1);
+assert.equal(creatorLevelRequirements(2,cls,[]).choiceRolls,0);
+assert.equal(creatorLevelRequirements(3,cls,[]).choiceRolls,1);
+const nativeNonrepeat=rows.filter(d=>d.type==='Talent'&&/reroll duplicates|reroll if duplicate|duplicate = reroll/.test(d.system?.description??'')&&!/may reroll duplicates or keep/i.test(d.system?.description??'')).map(d=>d.uuid);
+assert.deepEqual([...NONREPEATABLE_CREATOR_AWARDS].sort(),nativeNonrepeat.sort(),'exact native source/prose oracle, without blanket UUID deduplication');
+const three=structuredClone(cls);three.system.patron.startingBoons=3;
+assert.equal((await calculateAdvancement({items:[]},1,three)).requiredBoons,3,'native Class.patron.startingBoons, not hard-coded one');
+const wizard=rows.find(d=>d.type==='Class'&&d.name==='Wizard');
+assert.deepEqual(Object.keys(wizard.system.spellcasting.spellsknown).map(Number),[1,2,3,4,5,6,7,8,9,10]);
+const table=sources.get('Compendium.shadowdark.rollable-tables.RollTable.RQ0vogfVtJGuT9oT');
+const result=creatorTableOutcome(table,5); assert.equal(result.mode,'choose');assert.equal(result.count,1);assert.equal(result.options.length,2);
+const bundle=creatorTableOutcome({uuid:'RollTable.bundle',results:[{_id:'one',range:[1,1],documentUuid:human.uuid,name:'Same'},{_id:'two',range:[1,1],documentUuid:human.uuid,name:'Same'}]},1);
+assert.equal(bundle.mode,'bundle');assert.equal(bundle.count,2);assert.deepEqual(bundle.options.map((o:any)=>o.id),['one','two']);
+const rules=ruleInputsFrom(worldSnapshot(1));
+const actor:any={type:'Player',system:{abilities:Object.fromEntries(['str','dex','con','int','wis','cha'].map(k=>[k,{value:10}])),attributes:{hp:{value:0,max:10}},level:{value:3,xp:0}},items:[ownedCopy(sources.get('Compendium.shadowdark.talents.Item.6t06nSjj1hd6o5SV'))],effects:[]};
+const r=reconcileCreatorNumbers(actor,{'system.abilities.str.value':{value:16,basis:'effective'}}, {},rules);
+assert.deepEqual(r.errors,[]);assert.equal(r.source.system.abilities.str.value,14);assert.equal(r.prepared.abilities.str.value,16);
+assert.equal(actor.system.abilities.str.value,10,'source untouched');
+actor.items.push(structuredClone(actor.items[0]));
+assert.equal(reconcileCreatorNumbers(actor,{'system.abilities.str.value':{value:16,basis:'effective'}},{},rules).source.system.abilities.str.value,12,'independent repeats');
+actor.items[0].effects[0].changes[0].mode=5;
+assert.ok(reconcileCreatorNumbers(actor,{'system.abilities.str.value':{value:16,basis:'effective'}},{},rules).errors.length);
+const d=emptyCharacterDraft(), changed=structuredClone(d);changed.coins.gp=1;assert.notEqual(creatorCanonical(d),creatorCanonical(changed));
+console.log(`Creator contracts/native fixtures and numeric round trips passed (${CREATOR_NATIVE}); offline, not native acceptance.`);

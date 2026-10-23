@@ -11,6 +11,7 @@ import { sanitizeItems } from '../../utils/Sanitizer';
 import { applyChoice, assertResolvedTalentChoices, masteryKind, talentChoiceKind, choiceCatalog, type ChoiceCatalog } from '../../logic/talent-choices';
 import { canonicalUuid, sourceRef, formatUuid, ownedCopy } from '../../logic/identity';
 import type { Caller } from '../access';
+import { creatorLevelRequirements } from '../../logic/creator-awards';
 
 interface RollResultProcessorOptions {
     result: any;
@@ -115,28 +116,8 @@ export interface LevelUpState {
  * Calculates advancement requirements based on actor and target level.
  */
 export async function calculateAdvancement(actor: any, targetLevel: number, classObj: any) {
-    const isOddLevel = targetLevel % 2 !== 0;
-    const requiresPatron = Boolean(classObj.system?.patron?.required || classObj.system?.patron?.requiredBoon);
-
-    let requiredTalents = isOddLevel ? 1 : 0;
-    let requiredBoons = 0;
-    let choiceRolls = 0;
-
-    if (requiresPatron) {
-        if (targetLevel === 1) {
-            requiredBoons = 1;
-            choiceRolls = 0;
-            requiredTalents = 0;
-        } else if (isOddLevel) {
-            choiceRolls = 1;
-            requiredBoons = 0;
-            requiredTalents = 0;
-        } else {
-            requiredTalents = 0;
-            requiredBoons = 0;
-            choiceRolls = 0;
-        }
-    }
+    const native = creatorLevelRequirements(targetLevel, classObj, actor?.items ?? []);
+    let { requiredTalents, requiredBoons, choiceRolls } = native;
 
     // Apply Handler Init (e.g. Ambitious talent)
     if (actor && actor.items) {
@@ -153,7 +134,7 @@ export async function calculateAdvancement(actor: any, targetLevel: number, clas
         requiredTalents,
         requiredBoons,
         choiceRolls,
-        needsBoon: requiresPatron
+        needsBoon: native.needsBoon
     };
 }
 

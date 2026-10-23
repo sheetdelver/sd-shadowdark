@@ -9,17 +9,17 @@ import ShadowdarkImportPage from '../ui/tools/ShadowdarkImportPage';
 import Bestiary from '../ui/tools/Bestiary';
 
 assert.equal(manifest.componentStyles, theme, 'UI manifest must own shared styles');
-// The selected next release requires the Core v0.20.0 package/artwork/reference contracts.
+// The selected next release requires the Core v0.22.0 shared header contract (supporting publication pending).
 assert.equal(manifest.info.compatibility?.coreVersion, '>=0.20.0');
 const moduleInfo = JSON.parse(fs.readFileSync(new URL('../../info.json', import.meta.url), 'utf8'));
 assert.equal(manifest.info.version, moduleInfo.version, 'published UI uses the authoritative module version');
-assert.match(fs.readFileSync(new URL('../../.github/workflows/ci-shadowdark.yaml', import.meta.url), 'utf8'), /ref: v0\.20\.0\b/);
+assert.match(fs.readFileSync(new URL('../../.github/workflows/ci-shadowdark.yaml', import.meta.url), 'utf8'), /ref: v0\.22\.0\b/);
 const releaseWorkflow = fs.readFileSync(new URL('../../.github/workflows/release-shadowdark.yaml', import.meta.url), 'utf8');
-assert.match(releaseWorkflow, /CI_CORE_REF: 'v0\.20\.0'/);
+assert.match(releaseWorkflow, /CI_CORE_REF: 'v0\.22\.0'/);
 assert.match(releaseWorkflow, /node scripts\/release\.mjs --verify-tag-ci/);
 assert.match(releaseWorkflow, /node scripts\/publish-release\.mjs/);
 assert.doesNotMatch(releaseWorkflow, /npm ci|module:package/, 'publication consumes the validated package');
-assert.equal(manifest.info.compatibility?.apiContracts?.['ui-extension-api'], '>=3.3.0 <4.0.0');
+assert.equal(manifest.info.compatibility?.apiContracts?.['ui-extension-api'], '>=3.6.0 <4.0.0');
 assert.equal(manifest.info.compatibility?.apiContracts?.['module-api'], '>=1.7.0 <2.0.0');
 assert.equal(manifest.info.compatibility?.apiContracts?.['roll-engine-api'], '>=1.0.0 <2.0.0');
 assert.equal((manifest.info as any).sdkVersion, undefined, 'no invented SDK manifest field');
@@ -31,8 +31,9 @@ assert.deepEqual((manifest.info.worldSettings ?? []).map(row => [row.key, row.sc
 assert.equal(manifest.info.combatTracking?.attributes?.[0]?.path, 'system.attributes.hp');
 assert.equal(manifest.info.combatTracking?.attributes?.[1]?.path, 'derived.ac');
 assert.deepEqual(manifest.dashboardActions?.map(action => [action.id, action.kind]), [
-    ['generator', 'tool'], ['importer', 'tool'], ['bestiary', 'tool'],
+    ['creator', 'tool'], ['generator', 'tool'], ['importer', 'tool'], ['bestiary', 'tool'],
 ]);
+assert.equal(typeof manifest.tools?.creator,'function');
 const bestiaryAction = manifest.dashboardActions?.find(action => action.id === 'bestiary');
 assert.equal(bestiaryAction?.kind === 'tool' ? bestiaryAction.toolId : null, 'bestiary');
 assert.equal(typeof manifest.tools?.bestiary, 'function');

@@ -1093,3 +1093,14 @@ facts retain common value alignment. Mounted tests verify pair geometry, weights
 clearance and no horizontal overflow at360/768px, with the catalog suite now6/6.
 Screenshots inspected; typing passes. The prior package artifact predates this
 small JSX/CSS refinement; no new installed-world acceptance is claimed.
+
+### October 23 checkpoint and next scope
+
+The user's final artwork report was “it's fixed now,” followed by a request to
+checkpoint. The Monster Stats pass is committed as `5ea2bc3`; no additional
+artwork repair followed that report. This is operator acceptance of the selected
+checkpoint, not a blanket closeout of ADR-0003/0004 or proof of every native variant.
+The next selected task is the separate
+[Character Creator workflow audit](2026-10-23-character-creator-workflow.md) and
+[ADR-0005](../adr/0005-character-creator.md), currently planning only. It is the
+active audit; this presentation report retains its prior findings and evidence.

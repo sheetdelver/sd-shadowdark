@@ -7,6 +7,14 @@ context. The Core handoff is not this repository's work queue.
 Current presentation work is [ADR-0003](docs/adr/0003-preserve-module-presentation.md)
 and its [whole-UI audit](docs/audits/2026-10-20-presentation-regressions.md).
 ADR-0001/0002 remain closed for their agreed native behavior scope.
+The Character Creator is [ADR-0005](docs/adr/0005-character-creator.md),
+with its [workflow audit](docs/audits/2026-10-23-character-creator-workflow.md).
+Its manual paper-character transcription implementation has offline evidence;
+native/operator acceptance and the public shell discard hook remain open gates.
+Use its CC-01–CC-08 evidence ledger. Preserve the distinction
+between paper totals and native base values, exact independent grant identities,
+and unknown versus proven creation outcomes. Do not extend the level-0/1 writer
+or invent higher-level progression merely to expose a larger level selector.
 Settings panels supply semantic controls and content; Core owns their appearance.
 Do not mount module theme wrappers or paper styling in settings tabs.
 The optional HUD sheet-view pilot is [ADR-0004](docs/adr/0004-optional-hud-sheet-settings.md).
@@ -104,6 +112,18 @@ use temporary Git fixtures. No Core checkout is needed to run the helper.
   the handoff. Update documentation and tests with the implementation.
 
 ## Shadowdark rules and current design constraints
+
+For every new or changed UI surface, inspect the nearest existing module surface
+and reuse its layout, components, typography, spacing and control conventions.
+Adding functionality does not authorize a new visual design. Use shared Core
+SDK page chrome and module theme/content configuration instead of duplicating
+navigation/header markup. General styling
+keywords alone are not sufficient: compare the actual rendered result with the
+established UI at desktop and phone sizes. Reuse shared components where they
+fit, and preserve Core-owned theming for host settings and shared surfaces.
+Record the chosen reference, specific deviations and visual acceptance in the
+owning ADR. Keep implementation-specific design instructions in that ADR, not
+in agent guidance or the handoff; the handoff should link the active decision.
 
 Behavior refactoring does not authorize redesign. Preserve the module's paper
 layout, serif headings, heavy borders, square controls and shadows across every
@@ -266,6 +286,8 @@ npx tsx data/local/modules/shadowdark/src/tests/system-index.test.ts
 npx tsx data/local/modules/shadowdark/src/tests/native-parity.test.ts
 npx tsx data/local/modules/shadowdark/src/tests/advancement-recovery.test.ts
 npx tsx data/local/modules/shadowdark/src/tests/creation-validation.test.ts
+npx tsx data/local/modules/shadowdark/src/tests/creator-contracts.test.ts
+npx tsx data/local/modules/shadowdark/src/tests/character-creator.test.ts
 node data/local/modules/shadowdark/src/tests/verify-types.mjs
 npm run module:check -- shadowdark
 ```

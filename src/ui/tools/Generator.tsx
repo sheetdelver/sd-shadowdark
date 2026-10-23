@@ -17,6 +17,7 @@ import { advancementHitPoints } from '../../logic/advancement';
 import { useLanguagePlan } from '../hooks/useLanguagePlan';
 import { LanguageChoices } from '../components/LanguageChoices';
 import ModuleDialog from '../components/ModuleDialog';
+import ModulePageHeader from '../components/ModulePageHeader';
 import { validateLanguageSelections } from '../../logic/languages';
 
 export default function Generator() {
@@ -810,39 +811,8 @@ function GeneratorContent() {
     return (
         <div className={`flex flex-col min-h-screen font-crimson font-inter font-sans text-black pb-24`}>
 
-            {/* Top Navigation Bar */}
-            <nav className="relative bg-neutral-900 border-b border-neutral-800 px-4 py-3 shadow-md flex items-center justify-between backdrop-blur-sm bg-opacity-95">
+            <ModulePageHeader title="Create Character" context="Generating New Character" onBack={()=>navigate('/')} actions={
                 <button
-                    onClick={() => navigate('/')}
-                    className="flex items-center gap-2 text-neutral-400 hover:text-amber-500 transition-colors font-semibold group text-sm uppercase tracking-wide"
-                >
-                    <span className="group-hover:-translate-x-1 transition-transform">←</span>
-                    Back to Dashboard
-                </button>
-                <div className="text-xs text-neutral-600 font-mono hidden md:block">
-                    Generating New Character
-                </div>
-            </nav>
-
-            {/* Main Header (Subheader) - Controls & Title */}
-            <div className="bg-neutral-900 text-white shadow-md relative flex items-center justify-between px-6 border-b-4 border-black h-24">
-                <div className="flex items-center gap-6">
-                    <div className="w-16 h-16 bg-neutral-800 border-2 border-white/10 flex items-center justify-center rounded">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-8 h-8 opacity-50">
-                            <path d="M5.25 6.375a4.125 4.125 0 118.25 0 4.125 4.125 0 01-8.25 0zM2.25 19.125a7.125 7.125 0 0114.25 0v.003l-.001.119a.75.75 0 01-.363.63 13.067 13.067 0 01-6.761 1.873c-2.472 0-4.786-.684-6.76-1.873a.75.75 0 01-.364-.63l-.001-.122zM18.75 7.5a.75.75 0 00-1.5 0v2.25H15a.75.75 0 000 1.5h2.25v2.25a.75.75 0 001.5 0v-2.25H21a.75.75 0 000-1.5h-2.25V7.5z" />
-                        </svg>
-                    </div>
-                    <div className="py-2">
-                        <h1 className="text-3xl font-serif font-bold leading-none tracking-tight">Create Character</h1>
-                        <p className="text-xs text-neutral-400 font-sans tracking-widest uppercase mt-1">
-                            Shadowdark RPG
-                        </p>
-                    </div>
-                </div>
-
-                <div className="flex gap-6 items-center pr-2">
-                    {/* Randomize Button */}
-                    <button
                         onClick={randomizeAll}
                         className="group relative flex items-center justify-center -mb-2"
                         title="Randomize All"
@@ -851,8 +821,7 @@ function GeneratorContent() {
                             <img src="/icons/dice-d20.svg" alt="Randomize" className="w-12 h-12 brightness-0 invert transition-all group-hover:drop-shadow-[0_0_8px_rgba(245,158,11,0.8)]" />
                         </div>
                     </button>
-                </div>
-            </div>
+            } />
 
             {/* Main Content Area */}
             <div className="flex-1 px-4 max-w-5xl mx-auto w-full pt-6 mb-20 space-y-8">

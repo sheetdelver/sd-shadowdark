@@ -3,6 +3,16 @@
 Historical entries are reconstructed from [published releases](https://github.com/sheetdelver/sd-shadowdark/releases), their tags, and merged changes. Version numbers follow the published tags; the Unreleased section collects notes for the next authorized release.
 
 ## Unreleased
+- Adopt Core page headers
+- Require SDK 3.8.0 headers
+- Require UI API 3.3.0 → 3.6.0
+- Target Core 0.22.0 toolchain
+- Restore Creator confirmation actions
+- Align character tool presentation
+- Add manual Character Creator
+- Review paper totals before creation
+- Recover interrupted character creation
+- Honor native starting boon counts
 - Rename Bestiary: Monster Stats
 - Filter native monster statistics
 - Include optional community monsters

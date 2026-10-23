@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import ModulePageHeader from './components/ModulePageHeader';
 import ErrorBoundary from './components/ErrorBoundary';
 import { shadowdarkTheme } from './themes/shadowdark';
 
@@ -181,6 +182,7 @@ export default function ShadowdarkSheet(props: ShadowdarkSheetProps) {
 
     return (
         <div className={`flex flex-col h-full relative pb-0 font-crimson font-inter font-sans ${viewMode === 'simple' ? 'bg-black' : 'bg-neutral-100'} text-black`}>
+            <ModulePageHeader context={actor.name} />
             {/* Loading Overlay */}
             <LoadingModal message="Loading System Data..." visible={loadingSystem} theme={shadowdarkTheme.loadingModal} />
             {systemStatus === 'failed' && (

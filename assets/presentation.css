@@ -142,3 +142,64 @@
 @media (max-width: 420px) {
   .sdk-module--shadowdark .sd-monster-filter-fields { grid-template-columns: 1fr; }
 }
+/* Character Creator follows Generator's tool header, centered form and white
+   field panels. Core continues to own the outer world/theme canvas. ADR-0005. */
+.sdk-module--shadowdark .sd-creator { color:#171717; }
+.sdk-module--shadowdark .sd-creator-body { max-width:64rem; margin:0 auto; padding:1.5rem 1rem; }
+.sdk-module--shadowdark .sd-creator-steps { background:#fff; border:2px solid #000; }
+.sdk-module--shadowdark .sd-creator-steps ol { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); list-style:none; padding:0; margin:0; }
+.sdk-module--shadowdark .sd-creator-steps li { min-width:0; }
+.sdk-module--shadowdark .sd-creator-steps button { width:100%; height:100%; min-height:2.75rem; padding:.75rem .5rem; background:white; color:#525252; border:1px solid #e5e5e5; text-transform:uppercase; letter-spacing:.05em; font-size:.7rem; font-weight:700; }
+.sdk-module--shadowdark .sd-creator-steps [aria-current] { background:#000; color:white; border-color:#000; }
+.sdk-module--shadowdark .sd-creator-summary { display:flex; align-items:center; flex-wrap:wrap; gap:.5rem 1.25rem; padding:1rem; margin:1.5rem 0; background:#fff; border:2px solid #000; font-size:.75rem; color:#525252; }
+.sdk-module--shadowdark .sd-creator-summary strong { font-family:Georgia,'Times New Roman',serif; font-size:1.25rem; color:#000; margin-right:auto; }
+.sdk-module--shadowdark .sd-creator-page { min-width:0; background:#fafafa; border:2px solid #000; padding:1.5rem; }
+.sdk-module--shadowdark .sd-creator h2 { font-family:Georgia,'Times New Roman',serif; font-size:1.5rem; font-weight:900; border-bottom:2px solid #000; padding-bottom:.5rem; margin:0 0 1.5rem; }
+.sdk-module--shadowdark .sd-creator h3 { font-family:Georgia,'Times New Roman',serif; font-size:1.125rem; font-weight:800; margin:.75rem 0; }
+.sdk-module--shadowdark .sd-creator-page p { font-size:.875rem; line-height:1.5; margin:.75rem 0; }
+.sdk-module--shadowdark .sd-creator-page :where(button,input,select,textarea) { border:2px solid #000; border-radius:0; min-height:2.75rem; padding:.5rem .75rem; max-width:100%; background:#fff; color:#171717; font-size:.875rem; }
+.sdk-module--shadowdark .sd-creator-page :where(button) { font-family:Georgia,'Times New Roman',serif; font-weight:700; cursor:pointer; }
+.sdk-module--shadowdark .sd-creator-page :where(button:hover:not(:disabled)) { background:#f5f5f5; }
+.sdk-module--shadowdark .sd-creator :is(button,input,select,textarea):focus-visible { outline:2px solid #b45309; outline-offset:3px; }
+.sdk-module--shadowdark .sd-creator button:disabled { opacity:.45; cursor:not-allowed; }
+.sdk-module--shadowdark .sd-creator input[type=checkbox] { min-height:1rem; width:1rem; vertical-align:middle; accent-color:#000; flex:none; }
+.sdk-module--shadowdark .sd-creator label,.sdk-module--shadowdark .sd-creator-field { display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; margin:.75rem 0; font-size:.875rem; }
+.sdk-module--shadowdark .sd-creator label>input:not([type=checkbox]),.sdk-module--shadowdark .sd-creator label>select { flex:1; min-width:5rem; }
+.sdk-module--shadowdark .sd-creator textarea { width:100%; min-height:6rem; }
+.sdk-module--shadowdark .sd-creator label:has(>textarea) { display:block; }
+.sdk-module--shadowdark .sd-creator-fields { min-width:0; border:0; padding:0; }
+.sdk-module--shadowdark .sd-creator-fields:disabled { opacity:.65; }
+.sdk-module--shadowdark .sd-creator-identity { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1.5rem; align-items:start; }
+.sdk-module--shadowdark .sd-creator-identity>label,.sdk-module--shadowdark .sd-creator-identity>.sd-creator-field { display:flex; flex-direction:column; align-items:stretch; margin:0; padding:1.5rem; background:white; border:2px solid #000; box-shadow:0 1px 2px #0000000d; font-family:Georgia,'Times New Roman',serif; font-size:1.25rem; font-weight:900; }
+.sdk-module--shadowdark .sd-creator-identity>.sd-creator-field>span { border-bottom:2px solid #000; padding-bottom:.25rem; }
+.sdk-module--shadowdark .sd-creator-identity :is(input,select),.sdk-module--shadowdark .sd-creator-identity>.sd-creator-field>button { border:0; border-bottom:2px solid #d4d4d4; padding:.5rem 0; font-family:Georgia,'Times New Roman',serif; font-size:1.125rem; font-weight:700; text-align:left; }
+.sdk-module--shadowdark .sd-creator-identity>.sd-creator-name { grid-column:1/-1; }
+.sdk-module--shadowdark .sd-creator-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1.5rem; }
+.sdk-module--shadowdark .sd-creator-score { padding:1.25rem; background:white; border:2px solid #000; }
+.sdk-module--shadowdark .sd-creator-score>.sd-creator-field { display:grid; grid-template-columns:1fr 4.5rem; margin:0 0 .75rem; }
+.sdk-module--shadowdark .sd-creator-score>.sd-creator-field>span { font-family:Georgia,'Times New Roman',serif; font-size:1.25rem; font-weight:900; }
+.sdk-module--shadowdark .sd-creator-score input { width:100%; font-weight:700; font-size:1.25rem; text-align:center; }
+.sdk-module--shadowdark .sd-creator-score select { grid-column:1/-1; width:100%; border-color:#d4d4d4; font-family:Arial,Helvetica,sans-serif; }
+.sdk-module--shadowdark .sd-creator-score>span { display:block; font-size:.75rem; margin:.5rem 0; color:#525252; }
+.sdk-module--shadowdark .sd-creator-page .sd-creator-roll { background:#4f46e5; border-color:#4f46e5; color:white; font-family:Arial,Helvetica,sans-serif; font-size:.75rem; }
+.sdk-module--shadowdark .sd-creator-award { padding:1rem; margin:1rem 0; background:white; border:2px solid #000; overflow-wrap:anywhere; }
+.sdk-module--shadowdark .sd-creator-notice { padding:.75rem 1rem; margin:1rem 0; border:1px solid #d4d4d4; background:white; font-size:.875rem; overflow-wrap:anywhere; }
+.sdk-module--shadowdark .sd-creator [role=alert] { padding:.5rem; border-left:4px solid #dc2626; color:#991b1b; }
+.sdk-module--shadowdark .sd-creator-footer { display:flex; align-items:center; flex-wrap:wrap; gap:.75rem; margin-top:1.5rem; border-top:2px solid #000; padding-top:1rem; }
+.sdk-module--shadowdark .sd-creator-page .sd-creator-primary { background:#000; color:white; text-transform:uppercase; letter-spacing:.05em; }
+.sdk-module--shadowdark .sd-creator-page .sd-creator-refresh { margin-left:auto; border:0; background:none; color:#525252; font-family:Arial,Helvetica,sans-serif; font-size:.75rem; }
+.sdk-module--shadowdark .sd-creator-table { overflow-x:auto; }
+.sdk-module--shadowdark .sd-creator table { width:100%; border-collapse:collapse; text-align:left; background:white; font-size:.875rem; }
+.sdk-module--shadowdark .sd-creator :is(th,td) { padding:.75rem .5rem; border-bottom:1px solid #d4d4d4; }
+.sdk-module--shadowdark .sd-creator th { font-family:Georgia,'Times New Roman',serif; }
+.sdk-module--shadowdark .sd-creator details { margin:1rem 0; }
+.sdk-module--shadowdark .sd-creator summary { cursor:pointer; font-weight:700; padding:.75rem 0; }
+@media(max-width:639px) {
+  .sdk-module--shadowdark .sd-creator-body { padding:1rem .75rem; }
+  .sdk-module--shadowdark .sd-creator-page { padding:1rem; }
+  .sdk-module--shadowdark .sd-creator-steps ol { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .sdk-module--shadowdark .sd-creator-steps li:last-child { grid-column:1/-1; }
+  .sdk-module--shadowdark .sd-creator-identity,.sdk-module--shadowdark .sd-creator-grid { grid-template-columns:minmax(0,1fr); gap:1rem; }
+  .sdk-module--shadowdark .sd-creator-identity>label,.sdk-module--shadowdark .sd-creator-identity>.sd-creator-field { padding:1rem; }
+  .sdk-module--shadowdark .sd-creator-footer .sd-creator-refresh { margin-left:0; }
+}

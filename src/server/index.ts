@@ -1,5 +1,6 @@
 import { json, error, type ModuleServerRequest, type ModuleServerParams } from '@sheet-delver/sdk/server';
 import { handleImport } from './api/import';
+import { handleCreatorPrepare, handleCreatorCreate, handleCreatorStatus, handleCreatorRoll, handleCreatorHP } from './api/character-creator';
 import { handleGetLevelUpData, handleRollHP, handleRollGold, handleFinalizeLevelUp, handleRollTalent, handleRollBoon } from "./api/level-up";
 import { handleLearnSpell, handleGetSpellsBySource } from './api/spells';
 import { handleGetDocument } from './api/document';
@@ -35,6 +36,11 @@ async function effectRoute(run: () => Promise<unknown>) {
 }
 
 export const apiRoutes = {
+    'characters/creator/prepare': handleCreatorPrepare,
+    'characters/creator/create': handleCreatorCreate,
+    'characters/creator/status': handleCreatorStatus,
+    'characters/creator/roll': handleCreatorRoll,
+    'characters/creator/hp': handleCreatorHP,
     'languages/plan': handleLanguagePlan,
     'languages/manage': handleManageLanguages,
     'characters/create': handleCreateCharacter,

@@ -33,11 +33,13 @@ const uiManifest: UIModuleManifest & {
     sheet: () => import('../src/ui/ShadowdarkSheet'),
     rollModal: () => import('../src/ui/components/ShadowdarkInitiativeModal'),
     tools: {
+        'creator': () => import('../src/ui/tools/CharacterCreator'),
         'generator': () => import('../src/ui/tools/Generator'),
         'importer': () => import('../src/ui/tools/ShadowdarkImportPage'),
         'bestiary': () => import('../src/ui/tools/Bestiary'),
     },
     dashboardActions: [
+        { id: 'creator', label: 'Character Creator', kind: 'tool', toolId: 'creator' },
         { id: 'generator', label: 'Character Generator', kind: 'tool', toolId: 'generator' },
         { id: 'importer', label: 'Import From Shadowdarklings.net', kind: 'tool', toolId: 'importer' },
         bestiaryAction,

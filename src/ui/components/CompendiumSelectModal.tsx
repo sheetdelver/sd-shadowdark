@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { X, Search, Check, Loader2 } from 'lucide-react';
 import { CollectionStatus } from './CollectionStatus';
+import ModuleDialog from './ModuleDialog';
 
 interface Option {
     name: string;
@@ -18,10 +19,11 @@ interface CompendiumSelectModalProps {
     currentValue?: string | string[];
     multiSelect?: boolean;
     isLoading?: boolean;
+    sharedFrame?: boolean;
     dataState?: { loading: boolean; error: string | null; retry: () => void };
 }
 
-export default function CompendiumSelectModal({ isOpen, onClose, onSelect, title, options, currentValue, multiSelect, isLoading, dataState }: CompendiumSelectModalProps) {
+export default function CompendiumSelectModal({ isOpen, onClose, onSelect, title, options, currentValue, multiSelect, isLoading, dataState, sharedFrame = false }: CompendiumSelectModalProps) {
     const [search, setSearch] = useState('');
 
     const filteredOptions = useMemo(() => {
@@ -38,18 +40,7 @@ export default function CompendiumSelectModal({ isOpen, onClose, onSelect, title
 
     if (!isOpen) return null;
 
-    return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-neutral-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-            <div className="bg-white border-4 border-black w-full max-w-lg max-h-[80vh] flex flex-col shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] animate-in zoom-in-95 duration-200 overflow-hidden text-neutral-900 rounded-none">
-
-                {/* Header */}
-                <div className="flex items-center justify-between p-6 bg-black text-white border-b-2 border-white">
-                    <h2 className="text-2xl font-black font-serif uppercase tracking-widest">Select {title}</h2>
-                    <button onClick={onClose} className="text-white/50 hover:text-white transition-colors p-2">
-                        <X size={24} />
-                    </button>
-                </div>
-
+    const body = <>
                 {/* Search */}
                 <div className="p-4 border-b-2 border-dashed border-neutral-200 bg-neutral-50/50">
                     <div className="relative">
@@ -120,6 +111,23 @@ export default function CompendiumSelectModal({ isOpen, onClose, onSelect, title
                         </div>
                     )}
                 </div>
+
+    </>;
+    if (sharedFrame) return <ModuleDialog open={isOpen} title={`Select ${title}`} onClose={onClose} size="lg" footer={<button type="button" onClick={onClose}>Cancel</button>}>{body}</ModuleDialog>;
+
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-neutral-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+            <div className="bg-white border-4 border-black w-full max-w-lg max-h-[80vh] flex flex-col shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] animate-in zoom-in-95 duration-200 overflow-hidden text-neutral-900 rounded-none">
+
+                {/* Header */}
+                <div className="flex items-center justify-between p-6 bg-black text-white border-b-2 border-white">
+                    <h2 className="text-2xl font-black font-serif uppercase tracking-widest">Select {title}</h2>
+                    <button onClick={onClose} className="text-white/50 hover:text-white transition-colors p-2">
+                        <X size={24} />
+                    </button>
+                </div>
+
+                {body}
 
                 {/* Footer (Consistency with Language modal) */}
                 <div className="p-6 bg-neutral-100 border-t-4 border-black flex justify-between items-center">

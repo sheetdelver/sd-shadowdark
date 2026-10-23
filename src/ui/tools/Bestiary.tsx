@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useSDK } from '@sheet-delver/sdk/react';
+import ModulePageHeader from '../components/ModulePageHeader';
 import ModuleDialog from '../components/ModuleDialog';
 import ArtworkImage from '../components/ArtworkImage';
 import { CardBody, CardNotes } from '../components/ResourceDetailModal';
@@ -72,10 +73,7 @@ export default function Bestiary() {
 
     return (
         <main className="sd-monster-catalog min-h-screen font-serif pb-24">
-            <nav className="bg-neutral-900 border-b border-neutral-800 px-4 py-3 flex items-center justify-between">
-                <button type="button" onClick={() => navigate('/')} className="text-neutral-200 hover:text-amber-400 font-semibold text-sm uppercase tracking-wide min-h-11">← Back to Dashboard</button>
-                <h1 className="text-white font-bold uppercase tracking-widest text-sm">Monster Stats</h1>
-            </nav>
+            <ModulePageHeader title="Monster Stats" context="Monster reference" onBack={()=>navigate('/')} />
             <div className="max-w-6xl mx-auto p-4 space-y-4">
                 <section className="sd-monster-filters" aria-label="Filter monsters">
                     <label className="sd-monster-source">
