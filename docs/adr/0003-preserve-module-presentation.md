@@ -501,3 +501,68 @@ Combat Manager for GMs/Assistants. Older supported Core versions ignore the
 optional metadata and keep it under Tools. A separate structurally typed action
 keeps the released-Core build compatible; no floor/version bump. Caller-bound
 Bestiary reads and informational reference cards remain unchanged.
+
+
+### SD-UI23 follow-up: Monster Stats catalog
+
+Selected October23 after the user reported Core0.21.0 released and module pushes.
+Rename the visible Bestiary action/page to **Monster Stats**, retaining the existing
+`bestiary` tool ID and API routes for compatibility. Replace the three-column grid
+with one full-width row per monster: thumbnail/name (source beneath), Level,
+Alignment and Move. Activating the row by click or keyboard opens the same read-only
+card modal. Keep Shadowdark styling, optional artwork and Core's world background.
+
+Use a source selector (All Monsters, individual readable catalog packs by their
+actual metadata labels, and World Actors), name search, inclusive minimum/maximum
+level, alignment and native move values, plus Reset filters and a result count.
+No D&D creature taxonomy is inferred. Native move notes remain visible; missing
+values display a dash and do not match constrained filters. Do not show raw
+Actor IDs to distinguish same-name entries; preserve their exact references and
+use source labels. The shared NPC card builder removes its invented “Level #
+creature” subtitle, including compendium reference cards elsewhere.
+
+Audit found the old list gated the entire monster collection on the hard-coded
+shadowdark.monsters capability, despite the registry grouping NPCs from all
+hydrated declared packs. Remove that gate; retain per-pack capability checks
+before and after asynchronous work. Use public access.packs metadata for labels.
+The SDK compendium reader is declared-pack scoped: this iteration browses actual
+available catalog content, not every installed pack. Undeclared pack discovery/
+loading would need separately selected SDK support; never use private transports.
+
+Implementation/verification steps: (1) source-aware native summary and filter
+model, (2) responsive accessible row list and dashboard rename, (3) shared subtitle
+removal, (4) authorization/artwork/source and mounted filter/modal/keyboard tests,
+(5) packaged-style narrow/desktop review and updated audit/handoff. Preserve stale
+request cancellation and context retirement. No Foundry writes/version/floor
+changes. Operator acceptance remains pending. Layout reference:
+https://www.dndbeyond.com/monsters (reviewed October23); no assets or taxonomy copied.
+
+
+SD-UI23 catalog declaration correction: the user identified the distinct installed
+`shadowdark-community-content.monsters` pack. Audit confirmed it was absent from
+info.json. Add it as a hydrated Actor pack beside shadowdark.monsters; Core's
+existing declared-but-absent policy skips it when uninstalled. The registry then
+receives both sources through its normal lifecycle and caller capability filters.
+Never merge entries by name/terminal ID. If native pack labels collide, append the
+exact pack ID to distinguish the selector and row sources. This is a data-scope
+addition, not a module dependency/floor change or SDK change. Other undeclared
+packs remain outside this catalog until explicitly supported.
+
+SD-UI23 readability adjustment: user requested moving card text1.5–2em down into
+the artwork fade. Shared resource-card copy now adds1.75em only when visible art
+is present; the title and full-width background remain fixed. No-art/error fallback
+keeps compact spacing. This applies consistently to NPC and item/spell cards.
+
+SD-UI23 verification: boundary57/57 and migration19/19 suites, explicit module
+typing, presentation/artwork checks, isolated package validation/build, mounted
+filters/keyboard/context/layout4/4 and card layout/focus/fallback8/8 pass. Source
+baselines reproduce the hard-coded pack gate and invented subtitle. Narrow and
+desktop screenshots with packaged styles were inspected. Operator review remains
+pending; no live world write, version/floor bump or commit is part of this pass.
+
+SD-UI23 typography follow-up: user requested stronger fact labels with lighter
+values, paired Level/Alignment and AC/HP, and another1.75em of artwork clearance.
+Shared fact weights are800/600. NPC primary facts occupy two paired rows; Abilities,
+Move and Senses span full rows with aligned values. The visible-art gap is now
+10rem+3.5em; the no-art fallback is unchanged. Mounted360/768px geometry/weight
+checks and the other catalog checks pass6/6; explicit module typing passes.

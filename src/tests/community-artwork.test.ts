@@ -15,7 +15,7 @@ function runtime() {
     let revision = 1;
     return { world: { snapshot: () => ({ identity: { contextRevision: revision }, settings: {} }),
         assertRevision: (expected: number) => { if (revision !== expected) throw Error('retired'); } },
-        retire: () => revision++, access: { canReadPack: () => true },
+        retire: () => revision++, access: { canReadPack: () => true, packs: () => [{ id: 'shadowdark.monsters', label: 'Monsters', type: 'Actor' }] },
         documents: { get: async () => structuredClone(doc), list: async () => ({ rows: [structuredClone(doc)] }) } } as any;
 }
 await check('only native default NPC portraits with exact origins are eligible', () => {

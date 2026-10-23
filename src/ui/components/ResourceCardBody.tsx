@@ -45,9 +45,9 @@ export function CardBody({ card, onLink, onRollCheck, onRollFormula, information
                         </ul>
                     )}
                     {(card.subtitle || card.facts.length > 0) && (
-                        <dl className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-0.5 text-sm">
+                        <dl className={`sd-card-facts ${card.kind === 'npc' ? 'sd-card-facts--npc' : ''} grid grid-cols-[max-content_1fr] gap-x-3 gap-y-0.5 text-sm`}>
                             {[...(card.subtitle ? [{ label: 'Type', value: card.subtitle, detail: undefined }] : []), ...card.facts].map((fact, index) => (
-                                <div key={`${fact.label}-${index}`} className="contents">
+                                <div key={`${fact.label}-${index}`} className={card.kind === 'npc' && !['Level', 'Alignment', 'AC', 'HP'].includes(fact.label) ? 'sd-card-fact-wide' : 'contents'}>
                                     <dt className="font-bold uppercase text-[11px] tracking-widest text-neutral-600 pt-0.5">{fact.label}</dt>
                                     <dd className="break-words" title={fact.detail}>{fact.value}{fact.detail && <span className="block text-xs text-amber-800">{fact.detail}</span>}</dd>
                                 </div>

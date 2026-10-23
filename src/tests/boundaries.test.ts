@@ -417,6 +417,53 @@ async function registryAndRoutes() {
             assert.equal(writes.length, 0);
         } finally { shadowdarkAdapter.resolveDocumentFor = resolveFor; }
     });
+    await check('SD-UI23', 'declared community monsters remain distinct; absent optional pack leaves base catalog intact', async () => {
+        const base = { _id: 'same', name: 'Goblin', type: 'NPC', pack: 'shadowdark.monsters', uuid: 'Compendium.shadowdark.monsters.Actor.same', system: {} };
+        const community = { ...base, pack: 'shadowdark-community-content.monsters', uuid: 'Compendium.shadowdark-community-content.monsters.Actor.same' };
+        for (const rows of [[base], [base, community]]) {
+            const registry = new ShadowdarkRegistry();
+            registry.attach({ findAll: async (type: string) => type === 'Actor' ? rows : [] } as any, {} as any);
+            const collection = await registry.getCollection('monsters', { readable: () => true });
+            assert.deepEqual(collection.map(row => row.uuid).sort(), rows.map(row => row.uuid).sort());
+        }
+    });
+    await check('SD-UI23', 'Monster Stats exposes each readable catalog pack independently with native summaries', async () => {
+        const registry = (shadowdarkAdapter as any)._registry;
+        const collection = registry.getCollection;
+        const rows = [
+            { _id: 'one', uuid: 'Compendium.shadowdark.monsters.Actor.one', name: 'Duplicate', type: 'NPC', system: { level: { value: 1 }, move: 'near' } },
+            { _id: 'two', uuid: 'Compendium.shadowdark-community-content.monsters.Actor.two', name: 'Duplicate', type: 'NPC', system: { level: { value: 0 }, move: 'far', moveNote: 'fly', alignment: 'chaotic' } },
+            { _id: 'three', uuid: 'Compendium.shadowdark-community-content.monsters.Actor.three', name: 'Unknown', type: 'NPC', system: {} },
+        ];
+        registry.getCollection = async (_id: string, options: any) => rows.filter(row => options.readable(row.uuid.includes('shadowdark-community-content.monsters') ? 'shadowdark-community-content.monsters' : 'shadowdark.monsters'));
+        try {
+            let denied = false;
+            const runtime: any = { documents: { list: async () => ({ rows: [] }), get: async () => null },
+                access: { canReadPack: (pack: string) => !denied && pack === 'shadowdark-community-content.monsters',
+                    packs: () => [{ id: 'shadowdark-community-content.monsters', label: 'Extra Monsters', type: 'Actor' }] } };
+            const response = await statusOf(await handleBestiaryList({ runtime } as any));
+            assert.equal(response.status, 200);
+            assert.equal(response.body.entries.length, 2, 'unreadable base pack must not hide another readable pack');
+            assert.deepEqual(response.body.sources, [{ id: 'pack:shadowdark-community-content.monsters', label: 'Extra Monsters' }]);
+            const [known, unknown] = response.body.entries;
+            assert.equal(known.level, 0); assert.equal(known.move, 'far'); assert.equal(known.moveNote, 'fly');
+            assert.equal(unknown.level, null); assert.equal(unknown.move, null); assert.equal(unknown.alignment, null);
+            runtime.access.canReadPack = () => !denied;
+            runtime.access.packs = () => ['shadowdark.monsters', 'shadowdark-community-content.monsters'].map(id => ({ id, label: 'Monsters', type: 'Actor' }));
+            const both = await statusOf(await handleBestiaryList({ runtime } as any));
+            assert.equal(both.body.entries.length, 3);
+            assert.equal(both.body.entries.filter((entry: any) => entry.name === 'Duplicate').length, 2);
+            assert.deepEqual(new Set(both.body.sources.map((entry: any) => entry.label)), new Set([
+                'Monsters (shadowdark.monsters)', 'Monsters (shadowdark-community-content.monsters)'
+            ]));
+
+            runtime.artwork = { resolve: async () => { denied = true; return { status: 'unavailable' }; } };
+            // A caller revocation during source I/O is checked again before output.
+            runtime.documents.list = async () => { denied = true; return { rows: [] }; };
+            const revoked = await statusOf(await handleBestiaryList({ runtime } as any));
+            assert.deepEqual(revoked.body.entries, []); assert.deepEqual(revoked.body.sources, []);
+        } finally { registry.getCollection = collection; }
+    });
     await check('SD01-16', 'bestiary offers compendium monsters only with the caller pack capability', async () => {
         const registry = (shadowdarkAdapter as any)._registry;
         const collection = registry.getCollection;
@@ -437,6 +484,7 @@ async function registryAndRoutes() {
             assert.equal(card.facts.find((fact: any) => fact.label === 'AC').value, '11');
             assert.equal(card.facts.find((fact: any) => fact.label === 'Senses').value, 'Dark-adapted');
             assert.equal(card.actions.length, 0, 'no spawn, encounter or share action');
+            assert.equal(card.subtitle, '', 'NPC cards must not invent a type from the level');
         } finally { registry.getCollection = collection; registry.getDocument = resolve; }
     });
 }

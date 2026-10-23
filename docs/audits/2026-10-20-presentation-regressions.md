@@ -1053,3 +1053,43 @@ typing preserves compilation against the released SDK. Existing read permissions
 reference viewers, version/floors and workflow pins remain unchanged. Presentation
 suite and explicit module typing pass; the Core fixture verifies GM/Assistant/
 player placement and role changes. Operator verification remains pending.
+
+
+### SD-UI23 follow-up — Monster Stats, October23
+
+User requested the Monster Stats name and a filterable single-row catalog, using
+D&D Beyond's list/filter structure as a visual reference without its taxonomy.
+Audit found a hard-coded base-pack gate and “Level # creature” invented card type.
+Both are removed. Native summaries preserve missing values; source/name/inclusive
+level range/alignment/move filters combine, with reset/count and keyboard card
+opening. Exact same-name rows remain separate; source labels replace Actor-ID text.
+The shared NPC card correction also affects informational reference cards.
+
+The user identified shadowdark-community-content.monsters as a second installed
+source. info.json lacked it; declare it separately as an optional hydrated Actor
+pack alongside shadowdark.monsters. Core's declared-but-absent policy skips it if
+uninstalled. No dependency/version/floor change. Colliding native pack labels use
+exact pack IDs for disambiguation. Other undeclared packs remain outside scope.
+The additional requested card readability adjustment moves copy1.75em deeper into
+the existing artwork fade, preserving inset titles and compact no-art fallback.
+
+Baseline source tests fail the base-pack gate and invented type (54/56); corrected
+boundary suite57/57 covers both packs/duplicate identities, absent optional pack,
+missing native fields, label collision and access revocation. Migration hooks19/19,
+artwork and source presentation suites pass. Mounted baseline0/4 fails the selected
+new surface; corrected4/4 covers combined filters/reset, exact keyboard card reads,
+late response retirement and390/1280 layouts in both backgrounds. A selector-label
+ambiguity in the first mounted run was corrected with explicit accessible names.
+Final isolated package validation/build passes. Mounted tests with the packaged
+Tailwind pass4/4; card artwork/focus/footer/no-art regressions pass8/8 at360,768,
+1024,1440px, asserting the additional copy offset. Desktop/narrow rows and the
+card fade were visually inspected. These are source consumers with packaged CSS,
+not a live installed-world acceptance test.
+User review remains pending; no live Foundry probe/write or release operation.
+
+SD-UI23 typography refinement: paired Level/Alignment and AC/HP, labels800/values600,
+and a second1.75em copy offset (total3.5em beyond the original art gap). Full-row
+facts retain common value alignment. Mounted tests verify pair geometry, weights,
+clearance and no horizontal overflow at360/768px, with the catalog suite now6/6.
+Screenshots inspected; typing passes. The prior package artifact predates this
+small JSX/CSS refinement; no new installed-world acceptance is claimed.

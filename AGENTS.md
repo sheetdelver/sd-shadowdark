@@ -495,3 +495,11 @@ signature without conflicting origin, never name alone. Preserve types; write
 legacy loss/breakage to module flags, modern state to native fields. Restore after
 rest must never repair broken wands. Include actual native legacy templates and
 historical source-less Gear Add copies in regressions. Curse prose stays manual.
+
+
+SD-UI23: Monster Stats retains the stable bestiary route/tool ID. Native monster
+sources are declared separately: shadowdark.monsters and optional
+shadowdark-community-content.monsters. Do not collapse packs or same-name rows;
+use exact identities and caller-filtered pack labels. Core skips absent declared
+packs. Missing native list values are unavailable, not guessed zero/Near. NPC
+cards omit the invented level-as-type subtitle; the actual Level remains a fact.

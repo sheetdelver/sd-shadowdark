@@ -57,9 +57,10 @@ assert.doesNotMatch(importerPage, /fixed top-0|sticky top-\[45px\]|mt-\[45px\]/,
 assert.match(importerPage, /Paste Character JSON/);
 const bestiaryPage = renderToStaticMarkup(createElement(MockSDKProvider, null, createElement(Bestiary)));
 assert.doesNotMatch(bestiaryPage.match(/<main[^>]*>/)?.[0] ?? '', /bg-neutral-100/, 'bestiary canvas must expose the host background');
-assert.match(bestiaryPage, /Bestiary/);
+assert.match(bestiaryPage, /Monster Stats/);
+assert.equal(bestiaryAction?.label, 'Monster Stats');
 assert.match(bestiaryPage, /Back to Dashboard/);
-assert.match(bestiaryPage, /Loading creatures/, 'bestiary shows an explicit loading state before authorized data arrives');
+assert.match(bestiaryPage, /Loading monsters/, 'bestiary shows an explicit loading state before authorized data arrives');
 assert.doesNotMatch(bestiaryPage, /Spawn|Add to encounter/i, 'bestiary is read-only browsing');
 assert.equal('dashboardTools' in manifest, false);
 assert.equal(typeof manifest.componentStyles?.chat?.msgContainer, 'function');

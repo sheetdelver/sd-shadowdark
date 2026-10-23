@@ -97,10 +97,48 @@
 .sdk-module--shadowdark .sd-card-art::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to bottom, #fff 0%, rgba(255,255,255,.2) 18%, rgba(255,255,255,.1) 36%, rgba(255,255,255,.94) 63%, #fff 90%); }
 .sdk-module--shadowdark .sd-card-title { position: relative; z-index: 1; margin: 1rem 1.5rem 0; padding: .6rem .8rem; background: #000; color: #fff; text-align: center; font-family: Georgia, "Times New Roman", serif; font-size: 1.2rem; line-height: 1.25; font-weight: 900; text-transform: uppercase; overflow-wrap: anywhere; }
 .sdk-module--shadowdark .sd-card-copy { position: relative; z-index: 1; padding: 1rem; overflow-wrap: anywhere; }
-.sdk-module--shadowdark .sd-card-art:not([hidden]) ~ .sd-card-copy { padding-top: 10rem; }
+.sdk-module--shadowdark .sd-card-art:not([hidden]) ~ .sd-card-copy { padding-top: calc(10rem + 3.5em); }
+.sdk-module--shadowdark .sd-card-facts dt { font-weight: 800; color: #111; }
+.sdk-module--shadowdark .sd-card-facts dd { font-weight: 600; }
+.sdk-module--shadowdark .sd-card-facts--npc { grid-template-columns: max-content minmax(0, 1fr) max-content minmax(0, 1fr); }
+.sdk-module--shadowdark .sd-card-facts--npc .sd-card-fact-wide { display: contents; }
+.sdk-module--shadowdark .sd-card-facts--npc .sd-card-fact-wide dd { grid-column: 2 / -1; }
 .sdk-module--shadowdark .sd-card-notes { overflow-wrap: anywhere; }
 .sdk-module--shadowdark .sd-resource-card .sd-dialog-footer { max-height: 38dvh; overflow-y: auto; flex-shrink: 0; }
 .sdk-module--shadowdark .sd-resource-card .sd-dialog-header { flex-shrink: 0; }
 
 /* Known spells remain readable in the catalog without offering another copy. */
 .sdk-module--shadowdark .sd-spell-row[data-known="true"] { background: #eee; color: #666; }
+
+/* Monster Stats: shared columns, one native monster per accessible row. */
+.sdk-module--shadowdark .sd-monster-filters { background: #f5f5f5; color: #111; border: 2px solid #000; padding: 1rem; }
+.sdk-module--shadowdark .sd-monster-filters label, .sdk-module--shadowdark .sd-monster-filters fieldset { display: block; min-width: 0; margin: 0; }
+.sdk-module--shadowdark .sd-monster-filters label > span, .sdk-module--shadowdark .sd-monster-filters legend { display: block; font-size: .8rem; font-weight: bold; text-transform: uppercase; margin-bottom: .4rem; }
+.sdk-module--shadowdark .sd-monster-filters input, .sdk-module--shadowdark .sd-monster-filters select { width: 100%; min-width: 0; min-height: 44px; padding: .5rem; border: 2px solid #000; border-radius: 0; background: #fff; color: #000; font: inherit; }
+.sdk-module--shadowdark .sd-monster-source { max-width: 28rem; margin-bottom: 1rem !important; }
+.sdk-module--shadowdark .sd-monster-filter-fields { display: grid; grid-template-columns: 2fr 1.5fr 1fr 1fr; gap: 1rem; }
+.sdk-module--shadowdark .sd-monster-level-range { display: flex; align-items: center; gap: .4rem; }
+.sdk-module--shadowdark .sd-monster-filter-footer { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-top: 1rem; }
+.sdk-module--shadowdark .sd-monster-filter-footer button { background: #000; color: #fff; border: 2px solid #000; padding: .5rem .8rem; min-height: 44px; font-weight: bold; }
+.sdk-module--shadowdark .sd-monster-columns, .sdk-module--shadowdark .sd-monster-row { display: grid; grid-template-columns: minmax(0, 2.5fr) minmax(3rem, .5fr) minmax(0, 1fr) minmax(0, 1.5fr); align-items: center; gap: 1rem; padding: .75rem; }
+.sdk-module--shadowdark .sd-monster-columns { background: #000; color: #fff; font-weight: bold; text-transform: uppercase; font-size: .8rem; }
+.sdk-module--shadowdark .sd-monster-list { list-style: none; padding: 0; display: grid; gap: .6rem; }
+.sdk-module--shadowdark .sd-monster-row { width: 100%; text-align: left; background: #fff; color: #000; border: 2px solid #000; box-shadow: 3px 3px 0 #000; cursor: pointer; overflow-wrap: anywhere; }
+.sdk-module--shadowdark .sd-monster-row:hover { background: #f5f5f5; }
+.sdk-module--shadowdark .sd-monster-row:focus-visible { outline: 2px solid #a65f00; outline-offset: 3px; }
+.sdk-module--shadowdark .sd-monster-identity { display: flex; align-items: center; gap: .75rem; min-width: 0; }
+.sdk-module--shadowdark .sd-monster-identity strong { display: block; font-size: 1.05rem; }
+.sdk-module--shadowdark .sd-monster-identity small { display: block; color: #555; font: .8rem sans-serif; }
+.sdk-module--shadowdark .sd-monster-thumbnail { width: 48px; height: 48px; object-fit: cover; flex-shrink: 0; border: 1px solid #000; background: #eee; }
+.sdk-module--shadowdark .sd-monster-mobile-label { display: none; }
+.sdk-module--shadowdark .sd-monster-empty { background: #fff; color: #333; padding: 1rem; border: 2px solid #000; }
+@media (max-width: 700px) {
+  .sdk-module--shadowdark .sd-monster-filter-fields { grid-template-columns: 1fr 1fr; }
+  .sdk-module--shadowdark .sd-monster-columns { display: none; }
+  .sdk-module--shadowdark .sd-monster-row { grid-template-columns: 1fr 1fr 1.5fr; gap: .75rem; }
+  .sdk-module--shadowdark .sd-monster-identity { grid-column: 1 / -1; }
+  .sdk-module--shadowdark .sd-monster-mobile-label { display: block; font-size: .7rem; text-transform: uppercase; font-weight: bold; }
+}
+@media (max-width: 420px) {
+  .sdk-module--shadowdark .sd-monster-filter-fields { grid-template-columns: 1fr; }
+}

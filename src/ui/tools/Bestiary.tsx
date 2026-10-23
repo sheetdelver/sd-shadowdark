@@ -5,26 +5,20 @@ import { useSDK } from '@sheet-delver/sdk/react';
 import ModuleDialog from '../components/ModuleDialog';
 import ArtworkImage from '../components/ArtworkImage';
 import { CardBody, CardNotes } from '../components/ResourceDetailModal';
-import { formatUuid, type DocumentRef } from '../../logic/identity';
+import { formatUuid } from '../../logic/identity';
 import type { ResourceCard } from '../../logic/resource-cards';
 
-/**
- * Module bestiary: read-only browsing of Shadowdark NPCs from authorized native
- * Actor data. GMs see the declared monster compendium; everyone sees world NPCs
- * the server returns through their own visibility. Creatures with the same name
- * stay separate entries. There is no spawn, encounter or sharing action.
- */
-interface Entry { ref: DocumentRef; name: string; img?: string; fallbackImg?: string; source: 'compendium' | 'world'; level: number; alignment: string | null; ac: number | null; hp: number | null }
+import { alignmentLabel, moveLabel, filterMonsters, EMPTY_MONSTER_FILTERS, type MonsterEntry as Entry, type MonsterFilters } from '../../logic/monster-catalog';
 
+/** Read-only native monster catalog; exact references keep same-name rows separate. */
 export default function Bestiary() {
     const { fetchWithAuth, navigate, isConnected, worldId, currentUser, events } = useSDK();
     const scope = JSON.stringify([worldId, currentUser?.id, currentUser?.role, isConnected]);
     const [refresh, setRefresh] = useState(0);
     const [entries, setEntries] = useState<Entry[] | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [compendiumAvailable, setCompendiumAvailable] = useState(false);
-    const [query, setQuery] = useState('');
-    const [source, setSource] = useState<'all' | 'compendium' | 'world'>('all');
+    const [filters, setFilters] = useState<MonsterFilters>({ ...EMPTY_MONSTER_FILTERS });
+    const changeFilter = (key: keyof MonsterFilters, value: string) => setFilters(previous => ({ ...previous, [key]: value }));
     const [selected, setSelected] = useState<Entry | null>(null);
     const [card, setCard] = useState<{ state: 'loading' } | { state: 'ready'; card: ResourceCard } | { state: 'error'; message: string } | null>(null);
     const seq = useRef(0);
@@ -48,10 +42,9 @@ export default function Bestiary() {
             const data = await res.json().catch(() => null);
             if (cancelled) return;
             setLoadedScope(scope);
-            if (!res.ok || !data?.success) { setError(data?.error ?? 'The bestiary is unavailable.'); setEntries([]); return; }
+            if (!res.ok || !data?.success) { setError(data?.error ?? 'Monster Stats is unavailable.'); setEntries([]); return; }
             setEntries(data.entries.filter((entry: any) => entry.ref));
-            setCompendiumAvailable(data.compendiumAvailable === true);
-        }).catch(() => { if (!cancelled) { setError('The bestiary is unavailable.'); setEntries([]); } });
+        }).catch(() => { if (!cancelled) { setError('Monster Stats is unavailable.'); setEntries([]); } });
         return () => { cancelled = true; controller.abort(); seq.current++; };
     }, [fetchWithAuth, isConnected, scope, refresh]);
 
@@ -67,67 +60,80 @@ export default function Bestiary() {
         }).catch(() => current === seq.current && setCard({ state: 'error', message: 'This creature could not be loaded.' }));
     };
 
-    const names = useMemo(() => {
-        const counts = new Map<string, number>();
-        for (const entry of entries ?? []) counts.set(entry.name, (counts.get(entry.name) ?? 0) + 1);
-        return counts;
-    }, [entries]);
-    const visible = (loadedScope === scope ? entries ?? [] : []).filter(entry => (source === 'all' || entry.source === source)
-        && entry.name.toLowerCase().includes(query.trim().toLowerCase()));
+    const currentEntries = useMemo(() => loadedScope === scope ? entries ?? [] : [], [entries, loadedScope, scope]);
+    const sources = useMemo(() => [...new Map(currentEntries.map(entry => [entry.sourceId, entry.sourceLabel])).entries()]
+        .sort((a, b) => a[1].localeCompare(b[1])), [currentEntries]);
+    const alignments = useMemo(() => [...new Set(currentEntries.map(entry => entry.alignment).filter((value): value is string => !!value))]
+        .sort((a, b) => alignmentLabel(a).localeCompare(alignmentLabel(b))), [currentEntries]);
+    const moves = useMemo(() => [...new Set(currentEntries.map(entry => entry.move).filter((value): value is string => !!value))]
+        .sort((a, b) => moveLabel(a).localeCompare(moveLabel(b))), [currentEntries]);
+    const visible = filterMonsters(currentEntries, filters);
+    const invalidRange = filters.minLevel !== '' && filters.maxLevel !== '' && Number(filters.minLevel) > Number(filters.maxLevel);
 
     return (
-        <main className="min-h-screen font-serif pb-24">
+        <main className="sd-monster-catalog min-h-screen font-serif pb-24">
             <nav className="bg-neutral-900 border-b border-neutral-800 px-4 py-3 flex items-center justify-between">
                 <button type="button" onClick={() => navigate('/')} className="text-neutral-200 hover:text-amber-400 font-semibold text-sm uppercase tracking-wide min-h-11">← Back to Dashboard</button>
-                <h1 className="text-white font-bold uppercase tracking-widest text-sm">Bestiary</h1>
+                <h1 className="text-white font-bold uppercase tracking-widest text-sm">Monster Stats</h1>
             </nav>
-            <div className="max-w-5xl mx-auto p-4 space-y-4">
-                <div className="flex flex-col sm:flex-row gap-2">
-                    <label className="flex-1">
-                        <span className="sr-only">Search creatures</span>
-                        <input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Search creatures…"
-                            className="w-full border-2 border-black px-3 min-h-11 bg-white text-black" />
-                    </label>
-                    <label className="flex items-center gap-2">
-                        <span className="text-xs uppercase font-bold tracking-widest">Source</span>
-                        <select value={source} onChange={event => setSource(event.target.value as any)} className="border-2 border-black min-h-11 px-2 bg-white text-black">
-                            <option value="all">All</option>
-                            {compendiumAvailable && <option value="compendium">Shadowdark monsters</option>}
-                            <option value="world">World NPCs</option>
+            <div className="max-w-6xl mx-auto p-4 space-y-4">
+                <section className="sd-monster-filters" aria-label="Filter monsters">
+                    <label className="sd-monster-source">
+                        <span>Data source</span>
+                        <select aria-label="Data source" value={filters.source} onChange={event => changeFilter('source', event.target.value)}>
+                            <option value="">All Monsters</option>
+                            {sources.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+                            {filters.source && !sources.some(([id]) => id === filters.source) && <option value={filters.source}>Source unavailable</option>}
                         </select>
                     </label>
-                </div>
-                {!compendiumAvailable && entries && <p className="text-sm">Compendium monsters are shown to GMs. You can browse the world NPCs visible to you.</p>}
+                    <div className="sd-monster-filter-fields">
+                        <label><span>Monster name</span>
+                            <input type="search" value={filters.name} onChange={event => changeFilter('name', event.target.value)} placeholder="Search monsters…" />
+                        </label>
+                        <fieldset><legend>Level range</legend><div className="sd-monster-level-range">
+                            <input type="number" aria-label="Minimum level" placeholder="Min" value={filters.minLevel} onChange={event => changeFilter('minLevel', event.target.value)} />
+                            <span aria-hidden="true">–</span>
+                            <input type="number" aria-label="Maximum level" placeholder="Max" value={filters.maxLevel} onChange={event => changeFilter('maxLevel', event.target.value)} />
+                        </div></fieldset>
+                        <label><span>Alignment</span><select aria-label="Alignment" value={filters.alignment} onChange={event => changeFilter('alignment', event.target.value)}>
+                            <option value="">Any alignment</option>{alignments.map(value => <option key={value} value={value}>{alignmentLabel(value)}</option>)}
+                        </select></label>
+                        <label><span>Move</span><select aria-label="Move" value={filters.move} onChange={event => changeFilter('move', event.target.value)}>
+                            <option value="">Any move</option>{moves.map(value => <option key={value} value={value}>{moveLabel(value)}</option>)}
+                        </select></label>
+                    </div>
+                    <div className="sd-monster-filter-footer">
+                        <p aria-live="polite">{currentEntries.length ? `${visible.length} of ${currentEntries.length} monsters` : '0 monsters'}</p>
+                        <button type="button" onClick={() => setFilters({ ...EMPTY_MONSTER_FILTERS })}>Reset filters</button>
+                    </div>
+                    {invalidRange && <p role="alert">Minimum level must not exceed maximum level.</p>}
+                </section>
                 {error && <p role="alert" className="bg-white border-2 border-black p-3 text-red-800 font-bold">{error}</p>}
-                {entries === null && <p role="status" className="italic">Loading creatures…</p>}
-                <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3" aria-label="Creatures">
+                {entries === null && <p role="status" className="italic">Loading monsters…</p>}
+                <div className="sd-monster-columns" aria-hidden="true"><span>Monster name / source</span><span>Level</span><span>Alignment</span><span>Move</span></div>
+                <ul className="sd-monster-list" aria-label="Monsters">
                     {visible.map(entry => (
                         <li key={formatUuid(entry.ref)}>
-                            <button type="button" onClick={() => open(entry)}
-                                className="w-full text-left bg-white text-black border-2 border-black p-3 flex gap-3 items-center hover:bg-neutral-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-600 shadow-[3px_3px_0_0_rgba(0,0,0,1)] min-h-11">
-                                {entry.img && <ArtworkImage key={`${entry.img}:${entry.fallbackImg ?? ''}`} src={entry.img} fallback={entry.fallbackImg} className="w-12 h-12 object-cover border border-black bg-neutral-200 shrink-0" />}
-                                <span className="min-w-0">
-                                    <span className="block font-bold text-lg leading-tight break-words">{entry.name}</span>
-                                    <span className="block text-xs uppercase tracking-widest text-neutral-700">
-                                        LV {entry.level} · AC {entry.ac ?? '—'} · HP {entry.hp ?? '—'}
-                                    </span>
-                                    <span className="block text-[11px] text-neutral-600">
-                                        {entry.source === 'compendium' ? 'Shadowdark monsters' : 'World NPC'}
-                                        {(names.get(entry.name) ?? 0) > 1 ? ` · ${entry.ref.id}` : ''}
-                                    </span>
+                            <button type="button" onClick={() => open(entry)} className="sd-monster-row" aria-label={`View ${entry.name} — ${entry.sourceLabel}`}>
+                                <span className="sd-monster-identity">
+                                    {entry.img && <ArtworkImage key={`${entry.img}:${entry.fallbackImg ?? ''}`} src={entry.img} fallback={entry.fallbackImg} className="sd-monster-thumbnail" />}
+                                    <span><strong>{entry.name}</strong><small>{entry.sourceLabel}</small></span>
                                 </span>
+                                <span><span className="sd-monster-mobile-label">Level </span>{entry.level ?? '—'}</span>
+                                <span><span className="sd-monster-mobile-label">Alignment </span>{alignmentLabel(entry.alignment)}</span>
+                                <span><span className="sd-monster-mobile-label">Move </span>{moveLabel(entry.move)}{entry.moveNote ? ` (${entry.moveNote})` : ''}</span>
                             </button>
                         </li>
                     ))}
                 </ul>
-                {entries && visible.length === 0 && !error && <p className="italic">No creatures match.</p>}
+                {entries && visible.length === 0 && !error && <p className="sd-monster-empty">No monsters match your filters.</p>}
             </div>
             <ModuleDialog open={loadedScope === scope && !!selected} title={selected?.name ?? ''} subtitle={card?.state === 'ready' ? card.card.subtitle : undefined}
                 onClose={() => { seq.current++; setSelected(null); setCard(null); }} size="card"
                 footer={card?.state === 'ready' && (card.card.diagnostics.length > 0 || card.card.artworkCredit) ? <CardNotes card={card.card} /> : undefined}>
                 {card?.state === 'loading' && <p role="status" className="italic">Loading…</p>}
                 {card?.state === 'error' && <p role="alert" className="text-red-800">{card.message}</p>}
-                {card?.state === 'ready' && <CardBody card={card.card} />}
+                {card?.state === 'ready' && <CardBody card={card.card} informational />}
             </ModuleDialog>
         </main>
     );

@@ -54,7 +54,7 @@ const VARIABLE_DURATIONS = new Set(['days', 'hours', 'minutes', 'realTime', 'rou
 export const MOVE_LABELS: Record<string, string> = {
     none: 'None', close: 'Close', near: 'Near', doubleNear: 'Double Near', tripleNear: 'Triple Near', far: 'Far', special: 'Special',
 };
-const ALIGNMENT_LABELS: Record<string, string> = { lawful: 'Lawful', neutral: 'Neutral', chaotic: 'Chaotic' };
+export const ALIGNMENT_LABELS: Record<string, string> = { lawful: 'Lawful', neutral: 'Neutral', chaotic: 'Chaotic' };
 const ABILITY_LABELS: Record<string, string> = { str: 'STR', dex: 'DEX', con: 'CON', int: 'INT', wis: 'WIS', cha: 'CHA' };
 
 /** Native getSpellDuration helper. */
@@ -249,7 +249,7 @@ export function buildNpcCard(view: ShadowdarkView, source: any, ref: DocumentRef
     if (features.length) sections.push({ title: 'Features', entries: features });
     if (spells.length) sections.push({ title: 'Spells', entries: spells });
     return {
-        kind: 'npc', itemId: null, ref, title: source?.name ?? 'Creature', subtitle: `Level ${view.level} creature`, img: source?.img,
+        kind: 'npc', itemId: null, ref, title: source?.name ?? 'Creature', subtitle: '', img: source?.img,
         facts, states: [], description: system.notes ?? '', rollData: view.rollData, actions: [], sections, diagnostics: view.diagnostics,
     };
 }

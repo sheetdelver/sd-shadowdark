@@ -503,12 +503,22 @@ tracker are not run. Cards show
 the current identified presentation only, never the alternate identification
 fields. Descriptions go through `logic/description.ts` and the SDK sanitizer.
 
-The Bestiary dashboard action declares GM Tools placement (Core UI3.4.0+).
-Older supported hosts retain the Tools placement; this optional enhancement
-does not change data access or the compatibility floor. The tool lists world NPCs visible to the caller and, when the
-caller's pack capability allows it, the declared monster pack (the
-`server/access.ts` policy above).
-It is read-only: no spawn, encounter or sharing action.
+The **Monster Stats** dashboard action (stable tool ID/route `bestiary`) declares
+GM Tools placement (Core UI3.4.0+). Older supported hosts retain Tools placement.
+The read-only catalog groups NPC Actors by exact pack reference or world source,
+never by name or inferred creature type. It includes declared `shadowdark.monsters`
+and optional `shadowdark-community-content.monsters`; Core skips an absent pack.
+Public caller pack metadata supplies labels (identical labels include the pack ID).
+Each row shows native level/alignment/move, with move notes and source context;
+missing fields stay unavailable rather than becoming level0 or Near. Name, inclusive
+level range, alignment, movement and source filters combine and reset together.
+Rows activate the shared informational NPC card by mouse or keyboard. The shared
+NPC card no longer manufactures a type from level. Visible card artwork has an
+additional3.5em copy offset into the fade; cards without working art stay compact.
+NPC facts pair Level/Alignment and AC/HP, with other values spanning the row.
+Shared fact labels use weight800 and values600.
+No spawn, encounter, sharing or source-edit action is introduced. Per-pack capability
+checks run after asynchronous work; context changes retire pending lists/cards.
 
 ## Known alignment limits
 

@@ -9,6 +9,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
 import { execFileSync } from 'node:child_process';
+import postcss from 'postcss';
+import tailwind from '@tailwindcss/postcss';
+const monsterBaseline = process.argv.find(arg => arg.startsWith('--monster-baseline='))?.split('=')[1];
 const parityOnly = process.argv.includes('--parity-only');
 const baseline = process.argv.find(arg => arg.startsWith('--baseline='))?.slice(11);
 const providerBaseline=process.argv.find(arg=>arg.startsWith('--provider-baseline='))?.split('=')[1];
@@ -17,6 +20,11 @@ const { chromium } = await import(process.env.SHADOWDARK_PLAYWRIGHT_MODULE || 'p
 const moduleRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const out = path.resolve(process.argv[2] || path.join(moduleRoot, 'temp/collection-consumers'));
 fs.mkdirSync(out, { recursive: true });
+// Source CI mounts the actual host's CSS without starting Core or a Foundry service.
+const coreRoot = path.resolve(process.env.SHADOWDARK_CORE || process.cwd());
+const hostCss = process.env.SHADOWDARK_HOST_CSS ? fs.readFileSync(process.env.SHADOWDARK_HOST_CSS, 'utf8')
+    : (await postcss([tailwind({base:coreRoot})]).process(fs.readFileSync(path.join(coreRoot,'src/app/globals.css'),'utf8'), {from:path.join(coreRoot,'src/app/globals.css')})).css;
+
 const bundled = await build({ stdin: { contents: `
 import {useAutomaticSpellGrants} from '${moduleRoot}/src/ui/hooks/useAutomaticSpellGrants';
 import React from 'react'; import {createRoot} from 'react-dom/client';
@@ -121,6 +129,7 @@ window.change=values=>{window.sdk={...window.sdk,...values};window.render()};
 window.answer=(index,body,status=200)=>window.pending[index].resolve(Response.json(body,{status}));
 window.render();
 `, resolveDir: moduleRoot, loader: 'tsx' }, bundle: true, write: false, format: 'iife', platform: 'browser', jsx: 'automatic', plugins: [{ name: 'sdk-test-boundary', setup(b) {
+    if(monsterBaseline)b.onLoad({filter:/Bestiary\.tsx$/},a=>({loader:'tsx',resolveDir:path.dirname(a.path),contents:execFileSync('git',['show',monsterBaseline+':src/ui/tools/Bestiary.tsx'],{cwd:moduleRoot,encoding:'utf8'})}));
     if(providerBaseline)b.onLoad({filter:/ShadowdarkUIContext\.tsx$/},a=>({loader:'tsx',resolveDir:path.dirname(a.path),contents:execFileSync('git',['show',providerBaseline+':src/ui/context/ShadowdarkUIContext.tsx'],{cwd:moduleRoot,encoding:'utf8'})}));
     if(languageBaseline)b.onLoad({filter:/(?:LanguageSelectionModal\.tsx|Generator\.tsx|logic\/rules\.ts)$/},a=>({loader:a.path.endsWith('.tsx')?'tsx':'ts',resolveDir:path.dirname(a.path),contents:execFileSync('git',['show',languageBaseline+':'+path.relative(moduleRoot,a.path)],{cwd:moduleRoot,encoding:'utf8'})}));
     if(baseline)b.onLoad({filter:/SpellSelectionModal\.tsx$/},a=>({loader:'tsx',resolveDir:path.dirname(a.path),contents:execFileSync('git',['show',baseline+':src/ui/components/SpellSelectionModal.tsx'],{cwd:moduleRoot,encoding:'utf8'})}));
@@ -142,7 +151,7 @@ async function test(name, initial, run) {
     page.on('pageerror', e => errors.push(e.message)); await page.route('**/*', r => r.abort());
     try {
         await page.setContent('<div id="root" class="sdk-module--shadowdark"></div>');
-        if(name.startsWith('SD-UI13')) { assert.ok(process.env.SHADOWDARK_HOST_CSS, 'Core CSS including preflight is required'); await page.addStyleTag({path:process.env.SHADOWDARK_HOST_CSS}); await page.addStyleTag({path:path.join(moduleRoot,'assets/presentation.css')}); }
+        if(name.startsWith('SD-UI13') || name.startsWith('SD-UI23')) { await page.addStyleTag({content:hostCss}); await page.addStyleTag({path:path.join(moduleRoot,'assets/presentation.css')}); }
         if(['resource-card','wand-card'].includes(initial.which)) { await page.setViewportSize({width:initial.width,height:900}); if(process.env.SHADOWDARK_CARD_TAILWIND)await page.addStyleTag({path:process.env.SHADOWDARK_CARD_TAILWIND});await page.addStyleTag({path:path.join(moduleRoot,'assets/presentation.css')}); } await page.evaluate(x => window.initial = x, initial);
         await page.addScriptTag({ content: bundled.outputFiles[0].text });
         await run(page); assert.deepEqual(errors, []); results.push({ name, ok: true }); console.log(`✓ ${name}`);
@@ -155,9 +164,75 @@ const text = (p, value) => p.getByText(value, { exact: true }).waitFor({ timeout
 const count = (p, key) => p.evaluate(k => window.calls.filter(c => c.key === k).length, key);
 const settled = p => p.waitForTimeout(100);
 try {
+    const monsters = [
+        {ref:{kind:'compendium',documentType:'Actor',pack:'shadowdark.monsters',id:'g1'},name:'Goblin',source:'compendium',sourceId:'pack:shadowdark.monsters',sourceLabel:'Core Monsters',level:1,alignment:'chaotic',move:'near'},
+        {ref:{kind:'compendium',documentType:'Actor',pack:'world.extra',id:'g2'},name:'Goblin',source:'compendium',sourceId:'pack:world.extra',sourceLabel:'Extra Monsters',level:5,alignment:'lawful',move:'far',moveNote:'fly'},
+        {ref:{kind:'world',documentType:'Actor',id:'g3'},name:'Wandering Shade',source:'world',sourceId:'world',sourceLabel:'World Actors',level:null,alignment:null,move:null}
+    ];
+    const monsterPolicy = {bestiary:{body:{success:true,entries:monsters}}};
+    await test('SD-UI23: source/name/level/alignment/move filters and reset', {which:'bestiary',policy:monsterPolicy}, async p=>{
+        await p.getByRole('heading',{name:'Monster Stats',exact:true}).waitFor();
+        const rows=p.getByRole('list',{name:'Monsters'}).getByRole('button');
+        await rows.first().waitFor(); assert.equal(await rows.count(),3);
+        assert.deepEqual(await p.getByLabel('Data source').locator('option').allTextContents(),['All Monsters','Core Monsters','Extra Monsters','World Actors']);
+        await p.getByLabel('Data source').selectOption('pack:world.extra'); assert.equal(await rows.count(),1);
+        await p.getByLabel('Monster name').fill(' GOB '); assert.equal(await rows.count(),1);
+        await p.getByLabel('Minimum level').fill('5'); await p.getByLabel('Maximum level').fill('5'); assert.equal(await rows.count(),1);
+        await p.getByLabel('Alignment',{exact:true}).selectOption('lawful'); await p.getByLabel('Move',{exact:true}).selectOption('far'); assert.equal(await rows.count(),1);
+        assert.match(await rows.first().innerText(),/Far \(fly\)/);
+        await p.getByLabel('Minimum level').fill('6'); assert.equal(await rows.count(),0); await p.getByRole('alert').waitFor();
+        await p.getByRole('button',{name:'Reset filters'}).click(); assert.equal(await rows.count(),3);
+        await p.getByLabel('Minimum level').fill('0'); assert.equal(await rows.count(),2,'missing level must not become level zero');
+        await p.getByRole('button',{name:'Reset filters'}).click();
+        assert.doesNotMatch(await p.getByRole('list',{name:'Monsters'}).innerText(),/g1|g2|g3|creature|Type:/);
+    });
+    await test('SD-UI23: exact row opens read-only card with keyboard; context retires pending card', {which:'bestiary',policy:{...monsterPolicy,'Compendium.world.extra.Actor.g2':{hold:true}}}, async p=>{
+        const row=p.getByRole('button',{name:'View Goblin — Extra Monsters',exact:true});await row.waitFor();
+        await row.focus();await p.keyboard.press('Enter');
+        const dialog=p.getByRole('dialog',{name:'Goblin',exact:true});await dialog.waitFor();
+        assert.equal(await p.evaluate(()=>window.pending[0].call.key),'Compendium.world.extra.Actor.g2');
+        const card={kind:'npc',title:'Goblin',subtitle:'',facts:[{label:'Level',value:'5'}],states:[],description:'Native notes',sections:[],diagnostics:[],actions:[]};
+        await p.evaluate(card=>window.answer(0,{success:true,card}),card);await p.getByText('Native notes',{exact:true}).waitFor();
+        assert.equal(await dialog.getByText('Type',{exact:true}).count(),0);
+        await p.keyboard.press('Escape');await dialog.waitFor({state:'detached'});
+        await row.click();await dialog.waitFor();await p.evaluate(()=>window.retire());await dialog.waitFor({state:'detached'});
+        await p.evaluate(card=>window.answer(1,{success:true,card}),card);await settled(p);
+        assert.equal(await dialog.count(),0,'retired response cannot reopen card');
+    });
+    for (const width of [360,768]) await test(`SD-UI23: paired NPC facts, weight hierarchy and fade spacing ${width}px`, {which:'bestiary',policy:{...monsterPolicy,'Compendium.world.extra.Actor.g2':{body:{success:true,card:{kind:'npc',title:'Goblin',subtitle:'',
+        img:'data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600"><rect width="800" height="600" fill="#555"/></svg>'),
+        facts:[{label:'Level',value:'5'},{label:'Alignment',value:'Chaotic'},{label:'AC',value:'14'},{label:'HP',value:'34 / 34'},{label:'Abilities',value:'STR +2, DEX +1, CON +0, INT -1, WIS +0, CHA -1'},{label:'Move',value:'Near (fly)'},{label:'Senses',value:'Dark-adapted'}],
+        states:[],description:'Native monster description.',sections:[],diagnostics:[],actions:[]}}}}},async p=>{
+        await p.setViewportSize({width,height:900});
+        if(process.env.SHADOWDARK_CARD_TAILWIND)await p.addStyleTag({path:process.env.SHADOWDARK_CARD_TAILWIND});
+        await p.getByRole('button',{name:'View Goblin — Extra Monsters',exact:true}).click();
+        const dialog=p.getByRole('dialog',{name:'Goblin',exact:true});await dialog.waitFor();
+        await dialog.getByText('Dark-adapted',{exact:true}).waitFor();
+        const metrics=await dialog.evaluate(el=>{
+            const labels=Object.fromEntries([...el.querySelectorAll('dt')].map(n=>[n.textContent,{top:n.getBoundingClientRect().top,left:n.getBoundingClientRect().left,weight:Number(getComputedStyle(n).fontWeight)}]));
+            const values=[...el.querySelectorAll('dd')].map(n=>Number(getComputedStyle(n).fontWeight));
+            return {labels,values,padding:parseFloat(getComputedStyle(el.querySelector('.sd-card-copy')).paddingTop),overflow:el.querySelector('.sd-card-content').scrollWidth>el.querySelector('.sd-card-content').clientWidth};
+        });
+        assert.equal(metrics.labels.Level.top,metrics.labels.Alignment.top);
+        assert.equal(metrics.labels.AC.top,metrics.labels.HP.top);
+        assert.ok(metrics.labels.AC.top>metrics.labels.Level.top);
+        assert.ok(metrics.labels.Abilities.top>metrics.labels.AC.top);
+        assert.ok(metrics.values.every(weight=>weight===600)&&Object.values(metrics.labels).every(label=>label.weight===800));
+        assert.ok(metrics.padding>=212);assert.equal(metrics.overflow,false);
+        await p.screenshot({path:path.join(out,`npc-paired-facts-${width}.png`)});
+    });
+    for (const width of [390,1280]) await test(`SD-UI23: single-row responsive layout ${width}px`,{which:'bestiary',policy:monsterPolicy},async p=>{
+        await p.setViewportSize({width,height:900});
+        if(process.env.SHADOWDARK_CARD_TAILWIND)await p.addStyleTag({path:process.env.SHADOWDARK_CARD_TAILWIND});
+        await p.getByRole('button',{name:'View Goblin — Core Monsters',exact:true}).waitFor();
+        const rows=p.locator('.sd-monster-row');const boxes=await rows.evaluateAll(nodes=>nodes.map(n=>{const r=n.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,bottom:r.bottom}}));
+        assert.ok(boxes[1].y>=boxes[0].bottom && boxes.every(b=>b.x===boxes[0].x&&b.width===boxes[0].width));
+        assert.ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+        for(const theme of ['dark','light']) {await p.evaluate(theme=>{document.body.style.background=theme==='dark'?'#102037':'#eaf1f8'},theme);await p.screenshot({path:path.join(out,`monster-stats-${width}-${theme}.png`)});}
+    });
     if(process.argv.includes('--backgrounds-only') || process.env.SHADOWDARK_HOST_CSS) {
     for (const which of ['generator', 'importer', 'bestiary']) for (const width of [390, 1280]) {
-        await test(`SD-UI13: ${which} exposes host canvas at ${width}px`, {which, policy:{bestiary:{body:{success:true,entries:[{ref:{documentType:'Actor',id:'npc'},name:'Visible monster',source:'world',level:1,ac:10,hp:4}],compendiumAvailable:true}}}}, async p=>{
+        await test(`SD-UI13: ${which} exposes host canvas at ${width}px`, {which, policy:{bestiary:{body:{success:true,entries:[{ref:{documentType:'Actor',id:'npc'},name:'Visible monster',source:'world',sourceId:'world',sourceLabel:'World Actors',move:'near',alignment:'neutral',level:1,ac:10,hp:4}],compendiumAvailable:true}}}}, async p=>{
             await p.setViewportSize({width,height:900});
             assert.ok(process.env.SHADOWDARK_CARD_TAILWIND, 'compiled module CSS is required');
             await p.addStyleTag({path:process.env.SHADOWDARK_CARD_TAILWIND});
@@ -526,7 +601,7 @@ try {
             await dialog.getByText('Data notes (1)',{exact:true}).click();await dialog.getByText('Fixture source note',{exact:true}).waitFor();
             if(process.env.SHADOWDARK_CARD_TAILWIND){
                 const metrics=await dialog.evaluate(el=>{const body=el.querySelector('.sd-dialog-body'),art=el.querySelector('.sd-card-art'),copy=el.querySelector('.sd-card-copy'),notes=el.querySelector('.sd-card-notes'),button=Array.from(el.querySelectorAll('button')).find(b=>b.textContent==='Cast Fixture spell');return{bodyWidth:body.clientWidth,artWidth:art.getBoundingClientRect().width,fade:getComputedStyle(art,'::after').backgroundImage,padding:parseFloat(getComputedStyle(copy).paddingTop),notesBottom:notes.getBoundingClientRect().bottom,buttonTop:button.getBoundingClientRect().top,scroll:document.documentElement.scrollWidth,width:innerWidth};});
-                assert.ok(Math.abs(metrics.bodyWidth-metrics.artWidth)<=1);assert.match(metrics.fade,/linear-gradient/);assert.ok(metrics.padding>=150);assert.ok(metrics.notesBottom<=metrics.buttonTop);assert.ok(metrics.scroll<=metrics.width+1);
+                assert.ok(Math.abs(metrics.bodyWidth-metrics.artWidth)<=1);assert.match(metrics.fade,/linear-gradient/);assert.ok(metrics.padding>=212, 'card copy starts farther into the image fade');assert.ok(metrics.notesBottom<=metrics.buttonTop);assert.ok(metrics.scroll<=metrics.width+1);
                 await p.screenshot({path:path.join(out,`card-${width}-${duration}.png`)});
             }
             await p.evaluate(()=>{window.initial.actor.items[0].system.duration={type:'instant'};window.render()});
