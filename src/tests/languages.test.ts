@@ -57,9 +57,18 @@ await check('SD03 retained extras never create allowance; removal and exact repl
  assert.equal(validateLanguageInventory(plan,[ref('a')],[ref('b')]).valid,true);
  assert.equal(validateLanguageInventory(plan,[],[ref('a'),ref('a')]).valid,false);
 });
+await check('SD-UI14 mixed choices show capacities reserved against the other category',()=>{
+ const mixedRows=[...rows,{uuid:ref('c'),name:'Sylvan',system:{rarity:'common'}}];
+ const plan=languageEditingPlan(languagePlan(null,{system:{languages:{fixed:[ref('a'),ref('b')],select:1,selectOptions:[ref('c'),ref('r'),ref('s')]}}},mixedRows),mixedRows);
+ assert.deepEqual(languageInventorySections(plan,mixedRows,[ref('a'),ref('b'),ref('r')]),[{kind:'common',count:2,limit:2},{kind:'rare',count:1,limit:1}]);
+ const shared=languageEditingPlan(languagePlan(null,{system:{languages:{select:1,selectOptions:[ref('a'),ref('r')]}}},rows),rows);
+ assert.deepEqual(languageInventorySections(shared,rows,[]),[{kind:'common',count:0,limit:1},{kind:'rare',count:0,limit:1}]);
+ assert.deepEqual(languageInventorySections(shared,rows,[ref('a')]),[{kind:'common',count:1,limit:1},{kind:'rare',count:0,limit:0}]);
+ assert.equal(validateLanguageInventory(shared,[],[ref('a'),ref('r')]).valid,false);
+});
 await check('SD03 mixed-rarity restricted allowance is not doubled into two free quotas',()=>{
  const plan=languagePlan(null,{system:{languages:{select:1,selectOptions:[ref('a'),ref('r')]}}},rows);
- assert.deepEqual(languageInventorySections(plan,rows,[ref('r')]),[{kind:'common',count:0,limit:null},{kind:'rare',count:1,limit:null}]);
+ assert.deepEqual(languageInventorySections(plan,rows,[ref('r')]),[{kind:'common',count:0,limit:0},{kind:'rare',count:1,limit:1}]);
  assert.equal(validateLanguageInventory(plan,[],[ref('a'),ref('r')]).valid,false);
 });
 await check('SD-UI09 editing totals permit defaults to be customized without changing creation pools',()=>{

@@ -1,5 +1,6 @@
 'use client';
 
+import { useAutomaticSpellGrants } from '../hooks/useAutomaticSpellGrants';
 import { useState, useEffect, useCallback, useRef } from 'react';
 
 import { getErrorMessage, processHtmlContent } from '@sheet-delver/sdk';
@@ -83,6 +84,8 @@ export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProp
             if (!stale()) { setLoading(false); setReviewing(false); }
         }
     }, [setActor]);
+
+    const grantSync = useAutomaticSpellGrants(actor, async () => { await fetchActor(actorId, true); });
 
     const notifyRef = useRef(addNotification);
     notifyRef.current = addNotification;
@@ -210,6 +213,10 @@ export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProp
                 </div>
             </nav>
 
+            {grantSync.error && <div role="alert" className="mx-auto max-w-5xl border-2 border-black bg-white text-black p-3">
+                <p>Automatic spell grant: {grantSync.error}</p>
+                <button type="button" className="min-h-11 border-2 border-black px-3 mt-2" onClick={grantSync.retry}>Retry granted spells</button>
+            </div>}
             {reviewing && <p role="status">Refreshing character access…</p>}
             {actor && (
                 <div inert={reviewing || !isConnected} aria-hidden={reviewing || !isConnected || undefined} style={{ visibility: reviewing || !isConnected ? 'hidden' : undefined }} className="w-full max-w-5xl mx-auto p-4">

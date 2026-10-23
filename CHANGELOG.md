@@ -3,6 +3,20 @@
 Historical entries are reconstructed from [published releases](https://github.com/sheetdelver/sd-shadowdark/releases), their tags, and merged changes. Version numbers follow the published tags; the Unreleased section collects notes for the next authorized release.
 
 ## Unreleased
+- Recognize legacy spell wands
+- Roll spellcasting mishap tables
+- Clarify wand failure recovery
+- Show legacy spell scrolls
+- Retain spent scroll items
+- Correct effect reference diagnostics
+- Resolve advancement talent choices
+- Validate independent stat grants
+- Prevent duplicate spell choices
+- Apply spell grants automatically
+- Honor talent casting grants
+- Correct Priest starting choices
+- Clarify shared language allowances
+- Render labeled spell formulas
 - Inherit world tool backgrounds
 - Require Core 0.20.0
 - Share informational reference cards

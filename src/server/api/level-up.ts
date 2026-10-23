@@ -5,13 +5,14 @@ import { getErrorMessage, isSdkError, logger, SdkError } from '@sheet-delver/sdk
 import { shadowdarkAdapter } from '../../server/ShadowdarkAdapter';
 import { assembleFinalItems } from './level-up-engine';
 import * as levelUpEngine from './level-up-engine';
-import { TALENT_HANDLERS, extraSpellClassName } from '../../logic/talent-handlers';
-import { canonicalUuid, sourceRef, formatUuid } from '../../logic/identity';
+import { TALENT_HANDLERS } from '../../logic/talent-handlers';
+import { canonicalUuid, sourceRef, formatUuid, parseUuid } from '../../logic/identity';
+import { statChoiceRule } from '../../logic/stat-choices';
 import { callerOf, requestRules, requestRevision, contextConflict, requireOwnedActor } from '../access';
 import { hitPointRollFormula } from '../../logic/actions';
 import { prepareActorCore } from '../../logic/actor-preparation';
 import { advancementHitPoints } from '../../logic/advancement';
-import { advancementSpellChoices, grantedSpellSources, prepareSpellModel, spellListIdentity } from '../../logic/spell-model';
+import { knownSpellSources, advancementSpellChoices, grantedSpellSources, prepareSpellModel, spellListIdentity } from '../../logic/spell-model';
 import { callerLanguagePlan } from '../languages';
 import { validateLanguageSelections } from '../../logic/languages';
 import { spellReview } from '../../logic/spell-review';
@@ -28,12 +29,22 @@ async function verifyGrants(body: any, classObj: any, req: ModuleServerRequest) 
         if (value != null && (!Array.isArray(value) || value.some(entry => !entry || typeof entry !== 'object' || Array.isArray(entry))))
             throw new SdkError('validation', 'Advancement selections must be arrays of exact source selections.');
     }
+    for (const selection of [body.weaponMasterySelection, body.armorMasterySelection, body.spellAdvantageSelection, body.statSelection]) {
+        if (selection != null && (!selection || typeof selection !== 'object' || Array.isArray(selection)
+            || !Array.isArray(selection.selected) || selection.selected.some((value: unknown) => typeof value !== 'string')
+            || (selection.required !== undefined && (!Number.isInteger(selection.required) || selection.required < 0)))) {
+            throw new SdkError('validation', 'Talent choices must contain a count and a list of selected options.');
+        }
+    }
     const resolveGrant = async (entry: any, allowed: string[]) => {
         const uuid = canonicalUuid(entry?.documentUuid ?? entry?.uuid);
         if (uuid) {
             const doc = await shadowdarkAdapter.resolveDocumentFor(uuid, callerOf(req));
             if (!doc) throw new SdkError('validation', `${entry?.name || uuid} is not available.`);
-            if (doc.type === 'RollTable') return { name: doc.name, type: 'Talent', uuid, system: { ...(entry?.system ?? {}) }, effects: [] };
+            // RollTables have a document kind, not an Item subtype. Only a
+            // supported distribution instruction can become a Talent wrapper.
+            if (parseUuid(uuid)?.documentType === 'RollTable' && statChoiceRule(doc))
+                return { name: doc.name, type: 'Talent', uuid, system: { ...(entry?.system ?? {}) }, effects: [] };
             if (!allowed.includes(doc.type)) throw new SdkError('validation', `${doc.name} is a ${doc.type}, not ${allowed.join('/')}.`);
             return { ...doc, uuid, system: { ...(doc.system ?? {}), ...(entry?.system?.level !== undefined ? { level: entry.system.level } : {}),
                 ...(entry?.system?.talentClass ? { talentClass: entry.system.talentClass } : {}) } };
@@ -363,6 +374,11 @@ export function prepareCharacterCreation(req: ModuleServerRequest, choices: any)
 }
 async function finalizeLevelUp(actorId: string, req: ModuleServerRequest, input?: any) {
     const revision = requestRevision(req.runtime);
+    let noWrites = !actorId || actorId === 'new';
+    const rejected = (response: ReturnType<typeof error>) => noWrites
+        ? { ...response, json: async () => ({ ...await response.json() as Record<string, unknown>, advancementWrites: 'none' }) }
+        : response;
+    const reject = (...args: Parameters<typeof error>) => rejected(error(...args));
     try {
         const body = input ?? await req.json<any>();
         const { gold } = body;
@@ -374,6 +390,7 @@ async function finalizeLevelUp(actorId: string, req: ModuleServerRequest, input?
             actor = await requireOwnedActor(req.runtime, actorId);
             const replay = body.requestId ? await resumeAdvancement(req, actor, body, revision) : null;
             if (replay) return replay;
+            noWrites = true; // No saved request exists; all following checks are preflight.
         }
 
         // Server assembly resolves every source by exact identity through the
@@ -385,7 +402,7 @@ async function finalizeLevelUp(actorId: string, req: ModuleServerRequest, input?
             return { ...doc, uuid: canonicalUuid(uuid) ?? doc.uuid };
         };
         const classObj = await resolveTyped(body.classUuid ?? actor?.system?.class, 'Class');
-        if (!classObj) return error('validation', 'An exact readable Class is required before advancement.');
+        if (!classObj) return reject('validation', 'An exact readable Class is required before advancement.');
         const ancestry = await resolveTyped(body.ancestryUuid, 'Ancestry');
         const background = await resolveTyped(body.backgroundUuid, 'Background');
         const patron = await resolveTyped(body.patronUuid, 'Patron');
@@ -398,36 +415,26 @@ async function finalizeLevelUp(actorId: string, req: ModuleServerRequest, input?
             selectedLanguages: body.languages || [],
             hpRoll: body.hpRoll,
             goldRoll: gold,
+            statChoices: body.statChoices,
             statSelection: body.statSelection || { required: 0, selected: [] },
             statPool: body.statPool || { total: 0, allocated: {}, talentIndex: null },
             weaponMasterySelection: body.weaponMasterySelection || { required: 0, selected: [] },
             armorMasterySelection: body.armorMasterySelection || { required: 0, selected: [] },
+            spellAdvantageSelection: body.spellAdvantageSelection || { required: 0, selected: [] },
             extraSpellSelection: { ...(body.extraSpellSelection || { active: false, maxTier: 0, source: '' }), selected: verified.extraSpells }
         };
 
         const targetLevel = body.targetLevel || (actor?.system?.level?.value || 0) + 1;
         const currentLevel = actor?.system?.level?.value ?? 0;
-        if (!Number.isInteger(targetLevel) || targetLevel !== currentLevel + 1) return error('validation', 'Advancement must be exactly one level.');
-        if (actor && currentLevel > 0 && canonicalUuid(actor.system?.class) !== canonicalUuid(classObj?.uuid)) return error('validation', 'Advancement must keep the Actor’s exact Class identity.');
+        if (!Number.isInteger(targetLevel) || targetLevel !== currentLevel + 1) return reject('validation', 'Advancement must be exactly one level.');
+        if (actor && currentLevel > 0 && canonicalUuid(actor.system?.class) !== canonicalUuid(classObj?.uuid)) return reject('validation', 'Advancement must keep the Actor’s exact Class identity.');
 
         // Assembly: compendium sources are limited to the caller's readable packs.
         const finalItems = await assembleFinalItems(state, targetLevel, classObj, ancestry, background, patron, callerOf(req), actor);
 
-        const extraGrants = finalItems.filter(item => item.type === 'Talent' && TALENT_HANDLERS.some(handler => handler.action === 'extra-spell' && handler.matches(item)));
-        if (verified.extraSpells.length !== extraGrants.length) return error('validation', `Native granting talents require exactly ${extraGrants.length} extra spell choice(s).`);
-        if (new Set(verified.extraSpells.map((spell: any) => spell.uuid)).size !== verified.extraSpells.length) return error('validation', 'Extra spell choices must identify distinct exact sources.');
-        for (const [index, spell] of verified.extraSpells.entries()) {
-            const namedClass = extraSpellClassName(extraGrants[index]);
-            if (namedClass) {
-                let matches = false;
-                for (const reference of spell.system?.class ?? []) {
-                    const doc = await resolveTyped(reference, 'Class');
-                    if (doc && String(doc.name).toLowerCase() === namedClass) matches = true;
-                }
-                if (!matches) return error('validation', 'An extra spell does not match its native granting talent’s Class.');
-            }
-        }
-
+        const extraGrants = finalItems.filter(item => ['Talent','Boon'].includes(item.type) && TALENT_HANDLERS.some(handler => handler.action === 'extra-spell' && handler.matches(item)));
+        if (verified.extraSpells.length !== extraGrants.length) return reject('validation', `Native granting talents require exactly ${extraGrants.length} extra spell choice(s).`);
+        if (new Set(verified.extraSpells.map((spell: any) => spell.uuid)).size !== verified.extraSpells.length) return reject('validation', 'Extra spell choices must identify distinct exact sources.');
         // Evaluate actual/planned native grants, then validate every tier before
         // HP, XP, language or embedded Item writes. Empty catalogs cannot waive it.
         const planned = { ...(actor ?? { type: 'Player', items: [], effects: [] }),
@@ -436,21 +443,24 @@ async function finalizeLevelUp(actorId: string, req: ModuleServerRequest, input?
         const lookups = await shadowdarkAdapter.callerLookups(planned, callerOf(req));
         const core = prepareActorCore(planned, lookups, requestRules(req.runtime));
         const casting = 'classes' in core.spellcasting && core.spellcasting.classes.length > 0;
-        const choices = casting ? advancementSpellChoices(classObj, currentLevel, targetLevel) : { required: {} as Record<number, number>, diagnostics: [] };
-        if (classObj?.system?.spellcasting?.ability && !casting) return error('validation', 'Missing casting grant; review the exact Class talents before advancing.');
-        if (classObj?.system?.spellcasting?.ability && !prepareSpellModel(planned, core, lookups).sources.length) return error('validation', 'The Actor’s active grant does not match its exact spell-list Class.');
-        if (choices.diagnostics.length) return error('validation', choices.diagnostics.join(' '));
+        const choices = classObj?.system?.spellcasting?.ability ? advancementSpellChoices(classObj, currentLevel, targetLevel) : { required: {} as Record<number, number>, diagnostics: [] };
+        if (classObj?.system?.spellcasting?.ability && !casting) return reject('validation', 'Missing casting grant; review the exact Class talents before advancing.');
+        if (classObj?.system?.spellcasting?.ability && !prepareSpellModel(planned, core, lookups).sources.length) return reject('validation', 'The Actor’s active grant does not match its exact spell-list Class.');
+        if (choices.diagnostics.length) return reject('validation', choices.diagnostics.join(' '));
         const selected = state.selectedSpells;
         const identities = selected.map((spell: any) => canonicalUuid(spell.uuid));
         const innate = grantedSpellSources(planned.items);
+        const known = knownSpellSources(actor?.items ?? []);
+        if ([...identities, ...verified.extraSpells.map((spell: any) => canonicalUuid(spell.uuid))].some(uuid => uuid && known.has(uuid)))
+            return reject('validation', 'Choose a spell this character does not already know.');
         if (verified.extraSpells.some((spell: any) => identities.includes(canonicalUuid(spell.uuid)) || innate.has(spell.uuid)))
-            return error('validation', 'Extra spells must be distinct from required ordinary choices and fixed granted spells.');
-        if (identities.some((uuid: string | null) => uuid && innate.has(uuid))) return error('validation', 'Granted spells do not fill required ordinary spell choices.');
-        if (new Set(identities).size !== identities.length) return error('validation', 'A required spell source may be selected only once.');
-        if (selected.some((spell: any) => !Number.isInteger(spell.system?.tier) || spell.system.tier < 1 || spell.system.tier > 5)) return error('validation', 'Selected spell has an invalid native tier.');
+            return reject('validation', 'Extra spells must be distinct from required ordinary choices and fixed granted spells.');
+        if (identities.some((uuid: string | null) => uuid && innate.has(uuid))) return reject('validation', 'Granted spells do not fill required ordinary spell choices.');
+        if (new Set(identities).size !== identities.length) return reject('validation', 'A required spell source may be selected only once.');
+        if (selected.some((spell: any) => !Number.isInteger(spell.system?.tier) || spell.system.tier < 1 || spell.system.tier > 5)) return reject('validation', 'Selected spell has an invalid native tier.');
         for (let tier = 1; tier <= 5; tier++) {
             const count = selected.filter((spell: any) => spell.system.tier === tier).length;
-            if (count !== (choices.required[tier] ?? 0)) return error('validation', `Tier ${tier} requires exactly ${choices.required[tier] ?? 0} new spell(s); received ${count}.`);
+            if (count !== (choices.required[tier] ?? 0)) return reject('validation', `Tier ${tier} requires exactly ${choices.required[tier] ?? 0} new spell(s); received ${count}.`);
         }
         if (targetLevel === 1) {
             // Existing level-zero ancestry languages are inventory, not another
@@ -458,19 +468,19 @@ async function finalizeLevelUp(actorId: string, req: ModuleServerRequest, input?
             const existing = Array.isArray(actor?.system?.languages) ? actor.system.languages : [];
             const plan = await callerLanguagePlan(callerOf(req), actor ? null : ancestry, classObj, existing);
             const languages = validateLanguageSelections(plan, body.languageChoices, existing);
-            if (!languages.valid) return error('validation', languages.errors.join(' '));
+            if (!languages.valid) return reject('validation', languages.errors.join(' '));
             if (!Array.isArray(state.selectedLanguages) || state.selectedLanguages.some((uuid: string) => !languages.languages.includes(uuid)))
-                return error('validation', 'Language additions must come from the reviewed native choice pools.');
+                return reject('validation', 'Language additions must come from the reviewed native choice pools.');
             state.selectedLanguages = languages.languages;
         } else {
             const existing = Array.isArray(actor?.system?.languages) ? actor.system.languages : [];
-            if (state.selectedLanguages.some((uuid: string) => !existing.includes(uuid))) return error('validation', 'This advancement grants no language choices. Edit ordinary inventory separately.');
+            if (state.selectedLanguages.some((uuid: string) => !existing.includes(uuid))) return reject('validation', 'This advancement grants no language choices. Edit ordinary inventory separately.');
             state.selectedLanguages = existing;
         }
-        const conflict = contextConflict(req.runtime, revision); if (conflict) return conflict;
+        const conflict = contextConflict(req.runtime, revision); if (conflict) return rejected(conflict);
         if (actor) {
             const fresh = await req.runtime.documents.get('Actor', actorId, { minOwnership: 'owner' });
-            if (!fresh || spellReview(fresh) !== spellReview(actor)) return error('conflict', 'Actor source changed during advancement review. Refresh before applying any writes.');
+            if (!fresh || spellReview(fresh) !== spellReview(actor)) return reject('conflict', 'Actor source changed during advancement review. Refresh before applying any writes.');
         }
 
         const actorUpdates: any = {};
@@ -513,6 +523,7 @@ async function finalizeLevelUp(actorId: string, req: ModuleServerRequest, input?
             const dependencies = [classObj?.uuid, ancestry?.uuid, background?.uuid, patron?.uuid,
                 ...finalItems.flatMap(item => { const ref = sourceRef(item); return ref ? [formatUuid(ref)] : []; }),
                 ...finalItems.flatMap(item => item.type === 'Spell' ? item.system?.class ?? [] : [])].filter(Boolean);
+            noWrites = false;
             const applied = await resumeAdvancement(req, actor, body, revision, { items: finalItems, patch: actorUpdates, dependencies,
                 result: { actorId, targetLevel, updates: actorUpdates, hpRoll: state.hpRoll, goldRoll: gold, languages: state.selectedLanguages } });
             return applied ?? error('internal', 'Advancement plan could not be recorded.');
@@ -530,9 +541,9 @@ async function finalizeLevelUp(actorId: string, req: ModuleServerRequest, input?
         });
 
     } catch (e: unknown) {
-        const conflict = contextConflict(req.runtime, revision); if (conflict) return conflict;
-        if (isSdkError(e)) return error(e.code, e.message);
+        const conflict = contextConflict(req.runtime, revision); if (conflict) return rejected(conflict);
+        if (isSdkError(e)) return reject(e.code, e.message);
         logger.error('[API] Finalize Level-Up Error:', e);
-        return error('internal', getErrorMessage(e) || 'Failed to finalize level-up');
+        return reject('internal', getErrorMessage(e) || 'Failed to finalize level-up');
     }
 }

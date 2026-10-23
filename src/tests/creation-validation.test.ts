@@ -1,3 +1,8 @@
+import { prepareActorCore } from '../logic/actor-preparation';
+import { TableService } from '../utils/TableService';
+import { statChoiceRule } from '../logic/stat-choices';
+import { pendingChoiceKind, choiceCatalog, resolvedChoice } from '../logic/talent-choices';
+import { TALENT_HANDLERS } from '../logic/talent-handlers';
 /** SD02-R2: final write boundary, real shared preparation, native fixed grants/spells. */
 import assert from 'node:assert/strict';
 import path from 'node:path';
@@ -42,6 +47,101 @@ await check('review reproducer: three native fixed talents without three require
     actor.items = [ownedCopy(cls,cls.uuid), ...cls.system.talents.map((uuid: string) => ownedCopy(byUuid.get(uuid), uuid))];
     assert.equal(cls.system.spellcasting.spellsknown['1']['1'], 3); await rejected({ actor, languageChoices: languages },400);
 });
+await check('Wizard Spellcasting Advantage resolves its chosen known spell before creation', async () => {
+    const input:any=choices(); input.rolledTalents=[byUuid.get('Compendium.shadowdark.talents.Item.IZZnFjWhZurAIZPP')];
+    input.spellAdvantageSelection={required:1,selected:[spellRows[0].name]};
+    const body=await prepared(input);
+    const talent=body.actor.items.find((item:any)=>item._stats?.compendiumSource===input.rolledTalents[0].uuid);
+    assert.ok(talent.name.endsWith(' ('+spellRows[0].name+')'));
+    assert.ok(!JSON.stringify(talent).includes('REPLACEME'));
+    assert.equal((await post(body)).status,200);
+    for(const selected of [[],['Not a known spell'],[spellRows[0].name,spellRows[1].name]]) {
+        const invalid=structuredClone(body); invalid.creationPlan.choices.spellAdvantageSelection.selected=selected; await rejected(invalid,400);
+    }
+});
+await check('every native placeholder talent has a selector and resolves through final creation', async () => {
+    const talents=rows.filter(doc=>doc.type==='Talent'&&JSON.stringify(doc.effects).includes('REPLACEME'));
+    assert.deepEqual(talents.map(doc=>doc.name).sort(),['Armor Mastery','D12 Weapon Damage Die','Spellcasting Advantage','Weapon Mastery']);
+    const catalog=choiceCatalog(rows);
+    for(const template of talents) for(const modern of [false,true]) {
+        const talent=structuredClone(template);
+        if(modern) for(const effect of talent.effects) {
+            effect.system={...effect.system,changes:effect.changes.map((change:any)=>({key:change.key,type:'add',value:change.value,phase:'initial',priority:change.priority}))};
+            delete effect.changes;
+        }
+        const original=byUuid.get(talent.uuid);byUuid.set(talent.uuid,talent);
+        try {
+            const kind=pendingChoiceKind(talent)!;assert.ok(kind,talent.name);
+            assert.ok(TALENT_HANDLERS.some(handler=>handler.matches(talent)&&handler.action),talent.name);
+            const field=kind==='weapon'?'weaponMasterySelection':kind==='armor'?'armorMasterySelection':'spellAdvantageSelection';
+            const selected=kind==='spell'?spellRows[0].name:catalog[kind]![0].name;
+            const input:any=choices();input.rolledTalents=[talent];input[field]={required:1,selected:[selected]};
+            const body=await prepared(input);const result=body.actor.items.find((item:any)=>item._stats?.compendiumSource===talent.uuid);
+            assert.ok(resolvedChoice(result),talent.name);assert.ok(!JSON.stringify(result).includes('REPLACEME'));
+            const before=talent.effects.flatMap((effect:any)=>effect.system?.changes??effect.changes).map((change:any)=>change.value);
+            const after=result.effects.flatMap((effect:any)=>effect.system?.changes??effect.changes).map((change:any)=>change.value);
+            assert.deepEqual(after,before,'resolving a target preserves every authored effect value');
+            assert.equal((await post(body)).status,200,talent.name);
+        } finally {byUuid.set(talent.uuid,original);}
+    }
+});
+await check('two advantage talents keep independent choices and never grant extra spells', async () => {
+    const input:any=choices(), talent=byUuid.get('Compendium.shadowdark.talents.Item.IZZnFjWhZurAIZPP');
+    input.rolledTalents=[talent,talent];input.spellAdvantageSelection={required:2,selected:spellRows.slice(0,2).map(spell=>spell.name)};
+    const body=await prepared(input);const grants=body.actor.items.filter((item:any)=>item._stats?.compendiumSource===talent.uuid);
+    assert.equal(grants.length,2);assert.equal(new Set(grants.map(resolvedChoice)).size,2);
+    assert.equal(body.actor.items.filter((item:any)=>item.type==='Spell').length,3);
+    assert.equal((await post(body)).status,200);
+    for(const selection of [{required:1,selected:[spellRows[0].name]},{required:2,selected:null},{required:2,selected:[{}]}]) {
+        const invalid=structuredClone(body);invalid.creationPlan.choices.spellAdvantageSelection=selection;await rejected(invalid,400);
+    }
+});
+await check('all twelve fixed native stat grants and repeated gains apply their exact amounts', async () => {
+    const names:Record<string,string>={Strength:'str',Dexterity:'dex',Constitution:'con',Intelligence:'int',Wisdom:'wis',Charisma:'cha'};
+    const talents=rows.filter(doc=>doc.type==='Talent'&&/^\+[12] to (Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)$/.test(doc.name));
+    assert.equal(talents.length,12);
+    for(const talent of talents) {
+        const match=/^\+([12]) to (.+)$/.exec(talent.name)!;
+        const input:any=choices();input.rolledTalents=[talent,talent];const body=await prepared(input);
+        const core=prepareActorCore(body.actor,await adapter.callerLookups(body.actor,{runtime,isGM:false}));
+        const stat=names[match[2]];assert.equal(core.abilities[stat as keyof typeof core.abilities].value,body.actor.system.abilities[stat].value+2*Number(match[1]),talent.name);
+        assert.equal(body.actor.items.filter((item:any)=>item._stats?.compendiumSource===talent.uuid).length,2);
+        assert.equal((await post(body)).status,200);
+    }
+});
+await check('independent stat distributions enforce exact totals and distinct-stat constraints', async () => {
+    const input:any=choices();input.rolledTalents=[{type:'synthetic',name:'Distribute to Stats (Warlock)'},{type:'synthetic',name:'Distribute to Stats'}];
+    input.statChoices=[{str:1,dex:1},{con:2}];const body=await prepared(input);
+    const core=prepareActorCore(body.actor,await adapter.callerLookups(body.actor,{runtime,isGM:false}));
+    assert.equal(core.abilities.str.value,body.actor.system.abilities.str.value+1);
+    assert.equal(core.abilities.dex.value,body.actor.system.abilities.dex.value+1);
+    assert.equal(core.abilities.con.value,body.actor.system.abilities.con.value+2);
+    assert.equal((await post(body)).status,200);
+    for(const statChoices of [[{str:2},{con:2}],[{str:1},{con:2}],[{str:1,dex:1},{con:3}], [{str:1,dex:1},{con:1.5,wis:0.5}], [{str:1,unknown:1},{con:2}], [],null]) {
+        const invalid=structuredClone(body);invalid.creationPlan.choices.statChoices=statChoices;await rejected(invalid,400);
+    }
+    const one:any=choices();one.rolledTalents=[{name:'+1 to two stats',type:'Talent'}];one.statChoices=[{int:1,wis:1}];
+    assert.equal((await post(await prepared(one))).status,200);
+    const nested:any=choices();nested.rolledTalents=[byUuid.get('Compendium.shadowdark.rollable-tables.RollTable.EmBGQUSaf5L7ojKJ')];nested.statChoices=[{int:2}];
+    const nestedBody=await prepared(nested);assert.equal(nestedBody.actor.items.find((item:any)=>item.name==='Distribute to Stats')?.type,'Talent');
+    assert.equal((await post(nestedBody)).status,200);
+});
+await check('native table processing retains Warlock distinct stats, Bard distribution and fixed Wizard options', async () => {
+    const caller:any={runtime,isGM:false};
+    const process=async(id:string,total:number)=>{
+        const table=byUuid.get('Compendium.shadowdark.rollable-tables.RollTable.'+id);
+        const results=table.results.filter((result:any)=>result.range[0]<=total&&result.range[1]>=total);
+        const items=results.map((result:any)=>byUuid.get(result.documentUuid)).filter(Boolean);
+        return TableService.processRollResult(caller,{table,result:{total,results,items}});
+    };
+    const warlock=await process('xM3hghlK5nvo46Vo',4);assert.deepEqual(statChoiceRule(warlock.item),{total:2,maxPerStat:1});assert.equal(warlock.config.maxPerStat,1);
+    const bard=await process('ZzffJkaIfmdPzdE7',8);assert.deepEqual(statChoiceRule(bard.item),{total:2,maxPerStat:2});
+    const wizard=await process('RQ0vogfVtJGuT9oT',5);assert.equal(wizard.needsChoice,true);
+    assert.ok(wizard.choiceOptions.some((item:any)=>item.uuid==='Compendium.shadowdark.talents.Item.aRY0hjpvzYpdRbfR'));
+    assert.ok(wizard.choiceOptions.every((item:any)=>!statChoiceRule(item)));
+    const twelve=await process('RQ0vogfVtJGuT9oT',12);
+    assert.ok(twelve.choiceOptions.some((item:any)=>statChoiceRule(item)?.total===2));
+});
 await check('valid caster final write preserves all planned native arrays/effects/unknown fields', async () => {
     const body = await prepared(); const before = structuredClone(body); const result = await post(body); assert.equal(result.status,200,JSON.stringify(result));
     assert.deepEqual(writes.at(-1).data, before.actor); assert.deepEqual(body,before);
@@ -82,6 +182,31 @@ await check('extra native Talent spell is separate from three ordinary required 
     const missing = structuredClone(body); missing.creationPlan.choices.selectedSpells = spellRows.slice(0,2); await rejected(missing,400);
     const overlap = structuredClone(body); overlap.creationPlan.choices.extraSpellSelection.selected = [spellRows[0]]; await rejected(overlap,400);
 });
+await check('repeated native talents require separate bonus choices and retain quota provenance', async () => {
+    const input:any=choices(); const talent=byUuid.get('Compendium.shadowdark.talents.Item.T5nkdUM75LSnDpu5');
+    input.rolledTalents=[talent,talent]; input.extraSpellSelection={active:true,selected:spellRows.slice(3,5)};
+    const body=await prepared(input);
+    assert.equal(body.actor.items.filter((item:any)=>item._stats?.compendiumSource===talent.uuid).length,2);
+    assert.equal(body.actor.items.filter((item:any)=>item.flags?.shadowdark?.spellGrant?.source===talent.uuid).length,2);
+    assert.equal((await post(body)).status,200);
+    for(const selected of [spellRows.slice(3,4),[spellRows[3],spellRows[3]],[spellRows[3],rows.find(doc=>doc.type==='Spell'&&doc.system.tier===2&&doc.system.class.includes(WIZARD))]]) {
+        const invalid=structuredClone(body); invalid.creationPlan.choices.extraSpellSelection.selected=selected; await rejected(invalid,400);
+    }
+});
+await check('Shune boon gives a noncaster a tier-one INT Spell without ordinary Wizard slots', async () => {
+    const saved=structuredClone(cls), fighter='Compendium.shadowdark.classes.Item.hO7KrvqDRH6kvftJ';
+    Object.assign(cls,structuredClone(byUuid.get(fighter)),{_id:'reviewClass',uuid:'Item.reviewClass'});
+    cls.system.languages=structuredClone(zero);
+    try {
+        const input:any={...choices(),selectedSpells:[],rolledBoons:[byUuid.get('Compendium.shadowdark.talents.Item.mgRrWET5MEaGLVNo')],
+            weaponMasterySelection:{required:1,selected:['Club']},extraSpellSelection:{active:true,selected:[spellRows[0]]}};
+        const body=await prepared(input); const spell=body.actor.items.find((item:any)=>item.type==='Spell');
+        assert.equal(spell.flags.shadowdark.spellGrant.classUuid,WIZARD); assert.equal(spell.flags.shadowdark.spellGrant.level,1);
+        assert.equal((await post(body)).status,200);
+        const higher=structuredClone(body); higher.creationPlan.choices.extraSpellSelection.selected=[rows.find(doc=>doc.type==='Spell'&&doc.system.tier===2&&doc.system.class.includes(WIZARD))];
+        await rejected(higher,400);
+    } finally { for(const key of Object.keys(cls))delete cls[key];Object.assign(cls,saved); }
+});
 await check('altered native fields/effects/source identity are refused, unchanged preserved', async () => {
     const valid = await prepared();
     for (const alter of [
@@ -97,7 +222,11 @@ await check('a native fixed granted Spell cannot fill ordinary starting quotas',
     try {
         const ordinary = rows.filter(d => d.type === 'Spell' && d.system.tier === 1 && d.system.class.includes(PRIEST) && d.uuid !== 'Compendium.shadowdark.spells.Item.mByUvcHIVEPWscfH');
         const input = { ...choices(), selectedSpells: ordinary.slice(0,2) };
-        const valid = await prepared(input); assert.equal((await post(valid)).status,200);
+        const valid = await prepared(input);
+        const turn = 'Compendium.shadowdark.spells.Item.mByUvcHIVEPWscfH';
+        assert.equal(valid.actor.items.filter((item: any) => item.type === 'Spell' && item._stats?.compendiumSource === turn).length,1, 'fixed grant is in the original creation plan, with no picker addition');
+        assert.equal((await post(valid)).status,200);
+        assert.equal(writes.at(-1).data.items.filter((item: any) => item.type === 'Spell').length,3);
         valid.creationPlan.choices.selectedSpells = [ordinary[0], byUuid.get('Compendium.shadowdark.spells.Item.mByUvcHIVEPWscfH')];
         await rejected(valid,400);
     } finally { for (const key of Object.keys(cls)) delete cls[key]; Object.assign(cls,saved); }

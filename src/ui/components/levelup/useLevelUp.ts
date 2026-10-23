@@ -1,13 +1,15 @@
+import { statChoiceRule, validStatAllocation, type StatAllocation } from '../../../logic/stat-choices';
+import { knownSpellSources, grantedSpellSources } from '../../../logic/spell-model';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { isClassSpellcaster } from '../../../logic/rules';
 import { logger } from '@sheet-delver/sdk';
 import { useSDK } from '@sheet-delver/sdk/react';
-import { TALENT_HANDLERS, extraSpellClassName } from '../../../logic/talent-handlers';
+import { TALENT_HANDLERS } from '../../../logic/talent-handlers';
 import { useShadowdarkUI, useShadowdarkCollections } from '../../context/ShadowdarkUIContext';
 import { canonicalUuid } from '../../../logic/identity';
 import { useChoiceCatalog } from '../../hooks/useChoiceCatalog';
-import { fixedTalentReferences, masteryKind } from '../../../logic/talent-choices';
-import { slugify } from '../../../logic/foundry';
+import { fixedTalentReferences, talentChoiceKind, choiceCatalog } from '../../../logic/talent-choices';
+import { spellChoiceGrant, spellFitsGrant, matchSpellGrants } from '../../../logic/spell-grants';
 import { useLanguagePlan } from '../../hooks/useLanguagePlan';
 import { emptyLanguageSelections, validateLanguageSelections, type LanguageSelections } from '../../../logic/languages';
 
@@ -192,18 +194,12 @@ export const useLevelUp = (props: LevelUpProps) => {
     const [statPool, setStatPool] = useState<{ total: number; allocated: Record<string, number>; talentIndex: number | null; maxPerStat?: number }>({ total: 0, allocated: { str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 }, talentIndex: null });
     const [weaponMasterySelection, setWeaponMasterySelection] = useState<{ required: number; selected: string[] }>({ required: 0, selected: [] });
     const [armorMasterySelection, setArmorMasterySelection] = useState<{ required: number; selected: string[] }>({ required: 0, selected: [] });
+    const [spellAdvantageSelection, setSpellAdvantageSelection] = useState<{ required: number; selected: string[] }>({ required: 0, selected: [] });
+    const spellEffectData = useShadowdarkCollections(['spells'], spellAdvantageSelection.required > 0);
     const needsMastery = weaponMasterySelection.required > 0 || armorMasterySelection.required > 0;
     const masteryData = useChoiceCatalog(needsMastery);
     const [extraSpellSelection, setExtraSpellSelection] = useState<{ active: boolean; maxTier: number; source: string; selected: any[] }>({ active: false, maxTier: 0, source: '', selected: [] });
     const extraSpellData = useShadowdarkCollections(['classes', 'spells'], extraSpellSelection.active);
-    const extraSpellsList = useMemo(() => {
-        if (!extraSpellData.ready) return [];
-        const classDoc = collections.classes.find(entry => slugify(entry.name ?? '') === slugify(extraSpellSelection.source));
-        const ref = canonicalUuid(classDoc?.uuid);
-        if (!ref) return [];
-        return collections.spells.filter(spell => Array.isArray(spell.system?.class)
-            && spell.system.class.some((value: unknown) => canonicalUuid(value) === ref));
-    }, [extraSpellData.ready, collections, extraSpellSelection.source]);
 
     const [isSpellcaster, setIsSpellcaster] = useState(false);
     useEffect(() => {
@@ -258,7 +254,7 @@ export const useLevelUp = (props: LevelUpProps) => {
                 const refs = [activeClassObj, ancestryDoc].flatMap(doc => [...new Set(fixedTalentReferences(doc))]);
                 const docs = await Promise.all(refs.map(ref => fetchDocument(ref)));
                 if (docs.some(doc => !doc)) throw new Error('Required class or ancestry talents are unavailable. Retry after their data loads.');
-                if (current) setFixedChoices({ key: fixedChoiceKey, items: docs.filter(doc => masteryKind(doc)) });
+                if (current) setFixedChoices({ key: fixedChoiceKey, items: docs.filter(doc => talentChoiceKind(doc) || spellChoiceGrant(doc) || statChoiceRule(doc)) });
             } catch (error) {
                 if (current) {
                     const message = getErrorMessage(error);
@@ -270,6 +266,45 @@ export const useLevelUp = (props: LevelUpProps) => {
         void load();
         return () => { current = false; };
     }, [fixedChoiceKey, targetLevel, activeClassObj, ancestry, fetchDocument]);
+
+    const statGrants = useMemo(() => [...rolledTalents, ...rolledBoons,
+        ...(fixedChoices?.key === fixedChoiceKey ? fixedChoices.items : [])].filter(item => statChoiceRule(item)),
+        [rolledTalents, rolledBoons, fixedChoices, fixedChoiceKey]);
+    const statChoicesKey = JSON.stringify(statGrants.map(item => [item.uuid ?? item.name, statChoiceRule(item)]));
+    const [statChoiceState, setStatChoiceState] = useState<{ key: string; values: StatAllocation[] }>({ key: '', values: [] });
+    const statChoices: StatAllocation[] = statChoiceState.key === statChoicesKey ? statChoiceState.values : statGrants.map(() => ({}));
+    const changeStatChoice = (index: number, stat: string, delta: number) => {
+        const rule = statChoiceRule(statGrants[index]); if (!rule) return;
+        const values = statChoices.map(value => ({ ...value }));
+        const allocation = values[index] ?? {};
+        const value = (allocation[stat] ?? 0) + delta;
+        if (value < 0 || value > rule.maxPerStat) return;
+        allocation[stat] = value;
+        if (Object.values(allocation).reduce((sum, points) => sum + points, 0) > rule.total) return;
+        values[index] = allocation; setStatChoiceState({ key: statChoicesKey, values });
+    };
+
+    const extraSpellGrants = useMemo(() => [...rolledTalents, ...rolledBoons,
+        ...(fixedChoices?.key === fixedChoiceKey ? fixedChoices.items : [])].filter(item => spellChoiceGrant(item)),
+        [rolledTalents, rolledBoons, fixedChoices, fixedChoiceKey]);
+    const extraSpellContext = useMemo(() => ({ level: targetLevel, known: [...existingItems, ...selectedSpells], classDoc: activeClassObj }),
+        [targetLevel, existingItems, selectedSpells, activeClassObj]);
+    const extraSpellsList = useMemo(() => {
+        if (!extraSpellData.ready) return [];
+        const known = knownSpellSources(existingItems);
+        const granted = grantedSpellSources(existingItems, [...(targetLevel === 1 ? activeClassObj?.system?.talents ?? [] : []), ...rolledTalents.map(talent => talent.uuid), ...rolledBoons.map(boon => boon.uuid)]);
+        return collections.spells.filter(spell => extraSpellGrants.some(grant => spellFitsGrant(grant, spell, extraSpellContext)))
+            .map(spell => ({ ...spell, isKnown: known.has(canonicalUuid(spell.uuid) ?? ''), isInnate: granted.has(canonicalUuid(spell.uuid) ?? ''),
+                isGrantBlocked: !extraSpellSelection.selected.some(selected => selected.uuid === spell.uuid)
+                    && !matchSpellGrants(extraSpellGrants, [...extraSpellSelection.selected, spell], extraSpellContext) }));
+    }, [extraSpellData.ready, collections.spells, existingItems, targetLevel, activeClassObj, rolledTalents, rolledBoons, extraSpellGrants, extraSpellContext, extraSpellSelection.selected]);
+
+    const spellEffectOptions = useMemo(() => {
+        const granted = grantedSpellSources(existingItems, [...(targetLevel === 1 ? activeClassObj?.system?.talents ?? [] : []),
+            ...rolledTalents.map(item => item.uuid), ...rolledBoons.map(item => item.uuid)]);
+        return choiceCatalog([...existingItems, ...selectedSpells, ...extraSpellSelection.selected,
+            ...(collections.spells ?? []).filter(spell => granted.has(canonicalUuid(spell.uuid) ?? ''))]).spell ?? [];
+    }, [existingItems, targetLevel, activeClassObj, rolledTalents, rolledBoons, selectedSpells, extraSpellSelection.selected, collections.spells]);
 
     const fetchLevelUpData = useCallback(async (classUuidOverride?: string) => {
         if (!actorId && !classUuidOverride) return;
@@ -322,6 +357,10 @@ export const useLevelUp = (props: LevelUpProps) => {
                             if (!unique.has(s.uuid)) unique.set(s.uuid, s);
                         });
                         setAvailableSpells(Array.from(unique.values()));
+                        setSelectedSpells(previous => previous.filter(spell => {
+                            const current = unique.get(spell.uuid);
+                            return current && !current.isInnate && !current.isKnown;
+                        }));
                     }
                 }
                 if (apiData.knownLanguages) setKnownLanguages(apiData.knownLanguages);
@@ -835,6 +874,7 @@ export const useLevelUp = (props: LevelUpProps) => {
         submitting.current = true;
         setIsSubmitting(true);
         setStatuses(prev => ({ ...prev, class: 'LOADING' }));
+        let noWrites = !actorId || actorId === 'new';
         try {
             const headers: any = { 'Content-Type': 'application/json' };
             const revision = operation?.contextRevision ?? props.contextRevision ?? languageData.plan?.contextRevision;
@@ -853,16 +893,19 @@ export const useLevelUp = (props: LevelUpProps) => {
                     gold: goldRoll,
                     languages: selectedLanguages,
                     languageChoices: props.languageChoices ?? selectedLanguageGroups,
+                    statChoices,
                     statSelection,
                     statPool,
                     weaponMasterySelection,
                     armorMasterySelection,
+                    spellAdvantageSelection,
                     extraSpellSelection
             };
             const res = await fetchWithAuth(`/api/modules/shadowdark/actors/${actorId || 'new'}/level-up/finalize`, {
                 method: 'POST', headers, body: JSON.stringify({ ...submission.current, ...(recovery ? { recovery } : {}) })
             });
             const json = await res.json();
+            noWrites ||= !res.ok && json.advancementWrites === 'none';
             if (!mounted.current || authority !== authorityRef.current) return;
             if (!res.ok || !json.success) throw new Error(json.error?.message ?? json.error ?? 'Failed to finalize level-up');
             if (actorId && actorId !== 'new' && json.state !== 'complete') {
@@ -884,8 +927,16 @@ export const useLevelUp = (props: LevelUpProps) => {
 
         } catch (error: unknown) {
             if (mounted.current && authority === authorityRef.current) {
-                setError(`${getErrorMessage(error)}. Reconcile this same request; do not submit replacement grants.`);
-                setOperation((previous: any) => previous ?? { requestId: submission.current?.requestId, state: 'partial', operations: [], recovery: 'No authoritative completion response. Retry the same request to obtain saved receipts.' });
+                if (noWrites) {
+                    // Creation preparation performs no Actor/Item writes. An
+                    // invalid choice is editable, never a partial advancement.
+                    submission.current = null;
+                    setOperation(null);
+                    setError(getErrorMessage(error));
+                } else {
+                    setError(`${getErrorMessage(error)}. Reconcile this same request; do not submit replacement grants.`);
+                    setOperation((previous: any) => previous ?? { requestId: submission.current?.requestId, state: 'partial', operations: [], recovery: 'No authoritative completion response. Retry the same request to obtain saved receipts.' });
+                }
                 setStatuses(prev => ({ ...prev, class: 'READY' }));
             }
         } finally {
@@ -1167,9 +1218,10 @@ export const useLevelUp = (props: LevelUpProps) => {
 
         let wmReq = 0;
         let amReq = 0;
+        let saReq = 0;
 
         let esActive = false;
-        let esSource = '';
+        const esSources: string[] = [];
 
         const processItem = (item: any, index: number | null) => {
             const decision = getTalentDecision(item);
@@ -1192,11 +1244,13 @@ export const useLevelUp = (props: LevelUpProps) => {
                     case 'armor-mastery':
                         amReq += decision.config?.required || 0;
                         break;
+                    case 'spell-advantage':
+                        saReq += decision.config?.required || 0;
+                        break;
                     case 'extra-spell':
                         esActive = true;
 
-                        // Only an explicitly named class filters the offered list.
-                        esSource = extraSpellClassName(item) ?? '';
+                        esSources.push(spellChoiceGrant(item)!.label);
                         break;
                 }
             }
@@ -1242,12 +1296,14 @@ export const useLevelUp = (props: LevelUpProps) => {
             return prev;
         });
 
+        setSpellAdvantageSelection(prev => prev.required === saReq ? prev : { required: saReq, selected: [] });
+
+        const esSource = esSources.join(', ');
         setExtraSpellSelection(prev => {
             if (prev.active !== esActive || (esActive && prev.source !== esSource)) {
                 if (!esActive) return { active: false, maxTier: 0, source: '', selected: [] };
 
-                // Native 4.0.6 does not encode which tiers a "learn a spell" talent
-                // allows, so no tier limit is invented here.
+                // Per-grant tier/list eligibility is shared with final validation.
                 const maxTier = 5;
                 return {
                     active: true,
@@ -1283,6 +1339,7 @@ export const useLevelUp = (props: LevelUpProps) => {
                 statPool,
                 weaponMasterySelection,
                 armorMasterySelection,
+                spellAdvantageSelection,
                 activeClassObj
             })) return false;
         }
@@ -1307,7 +1364,7 @@ export const useLevelUp = (props: LevelUpProps) => {
         if ((extraTalents + extraBoons) < choiceRolls) return false;
 
         // 3. Stats
-        if (statSelection.required > 0 && statSelection.selected.length < statSelection.required) return false;
+        if (statGrants.some((grant, index) => !validStatAllocation(statChoiceRule(grant)!, statChoices[index]))) return false;
 
         // 4. Weapon Mastery
         if (needsMastery && !masteryData.ready) return false;
@@ -1318,16 +1375,15 @@ export const useLevelUp = (props: LevelUpProps) => {
         if (armorMasterySelection.required > 0 && (armorMasterySelection.selected.length < armorMasterySelection.required
             || armorMasterySelection.selected.some(name => !masteryData.catalog?.armor?.some(option => option.name === name)))) return false;
 
-        // 5b. Stat Pool (Distribution)
-        if (statPool.total > 0) {
-            const used = Object.values(statPool.allocated).reduce((a: number, b: any) => a + (Number(b) || 0), 0);
-            if (used < statPool.total) return false;
-        }
+        if (spellAdvantageSelection.required > 0 && (!spellEffectData.ready
+            || spellAdvantageSelection.selected.length !== spellAdvantageSelection.required
+            || spellAdvantageSelection.selected.some(name => !spellEffectOptions.some(option => option.name === name)))) return false;
 
         // 6. Extra Spells
         if (extraSpellSelection.active) {
-            if (!extraSpellData.ready || extraSpellSelection.selected.some(selected => !extraSpellsList.some(spell => spell.uuid === selected.uuid))) return false;
-            if (extraSpellSelection.selected.length < 1) return false;
+            if (!extraSpellData.ready || extraSpellSelection.selected.some(selected => !extraSpellsList.some(spell => spell.uuid === selected.uuid && !spell.isInnate && !spell.isKnown))) return false;
+            if (extraSpellSelection.selected.length !== extraSpellGrants.length
+                || !matchSpellGrants(extraSpellGrants, extraSpellSelection.selected, extraSpellContext)) return false;
         }
 
         // 7. Languages
@@ -1336,6 +1392,7 @@ export const useLevelUp = (props: LevelUpProps) => {
         // 8. Spells
         if (isSpellcaster && spellsToChooseTotal > 0) {
             if (selectedSpells.length !== spellsToChooseTotal || !availableSpells?.length) return false;
+            if (selectedSpells.some(selected => !availableSpells.some(spell => spell.uuid === selected.uuid && !spell.isInnate && !spell.isKnown))) return false;
             for (const [tier, count] of Object.entries(spellsToChoose)) {
                 const selectedInTier = selectedSpells.filter(s => Number(s.tier || s.system?.tier || 0) === Number(tier)).length;
                 if (selectedInTier !== count) return false;
@@ -1350,7 +1407,7 @@ export const useLevelUp = (props: LevelUpProps) => {
         if (targetLevel === 1 && goldRoll === null) return false;
 
         // 11. Duplicate Spell Check
-        if (isSpellcaster && extraSpellSelection.active) {
+        if (extraSpellSelection.active) {
             const hasOverlap = selectedSpells.some(s =>
                 extraSpellSelection.selected.some(es => (es.uuid || es._id) === (s.uuid || s._id))
             );
@@ -1361,7 +1418,8 @@ export const useLevelUp = (props: LevelUpProps) => {
     }, [
         rolledTalents, requiredTalents, targetLevel, existingItems, statSelection, statPool, weaponMasterySelection, armorMasterySelection, activeClassObj, fixedChoices, fixedChoiceKey, levelData, authorityKey,
         rolledBoons, choiceRolls,
-        extraSpellSelection, extraSpellData.ready, extraSpellsList, needsMastery, masteryData.ready, masteryData.catalog,
+        statGrants, statChoices, spellAdvantageSelection, spellEffectData.ready, spellEffectOptions,
+        extraSpellSelection, extraSpellData.ready, extraSpellsList, extraSpellGrants, extraSpellContext, needsMastery, masteryData.ready, masteryData.catalog,
         languageGroups, availableLanguages, fixedLanguages, selectedLanguages, knownLanguages, languageData, selectedLanguageGroups, skipLanguageSelection,
         isSpellcaster, spellsToChooseTotal, availableSpells, selectedSpells, spellsToChoose,
         pendingChoices,
@@ -1403,8 +1461,13 @@ export const useLevelUp = (props: LevelUpProps) => {
             goldRoll,
             statSelection,
             statPool,
+            statGrants,
+            statChoices,
             weaponMasterySelection,
             armorMasterySelection,
+            spellAdvantageSelection,
+            spellEffectData,
+            spellEffectOptions,
             extraSpellSelection,
             isComplete,
             hpFormula,
@@ -1433,6 +1496,7 @@ export const useLevelUp = (props: LevelUpProps) => {
             startingBoons: totalRequiredBoons, // Use the total for UI display
             choiceRolls,
             extraSpellsList,
+            extraSpellRequired: extraSpellGrants.length,
             extraSpellData,
             // Add missing properties that were previously there if needed by other components
             // activeClassObj is already there.
@@ -1448,8 +1512,10 @@ export const useLevelUp = (props: LevelUpProps) => {
             handleRollGold,
             handleRollTalent,
             handleStatToggle,
+            changeStatChoice,
             setWeaponMasterySelection,
             setArmorMasterySelection,
+            setSpellAdvantageSelection,
             setExtraSpellSelection,
             handleConfirm,
             handleChoiceSelection,

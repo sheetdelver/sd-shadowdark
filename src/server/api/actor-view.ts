@@ -6,6 +6,7 @@ import { ShadowdarkNormalizer } from '../../logic/normalization';
 import { spellReview } from '../../logic/spell-review';
 import { reviewToken, reviewMatches } from '../source-review';
 import { advancementNeedsReview } from '../advancement-operation';
+import { missingSpellGrants } from '../spell-grants';
 import { withActorLock } from '../operation-lock';
 
 /** Bounded caller projection. No privileged registry or second world cache. */
@@ -26,7 +27,9 @@ export async function handleActorView(actorId: string, req: ModuleServerRequest)
         const conflict = contextConflict(req.runtime, revision); if (conflict) return conflict;
         const normalized = ShadowdarkNormalizer.normalizeActorData(latest, {}, lookups, undefined, requestRules(req.runtime));
         const token = reviewToken(latest);
-        return json({ actor: { ...latest, ...normalized, advancementPending, worldContextRevision: revision, spellReviewToken: token }, derived: normalized.derived, baseline: token });
+        const missingGrants = latest.type === 'Player' && missingSpellGrants(Array.isArray(latest.items) ? latest.items : []).length > 0;
+        const canApplyGrants = missingGrants && !advancementPending && !!await req.runtime.documents.get('Actor', actorId, { minOwnership: 'owner' });
+        return json({ actor: { ...latest, ...normalized, advancementPending, spellGrants: { missing: missingGrants, canApply: canApplyGrants }, worldContextRevision: revision, spellReviewToken: token }, derived: normalized.derived, baseline: token });
     } catch (e) {
         return contextConflict(req.runtime, revision) ?? error(isSdkError(e) ? e.code : 'internal', getErrorMessage(e));
     }

@@ -1,13 +1,13 @@
+import { FIXED_SPELL_GRANTS as GRANTED_SPELLS, ownedSpellGrant } from './spell-grants';
 import type { PreparedActorCore, PreparationLookups } from './actor-preparation';
 import { canonicalUuid, documentId, formatUuid, parseUuid, sourceRef } from './identity';
 import { slugify } from './foundry';
 
 /** Native priest talent → spell. Exact identities, shared by every count consumer. */
-export const GRANTED_SPELLS: Readonly<Record<string, string>> = {
-    'Compendium.shadowdark.talents.Item.LfHTnYW8I65x8Y31': 'Compendium.shadowdark.spells.Item.mByUvcHIVEPWscfH',
-};
-export function grantedSpellSources(items: any[]): Set<string> {
-    return new Set(items.map(item => sourceRef(item)).filter(Boolean).map(ref => GRANTED_SPELLS[formatUuid(ref!)]).filter(Boolean));
+export { FIXED_SPELL_GRANTS as GRANTED_SPELLS } from './spell-grants';
+export function grantedSpellSources(items: any[], plannedTalents: readonly unknown[] = []): Set<string> {
+    const origins = items.map(item => sourceRef(item)).filter(Boolean).map(ref => formatUuid(ref!));
+    return new Set([...origins, ...plannedTalents.map(value => canonicalUuid(typeof value === 'string' ? value : value && typeof value === 'object' && 'uuid' in value ? value.uuid : null))].filter(Boolean).map(ref => GRANTED_SPELLS[ref!]).filter(Boolean));
 }
 export type SpellLimit = { status: 'known'; value: number } | { status: 'unavailable'; value: null; reason: string };
 /** Explicit native null is zero; missing/invalid data is never unlimited. */
@@ -54,7 +54,7 @@ export function prepareSpellModel(actor: any, core: PreparedActorCore, lookups: 
     const owned = items.filter(item => item.type === 'Spell').map(item => {
         const origin = sourceRef(item);
         const classes = (Array.isArray(item.system?.class) ? item.system.class : []).map((value: unknown) => canonicalUuid(value));
-        const innate = !!origin && granted.has(formatUuid(origin));
+        const innate = (!!origin && granted.has(formatUuid(origin))) || !!ownedSpellGrant(item, items);
         const resolved = classes.length && classes.every((uuid: string | null) => {
             const ref = parseUuid(uuid);
             return ref && !!lookups.classDocument?.(ref);
@@ -81,4 +81,9 @@ export function prepareSpellModel(actor: any, core: PreparedActorCore, lookups: 
             { status: 'unavailable', value: null, reason: 'This additional casting grant has no proven progression Class. Existing spells are preserved; choose an exact progression source before adding.' } as SpellLimit])) });
     }
     return { classUuid: identity, listUuid, grants, sources, owned, diagnostics };
+}
+
+/** Exact owned origins, independent of the list or how the Spell was granted. */
+export function knownSpellSources(items: any[]): Set<string> {
+    return new Set(items.filter(item => item.type === 'Spell').map(sourceRef).filter(Boolean).map(ref => formatUuid(ref!)));
 }

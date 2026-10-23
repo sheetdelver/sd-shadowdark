@@ -1,3 +1,4 @@
+import { SPELL_CHOICE_GRANTS, SPELL_CLASSES, shuneSpellTier, spellGrantClasses, spellFitsGrant, matchSpellGrants, spellGrantCastingRefs } from '../logic/spell-grants';
 /** ADR-0002 sanitized source regressions. No operator data or native writes. */
 import assert from 'node:assert/strict';
 import path from 'node:path';
@@ -10,6 +11,7 @@ import { handleActorView } from '../server/api/actor-view';
 import { prepareShadowdarkView } from '../logic/prepared-view';
 import { spellReview } from '../logic/spell-review';
 import { spellLimit } from '../logic/spell-model';
+import { handleSpellGrants } from '../server/api/spell-grants';
 import { handleManageSpells } from '../server/api/manage-spells';
 import { resolveSubItems, enrichItem } from '../logic/actor-enricher';
 import { resolveBaggage } from '../server/api/gear-resolver';
@@ -31,6 +33,85 @@ const knight = () => { const a: any = primLike(); a.items = [{ ...ownedCopy(byUu
 const WIZARD = 'Compendium.shadowdark.classes.Item.035nuVkU9q2wtMPs';
 const castingActor = () => { const a: any = primLike(); a.items = [{ _id: 'spellA', name: 'Custom spell', type: 'Spell', system: { class: ['Item.worldClass'], tier: 1, lost: false }, effects: [] }];
     a.effects = [{ _id: 'grant', changes: [{ key: 'system.spellcasting.classes', mode: 2, value: 'wizard', priority: 20 }], disabled: false, transfer: true }]; a.system.class = 'Item.worldClass'; return a; };
+await check('SD-UI16d native grant inventory covers every Learn Spell template and table reference', () => {
+    const templates = rows.filter(doc => doc.type === 'Talent' && /^Learn.*Spell$/i.test(doc.name));
+    assert.deepEqual(templates.map(doc => doc.uuid).sort(), Object.keys(SPELL_CHOICE_GRANTS).sort());
+    const references = rows.filter(doc => Array.isArray(doc.results)).flatMap(doc => doc.results)
+        .map(result => result.documentUuid).filter(uuid => templates.some(doc => doc.uuid === uuid));
+    for (const uuid of Object.keys(SPELL_CHOICE_GRANTS).filter(uuid => !uuid.endsWith('Ey3P0EplF5SHIdey'))) assert.ok(references.includes(uuid), uuid);
+    assert.deepEqual(spellGrantCastingRefs(rows.filter(doc => doc.type === 'Talent' && /Magical Dabbler|Spellcasting Advantage|Magic Missile Advantage/.test(doc.name))), []);
+});
+await check('SD-UI16d Shune uses acquisition level, rounds down with minimum one, and requires exact Wizard tier', () => {
+    const grant = byUuid.get('Compendium.shadowdark.talents.Item.mgRrWET5MEaGLVNo');
+    assert.deepEqual([1,2,3,4,5,6,7,8,9,10].map(shuneSpellTier), [1,1,1,2,2,3,3,4,4,5]);
+    for (let level=1; level<=10; level++) for (const spell of rows.filter(doc => doc.type === 'Spell')) {
+        const expected = spell.system.class.includes(WIZARD) && spell.system.tier === Math.max(1, Math.floor(level/2));
+        assert.equal(spellFitsGrant(grant, spell, {level,known:[]}),expected, level+':'+spell.name);
+    }
+});
+await check('SD-UI16d each native choice grant supplies casting on a noncaster without borrowed progression', async () => {
+    for (const [uuid, rule] of Object.entries(SPELL_CHOICE_GRANTS)) {
+        const list = rule.classUuid ?? WIZARD;
+        const spell = rows.find(doc => doc.type === 'Spell' && doc.system.tier === 1 && doc.system.class.includes(list));
+        const actor = primLike(); actor.system.class = 'Compendium.shadowdark.classes.Item.hO7KrvqDRH6kvftJ'; actor.effects=[];
+        const talent = { ...ownedCopy(byUuid.get(uuid)), _id:'grant' };
+        const learned = { ...ownedCopy(spell), _id:'learned', flags:{shadowdark:{spellGrant:{source:uuid,classUuid:list,level:1}}} };
+        actor.items=[talent,learned]; const before=structuredClone(actor);
+        const lookups=await adapter.callerLookups(actor,caller), view=prepareShadowdarkView(actor,lookups);
+        const action=view.actions.find(row=>row.itemId==='learned' && row.kind==='spell');
+        assert.equal(action?.available,true,uuid); assert.equal(action?.ability,byUuid.get(list).system.spellcasting.ability);
+        assert.equal(view.spellModel.owned[0].classification,'granted');
+        assert.ok(view.spellModel.sources.every(source=>Object.values(source.limits).every(limit=>limit.status==='unavailable')));
+        assert.deepEqual(actor,before);
+        const denied=await adapter.callerLookups(actor,{...caller,runtime:{...caller.runtime,access:{canReadPack:()=>false}}});
+        assert.equal(prepareShadowdarkView(actor,denied).actions.find(row=>row.itemId==='learned')?.available,false);
+    }
+});
+await check('SD-UI16d Shune keeps INT when another active class has a higher casting modifier', async () => {
+    const uuid='Compendium.shadowdark.talents.Item.mgRrWET5MEaGLVNo';
+    // Controlled custom shared-list fixture; native lists need not overlap.
+    const spell=structuredClone(rows.find(doc=>doc.type==='Spell'&&doc.system.class.includes(WIZARD)));
+    spell.system.class=[WIZARD,SPELL_CLASSES.priest];
+    const actor:any=primLike(); actor.system.abilities.wis.value=18;actor.system.abilities.int.value=10;
+    actor.effects=[{_id:'priest',disabled:false,transfer:true,changes:[{key:'system.spellcasting.classes',mode:2,value:'priest',priority:20}]}];
+    actor.items=[{...ownedCopy(byUuid.get(uuid)),_id:'grant'}, {...ownedCopy(spell),_id:'learned',flags:{shadowdark:{spellGrant:{source:uuid,classUuid:WIZARD,level:1}}}}];
+    const view=prepareShadowdarkView(actor,await adapter.callerLookups(actor,caller));
+    assert.equal(view.actions.find(row=>row.itemId==='learned')?.ability,'int');
+});
+await check('SD-UI16d mixed grants match distinct eligible spells independent of selection order', () => {
+    const wizard=byUuid.get('Compendium.shadowdark.talents.Item.T5nkdUM75LSnDpu5');
+    const witch=byUuid.get('Compendium.shadowdark.talents.Item.ZYZkbENdQAiNsEL6');
+    const w=rows.find(doc=>doc.type==='Spell'&&doc.system.tier===1&&doc.system.class.includes(WIZARD)&&!doc.system.class.includes(WITCH));
+    const c=rows.find(doc=>doc.type==='Spell'&&doc.system.tier===1&&doc.system.class.includes(WITCH)&&!doc.system.class.includes(WIZARD));
+    const context={level:1,known:[w,c]};
+    assert.deepEqual(matchSpellGrants([wizard,witch],[c,w],context),[1,0]);
+    assert.equal(matchSpellGrants([wizard,witch],[w,w],context),null);
+    assert.equal(matchSpellGrants([wizard],[c],context),null);
+});
+await check('SD-UI16d generic shared-list choice retains the Class that establishes its eligible tier', () => {
+    const grant=byUuid.get('Compendium.shadowdark.talents.Item.Ey3P0EplF5SHIdey');
+    const known=[{type:'Spell',system:{tier:1,class:[WIZARD]}},{type:'Spell',system:{tier:2,class:[WITCH]}}];
+    const choice={type:'Spell',system:{tier:2,class:[WIZARD,WITCH]}};
+    assert.deepEqual(spellGrantClasses(grant,choice,{level:3,known}),[WITCH]);
+});
+await check('SD-UI15 first-level Priest picker excludes the automatic Turn Undead grant', async () => {
+    const priest = 'Compendium.shadowdark.classes.Item.oZWzXx1WRLg286zD';
+    const turn = 'Compendium.shadowdark.spells.Item.mByUvcHIVEPWscfH';
+    for (const actor of [null, { ...primLike(), items: [], system: { class: priest, level: { value: 0 } } }]) {
+        const data = await adapter.getLevelUpData(actor, priest, undefined, caller);
+        assert.equal(data.spellsToChoose[1], 2);
+        assert.equal(data.availableSpells.find((spell: any) => spell.uuid === turn)?.isInnate, true);
+        assert.ok(data.availableSpells.filter((spell: any) => !spell.isInnate && spell.system.tier === 1).length >= 2);
+    }
+});
+await check('SD-UI16 advancement catalogs flag owned origins without changing grant classification', async () => {
+    const actor = primLike(); const spell = rows.find(doc => doc.type === 'Spell' && doc.system?.class?.includes(WIZARD));
+    actor.system.class = WIZARD; actor.system.level.value = 1;
+    actor.items = [{ ...ownedCopy(spell, spell.uuid), _id: 'fromBoon' }];
+    const data = await adapter.getLevelUpData(actor, WIZARD, undefined, caller);
+    assert.equal(data.availableSpells.find((row: any) => row.uuid === spell.uuid)?.isKnown, true);
+    assert.equal(data.availableSpells.find((row: any) => row.uuid === spell.uuid)?.isInnate, false);
+});
 await check('SD02-01 L01/L02/L04 diagnostics do not infer missing native data', () => {
     const a = castingActor(); const source = structuredClone(a); a.effects = [];
     const missingGrant = prepareShadowdarkView(a, { classDocument: () => byUuid.get(WIZARD) });
@@ -128,6 +209,90 @@ function management(failure = '') {
     const run = () => handleManageSpells(actor._id, { runtime, userSession: { userId: 'sanitized' }, json: async () => structuredClone(body) } as any);
     return { actor, events, receipts, body, runtime, run, recover: () => { failure = ''; } };
 }
+function fixedGrant(failure = '') {
+    const test = management(failure);
+    const priest = 'Compendium.shadowdark.classes.Item.oZWzXx1WRLg286zD';
+    const turn = 'Compendium.shadowdark.spells.Item.mByUvcHIVEPWscfH';
+    const grant = 'Compendium.shadowdark.talents.Item.LfHTnYW8I65x8Y31';
+    const ordinary = rows.filter(doc => doc.type === 'Spell' && doc.system.tier === 1 && doc.system.class.includes(priest) && doc.uuid !== turn).slice(0,2);
+    test.actor.system.class = priest; test.actor.system.level.value = 1;
+    test.actor.effects[0].changes[0].value = 'priest';
+    test.actor.items = [...ordinary.map((doc, i) => ({...ownedCopy(doc,doc.uuid),_id:`ordinary${i}`})), {...ownedCopy(byUuid.get(grant),grant),_id:'grant'}];
+    test.body.listUuid = priest; test.body.additions = [turn]; test.body.removals = []; test.body.baseline = spellReview(test.actor);
+    const request = (userId = 'sanitized', method = 'POST') => ({ runtime: test.runtime, method, userSession: { userId }, json: async () => ({}) } as any);
+    return { ...test, turn, request, sync: (userId?: string) => handleSpellGrants(test.actor._id, request(userId)) };
+}
+await check('SD-UI16c fixed grants automatically become real known/castable Items at full ordinary quota', async () => {
+    const test = fixedGrant();
+    assert.equal((await test.run()).status,400, 'manual selection of an automatic grant is refused');
+    assert.deepEqual(test.events,[]);
+    const res = await test.sync(); assert.equal(res.status,200,JSON.stringify(await res.json()));
+    const lookups = await adapter.callerLookups(test.actor,{...caller,runtime:test.runtime});
+    const view = prepareShadowdarkView(test.actor,lookups);
+    assert.equal(view.spellModel.owned.filter(row => row.innate).length,1);
+    assert.ok(view.actions.some(action => action.kind === 'spell' && action.itemId === 'created1'));
+    assert.equal(view.spellModel.owned.filter(row => !row.innate).length,2);
+    assert.deepEqual(test.events,['create']);
+    await Promise.all([test.sync(),test.sync('other-owner')]); assert.deepEqual(test.events,['create']);
+});
+await check('SD-UI16c actor view advertises owner grant sync but remains read-only', async () => {
+    const test = fixedGrant();
+    const response = await handleActorView(test.actor._id,test.request('sanitized','GET'));
+    assert.equal(response.status,200); const data: any = await response.json();
+    assert.deepEqual(data.actor.spellGrants,{missing:true,canApply:true}); assert.deepEqual(test.events,[]);
+    await test.sync();
+    const after: any = await (await handleActorView(test.actor._id,test.request('sanitized','GET'))).json();
+    assert.deepEqual(after.actor.spellGrants,{missing:false,canApply:false});
+    assert.ok(after.actor.derived.actions.some((action: any) => action.kind === 'spell' && action.itemId === 'created1'));
+});
+await check('SD-UI16c concurrent owners, reloads and new grant events never duplicate the fixed Spell', async () => {
+    const test = fixedGrant();
+    const talent = test.actor.items.pop();
+    await test.sync(); assert.deepEqual(test.events,[]);
+    test.actor.items.push(talent);
+    const results = await Promise.all([test.sync(),test.sync('other-owner'),test.sync()]);
+    assert.ok(results.every(result => result.status === 200)); assert.deepEqual(test.events,['create']);
+});
+await check('SD-UI16c GET and observer access cannot apply grants; source denial writes nothing', async () => {
+    const test = fixedGrant();
+    assert.equal((await handleSpellGrants(test.actor._id,test.request('sanitized','GET'))).status,405);
+    const get = test.runtime.documents.get;
+    test.runtime.documents.get = async (kind: string,id: string,options: any) => options?.minOwnership === 'owner' ? null : get(kind,id,options);
+    assert.equal((await test.sync()).status,403); assert.deepEqual(test.events,[]);
+    test.runtime.documents.get = get;
+    test.runtime.access = { canReadPack: () => false };
+    assert.equal((await test.sync()).status,403); assert.deepEqual(test.events,[]);
+});
+await check('SD-UI16c unknown grant responses/receipt failures never replay creates; refusals can retry', async () => {
+    const test = fixedGrant('lost-receipt');
+    assert.equal((await test.sync()).status,500); await test.sync(); assert.deepEqual(test.events,['create']);
+    // Missing source after an ambiguous write still cannot authorize replacement.
+    test.actor.items = test.actor.items.filter((item: any) => item._id !== 'created1');
+    assert.equal((await test.sync('other-owner')).status,409); assert.deepEqual(test.events,['create']);
+    const denied = fixedGrant('denied'); assert.equal((await denied.sync()).status,403);
+    denied.recover(); assert.equal((await denied.sync()).status,200); assert.deepEqual(denied.events,['create','create']);
+    const receiptFailure = fixedGrant(); const set = receiptFailure.runtime.dataStore.set;
+    receiptFailure.runtime.dataStore.set = async (key: string,value: any) => { if (value.status === 'complete') throw new Error('Receipt save unavailable'); return set(key,value); };
+    assert.equal((await receiptFailure.sync()).status,500); await receiptFailure.sync(); assert.deepEqual(receiptFailure.events,['create']);
+});
+await check('SD-UI16c pending advancement from any caller fences automatic writes', async () => {
+    const test = fixedGrant(); const get = test.runtime.dataStore.get;
+    test.runtime.dataStore.get = async (key: string) => key.startsWith('advancement-active-') ? { key: 'other-owner-operation' } : key === 'other-owner-operation' ? { grants: [], advancement: { status: 'started' } } : get(key);
+    assert.equal((await test.sync()).status,409); assert.deepEqual(test.events,[]);
+});
+await check('SD-UI16 known spells cannot be added again, including talent/boon copies', async () => {
+    for (const stamp of ['_stats', 'flags']) {
+        const test = management();
+        Object.assign(test.actor.items[0], stamp === '_stats' ? { _stats: { compendiumSource: 'Item.newSpell' } } : { flags: { core: { sourceId: 'Item.newSpell' } } });
+        test.body.baseline = spellReview(test.actor);
+        test.body.removals = [];
+        const before = structuredClone(test.actor);
+        assert.equal((await test.run()).status, 400);
+        assert.deepEqual(test.events, []);
+        assert.deepEqual(test.actor, before);
+        assert.equal(test.receipts.size, 0);
+    }
+});
 await check('SD02-04/05 no-op save, duplicate copies and explicit exact-ID removal', async () => {
     const test = management(); const before = structuredClone(test.actor);
     test.body.additions = []; test.body.removals = [];

@@ -220,10 +220,11 @@ async function actions() {
                 assert.equal(trial.writes.filter(write => write[0] === 'item.update').length, duration === 'focus' ? 0 : 1);
             }
         });
-        await check('C4', 'scroll is consumed even on success', async () => {
+        await check('C4', 'scroll is marked spent and retained even on success', async () => {
             const { runtime, writes } = fakeRuntime(wizardActor(), { rolls: [18] });
             await handleActorAction('w1', request(runtime, { requestId: 'req-scroll-01', kind: 'spell', itemId: 'scroll', spellIndex: 0 }) as any);
-            assert.ok(writes.some(write => write[0] === 'item.delete' && write[2] === 'scroll'));
+            assert.ok(writes.some(write => write[0] === 'item.update' && write[2] === 'scroll' && write[3]['flags.shadowdark.sheetDelver.scrollSpent'] === true));
+            assert.ok(!writes.some(write => write[0] === 'item.delete'));
         });
         await check('C4', 'wand critical failure loses that spell and breaks the wand', async () => {
             const { runtime, writes } = fakeRuntime(wizardActor(), { rolls: [1] });
@@ -621,6 +622,24 @@ async function importerAndCards() {
         const card = buildOwnedItemCard(prepareShadowdarkView(actor), actor.items[0])!;
         const text = JSON.stringify(card);
         assert.doesNotMatch(text, /Flying|Secret/); assert.ok(card.states.includes('Unidentified'));
+    });
+    await check('SD-UI17', 'Foundry inline labels and deterministic dice counts share rendering', () => {
+        const raw = '[[/roll (1 + (floor(@level.value/2)))d6]]{1 + half your level (rounded down)}';
+        for (const level of [1, 2, 3, 10]) {
+            const result = resolveFormula('(1 + (floor(@level.value/2)))d6', {level:{value:level}});
+            assert.deepEqual(result, {ok:true, value:`${1+Math.floor(level/2)}d6`, deterministic:false});
+        }
+        const html = presentDescription(raw, undefined, {level:{value:3}});
+        assert.match(html, /data-formula="2d6"/);
+        assert.match(html, />1 \+ half your level \(rounded down\)<\/button>/);
+        assert.doesNotMatch(html, /\{1|@level/);
+        assert.doesNotMatch(presentDescription(raw), /data-action|\{1/);
+        assert.equal(resolveFormula('(1d4)d6').ok, false);
+        assert.equal(resolveFormula('(-1)d6').ok, false);
+        assert.equal(resolveFormula('(1.5)d6').ok, false);
+        assert.equal(resolveFormula('(floor(@missing/2))d6').ok, false);
+        const safe=presentDescription('[[/r 1d6]]{<img src=x onerror=steal()>Oops}');
+        assert.doesNotMatch(safe, /<img|onerror=/);
     });
     await check('SD01-13', 'description presentation sanitizes without rewriting source', () => {
         const source = '<p onclick="steal()">Hit [[/r 1d6]] or [[check 12 dex]] @UUID[Compendium.shadowdark.spells.Item.x]{Light}<script>alert(1)</script><a href="javascript:alert(1)">x</a></p>';

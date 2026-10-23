@@ -130,13 +130,13 @@ export function validateLanguageInventory(plan: LanguagePlan, existing: readonly
 export function languageInventorySections(plan: LanguagePlan, rows: any[], selected: readonly string[]) {
     const rarity = (uuid: string) => languageRarity(rows.find(row => canonicalUuid(row.uuid) === uuid));
     return (['common', 'rare'] as const).map(kind => {
-        const groups = plan.groups.filter(group => group.id === kind ||
-            (['ancestry', 'class'].includes(group.id) && group.options.length > 0 && group.options.every(uuid => rarity(uuid) === kind)));
         const fixed = plan.fixed.filter(uuid => rarity(uuid) === kind);
-        // A mixed restricted pool cannot be counted as a full allowance in both rarities.
-        const mixed = plan.groups.some(group => ['ancestry', 'class'].includes(group.id) && group.count > 0
-            && group.options.some(uuid => rarity(uuid) === kind) && !group.options.every(uuid => rarity(uuid) === kind));
+        // Reserve selections in the other category first, then fill the remaining
+        // slots through the same matcher used for validation. A mixed pool is
+        // shared: its slot cannot increase both categories after it is selected.
+        const candidates = [...new Set(plan.groups.flatMap(group => group.options))].filter(uuid => rarity(uuid) === kind);
+        const allocation = allocateLanguageInventory(plan, [...selected.filter(uuid => rarity(uuid) !== kind), ...candidates]);
         return { kind, count: selected.filter(uuid => rarity(uuid) === kind).length,
-            limit: mixed ? null : fixed.length + groups.reduce((total, group) => total + group.count, 0) };
+            limit: fixed.length + [...allocation.assigned.values()].filter(uuid => rarity(uuid) === kind).length };
     });
 }

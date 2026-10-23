@@ -1,3 +1,6 @@
+import { prepareActorCore } from '../logic/actor-preparation';
+import { pendingChoiceKind, choiceCatalog, resolvedChoice } from '../logic/talent-choices';
+import { prepareShadowdarkView } from '../logic/prepared-view';
 /** SD02-R1: actual handlers and independent stored-source outcomes, offline SDK only. */
 import assert from 'node:assert/strict';
 import path from 'node:path';
@@ -47,6 +50,48 @@ const checks: any[] = [];
 async function check(name: string, run: () => Promise<void>) { try { await run(); checks.push({ name, pass: true }); } catch (e) { checks.push({ name, pass: false, error: String(e) }); } }
 const unchangedAdvancement = (f: ReturnType<typeof fixture>) => { assert.deepEqual(f.actor.system.level, f.initial.system.level); assert.deepEqual(f.actor.system.attributes.hp, f.initial.system.attributes.hp); };
 const finished = (f: ReturnType<typeof fixture>) => { assert.deepEqual(f.actor.system.level, { value: 3, xp: 15 }); assert.deepEqual(f.actor.system.attributes.hp, { value: 11, max: 11 }); assert.equal(f.actor.items.length, 4); };
+await check('known spell rejection is preflight and keeps all existing copies', async () => {
+    const f = fixture(); f.actor.items.push({ ...ownedCopy(spell, spell.uuid), _id: 'knownSpell' });
+    f.body.baseline = reviewToken(f.actor);
+    const before = structuredClone(f.actor), result = await f.run();
+    assert.equal(result.status, 400); assert.match(result.body.error, /already know/);
+    assert.equal(result.body.advancementWrites, 'none');
+    assert.deepEqual(f.events, []); assert.equal(f.records.size, 0); assert.deepEqual(f.actor, before);
+});
+await check('every native placeholder talent resolves before existing-Actor advancement writes and replays once', async () => {
+    const talents=rows.filter(doc=>doc.type==='Talent'&&JSON.stringify(doc.effects).includes('REPLACEME'));
+    assert.equal(talents.length,4);const catalog=choiceCatalog(rows);
+    for(const [index,talent] of talents.entries()) {
+        const f=fixture();f.actor._id='choiceActor'+index;f.body.requestId='native-choice-'+index;f.body.baseline=reviewToken(f.actor);
+        const kind=pendingChoiceKind(talent)!;
+        const field=kind==='weapon'?'weaponMasterySelection':kind==='armor'?'armorMasterySelection':'spellAdvantageSelection';
+        f.body.rolledTalents=[talent];f.body[field]={required:1,selected:[kind==='spell'?spell.name:catalog[kind]![0].name]};
+        const result=await f.run();assert.equal(result.status,200,JSON.stringify(result));assert.equal(result.body.state,'complete');
+        const granted=f.actor.items.find((item:any)=>item._stats?.compendiumSource===talent.uuid);
+        assert.ok(resolvedChoice(granted),talent.name);assert.ok(!JSON.stringify(granted).includes('REPLACEME'));
+        if(kind==='spell') {
+            const view=prepareShadowdarkView(f.actor,await adapter.callerLookups(f.actor,{runtime:f.request().runtime,isGM:false}));
+            assert.equal(view.actions.find(action=>action.kind==='spell')?.advantage,1);
+        }
+        const count=f.events.length;assert.equal((await f.run()).body.state,'complete');assert.equal(f.events.length,count);
+    }
+});
+await check('unselected advantage is a zero-write validation error, and corrected input can proceed', async () => {
+    const f=fixture();f.body.rolledTalents=[byUuid.get('Compendium.shadowdark.talents.Item.IZZnFjWhZurAIZPP')];
+    const rejected=await f.run();assert.equal(rejected.status,400);assert.equal(rejected.body.advancementWrites,'none');
+    assert.deepEqual(f.events,[]);assert.equal(f.records.size,0);
+    f.body.spellAdvantageSelection={required:1,selected:[spell.name]};assert.equal((await f.run()).body.state,'complete');
+});
+await check('existing-Actor stat grants remain independent through advancement and replay', async () => {
+    const f=fixture();f.body.rolledTalents=[{type:'synthetic',name:'Distribute to Stats (Warlock)'},{type:'synthetic',name:'Distribute to Stats'},
+        byUuid.get('Compendium.shadowdark.talents.Item.aRY0hjpvzYpdRbfR'),byUuid.get('Compendium.shadowdark.talents.Item.aRY0hjpvzYpdRbfR')];
+    f.body.statChoices=[{str:1,dex:1},{con:2}];
+    const invalid=await f.run({...f.body,statChoices:[{str:2},{con:2}]});assert.equal(invalid.status,400);assert.deepEqual(f.events,[]);
+    assert.equal((await f.run()).body.state,'complete');
+    const core=prepareActorCore(f.actor,await adapter.callerLookups(f.actor,{runtime:f.request().runtime,isGM:false}));
+    for(const [stat,amount] of Object.entries({str:1,dex:1,con:2,int:4})) assert.equal(core.abilities[stat as keyof typeof core.abilities].value,f.actor.system.abilities[stat].value+amount);
+    const count=f.events.length;assert.equal((await f.run()).body.state,'complete');assert.equal(f.events.length,count);
+});
 await check('first Item refusal preserves level/XP/HP and requires a fresh request after a zero-write refusal', async () => {
     const f = fixture('item-1'), result = await f.run(); unchangedAdvancement(f); assert.equal(result.body.state, 'retired');
     assert.equal(result.body.items, undefined, 'receipts must not serve saved source payloads'); assert.equal(result.body.operations[0].status, 'failed'); assert.equal(result.body.operations[0].itemId, undefined); assert.equal(f.events.length, 1);

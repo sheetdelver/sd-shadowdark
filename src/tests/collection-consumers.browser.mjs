@@ -18,16 +18,22 @@ const moduleRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '.
 const out = path.resolve(process.argv[2] || path.join(moduleRoot, 'temp/collection-consumers'));
 fs.mkdirSync(out, { recursive: true });
 const bundled = await build({ stdin: { contents: `
+import {useAutomaticSpellGrants} from '${moduleRoot}/src/ui/hooks/useAutomaticSpellGrants';
 import React from 'react'; import {createRoot} from 'react-dom/client';
 import {ShadowdarkUIProvider} from '${moduleRoot}/src/ui/context/ShadowdarkUIContext';
 import Gear from '${moduleRoot}/src/ui/components/GearSelectionModal';
 import Spells from '${moduleRoot}/src/ui/SpellsTab';
+import {ItemRow} from '${moduleRoot}/src/ui/InventoryComponents';
 import Generator from '${moduleRoot}/src/ui/tools/Generator';
 import Importer from '${moduleRoot}/src/ui/tools/ShadowdarkImportPage';
 import Bestiary from '${moduleRoot}/src/ui/tools/Bestiary';
 import Details from '${moduleRoot}/src/ui/DetailsTab';
 import SpellPicker from '${moduleRoot}/src/ui/components/SpellSelectionModal';
 import LanguagePicker from '${moduleRoot}/src/ui/components/LanguageSelectionModal';
+import {ExtraSpellSelectionSection} from '${moduleRoot}/src/ui/components/levelup/sections/ExtraSpellSelectionSection';
+import {SpellAdvantageSelectionSection} from '${moduleRoot}/src/ui/components/levelup/sections/SpellAdvantageSelectionSection';
+import {StatPoolSelectionSection} from '${moduleRoot}/src/ui/components/levelup/sections/StatPoolSelectionSection';
+import {statChoiceRule} from '${moduleRoot}/src/logic/stat-choices';
 import {useLevelUp} from '${moduleRoot}/src/ui/components/levelup/useLevelUp';
 import ModuleDialog from '${moduleRoot}/src/ui/components/ModuleDialog';
 import ResourceDetailModal from '${moduleRoot}/src/ui/components/ResourceDetailModal';
@@ -53,22 +59,55 @@ window.actorContext={actor:window.initial.actor||{id:'a',items:[],derived:{actio
 const root=createRoot(document.getElementById('root')); let mounted=true, show=true;
 const advancementClass={uuid:'Compendium.shadowdark.classes.Item.thief',name:'Thief',system:{hitPoints:'d4',patron:{required:false},talents:['Compendium.shadowdark.talents.Item.backstab']}};
 const advancementProps={actorId:'',currentLevel:0,targetLevel:1,classObj:advancementClass,classUuid:advancementClass.uuid,ancestry:null,abilities:{},spells:[],skipLanguageSelection:true,onComplete:()=>{},onCancel:()=>{}};
+function AutoGrants(){const sync=useAutomaticSpellGrants(window.initial.actor,async()=>{window.refreshes=(window.refreshes||0)+1;if(window.initial.afterSync){window.initial.actor=window.initial.afterSync;window.render()}});return <div>{sync.error&&<p role="alert">{sync.error}</p>}<button onClick={sync.retry}>Retry granted spells</button></div>}
 function Advancement(){const {state,actions}=useLevelUp(advancementProps);window.completeAdvancement=()=>{actions.setHpRoll(4);actions.setGoldRoll(60);actions.setRolledTalents([{name:'Native rolled talent',type:'Talent',system:{},effects:[]}]);};return <><output>{state.error||'No error'}</output><button disabled={!actions.isComplete()}>Finish advancement</button></>;}
-function ParityPicker(){const [open,setOpen]=React.useState(false);return <><button onClick={()=>setOpen(true)}>Open spell manager</button><SpellPicker isOpen={open} onClose={()=>setOpen(false)} onSave={intent=>window.saved=intent} title="Manage spells" tier={1} classUuid="Compendium.shadowdark.classes.Item.wizard" knownSpells={window.initial.owned||[]} maxSelections={window.initial.limit} actor={window.initial.actor}/></>;}
+function BonusAdvancement(){const {state,actions}=useLevelUp({...advancementProps,currentLevel:window.initial.level-1,targetLevel:window.initial.level});
+ window.setBonusGrants=()=>actions.setRolledBoons(window.initial.grants);window.bonusState=state.extraSpellSelection;
+ return <ExtraSpellSelectionSection active={state.extraSpellSelection.active} maxTier={state.extraSpellSelection.maxTier} source={state.extraSpellSelection.source}
+ requiredCount={state.extraSpellRequired} availableSpells={state.extraSpellsList} selectedSpells={state.extraSpellSelection.selected} status={state.extraSpellData.ready?'READY':'LOADING'}
+ onSelectionChange={selected=>actions.setExtraSpellSelection({...state.extraSpellSelection,selected})}/>;}
+const effectProps={...advancementProps,classObj:{...advancementClass,system:{...advancementClass.system,talents:[]}}};
+function EffectAdvancement(){const {state,actions}=useLevelUp(effectProps);
+ window.prepareEffectTest=()=>{actions.setHpRoll(4);actions.setGoldRoll(60);actions.setSelectedSpells(window.initial.learned||[]);if(window.initial.grants)actions.setRolledTalents(window.initial.grants)};
+ window.replaceLearned=spells=>actions.setSelectedSpells(spells);window.effectSelection=state.spellAdvantageSelection;
+ return <><button onClick={actions.handleRollTalent}>Roll talent</button><output>{state.error||'No error'}</output>
+ {state.spellEffectData.ready&&<SpellAdvantageSelectionSection required={state.spellAdvantageSelection.required} selected={state.spellAdvantageSelection.selected} options={state.spellEffectOptions}
+ onSelectionChange={selected=>actions.setSpellAdvantageSelection({...state.spellAdvantageSelection,selected})}/>}
+ {state.statGrants.map((grant,index)=><div data-stat-grant={index} key={index}><StatPoolSelectionSection title={grant.name} total={statChoiceRule(grant).total} maxPerStat={statChoiceRule(grant).maxPerStat}
+ allocated={state.statChoices[index]||{}} onChange={(stat,delta)=>actions.changeStatChoice(index,stat,delta)}/></div>)}
+ <button disabled={!actions.isComplete()} onClick={()=>actions.handleConfirm()}>Finish effect advancement</button></>;}
+function ParityPicker(){const [open,setOpen]=React.useState(false);return <><button onClick={()=>setOpen(true)}>Open spell manager</button><SpellPicker isOpen={open} onClose={()=>setOpen(false)} onSave={intent=>window.saved=intent} title="Manage spells" tier={1} classUuid={window.initial.listUuid||"Compendium.shadowdark.classes.Item.wizard"} knownSpells={window.initial.owned||[]} maxSelections={window.initial.limit} actor={window.initial.actor}/></>;}
 function Consumer(){switch(window.initial.which){
+case 'item-spells': {
+ const source=window.initial.actor;
+ const derived=prepareShadowdarkView(source,{classDocument:()=>({name:'Wizard',type:'Class',system:{spellcasting:{ability:'int'}}}),
+ spellDocument:ref=>window.initial.spells[ref.id]||null,label:ref=>window.initial.spells[ref.id]?.name||null});
+ window.actorContext={actor:{...source,derived},card:null,rollDialog:{open:false},isActionBusy:()=>false,
+ startAction:action=>window.lastAction=action,openCard:card=>window.lastCard=card,deleteItem:id=>window.discarded=id};
+ window.markSpent=()=>{source.items[0].flags={shadowdark:{sheetDelver:{scrollSpent:true}}};window.render()};
+ return <><Spells/><section aria-label="Inventory"><ItemRow item={source.items[0]} expandedItems={new Set()} toggleItem={()=>{}}/></section></>;
+}
 case 'importer':return <Importer/>;
 case 'bestiary':return <Bestiary/>;
+case 'wand-card':
 case 'resource-card': {
  const source=window.initial.actor;
- const derived=prepareShadowdarkView(source,{classDocument:()=>({name:'Wizard',type:'Class',system:{spellcasting:{ability:'int'}}})});
- derived.items.find(item=>item.id==='spell').diagnostics=['Fixture source note'];
- window.actorContext={actor:{...source,derived},card:{kind:'item',itemId:'spell'},rollDialog:{open:false},isActionBusy:()=>false,startAction:(action,options)=>window.lastAction={action,options},closeCard:()=>{},openCard:()=>{},performRoll:()=>{}};
+ const wand=window.initial.which==='wand-card';
+ const derived=prepareShadowdarkView(source,{classDocument:()=>({name:wand?'Priest':'Wizard',type:'Class',system:{spellcasting:{ability:wand?'wis':'int'}}}),spellDocument:ref=>window.initial.spells?.[ref.id]||null,label:ref=>window.initial.spells?.[ref.id]?.name||null});
+ const selected=wand?source.items[0]._id:'spell';
+ if(!wand)derived.items.find(item=>item.id==='spell').diagnostics=['Fixture source note'];
+ window.actorContext={actor:{...source,derived},card:{kind:'item',itemId:selected},rollDialog:{open:false},isActionBusy:()=>false,startAction:(action,options)=>window.lastAction={action,options},closeCard:()=>{},openCard:()=>{},performRoll:()=>{},
+ runItemControl:control=>{window.lastControl=control;for(const write of control.writes){const item=source.items.find(row=>row._id===write.itemId);for(const [path,value]of Object.entries(write.patch)){const parts=path.split('.');let target=item;for(const key of parts.slice(0,-1))target=target[key]??={};target[parts.at(-1)]=value}}window.render()}};
+ window.failWand=broken=>{source.items[0].flags={shadowdark:{sheetDelver:{wand:{lostSpells:['Compendium.shadowdark.spells.Item.ItoZZ0nli29N5d7G'],broken}}}};window.render()};
  return <ResourceDetailModal/>;
 }
+case 'auto-grants':return <React.StrictMode><AutoGrants/></React.StrictMode>;
 case 'parity-picker':return <ParityPicker/>;
 case 'advancement':return <Advancement/>;
+case 'bonus-advancement':return <BonusAdvancement/>;
+case 'effect-advancement':return <EffectAdvancement/>;
 case 'dialog':return <><button style={{position:'fixed',bottom:0,left:0,width:'100%',height:80,zIndex:150}}>Host tools</button><ModuleDialog open title="Resource card" suspended={!!window.suspendDialog} onClose={()=>{}} footer={<button onClick={()=>window.cardClicked=true}>Use resource</button>}>Resource details</ModuleDialog>{window.suspendDialog&&<div style={{position:'fixed',inset:0,zIndex:100}}><button onClick={()=>window.hostClicked=true}>Shared host action</button></div>}</>;
-case 'gear':return <Gear isOpen onClose={()=>{}} onCreate={async()=>{}}/>;
+case 'gear':return <Gear isOpen onClose={()=>{}} onCreate={async item=>{window.addedGear=item}}/>;
 case 'spell-picker':return <SpellPicker isOpen onClose={()=>{}} onSave={()=>{}} title="Manage spells" tier={1} classUuid="Compendium.shadowdark.classes.Item.wizard" knownSpells={[]}/>;
 case 'native-language-edit':return <LanguagePicker isOpen onClose={()=>{}} onSelect={selected=>window.savedLanguages=selected} currentLanguages={window.initial.current||[]} actorId="a"/>;
 case 'languages':return <LanguagePicker isOpen onClose={()=>{}} onSelect={()=>{}} currentLanguages={[]} actorId="a"/>;
@@ -92,6 +131,7 @@ window.render();
 const browser = await chromium.launch({ ...(process.env.SHADOWDARK_CHROME ? { executablePath: process.env.SHADOWDARK_CHROME } : {}), headless: true, args: ['--no-sandbox', '--disable-background-networking'] });
 const results = [];
 async function test(name, initial, run) {
+    const only=process.argv.find(arg=>arg.startsWith('--only='))?.slice(7);if(only&&!name.startsWith(only))return;
     if(process.argv.includes('--backgrounds-only')&&!name.startsWith('SD-UI13'))return;
     if(process.argv.includes('--cards-only')&&!name.startsWith('SD-UI10/11'))return;
     if(providerBaseline&&!name.startsWith('SD02-06') )return;
@@ -103,7 +143,7 @@ async function test(name, initial, run) {
     try {
         await page.setContent('<div id="root" class="sdk-module--shadowdark"></div>');
         if(name.startsWith('SD-UI13')) { assert.ok(process.env.SHADOWDARK_HOST_CSS, 'Core CSS including preflight is required'); await page.addStyleTag({path:process.env.SHADOWDARK_HOST_CSS}); await page.addStyleTag({path:path.join(moduleRoot,'assets/presentation.css')}); }
-        if(initial.which==='resource-card') { await page.setViewportSize({width:initial.width,height:900}); if(process.env.SHADOWDARK_CARD_TAILWIND)await page.addStyleTag({path:process.env.SHADOWDARK_CARD_TAILWIND});await page.addStyleTag({path:path.join(moduleRoot,'assets/presentation.css')}); } await page.evaluate(x => window.initial = x, initial);
+        if(['resource-card','wand-card'].includes(initial.which)) { await page.setViewportSize({width:initial.width,height:900}); if(process.env.SHADOWDARK_CARD_TAILWIND)await page.addStyleTag({path:process.env.SHADOWDARK_CARD_TAILWIND});await page.addStyleTag({path:path.join(moduleRoot,'assets/presentation.css')}); } await page.evaluate(x => window.initial = x, initial);
         await page.addScriptTag({ content: bundled.outputFiles[0].text });
         await run(page); assert.deepEqual(errors, []); results.push({ name, ok: true }); console.log(`✓ ${name}`);
     } catch (e) {
@@ -284,6 +324,120 @@ try {
         await p.evaluate(()=>{window.policy.spells={body:[]};window.sourceChanged()});await p.getByText(/No spells found/).waitFor();await p.evaluate(row=>window.answer(0,[row]),worldSpell);await settled(p);assert.equal(await p.getByRole('button',{name:'Add World-only spell',exact:true}).count(),0);assert.equal(await count(p,'spells'),2);
     });
     const spell = {type:'Spell', uuid:'Compendium.shadowdark.spells.Item.light',name:'Light',system:{tier:1,class:['Compendium.shadowdark.classes.Item.wizard'],duration:{type:'rounds',value:2}}};
+    const nativeWand=JSON.parse(fs.readFileSync(path.resolve(process.env.SHADOWDARK_NATIVE||'temp/shadowdark','data/packs/magic-items.db/wand_of_blind_deafen__yyUwr6H9imWcJ9YS.json'),'utf8'));
+    for(const sourced of [true,false]) for(const caster of [true,false]) await test(`SD-UI22 legacy wand card source=${sourced} caster=${caster}`,{
+        which:'wand-card',width:768,actor:{_id:'wandActor',type:'Player',system:{abilities:{wis:{value:14}}},effects:caster?[{_id:'casting',changes:[{key:'system.spellcasting.classes',mode:2,value:'priest'}]}]:[],
+            items:[{_id:'wand',name:nativeWand.name,type:nativeWand.type,img:nativeWand.img,system:nativeWand.system,...(sourced?{_stats:{compendiumSource:'Compendium.shadowdark.magic-items.Item.yyUwr6H9imWcJ9YS'}}:{})}]},
+        spells:{ItoZZ0nli29N5d7G:{...spell,name:'Blind/Deafen',system:{tier:2,class:['Compendium.shadowdark.classes.Item.oZWzXx1WRLg286zD']}}}
+    },async p=>{
+        const cast=p.getByRole('button',{name:'Cast Blind/Deafen',exact:true});await cast.waitFor();
+        assert.equal(await cast.isEnabled(),caster);assert.equal(await p.getByText('Wand',{exact:true}).count(),1);
+        assert.equal(await p.getByText(/Damage unavailable/).count(),0);assert.equal(await p.getByRole('button',{name:/Equip/}).count(),0);
+        if(!caster){assert.ok(await p.getByText(/not a spellcaster/).count());return;}
+        await cast.click();assert.equal(await p.evaluate(()=>window.lastAction.action.kind),'spell');
+        await p.evaluate(()=>window.failWand(false));await settled(p);assert.equal(await cast.isDisabled(),true);
+        await p.getByRole('button',{name:'Restore Wand of Blind/Deafen after a full rest',exact:true}).click();
+        await settled(p);assert.equal(await cast.isEnabled(),true);
+        await p.evaluate(()=>window.failWand(true));await settled(p);assert.equal(await cast.isDisabled(),true);
+        assert.equal(await p.getByRole('button',{name:/Restore .*after a full rest/}).count(),0);
+    });
+    const sourceGear={_id:'N27A6nb0epkHZ3lR',uuid:'Compendium.shadowdark.magic-items.Item.N27A6nb0epkHZ3lR',pack:'shadowdark.magic-items',name:'Scroll of Burning Hands',type:'Basic',
+        img:'icons/sundries/scrolls/scroll-writing-orange-black.webp',system:{magicItem:true,description:'<p>@UUID[Compendium.shadowdark.spells.ItN82uLU3PhJFLNm]{Burning Hands}</p>'},
+        flags:{fixture:{preserve:true}},effects:[{_id:'effect',name:'Preserved effect',changes:[]}],custom:{preserve:true}};
+    await test('SD-UI20 Gear Add preserves exact source and native Item content', {which:'gear',policy:{'magic-items':{body:[sourceGear]}}},async p=>{
+        await p.getByPlaceholder('Search gear...').fill('Burning Hands');
+        const add=p.getByRole('button',{name:'Add Scroll of Burning Hands to inventory'});
+        if(!await add.isVisible())await p.getByRole('button',{name:/Magic Items/}).click();
+        await add.click();const copy=await p.evaluate(()=>window.addedGear);
+        assert.equal(copy._stats.compendiumSource,sourceGear.uuid);assert.equal(copy._id,undefined);assert.equal(copy.uuid,undefined);
+        assert.deepEqual(copy.effects,sourceGear.effects);assert.deepEqual(copy.flags,sourceGear.flags);assert.deepEqual(copy.system,sourceGear.system);assert.deepEqual(copy.custom,sourceGear.custom);
+    });
+    for (const sourced of [true, false]) await test('SD-UI20 legacy scrolls appear and remain spent with source identity '+sourced, {
+        which:'item-spells', actor:{_id:'scrollActor',type:'Player',system:{abilities:{int:{value:14}}},effects:[{_id:'casting',changes:[{key:'system.spellcasting.classes',mode:2,value:'wizard'}]}],
+            items:[{_id:'scroll',name:'Scroll of Burning Hands',img:'icons/sundries/scrolls/scroll-writing-orange-black.webp',type:'Basic',_stats:sourced?{compendiumSource:'Compendium.shadowdark.magic-items.Item.N27A6nb0epkHZ3lR'}:undefined,system:{magicItem:true,quantity:1,description:'<p>@UUID[Compendium.shadowdark.spells.ItN82uLU3PhJFLNm]{Burning Hands}</p>'}}]},
+        spells:{ItN82uLU3PhJFLNm:{...spell,name:'Burning Hands'}}
+    }, async p=>{
+        const section=p.getByRole('region',{name:'Spells from items'}),cast=section.getByRole('button',{name:'Cast',exact:true});
+        await cast.waitFor();assert.equal(await cast.isEnabled(),true);assert.equal(await section.getByText('No scrolls or wands.').count(),0);
+        await section.getByRole('button',{name:/Burning Hands.*details/}).click();assert.deepEqual(await p.evaluate(()=>window.lastCard),{kind:'item',itemId:'scroll'});
+        await cast.click();assert.equal(await p.evaluate(()=>window.lastAction.itemId),'scroll');
+        await p.evaluate(()=>window.markSpent());await section.getByText('Spent',{exact:true}).waitFor();assert.equal(await cast.isDisabled(),true);
+        await p.getByRole('region',{name:'Inventory'}).getByText('Spent',{exact:true}).waitFor();
+        assert.equal(await p.evaluate(()=>window.initial.actor.items.length),1);
+    });
+    const effectSpells=['A','B','C'].map(letter=>({uuid:'Item.spell'+letter,type:'Spell',name:'Learned '+letter,system:{tier:1,class:['Item.wizard']}}));
+    const advantage={uuid:'Compendium.shadowdark.talents.Item.IZZnFjWhZurAIZPP',name:'Spellcasting Advantage',type:'Talent',effects:[{name:'Spellcasting Advantage on Spell',changes:[{key:'system.roll.spell.advantage.REPLACEME',mode:2,value:'1'}]}]};
+    const effectData={success:true,data:{isSpellcaster:true,spellsToChoose:{1:2},availableSpells:effectSpells,progressionReady:true,talentTable:'Item.table'}};
+    await test('SD-UI18 rolled advantage requires a known spell, submits its target and retires an invalidated choice',
+        {which:'effect-advancement',learned:effectSpells.slice(0,2),policy:{data:{body:effectData},spells:{body:effectSpells},'roll-talent':{body:{item:advantage}},finalize:{body:{success:true,items:[]}}}},async p=>{
+        await p.waitForFunction(()=>typeof window.prepareEffectTest==='function');await p.evaluate(()=>window.prepareEffectTest());
+        await p.getByRole('button',{name:'Roll talent',exact:true}).click();
+        const select=p.getByLabel('Spell for advantage',{exact:true}),finish=p.getByRole('button',{name:'Finish effect advancement'});
+        await select.waitFor();assert.equal(await finish.isDisabled(),true);assert.equal(await select.locator('option').count(),3);
+        await select.selectOption('Learned A');assert.equal(await finish.isDisabled(),false);
+        await p.evaluate(spells=>window.replaceLearned(spells),effectSpells.slice(1));assert.equal(await finish.isDisabled(),true);
+        await select.selectOption('Learned B');assert.equal(await finish.isDisabled(),false);await finish.click();
+        await p.waitForFunction(()=>window.calls.some(call=>call.key==='finalize'));
+        assert.deepEqual(await p.evaluate(()=>JSON.parse(window.calls.find(call=>call.key==='finalize').body).spellAdvantageSelection),{required:1,selected:['Learned B']});
+    });
+    await test('SD-UI18 separate stat grants enforce Warlock distinct choices and ordinary two-point allocation',
+        {which:'effect-advancement',grants:[{type:'synthetic',name:'Distribute to Stats (Warlock)'},{type:'synthetic',name:'Distribute to Stats'}],policy:{finalize:{body:{success:true,items:[]}}}},async p=>{
+        await p.waitForFunction(()=>typeof window.prepareEffectTest==='function');await p.evaluate(()=>window.prepareEffectTest());
+        const first=p.locator('[data-stat-grant="0"]'), second=p.locator('[data-stat-grant="1"]'),finish=p.getByRole('button',{name:'Finish effect advancement'});
+        await first.waitFor();assert.equal(await finish.isDisabled(),true);
+        await first.getByRole('button',{name:'Increase Strength'}).click();assert.equal(await first.getByRole('button',{name:'Increase Strength'}).isDisabled(),true);
+        await first.getByRole('button',{name:'Increase Dexterity'}).click();assert.equal(await finish.isDisabled(),true);
+        await second.getByRole('button',{name:'Increase Strength'}).click();await second.getByRole('button',{name:'Increase Strength'}).click();
+        assert.equal(await finish.isDisabled(),false);await finish.click();await p.waitForFunction(()=>window.calls.some(call=>call.key==='finalize'));
+        assert.deepEqual(await p.evaluate(()=>JSON.parse(window.calls.find(call=>call.key==='finalize').body).statChoices),[{str:1,dex:1},{str:2}]);
+    });
+    const shune={uuid:'Compendium.shadowdark.talents.Item.mgRrWET5MEaGLVNo',type:'Talent',name:'Learn a Wizard Spell',system:{}};
+    const wizardList='Compendium.shadowdark.classes.Item.035nuVkU9q2wtMPs';
+    const bonusSpells=[1,2,3].flatMap(tier=>['A','B','C'].map(letter=>({uuid:'Item.bonus'+tier+letter,type:'Spell',name:'Bonus '+tier+letter,system:{tier,class:[wizardList]}})));
+    for(const [level,tier] of [[3,1],[5,2]]) await test('SD-UI16d bonus picker rounds Shune down at level '+level+' and collects two independent grants',
+        {which:'bonus-advancement',level,grants:[shune,shune],policy:{spells:{body:bonusSpells}}},async p=>{
+        await p.waitForFunction(()=>typeof window.setBonusGrants==='function');await p.evaluate(()=>window.setBonusGrants());
+        await text(p,'0 / 2 Selected');await p.getByRole('button',{name:'Bonus '+tier+'A',exact:true}).waitFor();
+        for(const other of [1,2,3].filter(t=>t!==tier)) assert.equal(await p.getByRole('button',{name:'Bonus '+other+'A',exact:true}).count(),0);
+        await p.getByRole('button',{name:'Bonus '+tier+'A',exact:true}).click();await text(p,'1 / 2 Selected');
+        await p.getByRole('button',{name:'Bonus '+tier+'B',exact:true}).click();await text(p,'2 / 2 Selected');
+        assert.equal(await p.getByRole('button',{name:'Bonus '+tier+'C',exact:true}).isDisabled(),true);
+        await p.getByRole('button',{name:'Bonus '+tier+'A',exact:true}).click();await text(p,'1 / 2 Selected');
+        assert.equal(await p.getByRole('button',{name:'Bonus '+tier+'C',exact:true}).isDisabled(),false);
+        assert.deepEqual(await p.evaluate(()=>window.bonusState.selected.map(s=>s.name)),['Bonus '+tier+'B']);
+    });
+    for(const isInnate of [false,true]) await test('SD-UI16 known '+(isInnate?'granted':'ordinary')+' spell stays visible and disabled with spare capacity', {which:'parity-picker',owned:[{itemId:'known',name:spell.name,tier:1,uuid:spell.uuid,isInnate}],limit:3,policy:{spells:{body:[spell,worldSpell]}}},async p=>{
+        await p.getByRole('button',{name:'Open spell manager'}).click();
+        const add=p.getByRole('button',{name:'Add Light',exact:true});await add.waitFor();assert.equal(await add.isDisabled(),true);
+        assert.equal(await p.getByRole('button',{name:'Add World-only spell',exact:true}).isEnabled(),true);
+        await p.getByRole('button',{name:'SAVE CHANGES',exact:true}).click();assert.deepEqual(await p.evaluate(()=>window.saved),{additions:[],removals:[]});
+    });
+    const turnUuid='Compendium.shadowdark.spells.Item.mByUvcHIVEPWscfH';
+    const missingGrantActor={items:[{type:'Talent',_stats:{compendiumSource:'Compendium.shadowdark.talents.Item.LfHTnYW8I65x8Y31'}}]};
+    await test('SD-UI16c missing fixed grant stays disabled until the automatic saved Item arrives',{which:'parity-picker',actor:missingGrantActor,owned:[{itemId:'owned',name:'Ordinary spell',tier:1,uuid:'Item.owned'}],limit:1,policy:{spells:{body:[{...spell,uuid:turnUuid,name:'Turn Undead'}]}}},async p=>{
+        await p.getByRole('button',{name:'Open spell manager'}).click();const add=p.getByRole('button',{name:'Add Turn Undead',exact:true});await add.waitFor();
+        assert.equal(await add.isDisabled(),true);await p.getByText('Granted automatically',{exact:true}).waitFor();
+        await p.evaluate(uuid=>{window.initial.owned.push({itemId:'granted',name:'Turn Undead',tier:1,uuid,isInnate:true});window.initial.actor.items.push({type:'Spell',_id:'granted',_stats:{compendiumSource:uuid}});window.render()},turnUuid);
+        await p.getByRole('region',{name:'Owned spells',exact:true}).getByRole('button',{name:'Turn Undead',exact:true}).waitFor();
+        assert.equal(await add.isDisabled(),true);await p.getByText('Spells known: 1 / 1',{exact:true}).waitFor();
+    });
+    const automaticActor={id:'a',worldContextRevision:1,spellReviewToken:'before',spellGrants:{missing:true,canApply:true}};
+    await test('SD-UI16c sheet automatically requests grants once under strict effects and refreshes owned inventory',{which:'auto-grants',actor:automaticActor,afterSync:{...automaticActor,spellReviewToken:'after',spellGrants:{missing:false,canApply:false}},policy:{grants:{body:{success:true}}}},async p=>{
+        await p.waitForFunction(()=>window.refreshes===1);await p.evaluate(()=>window.render());
+        assert.equal(await p.evaluate(()=>window.calls.filter(c=>c.key==='grants').length),1);
+    });
+    await test('SD-UI16c automatic grant error is visible without repeated writes; retry uses the same route',{which:'auto-grants',actor:automaticActor,policy:{grants:{status:403,body:{error:{message:'Spell compendium unavailable'}}}}},async p=>{
+        await p.getByRole('alert').getByText('Spell compendium unavailable').waitFor();await p.evaluate(()=>window.render());
+        assert.equal(await p.evaluate(()=>window.calls.filter(c=>c.key==='grants').length),1);
+        await p.evaluate(()=>{window.policy.grants={body:{success:true}}});await p.getByRole('button',{name:'Retry granted spells'}).click();await p.waitForFunction(()=>window.refreshes===2);
+        assert.equal(await p.evaluate(()=>window.calls.filter(c=>c.key==='grants').length),2);
+    });
+    await test('SD-UI16c observer sheet never requests automatic writes',{which:'auto-grants',actor:{...automaticActor,spellGrants:{missing:true,canApply:false}}},async p=>{
+        await p.getByRole('button',{name:'Retry granted spells'}).waitFor();assert.equal(await p.evaluate(()=>window.calls.filter(c=>c.key==='grants').length),0);
+    });
+    for(const list of ['priest','wizard','witch']) await test('SD-UI16b exact owned origin is disabled on '+list+' list',{which:'parity-picker',listUuid:'Item.'+list,owned:[{itemId:'known',uuid:spell.uuid,name:'Shared spell',tier:1}],limit:2,policy:{spells:{body:[{...spell,name:'Shared spell',system:{...spell.system,class:['Item.'+list]}}]}}},async p=>{
+        await p.getByRole('button',{name:'Open spell manager'}).click();const add=p.getByRole('button',{name:'Add Shared spell',exact:true});await add.waitFor();assert.equal(await add.isDisabled(),true);
+    });
     const owned = [{itemId:'customA',name:'Source-less spell',tier:1,uuid:null},{itemId:'customB',name:'Source-less spell',tier:1,uuid:null}];
     await test('SD02-04/05 loaded picker preserves source-less duplicate Item IDs and unchanged save has empty intent', {which:'parity-picker',owned,limit:3,policy:{spells:{body:[]}}},async p=>{
         await p.getByRole('button',{name:'Open spell manager'}).click();
@@ -376,13 +530,27 @@ try {
                 await p.screenshot({path:path.join(out,`card-${width}-${duration}.png`)});
             }
             await p.evaluate(()=>{window.initial.actor.items[0].system.duration={type:'instant'};window.render()});
-            assert.equal(await focus.count(),0);await action.click();assert.equal(await p.evaluate(()=>window.lastAction.options.focus),false,'retired focus cannot affect instant casting');
+            await focus.waitFor({state:'detached'});await action.click();assert.equal(await p.evaluate(()=>window.lastAction.options.focus),false,'retired focus cannot affect instant casting');
             await p.evaluate(()=>{window.initial.actor.items[0].img='https://blocked.invalid/missing.webp';window.render()});
             await p.waitForFunction(()=>document.querySelector('.sd-card-art')?.hidden===true);
             assert.equal(await action.isEnabled(),true);
             if(process.env.SHADOWDARK_CARD_TAILWIND)assert.ok(await dialog.locator('.sd-card-copy').evaluate(el=>parseFloat(getComputedStyle(el).paddingTop)<30));
         });
     }
+    await test('SD-UI17 actor spell card uses labeled inline text and prepared healing dice', {which:'resource-card',width:768,actor:{_id:'a',type:'Player',system:{abilities:{int:{value:14}},level:{value:3}},effects:[{_id:'grant',changes:[{key:'system.spellcasting.classes',mode:2,value:'wizard'}]}],items:[{_id:'spell',type:'Spell',name:'Cure Wounds',system:{tier:1,class:['Item.wizard'],duration:{type:'instant'},damageType:'healing',formula:'(1 + (floor(@level.value/2)))d6',description:'<p>Roll [[/roll (1 + (floor(@level.value/2)))d6]]{1 + half your level (rounded down)}.</p>'},effects:[]}]}}, async p=>{
+        const dialog=p.getByRole('dialog');await dialog.waitFor();
+        await dialog.getByRole('button',{name:'1 + half your level (rounded down)',exact:true}).waitFor();
+        assert.equal(await dialog.locator('[data-formula]').getAttribute('data-formula'),'2d6');
+        assert.match(await dialog.innerText(),/Healing[\s\S]*2d6/i);assert.doesNotMatch(await dialog.innerText(),/@level|\[\[|\{1/);
+        if(process.env.SHADOWDARK_CARD_TAILWIND) await p.screenshot({path:path.join(out,'inline-spell-label.png')});
+    });
+    await test('SD-UI14 mixed class choices keep numeric coupled language totals', {which:'native-language-edit',current:[rare.uuid],policy:{plan:{body:{fixed:[],groups:[{id:'class',label:'Class Languages',count:1,options:[rare.uuid,common.uuid]}],errors:[],rows:[rare,common],current:[rare.uuid],review:'mixed-review',contextRevision:1}}}}, async p=>{
+        await p.getByRole('heading',{name:'common (0/0)',exact:true}).waitFor();await p.getByRole('heading',{name:'rare (1/1)',exact:true}).waitFor();
+        assert.equal(await p.getByRole('button',{name:'Draconic',exact:true}).isDisabled(),true);
+        await p.getByRole('button',{name:'Star Tongue',exact:true}).click();await p.getByRole('heading',{name:'common (0/1)',exact:true}).waitFor();
+        await p.getByRole('button',{name:'Draconic',exact:true}).click();await p.getByRole('heading',{name:'common (1/1)',exact:true}).waitFor();await p.getByRole('heading',{name:'rare (0/0)',exact:true}).waitFor();
+        assert.doesNotMatch(await p.locator('body').innerText(),/choose from/);
+    });
     const editorPlan={fixed:[common.uuid],groups:[{id:'class',label:'Class Languages',count:1,options:[rare.uuid]}],errors:[],rows:[common,rare,unknown],current:[common.uuid],review:'review1',contextRevision:1};
     await test('SD03 language counts and fixed grants stay intact through context refresh',{which:'native-language-edit',current:[common.uuid],policy:{plan:{body:editorPlan}}},async p=>{
         await p.getByRole('heading',{name:'common (1/1)',exact:true}).waitFor();

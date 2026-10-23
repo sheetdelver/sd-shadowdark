@@ -101,3 +101,6 @@
 .sdk-module--shadowdark .sd-card-notes { overflow-wrap: anywhere; }
 .sdk-module--shadowdark .sd-resource-card .sd-dialog-footer { max-height: 38dvh; overflow-y: auto; flex-shrink: 0; }
 .sdk-module--shadowdark .sd-resource-card .sd-dialog-header { flex-shrink: 0; }
+
+/* Known spells remain readable in the catalog without offering another copy. */
+.sdk-module--shadowdark .sd-spell-row[data-known="true"] { background: #eee; color: #666; }

@@ -1,6 +1,8 @@
+import { statChoiceRule } from './stat-choices';
+import { spellChoiceGrant } from './spell-grants';
 import { NATIVE_PREDEFINED_EFFECTS } from '../data/native-predefined-effects';
 import { createEffect } from '../utils/Sanitizer';
-import { applyMasteryChoice, masteryKind, pendingChoiceKind, type ChoiceCatalog } from './talent-choices';
+import { applyMasteryChoice, masteryKind, talentChoiceKind, pendingChoiceKind, type ChoiceCatalog } from './talent-choices';
 
 /**
  * Level-up/generation selection handlers. Native 4.0.6 talent tables return
@@ -15,7 +17,7 @@ export interface TalentHandler {
     description: string;
     matches: (item: any) => boolean;
     onRoll?: (context: any) => void | boolean;
-    action?: 'stat-selection' | 'stat-pool' | 'weapon-mastery' | 'armor-mastery' | 'extra-spell' | 'language-selection';
+    action?: 'stat-selection' | 'stat-pool' | 'weapon-mastery' | 'armor-mastery' | 'extra-spell' | 'spell-advantage' | 'language-selection';
     config?: any;
     onInit?: (context: { actor: any, targetLevel: number }) => { requiredTalents?: number; choiceRolls?: number };
     isBlocked?: (state: any) => boolean;
@@ -44,8 +46,6 @@ function distributeAllocations(item: any, state: any, sourceName: string) {
         if (value > 0) item.effects.push(abilityImprovementEffect(stat, value, sourceName));
     }
 }
-
-const SPELL_CLASS_FROM_NAME = /\blearn(?:\s+an?)?(?:\s+extra)?\s+(\w+)\s+spell\b/i;
 
 /** Resolve a fixed mastery template for a selection using the declared-data catalog. */
 async function masteryTemplate(kind: 'weapon' | 'armor', state: any, targetLevel: number,
@@ -83,9 +83,7 @@ export const TALENT_HANDLERS: TalentHandler[] = [
         id: 'stat-distribution',
         description: "Distribute +2 points across any stats",
         matches: (item: any) => {
-            if (item.name === "Distribute to Stats") return true;
-            const text = (item.text || item.description || "").toLowerCase();
-            return text.includes("distribute") && text.includes("+2") && text.includes("stat");
+            return statChoiceRule(item)?.maxPerStat === 2;
         },
         action: 'stat-pool',
         config: { total: 2 },
@@ -122,13 +120,19 @@ export const TALENT_HANDLERS: TalentHandler[] = [
         resolveItems: (state, targetLevel, resolveDocFn, catalog) => masteryTemplate('armor', state, targetLevel, resolveDocFn, catalog),
     },
     {
+        id: 'spell-advantage-choice',
+        description: 'Choose a known spell for casting advantage',
+        matches: (item: any) => talentChoiceKind(item) === 'spell',
+        action: 'spell-advantage',
+        config: { required: 1 },
+    },
+    {
         id: 'extra-spell-handler',
         description: "Learn an extra spell",
-        matches: (item: any) => SPELL_CLASS_FROM_NAME.test(String(item.name || item.text || item.description || '')),
+        matches: (item: any) => !!spellChoiceGrant(item),
         action: 'extra-spell',
         config: { active: true, count: 1 },
-        // Native "Learn … Spell" talents have no effects; the selected spell is the
-        // only grant. No spellcasting class is added on the player's behalf.
+        // Shared exact-source grant rules supply both choices and casting eligibility.
     },
     {
         id: 'generic-choice',
@@ -142,9 +146,3 @@ export const TALENT_HANDLERS: TalentHandler[] = [
         action: undefined,
     }
 ];
-
-/** The spell class named by a "Learn … Spell" talent, used only to filter the offered list. */
-export function extraSpellClassName(item: any): string | null {
-    const name = SPELL_CLASS_FROM_NAME.exec(String(item?.name || item?.text || item?.description || ''))?.[1]?.toLowerCase() ?? null;
-    return name && name !== 'extra' ? name : null;
-}

@@ -4,6 +4,15 @@ Date: 2026-10-20. Active scope: [ADR-0003](../adr/0003-preserve-module-presentat
 
 ## Current disposition — 2026-10-22
 
+The user also confirmed languages and text/formula formatting. The newly reported
+Destined effect-reference warnings are a separate finding, SD-UI19.
+
+**Latest operator confirmation:** the user reports that spell lists/selection and
+level-up grants now work. These reviewed flows are user verified following SD-UI16
+and SD-UI18 corrections. This does not claim every class/talent combination was
+manually tested or close the remaining sheet review. Earlier pending-retest notes
+below describe the evidence available at those checkpoints.
+
 **Open for user review; Shadowdark release held.** The user clarified that more
 module surfaces/behavior still need review. Core0.20.0 publication and completed
 Core ADR0067–0069 do not establish full Shadowdark acceptance. Implementations
@@ -574,3 +583,436 @@ SD-UI13 acceptance — 2026-10-22: the user verified the final shared background
 behavior, including the universal Core/SDK host correction, and authorized this
 local checkpoint. SD-UI13 is accepted. Remaining ADR0003 review is not implicitly
 closed; publication, pushes and merges remain user-owned.
+
+
+## SD-UI14–17 — Language totals, spell choices and rich-text metadata (2026-10-22)
+
+User reports: Common/Rare headers lost numeric allowances for a mixed class pool;
+first-level Priest creation rejected its spell choices and showed a fictitious
+partial-advancement panel; spell management offered already-known spells again;
+Cure Wounds exposed its inline-roll formula and `{Label}` as broken-looking text.
+The user separately accepted Custom Boon and Add/Edit Effect styling (SD-UI08).
+The changes below await operator retest; ADR0003 remains open.
+
+| Finding | Confirmed cause | Correction |
+| --- | --- | --- |
+| SD-UI14 | `logic/languages.ts::languageInventorySections` returned a null limit whenever a class/ancestry choice crossed rarities. | Reuse `allocateLanguageInventory`, reserving the other category's selections before computing each capacity. Headers stay numeric; help explains the shared slot. Common2/2 and Rare1/1 become Common2/3 and Rare0/1 when the shared rare selection is removed. The same slot cannot be spent twice. |
+| SD-UI15 | `ShadowdarkAdapter.getLevelUpData` considered only already-owned talent grants. `useLevelUp.handleConfirm` treated even the pure `new` preparation endpoint's rejection as a partial write. | Include exact planned first-level talent references when marking Turn Undead. Reject ordinary/granted overlap at final validation. Pure preparation errors remain editable. For existing Actors, a proven preflight rejection returns module-local `advancementWrites: "none"`; the client discards only that submission. Unknown/partial requests retain their identity and receipt recovery. |
+| SD-UI16 | `SpellSelectionModal` checked capacity but not owned origins; `handleManageSpells` likewise omitted the duplicate-owned check. Advancement extra-spell choices also lacked an owned-origin exclusion. | `knownSpellSources` is shared by catalog preparation and final handlers. Known/granted rows stay visible but disabled, even with spare capacity. Ordinary and talent/boon extra choices cannot add the same owned origin. Save/finalize rechecks before writes. Existing duplicate copies, custom sources and distinct same-name origins are preserved. |
+| SD-UI17 | `logic/description.ts` matched only the double-bracket roll and left its following label literal. `resolveFormula` could not parse the native deterministic parenthetical die count. | Shared labels/context-aware rendering across cards, inventory, talents and pickers. `derived.rollData` and card context use the same effective model as actions. The existing parser resolves deterministic parenthetical counts; missing context yields a readable label without an action and “Varies by character” for catalog facts. Original source HTML is untouched. |
+
+### Text ownership and native source investigation
+
+This screenshot contains Foundry inline enrichment syntax, not a Handlebars
+component. Foundry14 `TextEditor._enrichInlineRolls` consumes the optional `{label}`
+and `_createInlineRoll` uses it for display while keeping the roll formula separate.
+The public [TextEditor API](https://foundryvtt.com/api/v14/classes/foundry.applications.ux.TextEditor.html)
+describes HTML enrichment and its configuration; the [dice guide](https://foundryvtt.com/article/dice/)
+describes inline rolls. Static local `temp/foundry-v14.mjs` SHA256:
+`d34e6bc53a26f794b41b89b51e27c7a5c899318cf2632d2c8a6c39f8434afdfb`.
+
+Native Shadowdark release4.0.6 at
+`9677d16b3903b3b640f00d4efd48249142ac8334`:
+
+- `data/packs/spells.db/cure_wounds__N9NvonT0RL6PyiiV.json` declares
+  `(1 + (floor(@level.value/2)))d6` and the optional prose label.
+- `system/src/documents/ActorSD.mjs::getRollData` starts with system data;
+  `system/src/models/_ActorBaseSD.mjs::_modifyRollData` adds initiative context.
+- `system/src/models/items/_BaseItemSD.mjs::render` invokes native TextEditor
+  enrichment. SheetDelver does not invoke native browser code at runtime.
+
+Core `src/shared/sdk/utils.ts::processHtmlContent` is a sanitizer/URL resolver,
+not a generic template executor. Shadowdark's existing `logic/description.ts`
+is the module-wide enrichment point; `ui/sheet-utils.ts::formatDescription` now
+aliases it too. Source editors keep literal source for editing. Arbitrary
+Handlebars/JavaScript, eager rolls and every other system's enrichers are outside
+this implementation. A future SDK extraction could share syntax while accepting
+explicit caller context and system enrichers; no new Core hook or dependency was
+needed or added for this correction. No Core code changed.
+
+### Verification and practical limits
+
+Before/after regressions confirm: mixed headers returned null; the Priest's
+Turn Undead was not marked granted; an already-owned source was accepted with
+HTTP200 instead of rejected before writes; pure creation rejection exposed a
+partial record with no request ID; native Cure Wounds' formula was unsupported.
+All now pass with the same inputs. Additional cases cover legacy/current origin
+stamps, spare-capacity disabled ordinary/granted rows, existing duplicate
+preservation, shared-pool category switching, explicit no-write correction with a
+fresh request ID, and preservation of real partial/uncertain recovery.
+
+Toolchain: Core0.20.1 `bec6bcc5d2ad93693afe92726ab45aa93508357f`, local Node24.21.0.
+Module base4525c9e; version0.9.6 and Core minimum0.20.0 remain unchanged.
+
+Commands run from Core unless stated otherwise:
+
+- All19 source suites listed in module `.github/workflows/ci-shadowdark.yaml`,
+  invoked with `node --import tsx data/local/modules/shadowdark/src/tests/<suite>`:
+  passed. This includes `boundaries`, `languages`, `native-parity`,
+  `advancement-recovery`, `creation-validation`, and existing effect/action tests.
+- `node data/local/modules/shadowdark/src/tests/verify-types.mjs`: passed explicit
+  module/UI/migration typing; Core root typing alone is not this check.
+- `collection-consumers.browser.mjs <output>`:56/56 passed. The existing focus
+  transition assertion now waits for the React update to detach its checkbox;
+  immediate locator counts were racing the scheduled render. Product focus code
+  was unchanged. Background-only checks require their separate Core CSS fixture
+  and were not repeated in this pass.
+- `parity-corrections.browser.mjs <output>`:18/18 passed, including two new editable
+  rejection cases alongside exact-ID and uncertain-write regressions.
+- Browser tools used `SHADOWDARK_PLAYWRIGHT_MODULE` pointing to the existing isolated
+  Playwright tool and `SHADOWDARK_CHROME=/usr/bin/google-chrome`; all page network
+  requests were blocked. An extra SD-UI17 render using packaged Tailwind CSS was
+  visually inspected: the native label appears once and Healing reads2d6 for the
+  level3 fixture. This synthetic card is not native/operator acceptance.
+- `npm run module:check -- shadowdark --data-dir <isolated-data>` and
+  `npm run module:package -- shadowdark --data-dir <isolated-data>`: passed using
+  a real disposable source copy and the existing Core toolchain. An initial
+  symlink fixture failed migration-path confinement; using a real copy fixed the
+  fixture without changing the guard or repository code.
+- `node data/local/modules/shadowdark/src/tests/packaged-corrections.mjs
+  --archive=<tgz> --out=<isolated-output> --core=<Core>`: all9 compiled-route checks
+  passed against public SDK/testing, with no transports or services.
+
+Tested archive SHA256:
+`ff86ee53aea4c314980a3656d768d9aae610686a1421f1b3d2bcf26aab5db619`.
+The archive contains final runtime changes; subsequent changes are documentation
+and test screenshot capture only. No live Foundry connection/data write, retained
+task service, version/dependency change, commit, push or release occurred.
+
+
+## SD-UI16b — Missing fixed spell falsely labelled Known (2026-10-22)
+
+**Superseded:** the manual Add/Save policy below was rejected by the user. SD-UI16c
+implements automatic grant fulfillment; this section records the intermediate finding.
+
+User review after SD-UI16 showed Cure Wounds as the only owned spell while the
+catalog also disabled Turn Undead as Known. Cause confirmed in both
+`ui/components/SpellSelectionModal.tsx` and `server/api/manage-spells.ts`: the
+new duplicate guard unioned `grantedSpellSources` with `knownSpellSources`.
+The former proves entitlement from an exact native talent, not an owned Spell.
+
+Both layers now separate those facts. Known ordinary/granted Spell Items remain
+disabled across all lists. An unowned fixed grant is labelled “Granted · missing
+from character” and can be explicitly added and saved, including when ordinary
+slots are full. Its addition does not consume an ordinary slot. Owner/source/
+list/tier/filter/context checks and operation receipts remain in force. The saved
+Item appears in the prepared owned list and casting actions; a repeat submission
+reuses its receipt, while a fresh duplicate attempt is rejected before creation.
+Creation/advancement planned grants say “Granted separately” instead of Known.
+No Actor data was repaired or automatically changed during investigation.
+
+The native-source regression reproduces the defect before correction: a Priest
+with two ordinary tier1 spells plus the exact native Turn Undead talent receives
+400 on adding its missing spell. After correction it receives one created Spell,
+retains two ordinary spells, exposes an owned casting row and does not create again
+on retry. Native4.0.6 provenance remains as recorded above. The shared picker
+checks actual origins, with mounted Priest/Wizard/Witch list fixtures confirming
+that ownership exclusion is not tied to the Priest name or list.
+
+Verification for this follow-up: `native-parity.test.ts`,
+`advancement-recovery.test.ts`, `creation-validation.test.ts`, explicit
+`verify-types.mjs`, six mounted SD-UI16/16b cases and isolated `module:check`.
+Mounted coverage includes missing-at-full-quota, explicit save payload,
+missing-to-owned transition, and spare-capacity duplicate disabling.
+This supplements rather than repeats the preceding full suite/archive record;
+that archive predates SD-UI16b. Operator retest remains pending. No live Foundry
+connections, version changes, Git mutations or release operations occurred.
+
+
+## SD-UI16c — Granted spells belong in inventory automatically (2026-10-22)
+
+The user rejected SD-UI16b's manual correction. Fixed grants now produce real
+Spell Items automatically. Shared server resolution uses exact owned grant
+origins and native Spell sources; creation/advancement include missing grants in
+their original plans. Existing owner sheets use the dedicated automatic grant POST
+then refresh real owned/action rows. Observers and GET views never write. Available
+lists disable the fixed grant throughout, with no manual Add/Save instruction.
+This is shared list behavior, not a Priest-name UI condition. Native4.0.6's verified
+fixed mapping is the Turn Undead talent → Spell; other talent/boon spell choices
+remain explicit choices and are protected from duplicate selection after ownership.
+
+Grant receipts are keyed by world/Actor/source across callers. The existing Actor
+queue serializes requests; unfinished advancement from any caller fences them.
+Caller source access, source-review and world-context checks precede writes.
+Unknown create outcomes or lost receipts never create a second copy. Complete
+ownership does not poll/rewrite; failures have a visible bounded retry. Ordinary
+spell slots and browsing source filters do not suppress fixed grants. There is no
+world/bootstrap migration, bulk cleanup or source-name substitution.
+
+Verification (offline fixtures and actual mounted hook/picker, not native acceptance):
+- Native parity suite:26 checks, including full ordinary quota + automatic granted
+  casting row, cross-owner concurrency, grants added after initial load, read-only
+  view, observer/source denial, lost create response, receipt persistence failure,
+  refusal/retry and another caller's unfinished advancement.
+- Creation validation:10 checks; native Priest creation has two chosen ordinary
+  spells plus exactly one automatic Turn Undead. Fixed grants cannot fill ordinary
+  starting choices. Advancement/recovery:36 checks.
+- Explicit module types and nine mounted SD-UI16/16b/16c checks pass. Mounted tests
+  cover strict-effect deduplication, automatic refresh, failure/retry, observer
+  behavior, missing→owned transition and duplicate protection on Priest/Wizard/Witch.
+- Isolated module compilation checks manifest, CSS and logic/UI/server bundles.
+  Its first disposable copy lacked toolchain dependencies; linking the existing
+  toolchain into that disposable data root resolved fixture resolution errors.
+
+No live Foundry writes, running task services, version changes, Git mutations or
+release actions. Previous archive evidence predates this correction. User retest
+should open the affected character: the granted spell should appear automatically
+in Known spells and casting, with its available-list Add disabled.
+
+
+### SD-UI16d — talent/boon choices, casting and Shune rounding
+
+**User report:** fixed Turn Undead alone was too narrow. All native spell-granting
+talents/boons need real Spell ownership and usable casting, including noncasters.
+The user approved rounding Shune's half-level tier down with a minimum of 1 and
+requested a SheetDelver-specific handling document.
+
+**Finding and correction:** the old choice handler recognized names, retained only
+one named list/one choice, imposed no source-specific tier rule and did not supply
+casting permission. Repeated talent sources were collapsed, and chosen bonus
+Spells lacked provenance for ordinary quota exclusion. Shared exact-source rules
+now drive the picker and writer; an independent-choice matcher handles repeated
+and mixed grants. Saved grant source/Class/acquisition-level metadata supplies
+quota exemption and casting through the shared prepared model. Source effects
+remain untouched. Additional casting permission never borrows an ordinary Class
+progression table. Shune's explicit INT overrides another active casting list for
+its saved grant; a generic grant retains the list whose tier made it eligible.
+
+| Native source coverage | Handling |
+| --- | --- |
+| Turn Undead | Fixed automatic Spell, actual ownership, Priest casting permission |
+| Learn a Wizard Spell (Shune) | Exact Wizard tier `max(1, floor(acquisitionLevel / 2))`, INT |
+| Learn Wizard Spell | Wizard known/current progression tier, INT |
+| Learn Witch Spell | Witch known/current progression tier, CHA |
+| Learn Seer Spell | Seer known/current progression tier, WIS |
+| Learn Extra Spell | Established list/tier; retain eligible casting Class |
+| Magical Dabbler | Item-only permission remains; no normal Spell grant |
+| Casting bonuses/advantage, Magic Missile Advantage, Learning Spells | No inferred Spell creation or casting grant; scroll learning remains separate |
+
+All five Learn Spell templates in native4.0.6 are enumerated; the four named
+choices are checked against actual native table references. The generic template
+is also covered even though shipped tables do not directly select it. Exact IDs,
+published-rule boundary and the approved interpretation are recorded in
+[SheetDelver spell-grant handling](../rules/spell-grants.md).
+
+**Verified offline:** native-parity32 checks, creation-validation12 checks,
+advancement-recovery36 checks, action-phases13 checks, prepared-actor suite,
+explicit module TypeScript, and11 mounted SD-UI16 consumer cases pass. The mounted
+cases include actual `useLevelUp` plus bonus picker at levels3/5 with two separate
+grants. Native fixtures are pinned4.0.6 at9677d16; the overlapping-list ability
+and generic-tier cases use explicitly controlled custom fixtures. Isolated module
+check passes manifest/compatibility, scoped Tailwind and logic/UI/server bundles.
+These are module/source and controlled-browser checks, not new native acceptance.
+Earlier full-suite/archive evidence predates this correction.
+
+**Limits:** no existing custom/duplicate copies are deleted; no historical choice
+is guessed or automatically created from a talent with an unknown selection.
+Fixed automatic grants retain SD-UI16c's queue/ownership/context/receipt rules.
+No live Foundry changes, Core edits, version changes, commit or release occurred.
+Operator retest and the broader ADR review remain open.
+
+### SD-UI18 — required talent choices and independent stat grants
+
+**User report:** Wizard creation with Spellcasting Advantage returned HTTP500
+because its target was never selected. The user requested review of other grants,
+including +1 to two stats and +2 to a stat, across creation and advancement.
+
+**Findings and corrections:** the effect resolver supported spell targets but
+the workflow collected only weapon/armor selections. Warlock's distinct-stat
+table flag became an unrestricted pool; multiple distribution grants reused one
+aggregate allocation. Repeated fixed-stat source templates could be collapsed.
+A native distribution RollTable could also fail subtype validation because source
+RollTables do not have an Item `type`.
+
+The picker and writer now collect and validate each target/allocation separately.
+Pending spell advantage targets must be owned/planned Spells; the resolved Magic
+Missile effect stays unchanged. Native stat effects retain their amounts; repeated
+rolls remain separate grants. Warlock's two-stat restriction survives table
+processing, while unrestricted distributions allow a two-point single-stat gain.
+Distribution tables are recognized by document identity and become Talent effects.
+Invalid choices return validation errors before writes. Existing receipts and
+same-request recovery are retained. Rules are recorded in
+[talent choice handling](../rules/talent-choices.md).
+
+**Verified offline against native4.0.6 at9677d16:**
+
+- Creation validation:18 cases, including all four native placeholder templates
+  with both legacy and simulated modern effect representations, all twelve native
+  fixed +1/+2 stat talents repeated twice, mixed distributions, nested distribution
+  table selection, malformed allocations and final creation revalidation.
+- Advancement/recovery:39 cases, including the four target talents, correctable
+  zero-write failure, mixed stat grants, repeated +2 gains and idempotent replay.
+- Native parity:32; native alignment:61; effect conformance:89; weapon rules pass.
+- Full mounted consumer suite:67 cases pass. The two new cases exercise the real
+  advancement hook, required spell target and changed spell availability, separate
+  restricted/unrestricted stat pickers, completion gating and request payloads.
+- Explicit module typing and isolated module check cover manifest/compatibility,
+  scoped CSS and logic/UI/server bundles. Core remains unchanged.
+
+The baseline reproduced the reported HTTP500. The expanded final test then caught
+the RollTable subtype failure; both are corrected. These are controlled module
+and browser checks, not native-client acceptance. Operator creation/advancement
+retest and ADR review remain open. No live data, version or Git changes were made
+by validation, and no historical choices were inferred or repaired.
+
+### SD-UI19 — premature Destined reference warnings
+
+**User report:** languages and text/formula formatting now look correct, but the
+Effects tab reports missing `@bonus.destineddie` for Destined and Destined (Dmg)
+while the active Destined Die effect supplies 6.
+
+**Cause:** native4.0.6's Destined Item lists the two situational effects before
+Destined Die, all with the same default priority. Initial phased application
+records a missing reference; the later supplier makes it available to the roll
+consumer, but the earlier warning persisted. The previous conformance fixture put
+the supplier first and checked action damage, so it missed this false diagnostic.
+
+**Correction:** supported roll-selector reference diagnostics use completed Actor
+roll data after initial/final preparation. This preserves application order and
+the canonical source formulas, and does not invent a die size. Genuine missing
+values still attach diagnostics to the effect. The rule applies across supported
+roll selectors, not just Destined. Actor-data field validation remains immediate.
+
+**Evidence:** the native Destined Item and effects from pinned4.0.6 at9677d16 are
+loaded in their stored order, tested as legacy and simulated v14 effect shapes.
+Both cases reproduced the warning before the fix. Afterward all91 effect
+conformance checks pass: selected stat/attack/spell bonuses and weapon/spell
+damage use d6; an additional die upgrade yields d8; unselected situational bonuses
+stay excluded; disabling the die supplier still reports the missing reference.
+No source or live Foundry data is changed. Operator retest of SD-UI19 remains open.
+
+Prepared-Actor parity, native alignment61/61, explicit module typing and isolated
+module check (manifest, scoped CSS, logic/UI/server bundles) also pass. No Core
+changes or version/Git operations were required.
+
+### SD-UI20 — legacy scroll visibility and single-use retention
+
+**User report/decision:** two scrolls appear under carried gear but not Spells
+from items. Casting must mark a scroll spent without deleting it, leaving manual
+discard and preventing reuse.
+
+**Finding:** native4.0.6 Burning Hands and Hold Portal scrolls are `Basic` Items,
+with one exact Spell link in their descriptions. The prior action/list paths
+recognized only `Scroll` type and would delete a modern Scroll after casting.
+
+**Correction:** shared exact-origin scroll handling feeds caller-bound dependency
+reads, action preparation, spell rows, cards and inventory. Names alone never
+establish scroll capability. Sources retain their types, descriptions and other
+fields. The existing action prerequisite saves the spent flag before the result,
+protecting against repeated requests, concurrency and uncertain responses. All
+cast outcomes retain the Item. Manual discard remains; Potion/Wand behavior stays
+unchanged. The flag is enforced by SheetDelver, not native Foundry's own UI.
+
+**Verification:** three new real-handler cases reproduce missing actions on the
+pre-fix disposable source copy. Corrected action-phases16/16 and boundaries55/55
+pass. Coverage includes both actual native Basic sources plus a modern Scroll,
+linked spell identity, source preservation, denied dependency reads, same-name
+non-scroll exclusion, success/failure retention, completed replay, new-request
+rejection, concurrent requests, refused/uncertain spending and uncertain results.
+The mounted spell-list/inventory case confirms visibility, exact-ID card opening,
+cast invocation, Spent labels and disabled casting after refresh. Explicit module
+typing passes. This is controlled verification; user retest remains open.
+
+The isolated module check also passes manifest/compatibility, scoped CSS and
+logic/UI/server bundles. No live Foundry data, Core files or release versions changed.
+
+#### SD-UI20 follow-up — inventory Add lost source identity
+
+The user reported both scrolls still absent after the first correction. Inspection
+found GearSelectionModal's Add callback copied only name/type/image/system,
+discarding source metadata, effects and flags. The first fixtures used proper
+owned copies and therefore did not reproduce that path. A revised test using the
+historical Add payload fails before this follow-up.
+
+Gear Add now uses `ownedCopy`. Existing source-less copies are recognized only
+when Basic/magic classification and the complete native name/artwork/description
+signature match one of the two known scrolls. Different names, artwork, missing
+spell links or conflicting recorded origins are excluded. No provenance is
+fabricated and no inventory repair is written. Modified/unrecognized Basic Items
+remain ordinary gear.
+
+Verification: action-phases16/16 passes with both historical source-less payloads,
+their actual casting/spent persistence, and partial-match exclusions. Three mounted
+checks cover the real Add callback's full data/source preservation and spell-list
+visibility/spent state with and without origins. Explicit module typing passes.
+The first user retest was unsuccessful; this follow-up still needs user confirmation.
+
+Isolated module validation also passes manifest, scoped CSS and all three bundles.
+
+### SD-UI21 — spellcasting mishaps and wand failure recovery
+
+**User report / rule decision:** after verifying core rules p49, the user kept
+spellcaster/list eligibility and identified missing critical-failure mishap rolls.
+They clarified that wand failure disables casting until a full rest and critical
+failure also breaks the wand. Scrolls remain spent after any attempt and retained
+for manual discard (SD-UI20).
+
+**Finding:** the shared action route applied spell loss/wand breakage but scheduled
+no mishap. Native4.0.6 contains exact Wizard tables for tiers1–2,3–4,5; Witch and
+Knight of St. Ydris talent descriptions call for separate Diabolical tables that
+are not in those packs. Magical Dabbler explicitly calls for Wizard mishaps.
+The primary rules text is also indexed in the [Player Quickstart, p55](https://studylib.net/doc/28229005/shadowdark-player-quickstart---digital).
+
+**Correction:** preparation retains the selected casting Class identity and
+attaches its supported mishap rule. After a confirmed critical failure and its
+inventory consequences, the caller route reads the exact table and rolls its
+formula through Core dice, then posts sanitized result text with the casting
+speaker/visibility. The durable action receipt records the attempt/result;
+completed and uncertain mishaps never repeat on retry. Missing/inaccessible
+tables warn explicitly. A critical-failure wand is broken even when bonuses make
+its numeric total pass; clearing lost entries does not clear broken. The module
+does not add a separate rest command or automatically apply mishap prose effects.
+
+**Verification:** a disposable copy with the previous no-mishap scheduling behavior
+fails five new handler cases. Corrected action-phases22/22 and boundaries55/55
+pass; the isolated module check passes manifest/CSS and logic/UI/server bundles.
+Cases cover native tier tables, saved roll result, hidden roll mode/speaker,
+spent scroll retention, wand failure/breakage, externally cleared rest state,
+failed consequence retry, missing/uncertain results, failed result chat and
+manual totals not establishing criticals. Policy tests exclude Wizard fallback
+for Witch, Priest, Seer and custom classes and cover exact Magical Dabbler origin.
+No live Foundry operations, Core modifications or version changes were made.
+
+**Limits / remaining review:** user acceptance pending. Witch Diabolical tables
+need an authoritative available source before automation; penance and custom
+class rules are not guessed. Further rolls or effects instructed by table text
+(such as Devastation) are presented for manual resolution, not automatically
+executed. This is source/controlled-handler verification, not live play acceptance.
+
+### SD-UI22 — legacy native wand presentation and casting
+
+**User report:** Wand of Blind/Deafen displayed Weapon/Melee and missing-damage
+errors with no casting action. SD-UI21 fixtures covered modern Wand Items only.
+
+**Finding:** pinned native4.0.6 stores Blind/Deafen as Weapon and Unlife/Warding as
+Basic. Their spell links are in descriptions. Historical Gear Add also discarded
+origins. The modern Wand-only lookup/preparation path missed all three templates.
+
+**Correction:** shared exact-origin or complete-signature recognition exposes the
+actual caller-readable spells throughout cards, spell lists and actions; legacy
+wands no longer offer melee attacks, damage errors or Equip. Stored Item types
+are preserved. Modern state uses native fields; legacy loss/breakage uses module
+flags supported by their schemas. Restore after rest clears loss on unbroken
+wands only. Spell-list eligibility remains authoritative: Blind/Deafen is Priest,
+not Wizard/Witch. Unlife/Warding curse descriptions remain for manual adjudication.
+
+**Verification:** baseline fails the legacy card classification. Corrected action
+suite25/25 covers all three templates with/without origins, actual success/failure/
+critical handler writes, rest without repair, disabled noncaster actions,
+inaccessible links, conflicting/partial identities and rejection of crafted
+weapon attacks. Four mounted card checks cover origins and caster permissions,
+actual Cast callback, failed-state restoration and broken-state lockout. Initial
+browser assertions raced React updates; waiting for the existing settled helper
+passes all four. These are functional mounted checks, not packaged-style visual
+acceptance. Weapon rules, boundaries55/55, explicit typing and isolated module
+check (manifest/CSS/all three bundles) pass. No live Foundry data, Core files or
+release versions changed. User verification remains pending.
+
+### Operator checkpoint — 2026-10-22
+
+After SD-UI22 the user confirmed “verified working” and authorized committing the
+current repair pass. The legacy wand flow is now user verified. Prior explicit
+acceptance of languages, text/formulas and spell selection/level-up grants remains
+recorded above. This does not assert exhaustive manual coverage of every mishap,
+curse, class or historical data variant. The user has another item to address;
+ADR0003 remains open. Version and compatibility metadata are unchanged.

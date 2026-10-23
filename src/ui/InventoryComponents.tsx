@@ -58,7 +58,7 @@ export function ItemRow({ item, expandedItems, toggleItem, isTreasure, onSell, o
     const view = (actor?.derived?.items ?? []).find((entry: any) => entry.id === itemId);
     // Unavailable modes (e.g. a two-handed grip with a shield) are not listed; the card explains them.
     const attacks: PreparedAction[] = (actor?.derived?.actions ?? []).filter((action: PreparedAction) => action.itemId === itemId && action.kind === 'attack' && action.available);
-    const description = useMemo(() => presentDescription(item.system?.description, foundryUrl), [item.system?.description, foundryUrl]);
+    const description = useMemo(() => presentDescription(item.system?.description, foundryUrl, actor?.derived?.rollData), [item.system?.description, foundryUrl, actor?.derived?.rollData]);
     const equipped = view?.equipped ?? item.system?.equipped === true;
     const stashed = view?.stashed ?? item.system?.stashed === true;
     const lit = item.system?.light?.active === true;
@@ -77,6 +77,7 @@ export function ItemRow({ item, expandedItems, toggleItem, isTreasure, onSell, o
                     onClick={() => toggleItem(itemId)}>
                     <img src={resolveImageUrl(item.img)} alt="" className="w-8 h-8 object-cover border border-black mr-2 bg-neutral-200 shrink-0" />
                     <span className="break-words">{item.name}</span>
+                    {view?.scroll?.spent && <span className="ml-2 text-[10px] uppercase border border-black px-1">Spent</span>}
                     {view?.lightSource && <span className={`ml-2 text-xs ${lit ? 'text-amber-700 font-bold' : 'text-neutral-500'}`}>{lit ? 'Lit' : 'Unlit'}</span>}
                     {view && !view.identified && <span className="ml-2 text-[10px] uppercase border border-black px-1">Unidentified</span>}
                 </button>

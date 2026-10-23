@@ -8,8 +8,9 @@ import { GoldRollSection } from './levelup/sections/GoldRollSection';
 import { TalentBoonSection } from './levelup/sections/TalentBoonSection';
 import { SpellSelectionSection } from './levelup/sections/SpellSelectionSection';
 import { LanguageSelectionSection } from './levelup/sections/LanguageSelectionSection';
-import { StatSelectionSection } from './levelup/sections/StatSelectionSection';
+import { statChoiceRule } from '../../logic/stat-choices';
 import { WeaponSelectionSection } from './levelup/sections/WeaponSelectionSection';
+import { SpellAdvantageSelectionSection } from './levelup/sections/SpellAdvantageSelectionSection';
 import { ArmorSelectionSection } from './levelup/sections/ArmorSelectionSection';
 import { StatPoolSelectionSection } from './levelup/sections/StatPoolSelectionSection';
 import { SelectionOverlay } from './levelup/sections/SelectionOverlay';
@@ -149,6 +150,7 @@ export const LevelUpModal = (props: LevelUpProps) => {
                                         <ExtraSpellSelectionSection
                                             active={state.extraSpellSelection.active}
                                             maxTier={state.extraSpellSelection.maxTier}
+                                            requiredCount={state.extraSpellRequired}
                                             source={state.extraSpellSelection.source}
                                             availableSpells={state.extraSpellsList}
                                             selectedSpells={state.extraSpellSelection.selected}
@@ -164,21 +166,14 @@ export const LevelUpModal = (props: LevelUpProps) => {
 
 
 
-                                    {state.statSelection && state.statSelection.required > 0 && (
-                                        <StatSelectionSection
-                                            required={state.statSelection.required}
-                                            selected={state.statSelection.selected}
-                                            onToggle={actions.handleStatToggle}
-                                        />
-                                    )}
-
-                                    {state.statPool && state.statPool.total > 0 && (
-                                        <StatPoolSelectionSection
-                                            total={state.statPool.total}
-                                            allocated={state.statPool.allocated}
-                                            onChange={actions.handleStatPoolChange}
-                                        />
-                                    )}
+                                    {state.statGrants.map((grant, index) => <StatPoolSelectionSection
+                                        key={index}
+                                        title={`${grant.name}${state.statGrants.length > 1 ? ` (${index + 1})` : ''}`}
+                                        total={statChoiceRule(grant)!.total}
+                                        maxPerStat={statChoiceRule(grant)!.maxPerStat}
+                                        allocated={state.statChoices[index] ?? {}}
+                                        onChange={(stat, delta) => actions.changeStatChoice(index, stat, delta)}
+                                    />)}
 
                                     {state.weaponMasterySelection && state.weaponMasterySelection.required > 0 && (
                                         <WeaponSelectionSection
@@ -187,6 +182,16 @@ export const LevelUpModal = (props: LevelUpProps) => {
                                             onSelectionChange={(sel: string[]) => actions.setWeaponMasterySelection({ ...state.weaponMasterySelection, selected: sel })}
                                         />
                                     )}
+
+                                    {state.spellAdvantageSelection.required > 0 && <>
+                                        <CollectionStatus state={state.spellEffectData} label="Loading spell choices…" />
+                                        {state.spellEffectData.ready && <SpellAdvantageSelectionSection
+                                            required={state.spellAdvantageSelection.required}
+                                            selected={state.spellAdvantageSelection.selected}
+                                            options={state.spellEffectOptions}
+                                            onSelectionChange={selected => actions.setSpellAdvantageSelection({ ...state.spellAdvantageSelection, selected })}
+                                        />}
+                                    </>}
 
                                     {state.armorMasterySelection && state.armorMasterySelection.required > 0 && (
                                         <ArmorSelectionSection

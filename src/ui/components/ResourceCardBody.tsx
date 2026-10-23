@@ -20,7 +20,7 @@ export function CardBody({ card, onLink, onRollCheck, onRollFormula, information
     onRollFormula?: (formula: string) => void;
 }) {
     const { foundryUrl } = useSDK();
-    const html = useMemo(() => (informational ? presentReferenceDescription : presentDescription)(card.description, foundryUrl), [card.description, foundryUrl, informational]);
+    const html = useMemo(() => (informational ? presentReferenceDescription : presentDescription)(card.description, foundryUrl, card.rollData), [card.description, foundryUrl, informational, card.rollData]);
     const onClick = (event: React.MouseEvent) => {
         if (informational) return;
         const target = event.target as HTMLElement;
@@ -69,7 +69,7 @@ export function CardBody({ card, onLink, onRollCheck, onRollFormula, information
                             <li key={`${entry.title}-${index}`} className="py-2">
                                 <div className="font-bold">{entry.title}</div>
                                 {entry.facts && <div className="text-sm text-neutral-700">{entry.facts.map(fact => `${fact.label}: ${fact.value}`).join(' · ')}</div>}
-                                {entry.description && <div className="text-sm font-serif mt-1 break-words" dangerouslySetInnerHTML={{ __html: (informational ? presentReferenceDescription : presentDescription)(entry.description, foundryUrl) }} />}
+                                {entry.description && <div className="text-sm font-serif mt-1 break-words" dangerouslySetInnerHTML={{ __html: (informational ? presentReferenceDescription : presentDescription)(entry.description, foundryUrl, card.rollData) }} />}
                             </li>
                         ))}
                     </ul>

@@ -44,7 +44,7 @@ export default function SpellsTab() {
     const tiersFor = (source: SpellSource) => [1,2,3,4,5].filter(tier => (limitFor(source, tier) ?? 0) > 0 || knownFor(source,tier).length);
 
     const spellRows = actions.filter(action => action.kind === 'spell' && itemById(action.itemId ?? '')?.type === 'Spell');
-    const itemRows = actions.filter(action => action.kind === 'spell' && ['Scroll', 'Wand'].includes(itemById(action.itemId ?? '')?.type));
+    const itemRows = actions.filter(action => action.kind === 'spell' && itemById(action.itemId ?? '')?.type !== 'Spell');
 
     useEffect(() => {
         if (manage && !saving && !submission && !receipt && !managedSource) {
@@ -76,13 +76,15 @@ export default function SpellsTab() {
 
     const castRow = (action: PreparedAction, item: any, label: string, spellItem: any | null, lostPath: boolean) => {
         const lost = !!action.reason && action.reason.includes('lost');
+        const spent = views.find(view => view.id === action.itemId)?.scroll?.spent === true;
         const system = spellItem?.system ?? {};
         return (
             <li key={action.id} className="bg-white border-black border-2 p-2 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex flex-wrap items-center gap-2">
-                <button type="button" onClick={() => openCard({ kind: 'item', itemId: String(item.id) })} className="flex items-center gap-2 flex-1 min-w-[12rem] text-left min-h-11" aria-label={`${label} details`}>
+                <button type="button" onClick={() => openCard({ kind: 'item', itemId: String(item.id ?? item._id) })} className="flex items-center gap-2 flex-1 min-w-[12rem] text-left min-h-11" aria-label={`${label} details`}>
                     <img src={resolveImageUrl(item.img)} alt="" className="w-10 h-10 border border-black object-cover bg-black shrink-0" />
                     <span className="min-w-0">
-                        <span className={`block font-serif font-bold text-lg uppercase leading-tight break-words ${lost ? 'line-through text-neutral-500' : ''}`}>{label}</span>
+                        <span className={`block font-serif font-bold text-lg uppercase leading-tight break-words ${lost || spent ? 'line-through text-neutral-500' : ''}`}>{label}</span>
+                        {spent && <span className="text-xs font-bold uppercase">Spent</span>}
                         <span className="block text-[11px] font-bold uppercase tracking-widest text-neutral-600">
                             {action.spell?.tier !== null && action.spell?.tier !== undefined ? `Tier ${action.spell.tier} · DC ${action.dc}` : 'Tier unavailable'}
                             {system.duration ? ` · ${spellDuration(system.duration)}` : ''}{system.range ? ` · ${RANGE_LABELS[system.range] ?? system.range}` : ''}

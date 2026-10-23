@@ -70,14 +70,14 @@ export default function LanguageSelectionModal({ isOpen, onClose, onSelect, acto
         {data.ready && plan && languageInventorySections(plan, rows, selected).map(({ kind, count, limit }) => {
             const options = [...byUuid].filter(([, doc]) => languageRarity(doc) === kind && String(doc.name).toLowerCase().includes(search.toLowerCase()));
             return <section key={kind} aria-label={`${kind} languages`} className="mt-4">
-                <h3>{kind} ({limit === null ? `${count} selected` : `${count}/${limit}`})</h3>
+                <h3>{kind} ({count}/{limit})</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">{options.map(([uuid, doc]) => choice(uuid, doc.name))}</div>
                 {!options.length && <p className="sd-empty">No matching {kind} languages.</p>}
                 {limit !== null && count > limit && <p className="sd-form-notice">Existing languages exceed this allowance. Remove a selection before adding another.</p>}
             </section>;
         })}
         {data.ready && plan?.groups.filter(group => ['ancestry', 'class'].includes(group.id) && group.count > 0).map(group =>
-            <p key={group.id} className="sd-form-help">{group.label} ({[...(allocation?.assigned ?? [])].filter(([index]) => allocation?.slots[index].id === group.id).length}/{group.count}): choose from {group.options.map(uuid => byUuid.get(uuid)?.name ?? 'an unavailable language').join(', ')}.</p>)}
+            <p key={group.id} className="sd-form-help">{[...(allocation?.assigned ?? [])].filter(([index]) => allocation?.slots[index].id === group.id).length}/{group.count} shared {group.id} choices selected. {group.options.some(uuid => languageRarity(byUuid.get(uuid)) === 'common') && group.options.some(uuid => languageRarity(byUuid.get(uuid)) === 'rare') ? 'This allowance is shared between Common and Rare; choosing one reduces the space available in the other.' : 'Only languages in this ancestry or class choice pool use these slots.'}</p>)}
         {data.ready && unclassified.length > 0 && <section aria-label="Unclassified languages"><h3>Unclassified languages</h3><p className="sd-form-help">These languages have no known rarity. Only explicit ancestry or class choices can grant them.</p><div className="grid grid-cols-1 sm:grid-cols-2 gap-2">{unclassified.map(([uuid, doc]) => choice(uuid, doc.name))}</div></section>}
         {data.ready && retained.length > 0 && <section aria-label="Other known languages"><h3>Other known languages</h3><p className="sd-form-help">These existing languages are kept unless you remove them.</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">{retained.map(uuid => choice(uuid, currentLabels[uuid] && !canonicalUuid(currentLabels[uuid]) ? currentLabels[uuid] : (canonicalUuid(uuid) ? 'Unavailable language' : uuid)))}</div></section>}

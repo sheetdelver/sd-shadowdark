@@ -1,11 +1,14 @@
-import { logger } from '@sheet-delver/sdk';
+import { statChoiceRule, applyStatAllocation, validStatAllocation, type StatAllocation } from '../../logic/stat-choices';
+import { spellChoiceGrant, matchSpellGrants, spellGrantClasses, grantSource } from '../../logic/spell-grants';
+import { resolveSpellGrants } from '../spell-grants';
+import { logger, SdkError } from '@sheet-delver/sdk';
 import { shadowdarkAdapter } from '../../server/ShadowdarkAdapter';
 import { TALENT_HANDLERS } from '../../logic/talent-handlers';
 import { resolveBaggage, resolveGear } from './gear-resolver';
 import { ROLL_TABLE_FILTER } from '../../data/roll-table-patterns';
 import { TableService } from '../../utils/TableService';
 import { sanitizeItems } from '../../utils/Sanitizer';
-import { applyMasteryChoice, assertResolvedTalentChoices, masteryKind, type ChoiceCatalog } from '../../logic/talent-choices';
+import { applyChoice, assertResolvedTalentChoices, masteryKind, talentChoiceKind, choiceCatalog, type ChoiceCatalog } from '../../logic/talent-choices';
 import { canonicalUuid, sourceRef, formatUuid, ownedCopy } from '../../logic/identity';
 import type { Caller } from '../access';
 
@@ -99,10 +102,12 @@ export interface LevelUpState {
     selectedLanguages: string[];
     hpRoll: number | null;
     goldRoll: number | null;
+    statChoices?: StatAllocation[];
     statSelection: { required: number; selected: string[] };
     statPool: { total: number; allocated: Record<string, number>; talentIndex: number | null };
     weaponMasterySelection: { required: number; selected: string[] };
     armorMasterySelection: { required: number; selected: string[] };
+    spellAdvantageSelection?: { required: number; selected: string[] };
     extraSpellSelection: { active: boolean; maxTier: number; source: string; selected: any[] };
 }
 
@@ -198,7 +203,6 @@ export async function assembleFinalItems(state: LevelUpState, targetLevel: numbe
         origins.set(item, { source, grant });
         items.push(item);
     };
-    const baggageNames = new Set<string>();
 
     // Existing Actor items are matched by recorded source identity, never by name.
     const existingItems = actor?.items || [];
@@ -228,7 +232,7 @@ export async function assembleFinalItems(state: LevelUpState, targetLevel: numbe
                     if (uuid) displacedUuids.add(uuid);
                 }
 
-                if (handler.mutateItem) {
+                if (handler.mutateItem && !statChoiceRule(item)) {
                     const isSelection = (handler.action === 'stat-selection' && state.statSelection) ||
                                       (handler.action === 'stat-pool' && state.statPool) ||
                                       (handler.action === 'extra-spell' && state.extraSpellSelection);
@@ -275,7 +279,6 @@ export async function assembleFinalItems(state: LevelUpState, targetLevel: numbe
                     continue;
                 }
 
-                if (name) baggageNames.add(name);
                 append(item, 'fixed', `${group}:${uuid || `${item.type}:${name}`}`);
             }
         };
@@ -315,12 +318,10 @@ export async function assembleFinalItems(state: LevelUpState, targetLevel: numbe
     // 5. Final pass (Resolution & Categorization)
     const resolvedItems: any[] = [];
     const seenUuids = new Set<string>();
-    const seenMasteryGrants = new Set<string>();
-    // baggageNames now populated during Baggage pass above
+    const seenIndependentGrants = new Set<string>();
 
     for (const item of items) {
         const uuid = item.documentUuid || item.uuid || item._id;
-        const name = (item.name || "").trim().toLowerCase();
 
         // DISPLACEMENT CHECK: Skip if this item was displaced by a handler
         if (uuid && displacedUuids.has(uuid)) {
@@ -355,7 +356,7 @@ export async function assembleFinalItems(state: LevelUpState, targetLevel: numbe
 
                     // Apply mutations again to the resolved document
                     for (const handler of TALENT_HANDLERS) {
-                        if (handler.matches(clean) && handler.mutateItem) {
+                        if (handler.matches(clean) && handler.mutateItem && !statChoiceRule(clean)) {
                              const isSelection = (handler.action === 'stat-selection' && state.statSelection) ||
                                                (handler.action === 'stat-pool' && state.statPool) ||
                                                (handler.action === 'extra-spell' && state.extraSpellSelection);
@@ -374,15 +375,11 @@ export async function assembleFinalItems(state: LevelUpState, targetLevel: numbe
         // Resolve before deduplication: a shallow template may conceal a required
         // mastery choice. Only the same fixed grant may be collapsed, never two
         // rolled grants or a fixed and rolled grant sharing a source template.
-        if (masteryKind(clean)) {
-            if (seenMasteryGrants.has(origin.grant)) continue;
-            seenMasteryGrants.add(origin.grant);
+        if (origin.source === 'rolled' || talentChoiceKind(clean) || spellChoiceGrant(clean) || statChoiceRule(clean)) {
+            if (seenIndependentGrants.has(origin.grant)) continue;
+            seenIndependentGrants.add(origin.grant);
         } else {
             if (uuid && seenUuids.has(uuid)) continue;
-            if (origin.source === 'rolled' && baggageNames.has(name)) {
-                const isStacker = name.startsWith('+1') || name.startsWith('+2') || name.includes('improvement');
-                if (!isStacker) continue;
-            }
             if (uuid) seenUuids.add(uuid);
         }
 
@@ -403,27 +400,58 @@ export async function assembleFinalItems(state: LevelUpState, targetLevel: numbe
         resolvedItems.push(clean);
     }
 
-    const required = { weapon: 0, armor: 0 };
-    for (const item of resolvedItems) {
-        const kind = masteryKind(item);
+    const statGrants = resolvedItems.filter(item => statChoiceRule(item));
+    let statChoices = state.statChoices;
+    if (statChoices === undefined) {
+        // Preserve a single older in-flight choice, never multiply one aggregate
+        // allocation across independent grants.
+        if (statGrants.length > 1) throw new SdkError('validation', 'Choose stats separately for each talent or boon.');
+        const selected = state.statSelection?.selected ?? [];
+        statChoices = statGrants.length ? [selected.length ? Object.fromEntries(selected.map(stat => [stat, 1])) : state.statPool?.allocated ?? {}] : [];
+    }
+    if (!Array.isArray(statChoices) || statChoices.length !== statGrants.length
+        || statGrants.some((item, index) => !validStatAllocation(statChoiceRule(item)!, statChoices![index])))
+        throw new SdkError('validation', 'Allocate the required stat points separately for each talent or boon, within its per-stat limit.');
+    let statIndex = 0;
+    const statResolvedItems = resolvedItems.map(item => statChoiceRule(item) ? applyStatAllocation(item, statChoices![statIndex++]) : item);
+    const fixedSpells = await resolveSpellGrants([...existingItems, ...statResolvedItems.map(item => ownedCopy(item))], caller);
+    const effectCatalog = { ...catalog, spell: choiceCatalog([...existingItems, ...statResolvedItems, ...fixedSpells]).spell };
+    const selectionFor = (kind: 'weapon' | 'armor' | 'spell') => kind === 'weapon' ? state.weaponMasterySelection
+        : kind === 'armor' ? state.armorMasterySelection : state.spellAdvantageSelection;
+    const required = { weapon: 0, armor: 0, spell: 0 };
+    for (const item of statResolvedItems) {
+        const kind = talentChoiceKind(item);
         if (kind) required[kind]++;
     }
-    for (const kind of ['weapon', 'armor'] as const) {
-        const selection = kind === 'weapon' ? state.weaponMasterySelection : state.armorMasterySelection;
+    for (const kind of ['weapon', 'armor', 'spell'] as const) {
+        const selection = selectionFor(kind);
         if ((selection?.selected?.length ?? 0) !== required[kind]
             || (selection?.required !== undefined && selection.required !== required[kind])) {
-            throw new Error(`Choose a valid ${kind} for each mastery grant: ${required[kind]} required choices; refresh stale selections before creating Items.`);
+            throw new SdkError('validation', `Choose a valid ${kind} for each talent: ${required[kind]} required choices.`);
         }
     }
-    const selectionsUsed = { weapon: 0, armor: 0 };
-    const finalized = resolvedItems.map(item => {
-        const kind = masteryKind(item);
+    const selectionsUsed = { weapon: 0, armor: 0, spell: 0 };
+    const finalized = statResolvedItems.map(item => {
+        const kind = talentChoiceKind(item);
         if (!kind) return item;
-        const selection = kind === 'weapon' ? state.weaponMasterySelection : state.armorMasterySelection;
-        const selected = selection?.selected?.[selectionsUsed[kind]++];
-        return applyMasteryChoice(item, selected, kind, catalog);
+        const selected = selectionFor(kind)?.selected?.[selectionsUsed[kind]++];
+        try { return applyChoice(item, selected, kind, effectCatalog); }
+        catch (error) { throw new SdkError('validation', error instanceof Error ? error.message : 'Choose a valid talent option.'); }
     });
-    assertResolvedTalentChoices(finalized);
+    try { assertResolvedTalentChoices(finalized); }
+    catch (error) { throw new SdkError('validation', error instanceof Error ? error.message : 'Resolve the remaining talent choices before continuing.'); }
     // Created Items record their exact compendium source (Foundry fromCompendium).
-    return sanitizeItems(finalized).map(item => ownedCopy(item));
+    const copies = sanitizeItems(finalized).map(item => ownedCopy(item));
+    const grants = copies.filter(item => ['Talent','Boon'].includes(item.type) && spellChoiceGrant(item));
+    const selected = state.extraSpellSelection?.selected ?? [];
+    const context = { level: targetLevel, known: [...existingItems, ...state.selectedSpells], classDoc: classObj };
+    const assignment = matchSpellGrants(grants, selected, context);
+    if (grants.length !== selected.length || !assignment) throw new SdkError('validation', 'Choose one eligible, distinct spell for each talent or boon. Check its spell list and tier allowance.');
+    for (const [index, choice] of assignment.entries()) {
+        const spell = selected[choice], copy = copies.find(item => item.type === 'Spell' && grantSource(item) === grantSource(spell));
+        const classUuid = spellGrantClasses(grants[index], spell, context)[0];
+        if (!copy || !classUuid) throw new SdkError('validation', 'A granted spell has no exact source or casting class.');
+        copy.flags = { ...copy.flags, shadowdark: { ...copy.flags?.shadowdark, spellGrant: { source: grantSource(grants[index]), classUuid, level: targetLevel } } };
+    }
+    return [...copies, ...fixedSpells];
 }

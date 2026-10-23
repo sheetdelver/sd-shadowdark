@@ -57,6 +57,15 @@ export function pendingChoiceKind(item: any): ChoiceKind | null {
     return null;
 }
 
+/** Mastery grants and pending spell targets; fixed spell effects need no input. */
+export function talentChoiceKind(item: any): ChoiceKind | null {
+    for (const effect of effectsOf(item)) {
+        const kind = choiceKindForEffect(effect);
+        if (kind && (kind !== 'spell' || hasPlaceholder(effect))) return kind;
+    }
+    return null;
+}
+
 /**
  * Kind of a mastery-style talent, resolved or not, from native effect names.
  * Used to count independent grants; it never infers a kind from an ID suffix.

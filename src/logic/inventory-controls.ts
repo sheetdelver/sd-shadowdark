@@ -1,4 +1,5 @@
 import type { ItemView } from './prepared-view';
+import { isWand, wandRestUpdates } from './wands';
 
 /**
  * Inventory state controls for an owned Item, following native 4.0.6
@@ -16,7 +17,7 @@ import type { ItemView } from './prepared-view';
  *   scene light, chat card and the light tracker are not run by SheetDelver.
  */
 export interface ItemWrite { itemId: string; patch: Record<string, unknown> }
-export interface ItemControl { id: 'equip' | 'stash' | 'light'; label: string; pressed: boolean; writes: ItemWrite[]; title?: string }
+export interface ItemControl { id: 'equip' | 'stash' | 'light' | 'restore-wand'; label: string; pressed: boolean; writes: ItemWrite[]; title?: string }
 
 const idOf = (item: any) => String(item?._id ?? item?.id ?? '');
 
@@ -27,7 +28,11 @@ export function itemControls(items: ItemView[], sourceItems: any[], itemId: stri
     const controls: ItemControl[] = [];
     const name = item.name ?? 'item';
 
-    if (item.type === 'Weapon' || item.type === 'Armor') {
+    const rest = wandRestUpdates(item);
+    if (rest) controls.push({ id: 'restore-wand', label: `Restore ${name} after a full rest`, pressed: false,
+        writes: [{itemId, patch: rest}], title: 'Restore lost wand spells after completing a full rest. This does not repair a broken wand.' });
+
+    if ((item.type === 'Weapon' && !isWand(item)) || item.type === 'Armor') {
         const equipping = !view.equipped;
         const writes: ItemWrite[] = [{ itemId, patch: { 'system.equipped': equipping, 'system.stashed': false } }];
         if (equipping && item.type === 'Armor' && view.propertyNames.includes('shield')) {

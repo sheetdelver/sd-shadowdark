@@ -9,6 +9,7 @@ import { documentId } from '../../logic/identity';
 import { spellReview } from '../../logic/spell-review';
 import { callerOf, contextConflict, requestRevision, requestRules, requireOwnedActor } from '../access';
 import { operationProcess, withActorLock } from '../operation-lock';
+import { rollSpellMishap, type MishapReceipt } from '../spell-mishaps';
 
 /** Native ordered operation: prerequisites → one result attempt → consequences.
  * Receipts are caller/Actor/world/request-bound. SDK writes are sequential, not
@@ -25,6 +26,8 @@ interface ActionRecord {
     head: { action: { id: string; label: string; dc: number | null }; roll: { formula: string; total: number } | null; outcome: unknown };
     writes: ConsequenceWrite[]; statuses: WriteStatus[]; warnings: string[];
     phase: Phase; prerequisiteCount: number; retryable: boolean; review: string; dependencies: string[];
+    mishap?: MishapReceipt;
+    presentation?: { speaker: Record<string, unknown>; rollMode?: string };
 }
 interface Entry { at: number; generation: number; fingerprint: string; process: string; record: ActionRecord }
 type Save = (record: ActionRecord) => Promise<void>;
@@ -43,7 +46,13 @@ function response(record: ActionRecord, replayed = false) {
         state: record.phase === 'complete' ? 'complete' : 'partial', retryable: record.retryable,
         consequences: record.writes.flatMap((write, i) => record.statuses[i].status === 'pending' ? [] : [{ ...write, ...record.statuses[i] }]),
         pending: record.writes.filter((_, i) => record.statuses[i].status === 'pending').map(write => write.description),
-        warnings: record.warnings, ...(replayed ? { replayed: true } : {}) };
+        warnings: record.warnings, ...(record.mishap ? { mishap: record.mishap } : {}), ...(replayed ? { replayed: true } : {}) };
+}
+async function finishConsequences(record: ActionRecord, actorId: string, req: ModuleServerRequest, actor: any, save: Save) {
+    if (!await applyWrites(record, actorId, req, actor, save, record.prerequisiteCount, record.writes.length)) return;
+    if (record.mishap) await rollSpellMishap(record.mishap, req, record.presentation?.speaker ?? { actor: actorId },
+        record.presentation?.rollMode, record.warnings, record.dependencies, () => save(record));
+    record.phase = 'complete';
 }
 function reflected(write: ConsequenceWrite, actor: any) {
     let target = itemFor(actor, write.itemId);
@@ -141,7 +150,7 @@ async function replay(entry: Entry, actorId: string, req: ModuleServerRequest, s
         }
         // Reconcile only the known outcome's remaining consequences. Never re-enter
         // prerequisites or the result call, even after a world-context change.
-        if (await applyWrites(record, actorId, req, actor, save, record.prerequisiteCount, record.writes.length)) record.phase = 'complete';
+        await finishConsequences(record, actorId, req, actor, save);
         await save(record);
     } else {
         if (review(actor) !== record.review) { requireReview(record, 'Actor source changed before the result. Review the actual spent/identified state.'); await save(record); }
@@ -248,9 +257,13 @@ async function execute(actorId: string, body: ActionBody, req: ModuleServerReque
         }
         if (body.focus && !action.focusAllowed) record.warnings.push('Focus is unavailable for this action. Its normal failure rules apply.');
         const writes = planConsequences(action, triggering, outcome, { focus: body.focus === true && action.focusAllowed });
+        if (outcome?.criticalFailure && action.mishap) {
+            record.mishap = { rule: action.mishap, status: 'pending' };
+            record.presentation = { speaker, rollMode: body.rollMode };
+        }
         record.writes.push(...writes); record.statuses.push(...writes.map(() => ({ status: 'pending' as const })));
         record.phase = 'consequences'; await persist(record);
-        if (await applyWrites(record, actorId, runtimeReq, fresh, persist, record.prerequisiteCount, record.writes.length)) record.phase = 'complete';
+        await finishConsequences(record, actorId, runtimeReq, fresh, persist);
         await persist(record);
     };
     continuations.set(record, continueResult);

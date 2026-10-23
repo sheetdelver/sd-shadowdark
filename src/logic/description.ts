@@ -1,12 +1,15 @@
 import { processHtmlContent } from '@sheet-delver/sdk';
+import { resolveFormula } from './formula';
 import { canonicalUuid } from './identity';
 
 /**
  * The single description presentation path. Source HTML is never rewritten:
  * this returns display HTML only. Foundry enrichers handled here are
  * `@UUID[...]{Label}` (typed reference link), `[[/r formula]]` / `[[/roll formula]]`
- * (roll button) and Shadowdark `[[check DC stat]]` (check button). The result is
- * always passed through the SDK sanitizer.
+ * with optional `{Label}` (roll button) and Shadowdark `[[check DC stat]]` (check button). The result is
+ * always passed through the SDK sanitizer. Actor-dependent formulas require
+ * explicit caller-visible roll data; unsupported/missing data never becomes zero.
+ * This is bounded rich-text enrichment, not execution of Handlebars templates.
  */
 const escapeAttribute = (value: string) => value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const escapeText = (value: string) => value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -17,7 +20,7 @@ export function descriptionSource(value: unknown): string {
     return '';
 }
 
-export function enrichDescription(raw: unknown): string {
+export function enrichDescription(raw: unknown, rollData?: unknown): string {
     let html = descriptionSource(raw);
     html = html.replace(/@UUID\[([^\]]+)\](?:\{([^}]*)\})?/g, (_match, uuid: string, label?: string) => {
         const canonical = canonicalUuid(uuid);
@@ -26,7 +29,7 @@ export function enrichDescription(raw: unknown): string {
             ? `<a class="content-link" data-link="true" data-uuid="${escapeAttribute(canonical)}">${text}</a>`
             : `<span class="content-link unresolved" title="Unsupported reference">${text}</span>`;
     });
-    html = html.replace(/\[\[(.*?)\]\]/g, (match, content: string) => {
+    html = html.replace(/\[\[(.*?)\]\](?:\{([^}]*)\})?/g, (match, content: string, label?: string) => {
         const clean = content.replace(/<[^>]*>/g, '').replace(/&amp;/g, '&').trim();
         const check = /^check\s+(\d+)\s+(str|dex|con|int|wis|cha)$/i.exec(clean);
         if (check) {
@@ -35,7 +38,10 @@ export function enrichDescription(raw: unknown): string {
         const roll = /^\/(?:r|roll)\s+(.+)$/i.exec(clean);
         if (roll) {
             const formula = roll[1].trim();
-            return `<button type="button" data-action="roll-formula" data-formula="${escapeAttribute(formula)}">roll ${escapeText(formula)}</button>`;
+            const resolved = resolveFormula(formula, rollData);
+            const text = escapeText(label?.replace(/<[^>]*>/g, '') || (resolved.ok ? `roll ${resolved.value}` : 'Roll unavailable'));
+            if (!resolved.ok) return `<span title="${escapeAttribute(resolved.reason)}">${text}</span>`;
+            return `<button type="button" data-action="roll-formula" data-formula="${escapeAttribute(String(resolved.value))}">${text}</button>`;
         }
         return match;
     });
@@ -43,15 +49,15 @@ export function enrichDescription(raw: unknown): string {
 }
 
 /** Sanitized display HTML for a description string or `{ value }` object. */
-export function presentDescription(raw: unknown, baseUrl?: string): string {
-    return String(processHtmlContent(enrichDescription(raw), baseUrl));
+export function presentDescription(raw: unknown, baseUrl?: string, rollData?: unknown): string {
+    return String(processHtmlContent(enrichDescription(raw, rollData), baseUrl));
 }
 
 /** Informational reference cards keep labels/formulas, never inline controls.
  * Sanitize first, then turn links/buttons into text containers (also covers
  * source-authored controls rather than just generated Foundry enrichers). */
-export function presentReferenceDescription(raw: unknown, baseUrl?: string): string {
-    return presentDescription(raw, baseUrl)
+export function presentReferenceDescription(raw: unknown, baseUrl?: string, rollData?: unknown): string {
+    return presentDescription(raw, baseUrl, rollData)
         .replace(/<(a|button)\b[^>]*>/gi, '<span>')
         .replace(/<\/(a|button)>/gi, '</span>')
         .replace(/<(?:input|select|textarea|form)\b[^>]*>[\s\S]*?<\/(?:select|textarea|form)>/gi, '')

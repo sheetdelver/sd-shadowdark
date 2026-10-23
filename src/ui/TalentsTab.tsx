@@ -135,7 +135,7 @@ export default function TalentsTab() {
                                     <div className="mt-2 text-sm font-serif leading-relaxed text-neutral-800">
                                         <div
                                             className="prose prose-sm max-w-none"
-                                            dangerouslySetInnerHTML={{ __html: presentDescription(item.system?.description, foundryUrl) || '<span class="italic">No description available.</span>' }}
+                                            dangerouslySetInnerHTML={{ __html: presentDescription(item.system?.description, foundryUrl, actor?.derived?.rollData) || '<span class="italic">No description available.</span>' }}
                                             onClick={handleDescriptionClick}
                                         />
                                         <button type="button" onClick={() => openCard({ kind: 'item', itemId: String(item.id ?? item._id) })}

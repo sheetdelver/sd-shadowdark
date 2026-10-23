@@ -1,11 +1,13 @@
 import { prepareActorCore, ABILITY_KEYS, type AbilityKey, type PreparationLookups, type PreparedActorCore, type PreparedItemBasics } from './actor-preparation';
-import { listActions, weaponBase, bonusLabel, type PreparedAction } from './actions';
+import { buildRoll, listActions, weaponBase, bonusLabel, type PreparedAction } from './actions';
 import { UNAVAILABLE_RULE_INPUTS, hasLuckToken, luckMode, type RuleInputs } from './world-settings';
 import type { CanonicalEffect } from './effects';
 import { documentId, formatUuid, parseUuid, type DocumentRef } from './identity';
 import { slugify } from './foundry';
 import { grantedSpellSources, prepareSpellModel } from './spell-model';
 import { languageRarity } from './languages';
+import { isScroll, scrollSpellUuid, scrollSpent } from './scrolls';
+import { isWand, wandSpells, wandBroken } from './wands';
 
 /**
  * The single module-prepared Shadowdark view, published as `derived` (with
@@ -25,6 +27,8 @@ export interface ItemView extends PreparedItemBasics {
     weapon?: { baseDamage: string | null; baseHandedness: '1h' | '2h'; damagePath: string; baseWarnings: string[] };
     spells?: Array<{ index: number; ref: DocumentRef | null; label: string | null; lost: boolean }>;
     uses?: { limited: boolean; available: number; max: number };
+    scroll?: { spent: boolean };
+    wand?: boolean;
     innate?: boolean;
     /** Spell class references with exact labels and the native slugified name. */
     spellClasses?: Array<{ ref: DocumentRef | null; label: string | null; slug: string | null }>;
@@ -104,18 +108,20 @@ export function prepareShadowdarkView(source: any, lookups: ViewLookups = {}, ru
             ...basics, img: item?.img, category: CATEGORY[basics.type] ?? 'other',
             actionIds: (byItem.get(basics.id) ?? []).map(action => action.id),
         };
-        if (basics.type === 'Weapon') {
+        if (basics.type === 'Weapon' && !isWand(item)) {
             const base = weaponBase(item, basics);
             view.weapon = { baseDamage: base.damage, baseHandedness: base.handedness, damagePath: base.damagePath, baseWarnings: base.warnings };
         }
-        if (basics.type === 'Wand') {
-            view.spells = (Array.isArray(item?.system?.spells) ? item.system.spells : []).map((entry: any, index: number) => {
+        if (isWand(item)) {
+            view.wand = true; view.category = 'magic'; view.broken = wandBroken(item);
+            view.spells = wandSpells(item).map((entry, index) => {
                 const ref = parseUuid(entry?.uuid);
                 return { index, ref, label: ref ? lookups.label?.(ref) ?? null : null, lost: entry?.lost === true };
             });
         }
-        if (basics.type === 'Scroll') {
-            const ref = parseUuid(item?.system?.spellUuid);
+        if (isScroll(item)) {
+            view.scroll = { spent: scrollSpent(item) };
+            const ref = parseUuid(scrollSpellUuid(item));
             view.spells = [{ index: 0, ref, label: ref ? lookups.label?.(ref) ?? null : null, lost: false }];
         }
         if (basics.type === 'Class Ability') {
@@ -187,6 +193,7 @@ export function prepareShadowdarkView(source: any, lookups: ViewLookups = {}, ru
         schema: VIEW_SCHEMA,
         provenance: { preparedBy: 'SheetDelver Shadowdark module', nativeRelease: '4.0.6', nativeBrowserPrepared: false },
         kind: core.kind,
+        rollData: buildRoll(core),
         level: core.level,
         abilities,
         hp: core.hp,
@@ -198,7 +205,7 @@ export function prepareShadowdarkView(source: any, lookups: ViewLookups = {}, ru
         spellcastingAbility: null,
         isSpellcaster,
         canUseMagicItems,
-        showSpellsTab: isSpellcaster || canUseMagicItems || items.some(item => ['Spell', 'Scroll', 'Wand'].includes(item.type)),
+        showSpellsTab: isSpellcaster || canUseMagicItems || items.some(item => item.type === 'Spell' || isScroll(item) || isWand(item)),
         spellModel: prepareSpellModel(source, core, lookups),
         maxSlots: core.maxSlots,
         gearSlots: core.maxSlots,

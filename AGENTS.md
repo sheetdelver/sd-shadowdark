@@ -414,3 +414,74 @@ SDK3.5.0/module-api1.7.0/UI3.3.0. Publish Core before running those workflows or
 releasing this module. Historical0.19.2/0.19.5 test results below/above remain
 historical; they do not certify the new manifest on the older host. No module
 version bump or release is authorized by compatibility/documentation closeout.
+
+
+### Review regression guardrails — October22
+
+Route description presentation through `logic/description.ts`, including inline
+Foundry `{Label}` metadata; keep Core sanitization last and source HTML unchanged.
+Use explicit `derived.rollData` on actor-bound consumers; never guess context for
+catalog previews or execute arbitrary templates. Shared deterministic formula
+handling serves both display and actions. See ADR0003 SD-UI17 for supported scope.
+Known spell exclusions use canonical origins, including talent/boon choices, at
+both picker and write boundaries. Preserve existing duplicate/custom copies.
+A preflight `advancementWrites: "none"` response permits correction; an unknown
+or partial write does not. Preserve the maintained recovery regressions.
+
+SD-UI16c supersedes the rejected manual missing-grant workflow of SD-UI16b.
+Never merge fixed-grant entitlement into owned-spell identity. Creation/advancement
+must include actual granted Spell Items. Existing owner sheets automatically POST
+missing fixed grants, then refresh actual ownership/casting rows. The read-only
+view and observers never write. Fixed grants cannot be manually selected again;
+ordinary/choice grants keep their existing rules. Reuse exact native mappings,
+caller-readable sources, Actor queue, context fences and durable actor-wide
+receipts. Unknown creates never authorize a replacement. This selected fixed-grant
+fulfillment does not authorize effect-key migrations or general Actor repair.
+
+
+SD-UI16d extends the choice-grant workflow. Use the exact-source shared policy in
+`logic/spell-grants.ts`, including the independent grant matcher; do not infer
+spell lists from talent names. Preserve saved grant source/casting Class/level
+metadata, quota exemption and noncaster casting permission without granting an
+ordinary progression table. Shune uses the user-approved acquisition-level floor,
+minimum tier1; keep [SheetDelver handling](docs/rules/spell-grants.md) authoritative
+for that interpretation. Historical unknown spell choices are not inferred.
+
+SD-UI18 requires end-to-end coverage for every required talent target: native
+table result, mounted picker, submitted request, final validation and saved
+effects. Keep the four native placeholder templates enumerated in creation tests;
+fixed Magic Missile Advantage is already resolved. Stat distributions use shared
+`logic/stat-choices.ts` rules and one allocation per independent grant, never a
+global pool copied into every Talent. Preserve repeated native +1/+2 grants and
+the Warlock distinct-stat restriction. Test both creation and existing-Actor
+advancement, including correction after a zero-write validation failure. Keep
+[talent handling](docs/rules/talent-choices.md) and audit SD-UI18 current.
+
+SD-UI20 deliberately retains spent scroll Items instead of native automatic
+deletion. Reuse `logic/scrolls.ts` for modern and legacy Basic scrolls. Historical
+Gear Add dropped provenance: only the two complete native content signatures
+qualify for the source-less fallback. Never infer capability from names alone or
+arbitrary description links. New gear copies must preserve exact origin, effects
+and flags through `ownedCopy`; regress the actual Add callback payload, not just
+hand-authored owned fixtures. The caller-bound
+action route persists the spent flag before the result using existing receipts.
+All spell/card consumers must reject reuse; inventory retains manual discard.
+Keep [scroll handling](docs/rules/scrolls.md) explicit about this module policy and
+its boundary with native Foundry UI behavior.
+
+SD-UI21 retains the user-verified core p49 caster/list restriction; visibility
+does not imply casting permission. Shared spell actions resolve exact supported
+mishap traditions/tier tables and persist their follow-up dispatch in the original
+action receipt. Never reroll a cast or an uncertain mishap on retry. Wizard and
+Magical Dabbler rules do not supply Witch Diabolical tables or Priest/Seer penance.
+Missing tables require an explicit warning, not a guessed replacement. Table
+instructions/effects remain manual. Keep scroll spending, wand lost spells and
+wand breakage distinct; clearing lost entries never repairs a broken wand.
+
+SD-UI22: do not infer wand capability from stored type alone. Native Blind/Deafen
+is Weapon; Unlife/Warding are Basic. Use logic/wands.ts across lookups, actions,
+cards and controls. Legacy recognition requires exact origin or complete native
+signature without conflicting origin, never name alone. Preserve types; write
+legacy loss/breakage to module flags, modern state to native fields. Restore after
+rest must never repair broken wands. Include actual native legacy templates and
+historical source-less Gear Add copies in regressions. Curse prose stays manual.

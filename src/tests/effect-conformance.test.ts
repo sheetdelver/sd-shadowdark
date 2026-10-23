@@ -7,7 +7,7 @@ import { nativeKeyMigration } from '../logic/legacy-effect-keys';
 import { NATIVE_PREDEFINED_EFFECTS, NATIVE_REJECTED_PREDEFINED } from '../data/native-predefined-effects';
 import { prepareShadowdarkView } from '../logic/prepared-view';
 import { prepareActorCore } from '../logic/actor-preparation';
-import { hitPointRollFormula } from '../logic/actions';
+import { hitPointRollFormula, prepareRequestedAction } from '../logic/actions';
 import { modeToType } from '../logic/foundry';
 import { TALENT_HANDLERS } from '../logic/talent-handlers';
 import { TALENT_EFFECTS_MAP } from '../data/talent-effects';
@@ -198,6 +198,42 @@ check('EC-3', 'the pre-4.0 note is attached to the effect shown on the Effects t
     const carrier = v.effects.find((effect: any) => effect.name === 'Carrier');
     assert.match(carrier.diagnostics.join(' '), /con\.bonus: pre-4\.0 key; native Shadowdark 4\.0\.6 ignores it\. Its 4\.0 equivalent is system\.abilities\.con\.value = "2"/);
 });
+if (haveNative) for (const shape of ['legacy', 'v14'] as const) {
+    check('EC-3', `[${shape}] native Destined references resolve after its later die effect, including upgrades`, () => {
+        const pack = join(nativeRoot, 'data/packs/talents.db');
+        const talent = JSON.parse(readFileSync(join(pack, 'destined__Az2fXCwgo5C3x2X7.json'), 'utf8'));
+        const files = readdirSync(pack).map(file => JSON.parse(readFileSync(join(pack, file), 'utf8')));
+        talent.effects = talent.effects.map((id: string) => {
+            const effect = files.find(doc => doc._id === id);
+            return { ...effect, ...effectOf(effect.changes, shape, effect.name), _id: id };
+        });
+        const actor: any = probeActor([], shape); actor.items.push(talent);
+        const original = structuredClone(actor);
+        for (const upgraded of [false, true]) {
+            const source = structuredClone(actor);
+            if (upgraded) source.items.push({ _id: 'upgrade', type: 'Talent', name: 'Upgrade Destined Die', system: {},
+                effects: [effectOf([{ key: 'system.bonus.destineddie', mode: 2, value: '2' }], shape)] });
+            const core = prepareActorCore(source, lookups);
+            assert.equal(core.effective.bonus.destineddie, upgraded ? 8 : 6);
+            assert.equal(core.effects.flatMap(effect => effect.diagnostics).filter(note => note.includes('@bonus.destineddie')).length, 0);
+            assert.equal(core.diagnostics.filter(note => note.includes('@bonus.destineddie')).length, 0);
+            const selected = core.effects.filter(effect => effect.situational).map(effect => effect.ref);
+            for (const request of [{ kind: 'check', stat: 'str' }, { kind: 'attack', itemId: 'ls' }, { kind: 'spell', itemId: 'mm' }] as const) {
+                const base = prepareRequestedAction(core, source, lookups, request)!;
+                const action = prepareRequestedAction(core, source, lookups, { ...request, selected })!;
+                assert.ok(String(action.bonus).includes(upgraded ? 'd8' : 'd6'), String(action.bonus));
+                assert.ok(!String(base.bonus).includes('d6'), String(base.bonus));
+                if (request.kind !== 'check') assert.ok(String(action.damage?.formula).includes(upgraded ? '+d8' : '+d6'), String(action.damage?.formula));
+                assert.ok(!action.diagnostics.some(note => note.includes('@bonus.destineddie')));
+            }
+        }
+        assert.deepEqual(actor, original);
+        // Disabling the actual supplier must still report a real missing value.
+        talent.effects.find((effect: any) => effect.name === 'Destined Die').disabled = true;
+        const missing = prepareActorCore(actor, lookups);
+        assert.ok(missing.effects.find(effect => effect.name === 'Destined')?.diagnostics.some(note => note.includes('@bonus.destineddie')));
+    });
+}
 check('EC-3', 'HP Roll Advantage turns the level-up hit die into 2dNkh (LevelUpSD + dice.applyAdvantage)', () => {
     const source = probeActor([{ key: 'system.roll.hp.advantage', mode: 2, value: '1' }], 'v14');
     assert.equal(hitPointRollFormula(prepareActorCore(source, lookups), '1d8').formula, '2d8kh');

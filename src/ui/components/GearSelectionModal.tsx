@@ -5,6 +5,7 @@ import { useSDK } from '@sheet-delver/sdk/react';
 import { useShadowdarkUI, useShadowdarkCollections } from '../context/ShadowdarkUIContext';
 import { CollectionStatus } from './CollectionStatus';
 import { presentDescription } from '../../logic/description';
+import { ownedCopy } from '../../logic/identity';
 
 interface GearSelectionModalProps {
     isOpen: boolean;
@@ -135,19 +136,8 @@ export default function GearSelectionModal({ isOpen, onClose, onCreate }: GearSe
 
     const handleAdd = async (item: any) => {
         if (!data.ready) return;
-        // Clone item data to create a new instance
-        const newItemData = {
-            name: item.name,
-            type: item.type,
-            img: item.img,
-            system: JSON.parse(JSON.stringify(item.system || {}))
-        };
-
-        // Reset specific fields for a new distinct item
-        // newItemData.system.equipped = false; // Usually false by default
-        // newItemData.system.stashed = false;
-
-        await onCreate(newItemData);
+        // Preserve exact source identity, effects and flags on the owned copy.
+        await onCreate(ownedCopy(item));
         // Optional: show toast or feedback
     };
 

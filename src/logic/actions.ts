@@ -1,3 +1,7 @@
+import { ownedSpellGrant } from './spell-grants';
+import { spellMishap, type SpellMishap } from './spell-mishaps';
+import { isScroll, scrollSpellUuid, scrollSpent, SCROLL_SPENT_PATH } from './scrolls';
+import { isWand, wandSpells, wandBroken, wandFailureUpdates } from './wands';
 import { ABILITY_KEYS, rollKeyItem, type AbilityKey, type PreparedActorCore, type PreparationLookups, type PreparedItemBasics } from './actor-preparation';
 import { finiteNumber, slugify } from './foundry';
 import { formatBonus, resolveFormula } from './formula';
@@ -60,6 +64,8 @@ export interface PreparedAction {
     consequences: ActionConsequence[];
     /** Only native Player owned-spell focus checks exempt failure from loss. */
     focusAllowed: boolean;
+    /** Table belonging to the selected casting tradition; never a generic Wizard fallback. */
+    mishap?: SpellMishap;
     diagnostics: string[];
     request: ActionRequest;
 }
@@ -274,7 +280,7 @@ export function prepareNpcAttackAction(core: PreparedActorCore, item: any): Prep
     return action;
 }
 
-const buildRoll = (core: PreparedActorCore) => ({
+export const buildRoll = (core: PreparedActorCore) => ({
     ...core.effective,
     abilities: Object.fromEntries(ABILITY_KEYS.map(key => [key, { ...(core.effective.abilities?.[key] ?? {}), ...core.abilities[key] }])),
 });
@@ -308,12 +314,12 @@ export function spellSources(item: any, lookups: PreparationLookups): SpellSourc
         const ref = parseUuid(value);
         return { ref, spell: ref ? lookups.spellDocument?.(ref) ?? null : null };
     };
-    if (item?.type === 'Scroll') {
-        const { ref, spell } = resolve(system.spellUuid);
+    if (isScroll(item)) {
+        const { ref, spell } = resolve(scrollSpellUuid(item));
         return [{ spell, ref, itemId: null, lost: false, index: 0 }];
     }
-    if (item?.type === 'Wand') {
-        return (Array.isArray(system.spells) ? system.spells : []).map((entry: any, index: number) => {
+    if (isWand(item)) {
+        return wandSpells(item).map((entry, index) => {
             const { ref, spell } = resolve(entry?.uuid);
             return { spell, ref, itemId: null, lost: entry?.lost === true, index };
         });
@@ -322,7 +328,7 @@ export function spellSources(item: any, lookups: PreparationLookups): SpellSourc
 }
 
 /** PlayerSD._getSpellcastingAbility over declared class documents. */
-function spellcastingAbility(core: PreparedActorCore, spell: any, viaItem: boolean, lookups: PreparationLookups, ownedClasses: any[]): { ability: AbilityKey | null; reason: string | null } {
+function spellcastingAbility(core: PreparedActorCore, spell: any, viaItem: boolean, lookups: PreparationLookups, ownedClasses: any[]): { ability: AbilityKey | null; reason: string | null; classUuid?: string } {
     const spellcasting = core.spellcasting as { classes: string[]; allowAllItems: boolean; itemAbility: string };
     if (viaItem && spellcasting.itemAbility) return { ability: spellcasting.itemAbility as AbilityKey, reason: null };
     const classRefs: unknown[] = Array.isArray(spell?.system?.class) ? spell.system.class : [];
@@ -335,7 +341,7 @@ function spellcastingAbility(core: PreparedActorCore, spell: any, viaItem: boole
         const doc = lookups.classDocument?.(ref) ?? null;
         if (!doc) { unresolved.push(formatUuid(ref)); return []; }
         const ability = doc.system?.spellcasting?.ability;
-        return ability ? [{ name: slugify(doc.name ?? ''), ability: ability as AbilityKey }] : [];
+        return ability ? [{ name: slugify(doc.name ?? ''), ability: ability as AbilityKey, classUuid: formatUuid(sourceRef(doc) ?? ref) }] : [];
     });
     if (!classes.length) {
         return { ability: null, reason: unresolved.length
@@ -346,11 +352,11 @@ function spellcastingAbility(core: PreparedActorCore, spell: any, viaItem: boole
     if (!allowAll) {
         classes = classes.filter(entry => spellcasting.classes.includes(entry.name));
         if (!classes.length) return { ability: null, reason: 'The spell’s Class does not match this Actor’s active casting grant.' };
-        if (classes.length === 1) return { ability: classes[0].ability, reason: null };
+        if (classes.length === 1) return { ability: classes[0].ability, reason: null, classUuid: classes[0].classUuid };
     }
     let best = classes[0];
     for (const entry of classes) if ((core.abilities[entry.ability]?.mod ?? -99) > (core.abilities[best.ability]?.mod ?? -99)) best = entry;
-    return { ability: best.ability, reason: null };
+    return { ability: best.ability, reason: null, classUuid: best.classUuid };
 }
 
 export function prepareSpellAction(core: PreparedActorCore, triggering: any, source: SpellSource, lookups: PreparationLookups,
@@ -362,17 +368,18 @@ export function prepareSpellAction(core: PreparedActorCore, triggering: any, sou
     const action = empty('spell', `spell:${itemId}${source.index !== null ? `:${source.index}` : ''}`, full, `Cast ${name}`, itemId);
     const tier = finiteNumber(spell?.system?.tier) ?? (finiteNumber(spell?.system?.dc) !== null ? Number(spell.system.dc) - 10 : null);
     action.spell = { ref: source.ref, itemId: source.itemId, name, tier, index: source.index };
+    action.dc = tier !== null ? tier + 10 : null;
+    if (scrollSpent(triggering)) return unavailable(action, 'This scroll is spent. Discard it when ready.');
     if (!spell) {
         return unavailable(action, source.ref
             ? `Spell ${formatUuid(source.ref)} is not available from declared Shadowdark data.`
             : 'This item has no linked spell.');
     }
-    action.dc = tier !== null ? tier + 10 : null;
     if (action.dc === null) action.diagnostics.push('The spell has no tier, so its DC is unavailable.');
     const triggerType = triggering?.type;
     action.focusAllowed = core.kind === 'Player' && triggerType === 'Spell' && spell.system?.duration?.type === 'focus';
-    if (triggerType === 'Wand' && triggering?.system?.broken) return unavailable(action, 'The wand is broken.');
-    if (spell.system?.lost === true || source.lost) unavailable(action, 'The spell is lost.');
+    if (isWand(triggering) && wandBroken(triggering)) return unavailable(action, 'The wand is broken.');
+    if (spell.system?.lost === true || source.lost) unavailable(action, isWand(triggering) ? 'This wand spell is lost until a full rest.' : 'The spell is lost.');
     const rollData = buildRoll(core);
     const keyItem: RollKeyItem = { id: source.itemId ?? itemId, name: spell.name ?? '', propertyNames: [] };
     const config = { selected: request.selected, thisItemId: itemId };
@@ -400,9 +407,19 @@ export function prepareSpellAction(core: PreparedActorCore, triggering: any, sou
     if (triggerType !== 'Spell' && spellcasting.allowAllItems) canCast = true;
     if (!canCast) return unavailable(action, 'Missing casting grant: this character is not a spellcaster; no active effect grants a casting class.');
     const owned = ownedItems.filter(entry => entry?.type === 'Class');
-    const casting = spellcastingAbility(core, spell, true, lookups, owned);
+    const grant = triggerType === 'Spell' ? ownedSpellGrant(triggering, ownedItems) : null;
+    // A saved choice retains the casting class of its granting talent/boon.
+    // In particular, Shune explicitly uses INT, even on a shared spell list.
+    const grantRef = grant ? parseUuid(grant.classUuid) : null;
+    const grantAbility = grantRef ? lookups.classDocument?.(grantRef)?.system?.spellcasting?.ability : null;
+    const casting = grant ? { ability: ABILITY_KEYS.includes(grantAbility) ? grantAbility as AbilityKey : null,
+        reason: 'The granted spell’s casting Class is unavailable.', classUuid: grant.classUuid }
+        : spellcastingAbility(core, spell, true, lookups, owned);
     if (!casting.ability) return unavailable(action, casting.reason ?? 'Unable to determine the casting ability.');
     action.ability = casting.ability;
+    action.mishap = spellMishap(casting.classUuid ?? null, tier,
+        triggerType !== 'Spell' && !!(core.spellcasting as { itemAbility?: string }).itemAbility, ownedItems);
+    if (action.mishap) action.consequences.push({ when: 'critical-failure', description: `A critical failure requires a ${action.mishap.label.toLowerCase()} roll.` });
     if (formula && damageType !== 'none') {
         action.damage = damageConfig(core, rollData, 'spell', formula, keyItem, action, config);
         if (damageType === 'healing') action.damage.label = 'Healing';
@@ -416,9 +433,9 @@ export function prepareSpellAction(core: PreparedActorCore, triggering: any, sou
     action.advantage = numericKey(advantage, 'advantage') ?? 0;
     criticalConfig(core, rollData, 'spell', keyItem, action, config);
     if (triggerType === 'Spell') action.consequences.push({ when: 'failure', description: action.focusAllowed ? 'On failure the spell is lost unless this is a focus check.' : 'On failure the spell is lost.' });
-    else if (triggerType === 'Scroll') action.consequences.push({ when: 'always', description: 'The scroll is consumed whatever the result.' });
-    else if (triggerType === 'Wand') {
-        action.consequences.push({ when: 'failure', description: 'On failure this wand spell is lost.' });
+    else if (isScroll(triggering)) action.consequences.push({ when: 'always', description: 'Casting spends the scroll, whatever the result. It stays in inventory until discarded.' });
+    else if (isWand(triggering)) {
+        action.consequences.push({ when: 'failure', description: 'On failure this wand spell is unavailable until a full rest.' });
         action.consequences.push({ when: 'critical-failure', description: 'A critical failure also breaks the wand.' });
     }
     return action;
@@ -476,13 +493,13 @@ export function listActions(core: PreparedActorCore, source: any, lookups: Prepa
     const items: any[] = Array.isArray(source?.items) ? source.items : [];
     const actions: PreparedAction[] = ABILITY_KEYS.map(stat => prepareCheckAction(core, stat));
     for (const item of items) {
-        if (item?.type === 'Weapon' && core.kind === 'Player') {
+        if (item?.type === 'Weapon' && !isWand(item) && core.kind === 'Player') {
             for (const mode of weaponAttackModes(core, item)) {
                 actions.push(prepareWeaponAction(core, item, { attackType: mode.attackType, handedness: mode.handedness }));
             }
         } else if ((item?.type === 'NPC Attack' || item?.type === 'NPC Special Attack') && core.kind === 'NPC') {
             actions.push(prepareNpcAttackAction(core, item));
-        } else if (['Spell', 'Scroll', 'Wand'].includes(item?.type)) {
+        } else if (item?.type === 'Spell' || isWand(item) || isScroll(item)) {
             for (const source of spellSources(item, lookups)) actions.push(prepareSpellAction(core, item, source, lookups, items));
         } else if (item?.type === 'Class Ability') {
             actions.push(prepareAbilityAction(core, item));
@@ -500,7 +517,7 @@ export function prepareRequestedAction(core: PreparedActorCore, source: any, loo
     const item = items.find(entry => String(entry?._id ?? entry?.id ?? '') === request.itemId);
     if (!item) return null;
     if (request.kind === 'attack') {
-        if (item.type === 'Weapon') return prepareWeaponAction(core, item, request);
+        if (item.type === 'Weapon' && !isWand(item)) return prepareWeaponAction(core, item, request);
         if (item.type === 'NPC Attack' || item.type === 'NPC Special Attack') return prepareNpcAttackAction(core, item);
         return null;
     }
@@ -559,6 +576,10 @@ export interface ConsequenceWrite {
 /** Native useAbility/usePotion prerequisite writes, before roll or chat. */
 export function planPrerequisites(action: PreparedAction, triggering: any): ConsequenceWrite[] {
     if (!action.itemId) return [];
+    // Persist consumption before the result attempt so another request cannot
+    // reuse a scroll after a lost roll response. The existing receipt owns retry.
+    if (action.kind === 'spell' && isScroll(triggering)) return [{ op: 'update', itemId: action.itemId,
+        updates: { [SCROLL_SPENT_PATH]: true }, description: `${triggering.name} is spent and remains in inventory.` }];
     if (action.kind === 'ability' && triggering?.system?.limitedUses === true) return [{ op: 'update', itemId: action.itemId,
         updates: { 'system.uses.available': Math.max(0, Number(triggering.system.uses.available) - 1) }, description: `${triggering.name}: spend one use before the result.` }];
     if (action.kind !== 'potion' || triggering?.system?.identification?.identified !== false) return [];
@@ -584,13 +605,9 @@ export function planConsequences(action: PreparedAction, triggering: any, outcom
     if (action.kind === 'spell') {
         if (triggering?.type === 'Spell') {
             if (outcome?.success === false && !(options.focus && action.focusAllowed)) writes.push({ op: 'update', itemId, updates: { 'system.lost': true }, description: `${action.spell?.name} is lost.` });
-        } else if (triggering?.type === 'Scroll') {
-            writes.push({ op: 'delete', itemId, description: `${triggering.name} is consumed.` });
-        } else if (triggering?.type === 'Wand' && outcome?.success === false) {
-            const spells = (Array.isArray(triggering.system?.spells) ? triggering.system.spells : []).map((entry: any) => ({ ...entry }));
-            if (action.spell?.index !== null && action.spell?.index !== undefined && spells[action.spell.index]) spells[action.spell.index].lost = true;
+        } else if (isWand(triggering) && (outcome?.success === false || outcome?.criticalFailure)) {
             // WandSD.setSpellLost writes broken: criticalFailure.
-            writes.push({ op: 'update', itemId, updates: { 'system.spells': spells, 'system.broken': outcome.criticalFailure },
+            writes.push({ op: 'update', itemId, updates: wandFailureUpdates(triggering, action.spell?.index ?? 0, outcome.criticalFailure),
                 description: outcome.criticalFailure ? `${action.spell?.name} is lost and ${triggering.name} breaks.` : `${action.spell?.name} is lost from ${triggering.name}.` });
         }
     }

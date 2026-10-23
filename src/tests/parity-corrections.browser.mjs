@@ -37,7 +37,7 @@ fetchWithAuth:async(url,options={})=>{window.calls.push({url,headers:options.hea
 window.actorContext={actor:window.initial.actor,rollDialog:{open:false},refreshActor:async()=>{},isActionBusy:()=>false};
 const app=createRoot(document.getElementById('root'));
 function Form(props){if(window.initial.actualModal)return <LevelUpModal {...props}/>;const {state,actions}=useLevelUp({...props,skipLanguageSelection:true});window.confirm=()=>actions.handleConfirm();return <><button onClick={()=>actions.handleConfirm()}>Confirm advancement</button><output>{state.error}</output>{state.operation&&<AdvancementRecovery operation={state.operation} busy={state.isSubmitting} refresh={actions.refreshOperation} resume={actions.handleConfirm} onClose={props.onCancel}/>}</>;}
-function Advancement(){const flow=useShadowdarkLevelUp(window.actorContext.actor,window.sdk.addNotification);return <><button onClick={flow.triggerLevelUp}>Open advancement</button>{flow.showLevelUpModal&&<section aria-label="Advancement dialog"><Form actorId="actor" {...flow.levelUpData} onComplete={result=>{window.completions.push(result);window.sdk.addNotification('Authoritatively complete','success');flow.closeLevelUp();}} onCancel={flow.closeLevelUp}/></section>}</>;}
+function Advancement(){const flow=useShadowdarkLevelUp(window.actorContext.actor,window.sdk.addNotification);return <><button onClick={flow.triggerLevelUp}>Open advancement</button>{flow.showLevelUpModal&&<section aria-label="Advancement dialog"><Form actorId={window.initial.newCharacter?'new':'actor'} {...flow.levelUpData} onComplete={result=>{window.completions.push(result);window.sdk.addNotification('Authoritatively complete','success');flow.closeLevelUp();}} onCancel={flow.closeLevelUp}/></section>}</>;}
 window.render=()=>app.render(<ShadowdarkUIProvider>{window.initial.which==='advance'?<Advancement/>:<Spells/>}</ShadowdarkUIProvider>);
 window.setActor=actor=>{window.actorContext.actor=actor;window.render()};
 window.answer=(index,result,status=200)=>window.pending[index](Response.json(result,{status}));window.render();
@@ -60,6 +60,23 @@ next.items=[{_id:'ownedA',type:'Spell',name:'Owned List A',system:{tier:1,class:
 next.derived.spellModel={sources:[{classUuid:'Item.class',listUuid:A,name:'Wizard',grant:'wizard',limits:{1:{status:'known',value:3}}}],owned:[{itemId:'ownedA',name:'Owned List A',tier:1,classes:[A],classification:'ordinary',innate:false},{itemId:'ownedB',name:'Owned List B',tier:1,classes:[B],classification:'ordinary',innate:false}]};return next;}
 async function openManager(p){await p.getByRole('button',{name:/TIER 1/}).click();await p.getByRole('button',{name:'Add List A new',exact:true}).waitFor();}
 try{
+await test('SD-UI15 creation validation stays editable without a fictitious recovery record',{which:'advance',actor,newCharacter:true},async p=>{
+ await p.getByRole('button',{name:'Open advancement'}).click();await p.getByRole('button',{name:'Confirm advancement'}).click();await p.waitForFunction(()=>window.pending.length===1);
+ await p.evaluate(()=>window.answer(0,{error:{code:'validation',message:'Choose two ordinary spells; Turn Undead is already granted.'}},400));
+ await p.getByText('Choose two ordinary spells; Turn Undead is already granted.',{exact:true}).waitFor();
+ assert.equal(await p.getByRole('region',{name:'Advancement recovery'}).count(),0);
+ assert.deepEqual(await p.evaluate(()=>window.completions),[]);
+ await p.getByRole('button',{name:'Confirm advancement'}).click();await p.waitForFunction(()=>window.pending.length===2);
+ await p.evaluate(()=>window.answer(1,{success:true,items:[],hpRoll:3}));await p.waitForFunction(()=>window.completions.length===1);
+});
+await test('SD-UI15 explicit no-write rejection allows a fresh corrected request',{which:'advance',actor},async p=>{
+ await p.getByRole('button',{name:'Open advancement'}).click();await p.getByRole('button',{name:'Confirm advancement'}).click();await p.waitForFunction(()=>window.pending.length===1);
+ await p.evaluate(()=>window.answer(0,{error:'Choose a different spell.',advancementWrites:'none'},400));
+ await p.getByText('Choose a different spell.',{exact:true}).waitFor();assert.equal(await p.getByRole('region',{name:'Advancement recovery'}).count(),0);
+ await p.getByRole('button',{name:'Confirm advancement'}).click();await p.waitForFunction(()=>window.pending.length===2);
+ const calls=await p.evaluate(()=>window.calls.filter(c=>c.url.endsWith('/finalize')).map(c=>c.body));assert.notEqual(calls[0].requestId,calls[1].requestId);
+ await p.evaluate(()=>window.answer(1,{success:true,state:'complete',items:[],hpRoll:3}));await p.waitForFunction(()=>window.completions.length===1);
+});
 await test('R1 Actor target-level event cannot announce completion before final operation response',{which:'advance',actor},async p=>{
  await p.getByRole('button',{name:'Open advancement'}).click();await p.getByRole('button',{name:'Confirm advancement'}).click();await p.waitForFunction(()=>window.pending.length===1);
  const body=await p.evaluate(()=>window.calls.find(c=>c.url.endsWith('/finalize')).body);

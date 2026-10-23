@@ -242,6 +242,10 @@ raw items, effects and reference fields stay as Foundry stored them.
 - `logic/roll-keys.ts` ports `_getActiveEffectKeys` for `system.roll.*` selectors
   (ADD, then MULTIPLY, then OVERRIDE). Situational effects are listed as options;
   the roll UI does not select them yet.
+  Reference diagnostics for these selectors use completed Actor roll data, just
+  as action preparation does. A later effect may supply the referenced value
+  (for example, Destined Die). Initial/final application order is unchanged;
+  genuinely missing references still appear on their Effects rows.
 - `logic/identity.ts` parses exact UUIDs. Views carry structured references
   (`{ kind, pack, documentType, id }`) with prepared labels. Core 0.19 keeps
   canonical source strings in Actor responses and adds a separate,
@@ -823,3 +827,128 @@ Core's final ADR0070 design applies the same canvas through SDK SurfaceHost to
 module actor pages and tools. The player layout also hosts dashboard, combat and
 future routes with one image loader and shared viewport-fixed CSS. Modules may
 configure the documented fallback color; no module background hook is needed.
+
+
+### October22 review corrections (ADR0003)
+
+`knownSpellSources` compares canonical owned origins independently of casting
+lists and grant types. Management and advancement validate against it before
+writes; catalog UI disables the matching source without hiding it or deleting
+existing copies. `grantedSpellSources` additionally accepts exact planned talent
+references for first-level preparation. It does not infer grants from class names.
+
+`languageInventorySections` uses `allocateLanguageInventory` to reserve selected
+languages in other categories before reporting each category's capacity. Mixed
+class/ancestry pools are shared, not two independent quotas.
+
+Descriptions use `presentDescription(raw, baseUrl?, rollData?)` everywhere they
+are presented, with `presentReferenceDescription` removing controls from reference
+views. Optional inline labels are display text, never executable markup.
+`derived.rollData` comes from the same effective Actor model used by actions;
+owned cards, inventory, talents and the spell picker pass it explicitly. Catalogs
+have no implicit Actor. Deterministic parenthetical dice counts are bounded to
+0–1000 and use the existing arithmetic parser. Missing references never become
+zero. Rendering never rolls dice or changes source descriptions. Core's SDK
+sanitizer remains the final HTML boundary; source editors retain original markup.
+See ADR0003 for the limits and potential future generic SDK extraction.
+
+Advancement preflight errors may return `advancementWrites: "none"` in their JSON
+body. This module-local field is emitted only while no original operation exists
+and before invoking write orchestration. The mounted form may discard that rejected
+submission and let the player correct choices. It never infers this state from
+an error status or absent response; potentially persisted operations keep recovery.
+
+
+SD-UI16c supersedes SD-UI16b's manual missing-grant addition. `knownSpellSources`
+means actual owned Spell Items; `grantedSpellSources` means exact fixed native
+entitlement. `server/spell-grants.ts` resolves missing fixed Spells as caller-readable
+source copies. `assembleFinalItems` includes them in creation/advancement plans,
+so the original writer/receipts own those writes. Choice-based talent/boon spells
+still use the selected native choice; no choice is invented.
+
+For existing characters, read-only `actors/:id/view` exposes `spellGrants` with
+`missing` and owner-only `canApply`. ActorPage's `useAutomaticSpellGrants` issues
+`POST actors/:id/spells/grants` when needed, and refreshes the actual source. This
+uses no polling and does nothing for complete inventories or observer sheets.
+The route computes grants server-side, serializes with Actor operations, refuses
+unfinished advancement from any caller, rechecks source/context/ownership and
+persists per-Actor/source write-ahead receipts across callers and reloads. Unknown
+create outcomes never authorize a replacement; a visible failure offers retry,
+which reuses that durable fence. The queue is process-local, not distributed CAS.
+No background bootstrap or migration writes are added. Source filters and ordinary
+quotas do not suppress a fixed entitlement; compendium read access still applies.
+
+The picker disables fixed grants even before automatic completion, showing
+“Granted automatically”. Actual saved Items appear in Known spells with casting
+actions; fixed grants do not consume ordinary slots. Ordinary management refuses
+manual fixed-grant additions and duplicate owned origins across every class list.
+
+
+### Talent and boon spell choices (SD-UI16d)
+
+The shared `logic/spell-grants.ts` registry identifies native fixed and choice
+grants by exact source identity. The picker and final writer use the same list,
+tier and independent-choice matcher. Saved bonus Spells carry
+`flags.shadowdark.spellGrant` (grant source, casting Class, acquisition level),
+which the common prepared model uses for quota exemption and casting ability.
+Caller lookups resolve grant Classes through the same readable-document boundary.
+Additional casting permission never borrows another Class's progression table.
+Native source effects remain unchanged. See [SheetDelver spell-grant handling](rules/spell-grants.md)
+for the published-rule boundary, approved Shune rounding and historical limits.
+
+### Effect targets and stat distributions (SD-UI18)
+
+`logic/talent-choices.ts` identifies weapon, armor and pending spell effect
+targets. The creation/advancement UI collects each selection, and the shared
+final assembler validates it against caller-readable catalogs or owned/planned
+Spells before resolving native effects. Fixed spell targets require no picker.
+`logic/stat-choices.ts` supplies distribution limits to UI and server; ordered
+`statChoices` retain independent allocations. Repeated rolled native source
+templates remain independent grants. Final creation and existing-Actor paths
+share validation; receipt/replay handling is unchanged. See
+[talent choice handling](rules/talent-choices.md) for supported rules and limits.
+
+### Legacy scroll sources and spent state (SD-UI20)
+
+`logic/scrolls.ts` is the shared capability/identity policy for modern Scrolls and
+the two exact-origin native Basic scrolls. Caller lookups resolve their explicit
+spell references; preparation publishes linked actions and `ItemView.scroll.spent`.
+The Spells tab consumes prepared item actions instead of filtering only by stored
+Scroll/Wand type. Inventory/cards/list share the spent state.
+
+Historical Gear Add copies lost origins. A bounded compatibility check recognizes
+only complete native name/artwork/description signatures for those two source-less
+Basic magic Items, without manufacturing source metadata. Conflicting origins
+and partial matches are excluded. Gear Add now uses `ownedCopy` to preserve full
+Item data and exact provenance on future additions.
+
+Scroll casting persists a module-owned spent flag through the existing action
+prerequisite/receipt path before attempting the result. It retains the Item and
+server validation blocks new casts. This user-selected departure from native
+deletion is documented in [scroll handling](rules/scrolls.md). Native UI, Potion
+and Wand behavior are unchanged; no Core contract or migration is introduced.
+
+### Spellcasting mishaps (SD-UI21)
+
+`logic/spell-mishaps.ts` maps exact supported casting Class/Talent identities to
+the appropriate native tier table. Prepared actions carry a structured table
+reference, shared by ordinary spell and item casting. `server/spell-mishaps.ts`
+uses caller-readable table data and Core dice/chat after casting consequences.
+The action receipt records dispatch before rolling and retains the result;
+replays never repeat uncertain/complete mishaps. Missing Diabolical tables are
+explicit manual-resolution warnings, never a Wizard substitution. Penance and
+custom traditions are not inferred from names. Table result instructions and
+effects remain manual; see [scroll and wand handling](rules/scrolls.md).
+
+### Legacy wand capability (SD-UI22)
+
+`logic/wands.ts` centralizes wand recognition, linked spell rows, breakage and
+failure/rest patches. `data/legacy-wands.ts` records the three exact native4.0.6
+legacy templates (Blind/Deafen, Unlife, Warding). Caller lookups, preparation,
+actions, cards and item controls consume the shared capability instead of
+assuming stored type `Wand`. Conflicting origins fail recognition; originless
+historical copies need the complete native signature. No source types are changed.
+Legacy schema-safe state lives in `flags.shadowdark.sheetDelver.wand`; modern
+Wands retain native fields. Existing authorized item controls provide explicit
+Restore after rest, clearing loss only for unbroken wands. See the
+[scroll/wand policy](rules/scrolls.md) for casting and native-UI boundaries.

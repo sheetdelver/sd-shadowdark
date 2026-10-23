@@ -6,6 +6,7 @@ import { handleGetDocument } from './api/document';
 import { handleEffects } from './api/effects';
 import { handleActorAction } from './api/actions';
 import { handleActorView } from './api/actor-view';
+import { handleSpellGrants } from './api/spell-grants';
 import { handleManageSpells } from './api/manage-spells';
 import { handleLanguagePlan, handleManageLanguages, handleCreateCharacter } from './api/languages';
 import { handleLuck } from './api/luck';
@@ -107,6 +108,7 @@ export const apiRoutes = {
     'actors/[id]/level-up/roll-boon': async (req: ModuleServerRequest, { params }: ModuleServerParams) => {
         return handleRollBoon(await actorIdFrom(params), req);
     },
+    'actors/[id]/spells/grants': async (req: ModuleServerRequest, { params }: ModuleServerParams) => handleSpellGrants(await actorIdFrom(params), req),
     'actors/[id]/spells/manage': async (req: ModuleServerRequest, { params }: ModuleServerParams) => {
         return handleManageSpells(await actorIdFrom(params), req);
     },
