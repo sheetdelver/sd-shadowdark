@@ -5,6 +5,7 @@ import { creatorOperationStatus,dispatchCreator } from '../creation-operation';
 import { requestRevision,contextConflict,callerOf } from '../access';
 import { shadowdarkAdapter } from '../ShadowdarkAdapter';
 import { prepareActorCore } from '../../logic/actor-preparation';
+import { hitPointRollFormula } from '../../logic/actions';
 import { advancementHitPoints } from '../../logic/advancement';
 import { requestRules } from '../access';
 const route=async(req:ModuleServerRequest,run:()=>Promise<unknown>)=>{
@@ -41,7 +42,13 @@ export const handleCreatorRoll=(req:ModuleServerRequest)=>route(req,async()=>{
     else if(body.kind==='hp') {
         const cls=await shadowdarkAdapter.resolveDocumentFor(body.classUuid,callerOf(req));
         if(cls?.type!=='Class'||!/^d(?:4|6|8|10|12)$/.test(cls.system?.hitPoints??''))throw new SdkError('validation','The exact Class HP die is unavailable.');
-        formula=cls.system.hitPoints;
+        if(!body.draft||!Number.isInteger(body.level)||body.level<1||body.level>body.draft.level||body.classUuid!==body.draft.classUuid)throw new SdkError('validation','Choose a level within this character’s progression.');
+        const plan=await prepareCreator(req,body.draft);
+        const source={...plan.source,system:{...plan.source.system,level:{...plan.source.system.level,value:body.level}},items:plan.source.items.filter((i:any)=>{const award=i.flags?.shadowdark?.sheetDelver?.creatorAward;return !award||award.acquisitionLevel<=body.level;})};
+        const lookups=await shadowdarkAdapter.callerLookups(source,callerOf(req));
+        const roll=hitPointRollFormula(prepareActorCore(source,lookups,requestRules(req.runtime)),cls.system.hitPoints);
+        if(roll.diagnostics.length)throw new SdkError('validation',roll.diagnostics.join(' '));
+        formula=roll.formula;
     }else if(body.kind==='table') {
         const table=await shadowdarkAdapter.resolveDocumentFor(body.tableUuid,callerOf(req));
         if(!Array.isArray(table?.results)||!/^\d{1,2}d\d{1,3}(?:[+-]\d{1,3})?$/.test(table?.formula??''))throw new SdkError('validation','This exact table has no supported native roll formula.');
@@ -56,7 +63,9 @@ export const handleCreatorHP=(req:ModuleServerRequest)=>route(req,async()=>{
     if(plan.errors.some(e=>[1,2,3,4].includes(e.step)))throw new SdkError('validation','Resolve identity, scores and grant choices before calculating HP.');
     if(body.draft.awards.some((a:any)=>a.level===null))throw new SdkError('validation','Calculated HP needs known award chronology. Enter direct paper HP when history is unknown.');
     const gains=body.gains;
-    if(!Array.isArray(gains)||gains.length!==level||gains.some((n:unknown)=>typeof n!=='number'||!Number.isInteger(n)||n<1||n>1000))throw new SdkError('validation','Enter one positive die total for each level.');
+    const dieSides=Number(plan.hitDie?.slice(1));
+    if(level>0&&(!Number.isInteger(dieSides)||dieSides<1))throw new SdkError('validation','The Class hit die is unavailable.');
+    if(!Array.isArray(gains)||gains.length!==level||gains.some((n:unknown)=>typeof n!=='number'||!Number.isInteger(n)||n<1||n>dieSides))throw new SdkError('validation','Enter one die result within the Class hit die for each level.');
     const source=structuredClone(plan.source),lookups=await shadowdarkAdapter.callerLookups(source,callerOf(req));
     const finalCore=prepareActorCore(source,lookups,requestRules(req.runtime));
     if(finalCore.effects.some(e=>e.applies&&e.owner.kind==='item'&&!['Talent','Boon'].includes(e.owner.itemType??'')&&e.changes.some(c=>c.key==='system.abilities.con.value'||c.key.startsWith('system.attributes.hp.'))))
@@ -70,10 +79,13 @@ export const handleCreatorHP=(req:ModuleServerRequest)=>route(req,async()=>{
             return !award||award.acquisitionLevel<=at;
         })};
         const core=prepareActorCore(virtual,lookups,requestRules(req.runtime));
-        // HP-affecting effects make historical native source accumulation
-        // ambiguous without a native history; require direct transcription.
-        if(core.effects.some(e=>e.applies&&e.changes.some(c=>c.key.startsWith('system.attributes.hp.'))))throw new SdkError('validation','HP-changing effects require direct paper HP; historical source accumulation is not inferred.');
-        hp=advancementHitPoints(core,at,gains[at-1]);
+        // Constant bonuses can be prepared once after the level gains; a
+        // replacing or conditional effect needs a directly recorded total.
+        if(core.effects.some(e=>e.applies&&e.changes.some(c=>c.key.startsWith('system.attributes.hp.')&&(c.type!=='add'||!/^[+-]?\d+$/.test(String(c.value))))))throw new SdkError('validation','A conditional or replacing HP effect needs direct HP entry.');
+        // Constant permanent HP bonuses are applied once by preparation, not
+        // accumulated again with every level's hit die.
+        hp=advancementHitPoints({...core,hp},at,gains[at-1]);
     }
-    return {success:true,hp};
+    const final={...source,system:{...source.system,attributes:{...source.system.attributes,hp}}};
+    return {success:true,hp:prepareActorCore(final,lookups,requestRules(req.runtime)).hp};
 });

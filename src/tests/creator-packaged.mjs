@@ -24,7 +24,7 @@ import {nativePacks} from '${root}/src/tests/core0191/world';
 import {worldSnapshot} from '${root}/src/tests/fixtures/native-406';
 import {emptyCharacterDraft} from '${root}/src/logic/character-creation';
 async function run(){
-const packs=nativePacks(${JSON.stringify(process.env.SHADOWDARK_NATIVE_REFERENCE||path.resolve(root,'../../../../temp/shadowdark'))},['shadowdark.classes','shadowdark.ancestries','shadowdark.talents','shadowdark.class-abilities','shadowdark.spells','shadowdark.languages','shadowdark.gear','shadowdark.magic-items','shadowdark.rollable-tables']);
+const packs=nativePacks(${JSON.stringify(process.env.SHADOWDARK_NATIVE_REFERENCE||path.resolve(root,'../../../../temp/shadowdark'))},['shadowdark.backgrounds','shadowdark.classes','shadowdark.ancestries','shadowdark.talents','shadowdark.class-abilities','shadowdark.spells','shadowdark.languages','shadowdark.gear','shadowdark.magic-items','shadowdark.rollable-tables']);
 const rows=Object.entries(packs).flatMap(([pack,docs])=>docs.map(doc=>({...doc,pack,uuid:'Compendium.'+pack+'.'+(doc.results?'RollTable':'Item')+'.'+doc._id})));
 const runtime=createMockModuleRuntime({moduleId:'shadowdark',world:worldSnapshot(1),compendium:{Item:rows.filter(r=>!r.results),RollTable:rows.filter(r=>r.results)}});
 let allowed=true,writes=0,timeout=false;const actors=new Map();
@@ -36,7 +36,7 @@ runtime.documents.items.create=async()=>{throw Error('No separate Item create is
 await new Adapter().initialize(runtime);
 globalThis.fetch=async()=>{throw Error('Network is forbidden')};
 const req=body=>({runtime,userSession:{userId:'packaged-owner'},json:async()=>structuredClone(body)});
-const draft=emptyCharacterDraft();Object.assign(draft,{name:'Compiled paper character',level:3,classUuid:'Compendium.shadowdark.classes.Item.hO7KrvqDRH6kvftJ',ancestryUuid:'Compendium.shadowdark.ancestries.Item.w3gbUH2DOBxfZPHO'});
+const draft=emptyCharacterDraft();Object.assign(draft,{name:'Compiled paper character',backgroundUuid:rows.find(r=>r.type==='Background').uuid,alignment:'neutral',level:3,classUuid:'Compendium.shadowdark.classes.Item.hO7KrvqDRH6kvftJ',ancestryUuid:'Compendium.shadowdark.ancestries.Item.80h0XXptGDZvGAIZ'});
 for(const k of Object.keys(draft.abilities))draft.abilities[k]={value:16,basis:'effective'};
 draft.hp={value:{value:0,basis:'effective'},max:{value:19,basis:'effective'}};
 draft.fixedChoices['class:Compendium.shadowdark.talents.Item.5bpWuaT0KTNzuzCu']={target:'Club'};

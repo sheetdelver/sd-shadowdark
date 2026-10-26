@@ -3,6 +3,15 @@
 Historical entries are reconstructed from [published releases](https://github.com/sheetdelver/sd-shadowdark/releases), their tags, and merged changes. Version numbers follow the published tags; the Unreleased section collects notes for the next authorized release.
 
 ## Unreleased
+- Show class ability guidance
+- Enforce Creator fields and allowances
+- Simplify Creator HP and dice
+- Add Creator treasure and gems
+- Reconcile permanent effect durations
+- Reopen Creator with fresh forms
+- Clarify review and creation recovery
+- Remove duplicate sheet navigation
+- Fit sheets to content
 - Adopt Core page headers
 - Require SDK 3.8.0 headers
 - Require UI API 3.3.0 → 3.6.0

@@ -6,6 +6,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { getErrorMessage, processHtmlContent } from '@sheet-delver/sdk';
 import { useSDK, useSDKComponents } from '@sheet-delver/sdk/react';
 import ShadowdarkSheet from '../ShadowdarkSheet';
+import ModulePageHeader from '../components/ModulePageHeader';
 import { postActorRoll } from './postActorRoll';
 import { ShadowdarkActorProvider } from '../context/ShadowdarkActorContext';
 import { ShadowdarkUIProvider } from '../context/ShadowdarkUIContext';
@@ -199,27 +200,16 @@ export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProp
     if (!actor && !showDeleteModal && !actorError) return null;
 
     return (
-        <main className="min-h-screen font-sans selection:bg-amber-900 pb-20">
-            <nav className="relative bg-neutral-900 border-b border-neutral-800 px-4 py-3 shadow-md flex items-center justify-between backdrop-blur-sm bg-opacity-95">
-                <button
-                    onClick={() => navigate('/')}
-                    className="flex items-center gap-2 text-neutral-400 hover:text-amber-500 transition-colors font-semibold group text-sm uppercase tracking-wide cursor-pointer"
-                >
-                    <span className="group-hover:-translate-x-1 transition-transform">←</span>
-                    Back to Dashboard
-                </button>
-                <div className="text-xs text-neutral-600 font-mono hidden md:block">
-                    {actor?.name ? `${actor.name}` : 'Loading...'}
-                </div>
-            </nav>
+        <main className="min-h-screen flex flex-col font-sans selection:bg-amber-900 pb-20">
+            <ModulePageHeader context={actor?.name} onBack={() => navigate('/')} />
 
-            {grantSync.error && <div role="alert" className="mx-auto max-w-5xl border-2 border-black bg-white text-black p-3">
+            {grantSync.error && <div role="alert" className="mx-auto max-w-7xl border-2 border-black bg-white text-black p-3">
                 <p>Automatic spell grant: {grantSync.error}</p>
                 <button type="button" className="min-h-11 border-2 border-black px-3 mt-2" onClick={grantSync.retry}>Retry granted spells</button>
             </div>}
             {reviewing && <p role="status">Refreshing character access…</p>}
             {actor && (
-                <div inert={reviewing || !isConnected} aria-hidden={reviewing || !isConnected || undefined} style={{ visibility: reviewing || !isConnected ? 'hidden' : undefined }} className="w-full max-w-5xl mx-auto p-4">
+                <div inert={reviewing || !isConnected} aria-hidden={reviewing || !isConnected || undefined} style={{ visibility: reviewing || !isConnected ? 'hidden' : undefined }} className="w-full max-w-7xl mx-auto flex flex-col min-w-0">
                     <ShadowdarkUIProvider>
                         <ShadowdarkActorProvider
                             actor={actor}
@@ -246,7 +236,7 @@ export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProp
             )}
 
             {!actor && actorError && !showDeleteModal && (
-                <div className="w-full max-w-5xl mx-auto p-4 text-center text-neutral-300" role="alert">
+                <div className="w-full max-w-7xl mx-auto p-4 text-center text-neutral-300" role="alert">
                     <p>{actorError}</p>
                     <button type="button" onClick={() => fetchActor(actorId)}>Retry character</button>
                 </div>

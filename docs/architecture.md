@@ -2,6 +2,27 @@
 
 ## Character Creator
 
+The current rules-guided flow enforces source-defined level award entitlements,
+language pools and ordinary spell counts in the UI and server. Grant spells are
+filtered with existing eligibility helpers and share exact-identity duplicate
+checks with fixed/ordinary spells. `creatorAwardAllocation` matches awards to
+Class/Patron entitlements; missing rows never mean unlimited choices. Valuables
+are bounded draft data converted to native Basic/Gem Items, and rich-text notes
+use public SDK sanitization. The review stays procedural with final values. Planner issues carry field/choice
+targets for local validation; bounded numeric editing prevents invalid drafts.
+Verification failures expose the exact owner-readable marked Actor and bounded
+differing field paths without relaxing completion or allowing replay.
+Forward navigation reuses current planner errors; stage tabs cannot bypass required
+entries, and Back remains available. Background/alignment are required at every
+level; Level 0 is excluded from adventuring Class choices by exact identity.
+No general base/total selector or no-op review banner remains. Constant additive
+numeric reconciliation stays internal. HP dice use the existing advantage helper,
+per-level Class dice and first-level CON; constant bonuses prepare once. The HP
+UI keeps one input/roller block per level and calculates the full starting total
+automatically. Relevant rule-input changes invalidate the old total; increasing
+level keeps earlier rolls and adds required entries.
+
+
 [ADR-0005](adr/0005-character-creator.md) implements a separate player tool for
 transcribing paper characters at levels 0–20, with optional rolls and a final
 prepared review. Its
@@ -13,14 +34,21 @@ through one reviewed dispatch with outcome recovery. Existing creation routes
 remain limited to levels0/1 for Generator compatibility. The original creator implementation had no SDK/floor/version change; the
 subsequent shared-header adoption below raises the UI requirement.
 
-The Creator's presentation is under operator correction in ADR-0005; new feature
-work is stopped pending UI acceptance. `ui/components/ModulePageHeader.tsx`
+Shared header/UI correction was accepted. The October 25 rules-guided Creator
+refinement in ADR-0005 supersedes permissive transcription allowances. `ui/components/ModulePageHeader.tsx`
 supplies content and theme tokens to Core SDK3.8/UI3.6 `PageHeader`. All four
-dashboard tools and the sheet container use it; sheets omit the tool heading.
-Core owns both rows and responsive layout. Creator/Importer Back confirmations
+dashboard tools and ActorPage use it; sheets omit the tool heading. ActorPage
+owns the sole navigation bar outside the centered sheet. ShadowdarkSheet and
+ShadowdarkPaperSheet render character content only. The page uses a 1280px
+maximum container, with no additional width cap inside the tabbed content.
+The sheet meets navigation with no top gap and sizes only to its content.
+Only the transparent page canvas has a viewport minimum; sheet panels do not
+grow to fill unused space. Dock clearance remains outside the sheet background. The paper view has no outer black
+frame or inset canvas; content padding and individual field borders remain.
+Core owns both rows and responsive layout. Creator discard and Importer Back callbacks
 and Generator actions retain their existing handlers. No per-page navigation
 markup or mutable header registry is needed. The UI floor rises3.3→3.6; Core
-application floor remains>=0.20.0, and CI/release target plannedv0.22.0 publication.
+application floor remains>=0.20.0, and CI/release use Core v0.22.0.
 
 `logic/character-creation.ts` owns bounded draft/wire contracts and numeric
 reconciliation; `logic/creator-awards.ts` supplies shared source requirements and
@@ -35,7 +63,10 @@ Prepare/HP never write documents; optional dice use the request roll runtime.
 create with all Items. Exact positive primary-source marker evidence can settle
 uncertain receipts without writes; absent/ambiguous/changed evidence cannot.
 Generated document IDs, native defaults and canonical legacy/modern effect
-migration are the permitted source-comparison normalizations; nested native
+migration are the permitted source-comparison normalizations, including the
+verified v14 permanent-duration replacement for explicitly all-null legacy
+duration fields. Timed/unknown duration data remains significant. Fresh Creator
+visits omit complete historical receipts, while pending receipts retain recovery; nested native
 references and array order remain significant. Queues serialize one process;
 no distributed CAS or public SDK idempotency guarantee is claimed.
 

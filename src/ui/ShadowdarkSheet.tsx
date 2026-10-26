@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import ModulePageHeader from './components/ModulePageHeader';
 import ErrorBoundary from './components/ErrorBoundary';
 import { shadowdarkTheme } from './themes/shadowdark';
 
@@ -181,8 +180,7 @@ export default function ShadowdarkSheet(props: ShadowdarkSheetProps) {
     const secondaryTabs = overflowTabs;
 
     return (
-        <div className={`flex flex-col h-full relative pb-0 font-crimson font-inter font-sans ${viewMode === 'simple' ? 'bg-black' : 'bg-neutral-100'} text-black`}>
-            <ModulePageHeader context={actor.name} />
+        <div className={`flex flex-col min-w-0 relative font-crimson font-inter font-sans ${viewMode === 'simple' ? 'bg-white' : 'bg-neutral-100 pb-6'} text-black`}>
             {/* Loading Overlay */}
             <LoadingModal message="Loading System Data..." visible={loadingSystem} theme={shadowdarkTheme.loadingModal} />
             {systemStatus === 'failed' && (
@@ -353,7 +351,7 @@ export default function ShadowdarkSheet(props: ShadowdarkSheetProps) {
                     </div>
 
                     {/* Content Area */}
-                    <div className="flex-1 px-4 max-w-5xl mx-auto w-full">
+                    <div className="flex-1 px-4 mx-auto w-full">
                         {activeTab === 'details' && (
                             <DetailsTab />
                         )

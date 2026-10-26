@@ -4,10 +4,11 @@ import { getProperty, setProperty } from './foundry';
 import type { RuleInputs } from './world-settings';
 import type { StatAllocation } from './stat-choices';
 import type { prepareShadowdarkView } from './prepared-view';
-import type { creatorLevelRequirements, creatorTableOutcome } from './creator-awards';
+import type { creatorLevelRequirements, creatorTableOutcome, creatorAwardAllocation } from './creator-awards';
 import type { ChoiceCatalog } from './talent-choices';
 import type { LanguagePlan } from './languages';
 
+export const LEVEL_ZERO_CLASS = 'Compendium.shadowdark.classes.Item.6LEKsG1HEw3dbo27';
 export const CREATOR_VERSION = 1 as const;
 export type NumericEntry = { value: number | null; basis: 'effective' | 'base' };
 export interface CreatorChoices { stats?: StatAllocation; target?: string; spell?: string; castingClass?: string }
@@ -21,6 +22,7 @@ export interface CreatorGear {
     id: string; source: string; quantity: number; equipped: boolean; stashed: boolean;
     spent?: boolean; broken?: boolean; lostSpells?: string[];
 }
+export interface CreatorValuable { id:string; kind:'treasure'|'gem'; name:string; quantity:number; cost:{gp:number;sp:number;cp:number} }
 export interface CharacterDraft {
     version: typeof CREATOR_VERSION; name: string; level: number; xp: number;
     classUuid: string; ancestryUuid: string; backgroundUuid: string; deityUuid: string; patronUuid: string;
@@ -30,10 +32,10 @@ export interface CharacterDraft {
     ancestryTalents: string[]; classTalents: string[];
     languages: string[]; spells: { source: string; castingClass: string }[];
     hp: { value: NumericEntry; max: NumericEntry };
-    gear: CreatorGear[]; coins: { gp: number; sp: number; cp: number };
+    gear: CreatorGear[]; valuables?: CreatorValuable[]; coins: { gp: number; sp: number; cp: number };
     notes: string; acknowledgements: string[];
 }
-export interface CreatorIssue { id: string; step: number; message: string }
+export interface CreatorIssue { id: string; step: number; message: string; field?: string }
 /** Environment-neutral wire contract; UI never imports server orchestration. */
 export interface CreatorPlan {
     version:1; contextRevision:number; review:string; source:any;
@@ -42,7 +44,8 @@ export interface CreatorPlan {
     errors:CreatorIssue[];warnings:CreatorIssue[];unacknowledged:CreatorIssue[];ready:boolean;
     choices:any[];awards:any[];requirements:ReturnType<typeof creatorLevelRequirements>[];expectedAwards:number;
     ancestryOptions:{uuid:string;name:string}[];classOptions:{uuid:string;name:string}[];ancestryChoiceCount:number;classChoiceCount:number;
-    tables:{uuid:string;name:string;formula:string;outcomes:ReturnType<typeof creatorTableOutcome>[]}[];
+    awardAllocation:ReturnType<typeof creatorAwardAllocation>;
+    tables:{uuid:string;kind:'talent'|'boon';name:string;formula:string;outcomes:ReturnType<typeof creatorTableOutcome>[]}[];
     languagePlan:LanguagePlan&{rows:any[]};fixedSpells:{source:string|null;name:string}[];targetCatalog:ChoiceCatalog;
     listUuid:string|null;requiresPatron:boolean;hitDie:string|null;dependencies:{uuid:string;hash:string}[];
 }
@@ -50,7 +53,7 @@ export function emptyCharacterDraft(): CharacterDraft {
     return { version: 1, name: '', level: 1, xp: 0, classUuid: '', ancestryUuid: '', backgroundUuid: '', deityUuid: '', patronUuid: '', alignment: '',
         abilities: Object.fromEntries(ABILITY_KEYS.map(key => [key, { value: null, basis: 'effective' }])) as CharacterDraft['abilities'],
         awards: [], fixedChoices: {}, ancestryTalents: [], classTalents: [], languages: [], spells: [],
-        hp: { value: { value: null, basis: 'effective' }, max: { value: null, basis: 'effective' } }, gear: [], coins: { gp: 0, sp: 0, cp: 0 }, notes: '', acknowledgements: [] };
+        hp: { value: { value: null, basis: 'effective' }, max: { value: null, basis: 'effective' } }, gear: [], valuables: [], coins: { gp: 0, sp: 0, cp: 0 }, notes: '', acknowledgements: [] };
 }
 /** Stable full-intent encoding. Unlike creationGrantReview, includes inventory/numbers/notes. */
 export function creatorCanonical(value: unknown): string {
@@ -94,6 +97,7 @@ export function validateCharacterDraft(v: any): asserts v is CharacterDraft {
         || v.gear.some((g: any) => !object(g) || !id(g.id) || !exact(g.source) || !integer(g.quantity,0) || typeof g.equipped !== 'boolean' || typeof g.stashed !== 'boolean' || (g.equipped && g.stashed))) fail();
     for(const g of v.gear) if ((g.spent!==undefined&&typeof g.spent!=='boolean')||(g.broken!==undefined&&typeof g.broken!=='boolean')||(g.lostSpells!==undefined&&!refs(g.lostSpells)))fail();
     if (!Array.isArray(v.acknowledgements) || v.acknowledgements.length > 200 || v.acknowledgements.some((s: unknown) => typeof s !== 'string' || s.length > 100)) fail();
+    if (v.valuables !== undefined && (!Array.isArray(v.valuables) || v.valuables.length>200 || new Set(v.valuables.map((r:any)=>r.id)).size!==v.valuables.length || v.valuables.some((r:any)=>!object(r)||!id(r.id)||!['treasure','gem'].includes(r.kind)||typeof r.name!=='string'||!r.name.trim()||r.name.length>200||!integer(r.quantity,1)||!object(r.cost)||['gp','sp','cp'].some(k=>!integer(r.cost[k]))||Object.keys(r).some(k=>!['id','kind','name','quantity','cost'].includes(k))))) fail();
     const keys = Object.keys(emptyCharacterDraft());
     if (Object.keys(v).some(k => !keys.includes(k))) fail();
 }

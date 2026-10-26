@@ -3,6 +3,111 @@
 Status: Accepted — header/UI correction accepted; native creation and remaining functional gates open
 Date: 2026-10-23
 
+## Refinement checkpoint — October 26
+
+The user requested checkmarks, annotations and a commit of the selected work.
+The following implementation/refinement items are checkpointed; this does not
+replace the separate native acceptance matrix or close the whole ADR.
+
+- [x] Required-stage navigation and field-local numeric/choice validation.
+- [x] Generator-style name/score dice and class ability guidance.
+- [x] Native level-based talent, boon, language and spell allowances (CC-R02).
+- [x] Per-level HP inputs/rollers, Roll all HP and full starting HP.
+- [x] Treasure/gems, shared rich-text notes and procedural review.
+- [x] Permanent-effect duration reconciliation and fresh Creator re-entry.
+- [x] One shared sheet navigation bar, no top gap or paper frame, content-only height.
+- [x] Changelog, rules, architecture and evidence annotations.
+- [ ] Native v13/v14 Creator acceptance and actual saved-request recovery recheck (CC-R04/CC-07).
+- [ ] Public SDK hook for shell-wide discard protection (CC-R03).
+
+Core 0.22.0 is published. This module checkpoint does not change version0.9.6,
+Core/SDK/API requirements or release metadata. Standard-array mode remains an
+unselected house-rule option. Supporting tests are recorded in the workflow audit.
+
+## Rules-guided refinement — October 25 (current decision)
+
+The user rejected the no-op Reviewed banner and the permissive award/language/
+spell entry controls. This supersedes the original transcription-deviation
+policy below. Preserve the existing seven stages, shared headers and operation
+recovery. Do not interpret paper transcription as permission to bypass source
+progression requirements. The user subsequently chose to **keep the procedural
+review**, ordered by creation stage, instead of replacing it with a sheet image.
+
+- Validation messages belong directly under their field or choice group on every
+  Creator stage, using explicit planner field identifiers. Required choices,
+  award targets, languages/Spells and inventory use the same pattern; numeric
+  entries reject non-integers and out-of-range values before draft submission.
+  HP uses 1..Class hit die; scores do not receive an invented 18 ceiling. Preserve
+  server validation and expose actual transport/creation failures at their action.
+- Creation verification must offer the caller-owned marked character for review
+  when it exists. State plainly that saved details differ, with bounded differing
+  field paths and request ID under optional Verification details. Never declare
+  completion or replay creation merely to suppress the warning. The reported duration-only mismatch is addressed by the verified v14
+  empty-duration migration described below; other mismatches still need actual
+  saved-source evidence. Completed previous requests must not lock a fresh
+  Creator visit; pending requests retain recovery and the no-replay fence.
+- Forward navigation (Next and stage tabs) requires a fresh plan with every
+  earlier required step complete. Back remains available for corrections. Required
+  identity includes name, ancestry, background, alignment and an adventuring Class
+  above level zero; exclude the native Level 0 Class from that picker. Reuse one
+  shared exact Level 0 identity in the client filter and server validation.
+- Background and alignment apply at level zero too (core rules p14); deity is
+  optional for level-zero characters, consistent with native generator controls.
+  Use Choose… for incomplete required selection, not None.
+- Explicit score rolls replace values immediately without a confirmation. Retain
+  confirmations for leaving a draft and final creation.
+- Remove the generic Reviewed banner entirely. Final review owns the check.
+- Reuse Generator's ancestry name endpoint and indigo d6 appearance. Show a
+  disabled die before ancestry selection; accept only the current request's
+  result. Scores accept typed digits without spinners or general base/total
+  controls, with Roll All and individual dice. Typed totals retain additive
+  reconciliation internally; rolled scores receive selected bonuses once.
+- Use the existing per-level Class/ancestry/Patron requirements to allocate one
+  entitlement per award. Class and Patron table identity determines eligibility;
+  either/or entitlements cannot become two awards. Fixed grants are automatic.
+  Missing, excess, wrong-level and wrong-table selections are errors in both the
+  UI and final server preparation, not acknowledgeable deviations.
+- Reuse native language-pool matching and spell progression/grant helpers.
+  Ordinary, fixed and granted Spells remain distinct. Filter unavailable/used
+  choices, display counts, stop adding at capacity, and enforce full native
+  counts server-side. A missing source progression row is unavailable, never an
+  unlimited allowance; the current native caster tables end at level 10.
+- HP has one card for each selected level, stacked in a single column at every
+  viewport width, with its numeric hit-die input and
+  adjacent die button on the same line. A single Roll all HP button sits above
+  the cards and replaces all level rolls without confirmation. The total is calculated automatically
+  below the blocks using existing per-level Class dice, native HP advantage,
+  first-level CON and talent preparation. Level zero shows its CON-based total
+  without Class dice. No current/max controls or replacement confirmation.
+  Increasing level preserves earlier rolls and adds empty required blocks;
+  decreasing level drops later rolls. Class changes clear the old die entries.
+  Relevant ability/grant/identity changes invalidate the old total until the HP
+  step recalculates it. New characters start at full HP. This replaces the brief
+  one-total-input design; it is the user's clarified per-level workflow.
+  Optional identity clearing says Clear selection and uses a small secondary
+  action, never a second value labeled None.
+- Reuse Treasure and Gem Bag entry controls with draft-local callbacks; selling
+  is absent in Creator. Validate bounded names/counts/costs and construct native
+  Basic-treasure/Gem items on the server. Keep gear and money behavior intact.
+- Use Core RichTextEditor with module styling; sanitize saved HTML. Review runs
+  Identity → Scores → Talents/Boons → Languages/Spells → HP → Equipment/Money →
+  Notes → Requirements. Show final scores/modifiers, not source-storage columns.
+  Missing requirements link back to their step. Keep the reviewed single-payload
+  write and interrupted-operation recovery unchanged.
+
+Acceptance uses bounded real-planner and mounted workflows: correct counts and
+wrong-level/source rejection, no duplicate spell choices, native fixed grants,
+per-level HP/advantage, valuables/HTML in the final payload, responsive layouts
+and no stale name-roll application. Do not substitute tests for operator/native
+acceptance. No Core changes, SDK/floor bump or release bump selected. The October26
+checkpoint separately authorizes the module commit.
+
+Known limits remain explicit: native v13/v14 creation acceptance and shell-wide
+navigation protection are open. Numeric effects that cannot be inverted without
+an original score are not guessed. Out-of-progression campaign awards are not
+silently added through the Class progression selector. Review any required
+exception as an explicit workflow rather than reinstating unrestricted entry.
+
 ## Current operator disposition — October 23
 
 The user accepted the corrected UI and verified Back to Dashboard after the
@@ -12,8 +117,8 @@ the whole Character Creator ADR. CC-R02 spell-picker eligibility/duplicates,
 CC-R03 shell navigation discard protection and CC-R04/CC-07 native creation
 acceptance remain open. Continue only the next work selected by the user.
 
-Core ADR-0073 closes the shared header scope. Supporting Core **0.22.0** remains
-pending, with SDK **3.8.0** / UI **3.6.0** and module toolchain pins already
+Core ADR-0073 closes the shared header scope. Supporting Core **0.22.0** is
+now published, with SDK **3.8.0** / UI **3.6.0** and module toolchain pins
 recorded below. Module release version is unchanged. Historical UI stop and
 implementation checkpoints below retain the decision sequence; this disposition
 supersedes their pending visual-acceptance statements.
@@ -79,6 +184,67 @@ shared UI, not authorization for unrelated features or the deferred D&D queue.
 At proposal time Core was clean on main at `597ffbae`; the user subsequently approved and created `feat/shared-module-page-header`, as recorded below. Core should own a new ADR rather than amending
 closed background/settings decisions. This module ADR retains its adoption and
 operator acceptance criteria.
+
+### Ability-score guidance
+
+The Stats section of the native Player Quickstart prescribes 3d6 in order, with
+an optional reroll of the full set if no score is at least14. It provides no
+standard array. Retain rolls/manual transcription; do not label a proposed
+house-rule array as official or add an array toggle without that separate choice.
+
+The Ability Scores step lists key abilities without assigning scores or adding
+requirements. Fighter STR and Thief DEX follow the Quickstart's explicit guidance,
+keyed by exact native Class identity. Other casting guidance reads the selected
+Class's `system.spellcasting.ability`; fixed Class Ability checks read the
+caller-readable referenced documents' `system.ability`, with their source labels.
+Do not infer a custom class's priorities from its name, unrelated abilities, or
+optional unselected grants. CON's HP role and basic melee/ranged uses are general
+help, separate from class-specific hints. Level0 does not inherit a disabled
+adventuring Class's guidance. Reuse the Creator's existing typography/layout.
+
+### Creation recovery: permanent effect durations
+
+The saved request contained three Item effects whose seven legacy duration fields
+were all null. Operator diagnostics report those fields differing after save.
+Foundry v14.367 `common/documents/active-effect.mjs`, `migrateData`,
+`#migrateDuration` and `defineSchema`, replaces that empty legacy shape with
+`duration: {value: null, units: "seconds", expiry: null, expired: false}` and
+`start: null` when legacy startTime is present. Comparison now canonicalizes only
+that explicitly empty legacy shape. Non-null timing, unexpected properties,
+expiry, expired state and authored start values remain significant; this is not
+a blanket removal of duration fields. No stored payload or Actor is rewritten.
+
+Status reconciliation can confirm the original marked Actor and unblock future
+creation without repeating a write. A fresh Creator mount omits already-complete
+historical receipts; completion from its current operation remains visible.
+Pending/unknown requests still show recovery. Re-entry does not discard receipts
+or convert an unknown result into a failed create. Native operator recheck remains
+necessary; offline source equivalence does not prove unrelated fields match.
+
+### October 25 sheet adoption correction
+
+Operator screenshots exposed two navigation bars in both sheet layouts: the
+shared header had been added inside ShadowdarkSheet while ActorPage retained
+its handwritten navigation. ActorPage now renders the shared ModulePageHeader
+once, above the sheet container, replacing the old markup. Sheets render only
+character content. This corrects module adoption; Core's header needs no change.
+
+The operator also reported smaller sheets. The 1024px ActorPage limit predates
+header adoption, so the header alone is not proven to have caused that change.
+Both layouts now use a 1280px responsive page container; tabbed content loses
+its additional 1024px cap. Retain the existing paper layout/artwork and responsive
+padding rather than scaling its contents or nesting another page shell.
+
+Final operator clarification: both layouts meet navigation with no external top
+padding, but their height follows content only. Do not stretch the white/paper
+panel to the viewport minimum. Only the transparent page canvas fills the screen;
+unused space below the sheet exposes the world background. Long content grows
+naturally without an internal scroll box. Dock clearance is outside the sheet
+background. Paper removes its black outer canvas/frame/shadow, nested width cap
+and external margin; ordinary internal content padding and field borders remain.
+Both modes keep one shared navigation bar and the 1280px desktop container.
+The earlier viewport-fill interpretation was rejected. Footer behavior remains
+unchanged: the user clarified that it belongs on the dashboard only.
 
 ### Core header adoption — implementation checkpoint
 

@@ -203,3 +203,15 @@
   .sdk-module--shadowdark .sd-creator-identity>label,.sdk-module--shadowdark .sd-creator-identity>.sd-creator-field { padding:1rem; }
   .sdk-module--shadowdark .sd-creator-footer .sd-creator-refresh { margin-left:0; }
 }
+
+/* Creator reuses Generator's indigo d6 control and compact score entry. */
+.sdk-module--shadowdark .sd-creator-field-heading,
+.sdk-module--shadowdark .sd-creator-score-heading { display:flex; align-items:center; justify-content:space-between; gap:1rem; border-bottom:2px solid #000; padding-bottom:.25rem; margin-bottom:1rem; }
+.sdk-module--shadowdark .sd-creator-field-heading label,
+.sdk-module--shadowdark .sd-creator-score-heading label { margin:0; font-family:Georgia,'Times New Roman',serif; font-size:1.25rem; font-weight:900; }
+.sdk-module--shadowdark .sd-creator-page .sd-creator-dice { display:inline-flex; align-items:center; justify-content:center; width:2.5rem; min-height:2.5rem; flex:none; padding:.25rem; border:0; border-radius:.5rem; background:#4f46e5; box-shadow:0 4px 6px #0002; }
+.sdk-module--shadowdark .sd-creator-page .sd-creator-dice:hover:not(:disabled) { background:#6366f1; }
+.sdk-module--shadowdark .sd-creator-page .sd-creator-dice:disabled { background:#a3a3a3; cursor:not-allowed; }
+.sdk-module--shadowdark .sd-creator-dice img { width:2rem; height:2rem; filter:brightness(0) invert(1); }
+
+.sdk-module--shadowdark .sd-creator-identity>.sd-creator-field>button.sd-creator-clear { align-self:flex-start; border:0; padding:.25rem 0; margin-top:.5rem; font:400 .875rem Arial,sans-serif; text-decoration:underline; color:#525252; }

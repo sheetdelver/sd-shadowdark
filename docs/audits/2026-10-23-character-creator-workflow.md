@@ -1,10 +1,359 @@
 # Character Creator workflow audit
 
 Date: 2026-10-23
-Status: Header/UI correction accepted; remaining Creator gates open
+Status: October 26 refinement checkpoint approved; native acceptance/recovery recheck and shell SDK gate remain open
 Decision: [ADR-0005](../adr/0005-character-creator.md)
 
-## Scope and evidence
+## October 26 checkpoint
+
+User requested annotation/checkmarks and a local commit of the selected Creator
+and sheet refinements. ADR-0005 now contains the completed refinement checklist.
+Latest verification:32 source cases, seven mounted Creator groups, explicit
+module typing and package build pass. Sheet geometry has source/archive-CSS
+checks; five ActorPage lifecycle cases and presentation checks passed during the
+sheet correction. Compiled creation/recovery routes passed before the final
+informational ability-guidance addition. Evidence below distinguishes those
+artifacts rather than claiming every historical check ran against the latest one.
+
+CC-R01 presentation corrections and CC-R02 picker implementation are checkpointed.
+CC-R03 remains a public SDK dependency; CC-R04/CC-07 remain native acceptance,
+including operator recheck of the prior duration-only receipt. No live data was
+changed. Core is clean/read-only; module version0.9.6 and requirements are
+unchanged. Push, PR and release remain user-owned follow-up actions.
+
+## Class ability guidance — October 25
+
+Added selected-Class hints to Ability Scores using existing Creator presentation.
+Exact core Fighter/Thief guidance comes from the native Player Quickstart Stats
+page (`quickstart-guides.db/stats__QHTrjIWK9cBCx5KZ.json` at native reference
+9677d16b3903b3b640f00d4efd48249142ac8334). Casting ability and fixed Class Ability
+checks use caller-readable native fields; no name matching or score assignment.
+Level0 omits the disabled Class's guidance. General CON/attack help is separate.
+The Quickstart specifies 3d6 in order and an optional full reroll when none reaches
+14; no official standard array was found or added. A house-rule array is unselected.
+
+32 planner/writer/helper checks and seven source browser groups pass, including
+mounted Fighter hints and native/custom casting, referenced ability checks,
+level0 and unknown-class behavior. Explicit typing and packaging pass. Desktop
+Ability Scores capture inspected. Logs:
+`/tmp/sd-creator-ability-{tests,types,browser,package}.log`; captures:
+`/tmp/sd-creator-ability-browser/scores-{390,1280}.png`.
+Latest runtime archive SHA256:
+`bf5e825c557a4c843639a3485c7b9ab3197a9d2071bd2d3fedc5a5367c0f87a6`.
+No live changes, commits, contract/version bumps or retained test services.
+Native Creator acceptance remains open; final documentation postdates packaging.
+
+## Permanent-duration recovery correction — October 25
+
+Operator re-entry screenshot shows the original request, with differences only
+on legacy duration fields of three Item effects (diagnostics capped at20 paths).
+The read-only saved receipt has all seven fields null for Ability Score
+Improvement (Int/Str/Dex). Foundry v14.367 local reference
+`common/documents/active-effect.mjs` lines47–67,191–203,229–239 establishes the
+schema/migration change. The exact empty legacy duration now compares as the
+v14 permanent-effect shape; real timing, expiry, expired state, start values and
+unknown properties are not discarded. No live Actor or receipt was edited.
+
+A fresh Creator visit now suppresses completed historical receipts after its
+status check, while the current creation's success stays visible and uncertain
+requests retain recovery. The original dispatched request can settle through
+normal status reconciliation, without another Actor creation.
+
+31 planner/writer checks pass, including legacy-to-v14 duration reconciliation,
+no replay, a subsequent distinct create, and rejection of actual timing/start
+changes. Seven mounted source workflow groups pass; the existing desktop case
+now also confirms re-entry to an editable fresh form after completion without
+another write. Explicit typing, packaging and compiled creator routes pass.
+These are offline checks; operator re-entry still verifies the actual saved
+Actor has no additional differences. Other historical native gates stay open.
+Logs: `/tmp/sd-creator-duration-{tests,types,browser,package,compiled}.log`.
+Runtime archive SHA256:
+`5f92c3adbe0d5f84b197c67d7d05a5f14b604d03f6251a8d8dfe44109a5f824f`.
+Final docs postdate the archive. Core unchanged; no services retained or commits.
+
+## Final content-only sheet height — October 25
+
+The user rejected viewport-minimum sheet height: the white panel must end after
+its content. Removed flex growth from the sheet containers and put dock clearance
+outside the sheet background. Only the transparent page canvas retains its
+viewport minimum. No top gap or black frame; footer remains dashboard-only as
+the user clarified. This supersedes the viewport-fill interpretation below.
+
+Source and archive-CSS geometry checks pass for both modes at 390/1440px.
+Changing viewport height from 1000 to 1400px leaves sheet height unchanged.
+The controlled desktop paper ends at869px; long mobile paper grows to2153px.
+Tab bodies remain controlled, so these measurements prove shell behavior, not
+native character content parity. Logs/captures:
+`/tmp/sd-sheet-content-height.log`, `/tmp/sd-sheet-content-height/`,
+`/tmp/sd-sheet-content-archive-css.log`, `/tmp/sd-sheet-content-archive-css/`.
+Packaging passes (`/tmp/sd-sheet-content-package.log`); current runtime SHA256:
+`50d00ba7bd1f2764d55a3c9f4e2a679b9aa8a14235ac7be55020ff4f150d4174`.
+Final docs postdate packaging. Core unchanged, no services retained, uncommitted.
+
+## Superseded viewport-fill interpretation — October 25
+
+The operator rejected the width-only correction: sheets still had a top gap,
+and the paper view retained a black surround. Both layouts now meet navigation
+directly and use a growing flex column. Viewport height is a minimum, not a fixed
+height: short sheets extend to the viewport bottom and longer content grows the
+page naturally, without an internal scroll box. The user explicitly confirmed
+content-driven vertical growth. Paper removes its outer black canvas, border,
+shadow, margin and nested width cap; content padding and field borders remain.
+Dock clearance is inside the sheet background, not an external bottom gap.
+
+Explicit typing and packaging pass. The composed shell probe now checks the
+actual requested geometry in both modes at 390/1440px, with generated source CSS
+and archive CSS: sheet top equals nav bottom (53px), sheet bottom reaches at
+least the 1000px viewport, paper width equals the container width, the paper
+background is white, and no horizontal page overflow. The long mobile paper
+view grows to 2233px, demonstrating content growth beyond the minimum. Desktop
+paper capture inspected. The fixture still controls tab bodies/transport; this
+is layout evidence, not full native content acceptance. No Core/live changes.
+
+Evidence: `/tmp/sd-sheet-fill-types.log`, `/tmp/sd-sheet-fill.log`,
+`/tmp/sd-sheet-fill-check/`, `/tmp/sd-sheet-fill-archive-css.log`,
+`/tmp/sd-sheet-fill-archive-css/`, `/tmp/sd-sheet-fill-package.log`.
+Latest runtime archive SHA256:
+`a7fc88ffa647f9388a82cfa14845b82d1ef19cb19847c4bea4d833c3ff19df58`.
+Final documentation postdates the archive. Earlier width-only evidence below
+is superseded for height/frame acceptance. Changes remain uncommitted.
+
+## Sheet navigation and width correction — October 25
+
+Operator screenshots show duplicate Dashboard navigation in both sheet layouts.
+ActorPage retained its old navigation while ShadowdarkSheet mounted the new
+shared header. ActorPage now replaces its old bar with ModulePageHeader; the
+sheet content has no navigation header of its own. Core remains unchanged.
+The reported shrinking is not proven to originate in the header: the outer
+1024px cap already existed before adoption. The correction widens that shared
+page container to 1280px and removes the tabbed content's redundant 1024px cap.
+
+Explicit module typing, the presentation suite and all five existing ActorPage
+lifecycle checks pass. An isolated composed ActorPage/ShadowdarkSheet/paper-sheet
+probe verifies both view modes at 390 and 1440px: exactly one Dashboard button
+and page navigation, full-width bar, 1280px desktop container, no horizontal
+page overflow and working Dashboard action. Transport/context and tab bodies
+are controlled; this is shell/layout verification, not live Actor acceptance.
+Desktop captures were inspected. The same geometry passes with CSS extracted
+from the new archive. No running host or native connection was used.
+
+Logs/captures: `/tmp/sd-sheet-types.log`, `/tmp/sd-sheet-header-lifecycle/results.json`,
+`/tmp/sd-sheet-layout.log`, `/tmp/sd-sheet-layout-check/`,
+`/tmp/sd-sheet-layout-archive-css.log`, `/tmp/sd-sheet-layout-archive-css/`,
+`/tmp/sd-sheet-package.log`. Latest runtime archive SHA256:
+`82aa9ebdcf26fa65a0ae59d97159951abee98b82fec571a41281804f9a614add`.
+Audit closeout postdates packaging. Creator workflow evidence below is from the
+preceding archive; it was not rerun for this sheet-only correction. Operator
+recheck remains pending. No version changes or commits.
+
+## Latest corrections — local validation and creation verification
+
+User reported invalid HP values accepted into the draft, validation at page ends,
+and an opaque post-create verification warning. Creator issues now carry an
+explicit field/choice target; the UI renders messages beneath that input or
+selection group. Numeric editing rejects invalid integer/range input before
+submission: HP 1..Class hit die, acquisition level within character level,
+nonnegative XP/coins/quantities and bounded values. No invented maximum 18 is
+applied to effective scores. Re-entering a retained valid value clears a rejected
+input error. Name/notes limits and treasure/gem numeric guards apply in their own
+forms. Final server validation remains authoritative. Transport/recovery failures
+remain beside their action rather than being mislabeled as a numeric field error.
+
+Read-only inspection of the local receipt for the user-reported request confirmed
+a dispatched create with a returned Actor ID. No stored receipt or native Actor
+was changed. The native saved source is not available from that receipt, so the
+actual mismatch cause is **unconfirmed**. Do not infer a normalization exception
+from the screenshot, expected payload or passing offline cases.
+
+When an owner-readable Actor has the exact creation marker but differs in saved
+fields, recovery now exposes Review created character and optional Verification
+details (bounded field paths and request ID, no duplicated source payload).
+The primary text explains that the character exists and needs checking. Final
+confirmation uses the character name/level rather than internal receipt language.
+Strict source comparison, caller ownership, marker checks and no-replay behavior
+are retained. Normalization rules are unchanged. User will recapture the initial
+popup and recheck after these edits; live/native acceptance remains open.
+
+Verification: explicit module typing, 30 planner/writer cases, seven source
+browser groups, package contracts, compiled routes and seven archive browser
+groups pass. Existing browser cases now cover field-local required-name errors,
+rejected negative XP with correction, rejected d8 HP above 8, and a controlled
+saved-character mismatch that exposes its field path and opens the existing
+Actor without another create. That fixture is not evidence of the user's native
+mismatch cause. Desktop field-error capture inspected; both widths retain the
+single-column HP layout and inline dice.
+
+Latest runtime archive SHA256:
+`e6588f5cc6966e04461e8aa0227c89560e487fbc611ba0e516775bfba432a597`.
+Logs: `/tmp/sd-creator-fields-{types,planner,browser,package,compiled,archive-browser}.log`.
+Captures: `/tmp/sd-creator-fields-browser/hp-validation-{390,1280}.png`
+and `/tmp/sd-creator-fields-archive-browser/`.
+Final audit/handoff edits postdate this archive. Older archive identities below
+are historical. Core and live data are unchanged; no test services retained.
+
+## Latest HP layout correction
+
+User clarified that the level cards must be stacked in one column, not split
+across two columns, and requested Roll all HP above them. Each card retains its
+input/die pair on one line. These structural layout properties now travel with
+the component rather than relying on the newly appended presentation stylesheet
+rules; previous isolated captures had the pair inline, but the user's running
+session still showed the die underneath. That discrepancy is recorded rather
+than claimed resolved by earlier screenshots.
+
+Roll all HP uses the existing per-level roll route and replaces all entries only
+after every requested result returns under the current draft/context. Individual
+rollers remain independent. The total uses the existing HP calculation route.
+Missing HP now produces one actionable message, Enter or roll HP for each level,
+instead of separate internal current/max field paths. Existing browser cases
+check card stacking and input/die alignment at both widths, Roll all and an
+individual reroll, totals, level changes and retained creation behavior.
+
+Verification: explicit typing, package contracts/compiled routes and all seven
+packaged browser groups pass. Desktop HP capture inspected; geometric assertions
+verify single-column stacking and inline input/die centers at 390 and 1280 widths.
+Current runtime archive SHA256:
+`eb19d120edc6c674b5a9321dc6041f50adf4a20801a7a534fe86a668eddc0272`.
+Logs `/tmp/sd-creator-hp-stack-{types,package,compiled,browser}.log`;
+captures `/tmp/sd-creator-hp-stack-browser/hp-{390,1280}.png`.
+Docs/handoff postdate the archive. Native/operator acceptance remains open;
+Core and live data unchanged. No test services retained.
+
+## Current HP follow-up — per-level blocks
+
+The user clarified that HP must expose one block per level, with an input and
+its roller side by side. This supersedes the intermediate single-total entry
+layout. Total HP calculates automatically below the blocks via existing roll/HP
+routes, with no current/max form or replacement confirmation. Level zero uses
+CON-based calculation without Class dice. Both internal effective HP values are
+set to the calculated total; new characters start at full HP. Legacy draft and
+recovery receipt shapes remain unchanged.
+
+Increasing level retains earlier die entries and adds blank required blocks;
+decreasing level drops higher entries. Changing Class clears the old die entries.
+Ability/grant/identity changes invalidate the total until recalculation on the HP
+step. The existing server calculator still rejects unsupported HP effect/history
+semantics; it does not invent chronology. The optional deity clear action now
+says Clear selection and has secondary styling rather than a second None value.
+
+Earlier single-total UI evidence (archive `77c50a…`) predates this clarification
+and is not acceptance of the current layout. Explicit typing and seven source
+mounted groups pass, including typed per-level results, individual rollers,
+automatic level-zero HP, full starting HP and increasing level 3→4 while keeping
+the first three entries and requiring the fourth. Phone HP layout was visually
+inspected: input and die remain side by side. No Core or live-world changes.
+Package contracts/compiled routes and all seven archive-mounted groups pass.
+Desktop archive HP layout was visually inspected as well. Current runtime archive
+SHA256: `8036654be86baafc7d011bdb2e5b0ba0390cc0f706c96684cabdba8aa8e01b4e`.
+Logs: `/tmp/sd-creator-hp-levels-{types,browser,package,compiled,archive-browser}.log`.
+Captures: `/tmp/sd-creator-hp-levels-archive-browser/hp-{390,1280}.png`.
+Final documentation postdates that runtime archive. These are offline checks;
+operator/native acceptance remains open. No test services retained.
+
+## Follow-up — required stages and direct score rolls
+
+The user requested that required entries block advancing and that score rolls
+replace immediately. Next and forward stage tabs now check the same fresh plan
+as final creation; earlier stages remain reachable. Required name, ancestry,
+background, alignment and above-zero Class prevent skipping Identity. Incomplete
+scores, grants, languages/Spells and HP likewise block later stages. Loading or
+retired plans cannot authorize forward navigation.
+
+The Class picker excludes the exact native Level 0 Class using one shared
+constant; the server already rejects it for adventurers. At level zero the
+planner continues to select that Class automatically. Core rules p14 includes
+background and alignment at both starting levels. Both now have a required marker
+and server validation; an empty alignment is Choose…, not None. Deity stays
+optional at level zero: it is not a required entry in that starting-level list,
+and the pinned native generator offers its selector at level zero too
+(`system/templates/apps/character-generator.hbs`, background/alignment/deity
+partials and `CharacterGeneratorSD.mjs`). No class-specific deity policy changed.
+Rule text checked in the [core rules, p14](https://anyflip.com/agkyz/ktro/basic).
+
+Single-score and Roll all actions immediately replace selected scores with no
+modal. Creator Back/discard and final creation confirmations remain. Existing
+planner validation cases now cover missing background/alignment and invalid
+adventuring Class; the mounted suite includes blocked Next and tab navigation,
+returning to earlier steps, the Level 0 picker exclusion and immediate rerolls.
+
+Source verification: 30 planner cases, explicit typing, and seven mounted
+workflow groups pass. Package contract validation and compiled creator routes
+pass. All seven mounted groups also pass against the final compiled UI and
+packaged styles. Archive SHA256:
+`833caa3c375eb4ef78a1f2b29977c84671b6e1d477e1611c0343a08c3d57d15e`.
+Logs: `/tmp/sd-creator-step-{planner,types,browser,package,compiled,archive-browser}.log`;
+archive screenshots: `/tmp/sd-creator-step-archive-browser`. These supersede
+prior archive identities for runtime review; final audit/handoff edits postdate
+this archive. Native/operator acceptance is still open. Core is unchanged;
+module refinements remain uncommitted, with no live service or data changes.
+
+## Current refinement — October 25
+
+The current decision is ADR-0005's **Rules-guided refinement**. It supersedes
+historical manual-deviation allowances below. The user retained the procedural
+review, ordered by stage; a sheet-replica redesign is not selected. Earlier header
+acceptance remains valid, but it does not establish acceptance of these new changes.
+
+Implemented in the existing module branch:
+
+- Removed the Reviewed banner; reused Generator name dice/ancestry endpoint and
+  score controls. Typed scores have no spinners or exposed storage-basis selector.
+- Matched independent awards to native Class/Patron level entitlements; enforced
+  source pools, ordinary Spell quotas and fixed/granted/selected Spell identity
+  exclusion in both the picker and final preparation. Missing or extra choices
+  cannot be waived. CC-R02 now has corrective offline evidence, pending operator
+  confirmation; this does not reopen completed sheet/advancement acceptance.
+- HP calculation validates one Class die per level, uses existing native advantage
+  and advancement helpers, and prepares constant bonuses once. Direct entry
+  remains available without invented historical rolls.
+- Reused Treasure/Gem Bag and Core RichTextEditor; valuables are bounded draft
+  entries converted to native items, notes are sanitized, and Creator omits sale
+  operations. Review lists final values and links errors to their originating step.
+
+Verification on Core 0.22.0 / SDK 3.8.0 / UI 3.6.0:
+
+- 30 real-planner/writer cases passed, including no-waiver progression/language/
+  Spell limits, source identity, HP advantage/constant bonus, valuables, sanitized
+  notes and retained recovery behavior. Creator contracts and presentation pass.
+- Explicit module/UI/server typing passes. Six source mounted workflow groups
+  pass, using actual Core PageHeader, ConfirmationModal and RichTextEditor,
+  including phone/desktop entry, independent grants and caster selection caps.
+- Module contract validation and isolated packaging pass. Compiled planner/writer
+  checks pass for round-trip data, complete payload, duplicate/uncertain recovery
+  and revoked-source preflight. Archive identity and final mounted checks follow
+  below. These are controlled offline checks, not native acceptance.
+
+Final isolated archive: `shadowdark-0.9.6.tgz`, SHA256
+`b5b5ed1220f213e5e68029e23734adbb4cab970e9a559566d2b4dee9766d4af7`.
+All six mounted groups pass against its compiled UI and packaged styles.
+Desktop review and phone scores were visually inspected: sequential sections,
+compact notes and intact score/control layout. The isolated fixture blocks asset
+requests, so screenshots do not verify the die SVG itself; the Creator uses the
+Generator's existing `/icons/dice-d6.svg`, verified present in Core. The archive UI run caught a
+transient editor crash after saving notes when an inline theme object caused
+editor recreation on every review refresh. A stable module-level theme fixes
+that; the same phone/desktop save-and-create cases now pass. This is module
+integration evidence, not a Core change. Documentation-only audit/handoff edits
+postdate the archive; its runtime code matches the final source.
+
+Local evidence: `/tmp/sd-creator-rules-{planner,contracts,presentation,browser}.log`,
+`/tmp/sd-creator-rules-final-types.log`, `/tmp/sd-creator-refinement-package.log`,
+`/tmp/sd-creator-refinement-compiled-final.log`, and
+`/tmp/sd-creator-rules-archive-browser.log`. Source/archive screenshots accompany
+those browser output directories. No test services intentionally retained.
+
+Core v0.22.0 publication was independently verified; the earlier publication
+block is satisfied. README now reflects the already-declared UI 3.6 contract.
+No Core code, release versions, compatibility requirements or native data changed.
+
+Remaining limits: native v13/v14 creation acceptance (CC-R04/CC-07); shell-wide
+discard protection (CC-R03); operator acceptance of this refinement. Native
+caster tables currently define levels 1–10, so missing higher-level progression
+blocks completion. Arbitrary campaign exceptions have no new bypass. Conditional
+or replacing numeric effects without a recoverable original value remain
+unsupported rather than guessed. General numeric storage controls stay internal.
+
+## Original planning scope and evidence
 
 The user requests a manual, step-based tool for reproducing a paper character at
 level 0–20, with optional rolls. It is separate from random generation and the
@@ -179,8 +528,8 @@ No full source suite or packaging rerun was needed for that read-only review.
 
 | ID | Finding / disposition | Acceptance |
 | --- | --- | --- |
-| CC-R01 | **UI rejected by the operator.** The separate cream panels/sticky sidebar, header and generic control styling did not follow the established Generator. Functional/mounted passes did not establish visual approval. Current work is UI correction only; new features are stopped by explicit user direction. | Follow ADR-0005's concrete Generator reference. Inspect desktop/phone identity, scores, grants and review; obtain operator acceptance. |
-| CC-R02 | **Spell picker eligibility/duplicates (code review).** `CharacterCreator` grant choices call the unfiltered `choose('spells',…)`; ordinary choices exclude fixed/ordinary selections but not spells selected through grants. Server `prepareCreator` rejects ineligible or duplicate choices, so this is a picker/usability gap rather than evidence of invalid creation. | After the current UI correction, reuse shared grant eligibility and exact selected/fixed identities; mark unavailable/selected choices consistently. Preserve legitimate paper ordinary-list deviations. One focused mounted case should cover a grant/ordinary duplicate and an ineligible grant. No rule or picker feature repair in this UI-only pass. |
+| CC-R01 | **Checkpointed.** Original presentation rejection was corrected; shared-header adoption and subsequent sheet frame/height corrections are recorded above. | Preserve the accepted conventions in ADR-0005; historical rejection is not an active feature stop. |
+| CC-R02 | **Implementation checkpointed October26.** Shared grant eligibility and exact fixed/selected spell exclusions now apply to picker and server allowances, with focused mounted coverage. | Native acceptance remains part of CC-R04/CC-07; prior permissive transcription plan is superseded by the rules-guided decision. |
 | CC-R03 | **Shell discard protection remains open.** Current Core tool host renders tools without a dirty-state contract; settings-panel `onDirtyChange` does not cover tools. Drafts remain memory-only. | Separately selected public Core hook and actual shell navigation check; current module-owned Back confirmation is not sufficient. No private host imports or Core edits. |
 | CC-R04 | **Native/operator creation acceptance remains open.** Marker/default normalization, prepared/native equality and interrupted creation have offline evidence only. | Complete CC-07 with explicit disposable native13/14 authority. No live probe or write performed by this review. |
 

@@ -22,7 +22,7 @@ const activeFor=(s:string)=>`creator-active-${s}`;
 /** Compare every reviewed field; native schema may add defaults, IDs and stats.
  * Embedded arrays retain their exact order/count. Modern/legacy changes normalize
  * through the shared reader, preserving their semantics and all other fields. */
-export function creationSourceMatches(actual:any,expected:any):boolean {
+export function creationSourceDifferences(actual:any,expected:any):string[] {
     const normalize=(value:any,kind:'document'|'effect'|'plain'='document'):any=>{
         if(Array.isArray(value))return value.map(v=>normalize(v,kind));
         if(!value||typeof value!=='object')return value;
@@ -31,6 +31,19 @@ export function creationSourceMatches(actual:any,expected:any):boolean {
             for(const k of ['_id','id','uuid','pack','_key'])delete copy[k];
             if(copy._stats)copy._stats=copy._stats.compendiumSource?{compendiumSource:copy._stats.compendiumSource}:{};
         }
+        // Foundry v14 BaseActiveEffect.migrateData/defineSchema replaces an
+        // explicitly empty legacy duration with the permanent-effect schema.
+        // Only this proven empty shape is equivalent; timed/authored durations
+        // and unknown properties must still participate in source verification.
+        if(kind==='effect'&&copy.duration&&typeof copy.duration==='object') {
+            const legacy=['combat','rounds','seconds','startRound','startTime','startTurn','turns'];
+            const duration=copy.duration;
+            if(legacy.some(key=>Object.hasOwn(duration,key))
+                &&Object.keys(duration).every(key=>legacy.includes(key)&&duration[key]===null)) {
+                copy.duration={value:null,units:'seconds',expiry:null,expired:false};
+                if(Object.hasOwn(duration,'startTime')&&!Object.hasOwn(copy,'start'))copy.start=null;
+            }
+        }
         if(kind==='effect'&&(Array.isArray(copy.changes)||Array.isArray(copy.system?.changes))) {
             const raw=copy.system?.changes??copy.changes;
             const changes=readChanges(copy).changes.map(c=>{const normalized={...raw[c.index],key:c.key,type:c.type,value:String(c.value),phase:c.phase,priority:c.priority};delete normalized.mode;return normalized;});
@@ -38,16 +51,23 @@ export function creationSourceMatches(actual:any,expected:any):boolean {
         }
         return Object.fromEntries(Object.entries(copy).map(([k,v])=>[k,normalize(v,kind!=='plain'&&k==='effects'?'effect':kind==='document'&&k==='items'?'document':'plain')]));
     };
-    const includes=(a:any,e:any):boolean=>{
-        if(Array.isArray(e)) {
-            if(!Array.isArray(a)||a.length!==e.length)return false;
-            return e.every((value,index)=>includes(a[index],value));
+    const differences:string[]=[];
+    const compare=(a:any,e:any,path:string)=>{
+        if(differences.length>=20)return;
+        if(Array.isArray(e)){
+            if(!Array.isArray(a)||a.length!==e.length){differences.push(`${path}.length`);return;}
+            e.forEach((value,index)=>compare(a[index],value,`${path}[${index}]`));return;
         }
-        if(e&&typeof e==='object')return !!a&&typeof a==='object'&&Object.entries(e).every(([k,v])=>includes(a[k],v));
-        return a===e;
+        if(e&&typeof e==='object'){
+            if(!a||typeof a!=='object'){differences.push(path);return;}
+            for(const [key,value] of Object.entries(e))compare(a[key],value,path?`${path}.${key}`:key);return;
+        }
+        if(a!==e)differences.push(path);
     };
-    return includes(normalize(actual),normalize(expected));
+    compare(normalize(actual),normalize(expected),'');return differences;
 }
+export function creationSourceMatches(actual:any,expected:any):boolean {return creationSourceDifferences(actual,expected).length===0;}
+
 function receipt(j:Journal) { return {requestId:j.requestId,state:j.state==='prepared'?'not-created':j.state==='complete'?'complete':'uncertain',actorId:j.actorId,
     message:j.state==='complete'?'Creation confirmed. Open the character.':j.state==='prepared'?'No creation was dispatched. Edit and prepare again.':j.message??'Creation may have succeeded. Check creation; do not submit another character.'}; }
 async function reconcile(req:ModuleServerRequest,j:Journal,key:string) {
@@ -72,9 +92,12 @@ async function reconcile(req:ModuleServerRequest,j:Journal,key:string) {
         try {matches=[await requireOwnedActor(req.runtime,id)];}catch{return receipt(j);}
     }
     const actual=matches[0];
-    if(actual?.flags?.shadowdark?.sheetDelver?.creatorOperation!==j.marker||!creationSourceMatches(actual,j.payload)) {
-        j.message='The exact marked character differs from the reviewed source. Review it with your GM; this operation will not create a replacement.';
-        return receipt({...j,state:'dispatched'});
+    if(actual?.flags?.shadowdark?.sheetDelver?.creatorOperation!==j.marker){
+        return {...receipt(j),actorId:undefined,message:'The saved character could not be identified as this creation. Ask your GM to review the request.'};
+    }
+    const differences=creationSourceDifferences(actual,j.payload);
+    if(differences.length){
+        return {...receipt(j),actorId:documentId(actual),differences,message:'Your character was created, but some saved details need checking. Open the character to review it. Checking again will not create a duplicate.'};
     }
     const completed={...j,actorId:documentId(actual),state:'complete' as const};
     await req.runtime.dataStore.set(key,completed);Object.assign(j,completed);return receipt(j);

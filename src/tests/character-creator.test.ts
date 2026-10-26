@@ -1,3 +1,4 @@
+import { creatorAbilityGuidance } from '../logic/creator-ability-guidance';
 /** Real creator planner/routes/journal with pinned sources and public runtime
  * contracts. All storage/transport is isolated; this is not native acceptance. */
 import assert from 'node:assert/strict';
@@ -30,14 +31,33 @@ runtime.rolls={roll:async(formula:string)=>{rollCount++;return {formula,total:fo
 await adapter.initialize({...runtime,logger:console});
 const req=(body:any,user='creator-owner'):any=>({runtime,userSession:{userId:user},json:async()=>copy(body)});
 const base=(level=3,cls=FIGHTER):CharacterDraft=>{
-    const d=emptyCharacterDraft();d.name='Paper character';d.level=level;d.classUuid=cls;d.ancestryUuid=DWARF;
+    const d=emptyCharacterDraft();d.name='Paper character';d.backgroundUuid=rows.find(r=>r.type==='Background')!.uuid;d.alignment='neutral';d.level=level;d.classUuid=cls;d.ancestryUuid=DWARF;
     for(const k of Object.keys(d.abilities))d.abilities[k as keyof typeof d.abilities]={value:12,basis:'effective'};
     d.hp={value:{value:0,basis:'effective'},max:{value:17,basis:'effective'}};
-    d.fixedChoices[`class:Compendium.shadowdark.talents.Item.5bpWuaT0KTNzuzCu`]={target:'Club'};return d;
+    d.fixedChoices[`class:Compendium.shadowdark.talents.Item.5bpWuaT0KTNzuzCu`]={target:'Club'};
+    const c=sources.get(cls),spellcaster=!!c?.system?.spellcasting?.ability;
+    for(let at=1;at<=level;at+=2)d.awards.push({id:`level-${at}`,origin:'recorded',level:at,source:spellcaster?(sources.get(c.system.classTalentTable)?.results.find((r:any)=>/Spellcasting Check/.test(r.name))?.documentUuid??'Compendium.shadowdark.talents.Item.0WmG5j0Wv685YTqO'):'Compendium.shadowdark.talents.Item.WSm6JESNoyFBnkW2',choices:{}});
+    if(spellcaster&&level>0){
+        const fixed=sources.get(DWARF).system.languages.fixed;
+        for(const rarity of ['common','rare'])d.languages.push(...rows.filter(r=>r.type==='Language'&&r.system.rarity===rarity&&!fixed.includes(r.uuid)).slice(0,c.system.languages[rarity]??0).map(r=>r.uuid));
+        d.languages.push(...(c.system.languages.selectOptions??[]).slice(0,c.system.languages.select??0));
+        for(let tier=1;tier<=5;tier++)d.spells.push(...rows.filter(r=>r.type==='Spell'&&r.system.tier===tier&&r.system.class.includes(cls)&&r.uuid!=='Compendium.shadowdark.spells.Item.mByUvcHIVEPWscfH').slice(0,c.system.spellcasting.spellsknown[level]?.[tier]??0).map(r=>({source:r.uuid,castingClass:cls})));
+    }
+    return d;
 };
 const checks:any[]=[];
 async function check(name:string,run:()=>Promise<void>){try{await run();checks.push({name,pass:true});}catch(e){checks.push({name,pass:false,error:String(e)});}}
 async function ready(d:CharacterDraft){let p=await prepareCreator(req({}),d);assert.deepEqual(p.errors,[],JSON.stringify(p.errors));d.acknowledgements=p.warnings.map(w=>w.id);p=await prepareCreator(req({}),d);assert.equal(p.ready,true);return p;}
+await check('ability guidance follows selected native casting/check data and exact core identities',async()=>{
+    assert.equal(creatorAbilityGuidance(sources.get(FIGHTER),[],1)[0].ability,'str');
+    assert.equal(creatorAbilityGuidance(sources.get(WIZARD),[],1)[0].ability,'int');
+    const cls={uuid:'Item.custom',name:'Fighter',system:{spellcasting:{ability:'cha'},classAbilities:['Item.check']}};
+    const checks=[{uuid:'Item.check',name:'Omen',system:{ability:'wis'}},{uuid:'Item.other',name:'Unrelated',system:{ability:'str'}}];
+    assert.deepEqual(creatorAbilityGuidance(cls,checks,1).map(r=>r.ability),['cha','wis']);
+    cls.system.spellcasting.ability='dex';assert.equal(creatorAbilityGuidance(cls,checks,1)[0].ability,'dex');
+    assert.deepEqual(creatorAbilityGuidance(cls,checks,0),[]);
+    assert.deepEqual(creatorAbilityGuidance({uuid:'Item.unknown',name:'Fighter'},[],1),[]);
+});
 await check('manual levels 0,1,2,3,10,20 prepare without writes or advancement replay',async()=>{
     const before=writeCount;for(const level of [0,1,2,3,10,20]){const d=base(level);const p=await ready(d);assert.equal(p.source.system.level.value,level);assert.equal(p.source.system.level.xp,0);assert.equal(p.source.system.attributes.hp.value,0);if(level===0){assert.equal(p.source.system.class,LEVEL_ZERO_CLASS);assert.ok(!p.source.items.some((i:any)=>i._stats?.compendiumSource==='Compendium.shadowdark.talents.Item.5bpWuaT0KTNzuzCu'));}}assert.equal(writeCount,before);
 });
@@ -49,9 +69,9 @@ await check('fixed Player source matches full prepared review with injured HP an
     const d=base();const gear=rows.find(r=>r.type==='Weapon'&&r.name==='Club');d.gear=[{id:'weapon',source:gear.uuid,quantity:2,equipped:true,stashed:false}];d.coins={gp:17,sp:4,cp:9};d.notes='<script>plain paper notes</script>';
     const p=await ready(d);assert.equal(p.source.system.attributes.hp.value,0);assert.equal(p.source.items.at(-1).system.quantity,2);assert.deepEqual(p.source.items.at(-1).effects,gear.effects);assert.ok(!p.source.system.notes.includes('<script>'));
 });
-await check('level20 caster has no fabricated progression and can record actual ordinary Spells',async()=>{
+await check('level20 caster without native progression cannot acknowledge missing allowances away',async()=>{
     const d=base(20,WIZARD),spell=rows.find(r=>r.type==='Spell'&&r.system.tier===5&&r.system.class.includes(WIZARD));d.spells=[{source:spell.uuid,castingClass:WIZARD}];
-    const p=await ready(d);assert.ok(p.warnings.some(w=>w.message.includes('No spell allowance')));assert.ok(p.preview.spellModel.sources.every(s=>Object.values(s.limits).every((l:any)=>l.status==='unavailable')));
+    const p=await prepareCreator(req({}),d);assert.equal(p.ready,false);assert.ok(p.errors.some(w=>w.message.includes('no spells-known data')));assert.ok(p.preview.spellModel.sources.every(s=>Object.values(s.limits).every((l:any)=>l.status==='unavailable')));
 });
 await check('Priest fixed Turn Undead is actual owned inventory and cannot fill ordinary selections twice',async()=>{
     const d=base(1,'Compendium.shadowdark.classes.Item.oZWzXx1WRLg286zD'),p=await ready(d),ref='Compendium.shadowdark.spells.Item.mByUvcHIVEPWscfH';
@@ -59,26 +79,26 @@ await check('Priest fixed Turn Undead is actual owned inventory and cannot fill 
 });
 await check('Shune uses acquisition level for a noncaster, retaining casting source and no Wizard progression',async()=>{
     const d=base(10),grant='Compendium.shadowdark.talents.Item.mgRrWET5MEaGLVNo';const spell=rows.find(r=>r.type==='Spell'&&r.system.tier===2&&r.system.class.includes(WIZARD));
-    d.awards=[{id:'shune',origin:'recorded',source:grant,level:4,choices:{[grant]:{spell:spell.uuid}}}];const p=await ready(d),owned=p.source.items.find((i:any)=>i.type==='Spell');assert.equal(owned.flags.shadowdark.spellGrant.level,4);assert.equal(owned.flags.shadowdark.spellGrant.classUuid,WIZARD);
+    d.awards=[{id:'shune',origin:'recorded',source:grant,level:4,choices:{[grant]:{spell:spell.uuid}}}];const p=await prepareCreator(req({}),d),owned=p.source.items.find((i:any)=>i.type==='Spell');assert.ok(p.errors.some(e=>e.message.includes('Class/Patron table')));assert.equal(owned.flags.shadowdark.spellGrant.level,4);assert.equal(owned.flags.shadowdark.spellGrant.classUuid,WIZARD);
     assert.ok(p.preview.spellModel.sources.every(s=>s.classUuid!==FIGHTER));d.level=20;d.awards[0].level=20;assert.ok((await prepareCreator(req({}),d)).errors.some(e=>e.message.includes('unsupported tier')));
     d.awards[0].level=null;assert.ok((await prepareCreator(req({}),d)).errors.some(e=>e.message.includes('acquisition level')));
 });
 await check('native table OR choices retain exact result IDs and independent stat allocations',async()=>{
-    const d=base(),table=sources.get('Compendium.shadowdark.rollable-tables.RollTable.dExHo4P85MgpwHd9');
+    const d=base(1),table=sources.get('Compendium.shadowdark.rollable-tables.RollTable.dExHo4P85MgpwHd9');
     d.awards=[{id:'table-grant',origin:'table',table:table.uuid,total:8,results:['Pz3scmVvkfGW86Qt'],level:1,choices:{}}];const p=await ready(d);const owned=p.source.items.find((i:any)=>i.flags?.shadowdark?.sheetDelver?.creatorAward?.id==='table-grant');assert.equal(owned.system.level,1);assert.equal(owned.flags.shadowdark.sheetDelver.creatorAward.table,table.uuid);assert.deepEqual(owned.flags.shadowdark.sheetDelver.creatorAward.results,['Pz3scmVvkfGW86Qt']);
     d.awards[0].results!.push('ShfsugAB4FBHqExq');assert.ok((await prepareCreator(req({}),d)).errors.some(e=>e.message.includes('bundle')));
 });
 await check('each native extra-Spell family is validated and preserves its exact casting source',async()=>{
     for(const [grant,cls] of [['T5nkdUM75LSnDpu5',WIZARD],['ZYZkbENdQAiNsEL6','Compendium.shadowdark.classes.Item.KGnBAFiTiLHZJUND'],['LaRNVk9FZkrM1nSJ','Compendium.shadowdark.classes.Item.xdjod5gPhNPIkLth'],['Ey3P0EplF5SHIdey',WIZARD]]) {
-        const d=base(3,cls),source='Compendium.shadowdark.talents.Item.'+grant,spell=rows.find(r=>r.type==='Spell'&&r.system.tier===1&&r.system.class.includes(cls));
-        d.awards=[{id:'family',origin:'recorded',source,level:1,choices:{[source]:{spell:spell.uuid,castingClass:cls}}}];const p=await ready(d);
+        const d=base(3,cls),source='Compendium.shadowdark.talents.Item.'+grant,spell=rows.find(r=>r.type==='Spell'&&r.system.tier===1&&r.system.class.includes(cls)&&!d.spells.some(s=>s.source===r.uuid));
+        d.awards=[{id:'family',origin:'recorded',source,level:1,choices:{[source]:{spell:spell.uuid,castingClass:cls}}}];const p=await prepareCreator(req({}),d);
         assert.ok(p.source.items.some((i:any)=>i.flags?.shadowdark?.spellGrant?.source===source&&i.flags.shadowdark.spellGrant.classUuid===cls));
     }
 });
 await check('two independent stat distributions enforce each allocation and the Warlock restriction',async()=>{
     const d=base(3),table='Compendium.shadowdark.rollable-tables.RollTable.xM3hghlK5nvo46Vo';
     d.awards=[{id:'one-stats',origin:'table',table,total:4,results:[],level:1,choices:{stats:{stats:{str:1,dex:1}}}},{id:'two-stats',origin:'table',table,total:4,results:[],level:3,choices:{stats:{stats:{con:1,wis:1}}}}];
-    const p=await ready(d);assert.equal(p.source.system.abilities.str.value,11);assert.equal(p.source.system.abilities.con.value,11);
+    const p=await prepareCreator(req({}),d);assert.ok(p.errors.some(e=>e.message.includes('Class/Patron table')));assert.equal(p.source.system.abilities.str.value,11);assert.equal(p.source.system.abilities.con.value,11);
     d.awards[0].choices.stats.stats={str:2};assert.ok((await prepareCreator(req({}),d)).errors.some(e=>e.message.includes('Allocate')));
 });
 await check('native equipment overrides demand base entry and stashing changes the prepared review',async()=>{
@@ -99,7 +119,7 @@ await check('unresolved mastery/stat choices cannot be acknowledged away',async(
 });
 await check('only exact native nonrepeatable awards block duplicates; repeatable sources remain independent',async()=>{
     for(const source of NONREPEATABLE_CREATOR_AWARDS){const d=base();d.awards=[{id:'first',origin:'recorded',source,level:1,choices:{}},{id:'second',origin:'recorded',source,level:3,choices:{}}];assert.ok((await prepareCreator(req({}),d)).errors.some(e=>e.message.includes('cannot repeat')));}
-    const d=base(),source='Compendium.shadowdark.talents.Item.vWtHRiL8lNiisrXy';d.awards=[{id:'first',origin:'recorded',source,level:1,choices:{}},{id:'second',origin:'recorded',source,level:3,choices:{}}];const p=await ready(d);assert.equal(p.source.items.filter((i:any)=>i._stats?.compendiumSource===source).length,2);
+    const d=base(),source='Compendium.shadowdark.talents.Item.WSm6JESNoyFBnkW2';d.awards=[{id:'first',origin:'recorded',source,level:1,choices:{}},{id:'second',origin:'recorded',source,level:3,choices:{}}];const p=await ready(d);assert.equal(p.source.items.filter((i:any)=>i._stats?.compendiumSource===source).length,2);
 });
 await check('invalid shapes and forged document bodies fail before all writes',async()=>{
     const before=writeCount;for(const change of [(d:any)=>d.level=21,(d:any)=>d.hp.value.value=NaN,(d:any)=>d.gear=[{id:'bad',source:'Item.fake',quantity:-1}],(d:any)=>d.effects=[],(d:any)=>d.abilities.str.value=Infinity]){const d=base();change(d);await assert.rejects(()=>prepareCreator(req({}),d));}assert.equal(writeCount,before);
@@ -110,8 +130,8 @@ await check('final malformed preflight proves zero writes and remains editable',
 await check('caller permission revocation blocks preparation; no warmed registry bypass',async()=>{deny=true;try{await assert.rejects(()=>prepareCreator(req({}),base()));}finally{deny=false;}});
 await check('optional rolls are explicit and use public runtime only',async()=>{const before=rollCount;await prepareCreator(req({}),base());assert.equal(rollCount,before);const r=await handleCreatorRoll(req({kind:'score'}));assert.equal(r.status,200);assert.equal(rollCount,before+1);});
 await check('optional HP gains use first-level prepared CON and later die totals',async()=>{
-    const d=base(3,WIZARD);d.ancestryUuid='Compendium.shadowdark.ancestries.Item.w3gbUH2DOBxfZPHO';
-    const response=await handleCreatorHP(req({draft:d,gains:[5,3,4]})),body:any=await response.json();assert.equal(response.status,200,JSON.stringify(body));assert.equal(body.hp.max,13);
+    const d=base(3,FIGHTER);
+    const response=await handleCreatorHP(req({draft:d,gains:[5,3,4]})),body:any=await response.json();assert.equal(response.status,200,JSON.stringify(body));assert.equal(body.hp.max,15);assert.equal((await handleCreatorHP(req({draft:d,gains:[9,3,4]}))).status,400);const roll=await handleCreatorRoll(req({kind:'hp',draft:d,classUuid:FIGHTER,level:1}));assert.equal(roll.status,200);assert.match((await roll.json() as any).formula,/2d8kh/);
 });
 await check('full review changes on inventory, notes, numbers and exact acknowledgements',async()=>{const d=base(),p=await ready(d);for(const change of [(d:CharacterDraft)=>d.coins.gp++,(d:CharacterDraft)=>d.notes='Changed',(d:CharacterDraft)=>d.hp.value.value=1]){const next=copy(d);change(next);assert.notEqual((await prepareCreator(req({}),next)).review,p.review);}});
 await check('fresh final review rejects a changed source or stale context without dispatch',async()=>{
@@ -126,7 +146,7 @@ await check('lost acknowledgement settles only from a unique exact marked primar
 await check('unknown outcomes: absent cached/primary evidence, ambiguity and source edits never recreate',async()=>{
     const d=base(),p=await ready(d);transport='timeout';const r=await dispatchCreator(req({}),'ambiguous-test',d,p);transport='ok';const before=writeCount,actual=copy(actors.get(`actor${writeCount}`));actors.delete(actual._id);
     assert.equal((await creatorOperationStatus(req({}),r.requestId))?.state,'uncertain');await assert.rejects(()=>dispatchCreator(req({}),'replacement-test',d,p),/previous creation/);assert.equal(writeCount,before);
-    actors.set(actual._id,actual);actors.set('duplicate',{...copy(actual),_id:'duplicate'});assert.equal((await creatorOperationStatus(req({}),r.requestId))?.state,'uncertain');actors.delete('duplicate');actual.system.coins.gp++;assert.equal((await creatorOperationStatus(req({}),r.requestId))?.state,'uncertain');actual.system.coins.gp--;assert.equal((await creatorOperationStatus(req({}),r.requestId))?.state,'complete');
+    actors.set(actual._id,actual);actors.set('duplicate',{...copy(actual),_id:'duplicate'});assert.equal((await creatorOperationStatus(req({}),r.requestId))?.state,'uncertain');actors.delete('duplicate');actual.system.coins.gp++;const mismatch:any=await creatorOperationStatus(req({}),r.requestId);assert.equal(mismatch.state,'uncertain');assert.equal(mismatch.actorId,actual._id);assert.deepEqual(mismatch.differences,['system.coins.gp']);assert.equal(writeCount,before);actual.system.coins.gp--;assert.equal((await creatorOperationStatus(req({}),r.requestId))?.state,'complete');
 });
 await check('receipt save failure preserves exact acknowledged ID and dispatched fence',async()=>{
     const d=base(),p=await ready(d),before=writeCount;failReceipt=true;const r=await dispatchCreator(req({}),'receipt-test',d,p);assert.equal(r.state,'uncertain');failReceipt=false;assert.equal((await creatorOperationStatus(req({}),'receipt-test'))?.state,'complete');assert.equal(writeCount,before+1);
@@ -148,6 +168,43 @@ await check('source comparison preserves native nested UUIDs and order while all
 await check('recovery normalizes native v13/v14 effect shape while preserving authored extra change fields',async()=>{
     const expected={type:'Player',effects:[{name:'Native grant',changes:[{key:'system.abilities.str.value',mode:2,value:'2',priority:null,extra:'preserve'}]}]},actual={type:'Player',effects:[{_id:'nativeEffect',name:'Native grant',system:{changes:[{key:'system.abilities.str.value',type:'add',value:'2',priority:20,phase:'initial',extra:'preserve'}]}}]};
     assert.ok(creationSourceMatches(actual,expected));actual.effects[0].system.changes[0].extra='changed';assert.equal(creationSourceMatches(actual,expected),false);
+});
+await check('native v14 permanent duration migration settles saved creation without replay',async()=>{
+    const d=base(),p=await ready(d);
+    const legacy={combat:null,rounds:null,seconds:null,startRound:null,startTime:null,startTurn:null,turns:null};
+    const effect=p.source.items.flatMap((item:any)=>item.effects??[])[0];assert.ok(effect);
+    effect.duration=copy(legacy);
+    const before=writeCount;transport='timeout';const dispatched=await dispatchCreator(req({}),'duration-migration',d,p);transport='ok';
+    const actual=actors.get(`actor${writeCount}`);
+    const saved=actual.items.flatMap((item:any)=>item.effects??[])[0];
+    saved.duration={value:null,units:'seconds',expiry:null,expired:false};saved.start=null;
+    assert.ok(creationSourceMatches(actual,p.source));
+    for(const change of [{value:1},{units:'rounds'},{expiry:'turnStart'},{expired:true}]){
+        const altered=copy(actual);Object.assign(altered.items.flatMap((item:any)=>item.effects??[])[0].duration,change);
+        assert.equal(creationSourceMatches(altered,p.source),false);
+    }
+    const timed=copy(p.source);timed.items.flatMap((item:any)=>item.effects??[])[0].duration.rounds=1;
+    assert.equal(creationSourceMatches(actual,timed),false);
+    const started=copy(actual);started.items.flatMap((item:any)=>item.effects??[])[0].start={time:1};
+    assert.equal(creationSourceMatches(started,p.source),false);
+    assert.equal((await creatorOperationStatus(req({}),dispatched.requestId))?.state,'complete');
+    await dispatchCreator(req({}),dispatched.requestId,d,p);assert.equal(writeCount,before+1);
+    const next=await dispatchCreator(req({}),'after-duration-migration',d,p);assert.equal(next.state,'complete');assert.equal(writeCount,before+2);
+});
+await check('level awards and language/spell limits cannot be waived; no writes on invalid creation',async()=>{
+    const before=writeCount;
+    for(const mutate of [(d:CharacterDraft)=>d.backgroundUuid='',(d:CharacterDraft)=>d.alignment='',(d:CharacterDraft)=>d.classUuid=LEVEL_ZERO_CLASS,(d:CharacterDraft)=>d.awards.pop(),(d:CharacterDraft)=>d.awards.push({...d.awards[0],id:'extra'}),(d:CharacterDraft)=>d.awards[0].level=2,(d:CharacterDraft)=>d.languages.push(rows.find(r=>r.type==='Language'&&!sources.get(DWARF).system.languages.fixed.includes(r.uuid)).uuid)]){
+        const d=base();mutate(d);let p=await prepareCreator(req({}),d);d.acknowledgements=p.warnings.map(w=>w.id);p=await prepareCreator(req({}),d);assert.equal(p.ready,false);assert.ok(p.errors.length>0);
+        const response=await handleCreatorCreate(req({requestId:'invalid-rules',draft:d,review:p.review,contextRevision:revision}));assert.equal(response.status,400);
+    }
+    const zero=base(0);zero.backgroundUuid='';zero.alignment='';assert.ok((await prepareCreator(req({}),zero)).errors.filter(e=>e.step===1).length>=2);
+    const wizard=base(1,WIZARD);await ready(wizard);wizard.spells.pop();assert.ok((await prepareCreator(req({}),wizard)).errors.some(e=>e.message.includes('Tier 1')));
+    wizard.spells.push(...rows.filter(r=>r.type==='Spell'&&r.system.tier===1&&r.system.class.includes(WIZARD)&&!wizard.spells.some(s=>s.source===r.uuid)).slice(0,2).map(r=>({source:r.uuid,castingClass:WIZARD})));assert.ok((await prepareCreator(req({}),wizard)).errors.some(e=>e.message.includes('Tier 1')));
+    assert.equal(writeCount,before);
+});
+await check('treasure/gems use bounded native shapes and notes retain sanitized rich text',async()=>{
+    const d=base();d.valuables=[{id:'gem',kind:'gem',name:'Ruby',quantity:1,cost:{gp:50,sp:0,cp:0}},{id:'treasure',kind:'treasure',name:'Idol',quantity:1,cost:{gp:20,sp:5,cp:0}}];d.notes='<p><strong>History</strong></p><script>bad()</script>';
+    const p=await ready(d);assert.equal(p.source.items.find((i:any)=>i.name==='Ruby').type,'Gem');assert.equal(p.source.items.find((i:any)=>i.name==='Idol').system.treasure,true);assert.match(p.source.system.notes,/<strong>History<\/strong>/);assert.doesNotMatch(p.source.system.notes,/script|bad\(\)/);
 });
 console.log(JSON.stringify({scope:'Offline real creator routes, planner, journal + public SDK/testing; not native acceptance',checks},null,2));
 if(checks.some(c=>!c.pass))process.exitCode=1;

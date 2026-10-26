@@ -38,3 +38,24 @@ export function creatorTableOutcome(table: any, total: number) {
         mode: distribute ? 'stats' as const : choose ? 'choose' as const : 'bundle' as const,
         statRule: distribute ? { total: 2, maxPerStat: filter & F.DistributeTwoStatsOnlyOnce ? 1 : 2 } : null, unsupported };
 }
+
+/** Match each recorded award to one level entitlement. A choice entitlement
+ * accepts either native table; it never adds both a talent and a boon slot. */
+export function creatorAwardAllocation(requirements: ReturnType<typeof creatorLevelRequirements>[], awards: {id:string;level:number|null;origin:string;source?:string;table?:string}[], tables: {uuid:string;kind:'talent'|'boon';outcomes:{options:{source:string}[]}[]}[]) {
+    const slots=requirements.flatMap(r=>[
+        ...Array.from({length:r.requiredTalents},()=>({level:r.level,kind:'talent' as const})),
+        ...Array.from({length:r.requiredBoons},()=>({level:r.level,kind:'boon' as const})),
+        ...Array.from({length:r.choiceRolls},()=>({level:r.level,kind:'choice' as const})),
+    ]).map((s,index)=>({...s,id:`${s.level}:${index}`,awardId:null as string|null}));
+    const eligible=(a:typeof awards[number],s:typeof slots[number])=>a.level===s.level&&tables.some(t=>(s.kind==='choice'||s.kind===t.kind)&&(a.origin==='table'?a.table===t.uuid:t.outcomes.some(o=>o.options.some(o=>o.source===a.source))));
+    const assigned=new Map<string,number>();
+    const place=(a:typeof awards[number],seen:Set<number>):boolean=>{
+        for(let i=0;i<slots.length;i++)if(!seen.has(i)&&eligible(a,slots[i])){
+            seen.add(i);const previous=slots[i].awardId;
+            if(!previous||place(awards.find(row=>row.id===previous)!,seen)){slots[i].awardId=a.id;assigned.set(a.id,i);return true;}
+        }
+        return false;
+    };
+    for(const award of awards)place(award,new Set());
+    return {slots,invalid:awards.filter(a=>!assigned.has(a.id)).map(a=>a.id)};
+}

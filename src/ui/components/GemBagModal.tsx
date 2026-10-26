@@ -22,7 +22,7 @@ interface GemBagModalProps {
     onCreateItem?: (data: any) => Promise<unknown>;
     onUpdateItem?: (itemId: string, patch: Record<string, unknown>) => Promise<unknown>;
     /** Sells gems through the inventory's single sale routine. */
-    onSell: (items: any[]) => Promise<unknown>;
+    onSell?: (items: any[]) => Promise<unknown>;
     onDeleteItem?: (itemId: string) => unknown;
 }
 
@@ -35,6 +35,7 @@ export default function GemBagModal({
     onSell,
     onDeleteItem
 }: GemBagModalProps) {
+    const [valueError,setValueError]=useState('');
     const [editingGem, setEditingGem] = useState<GemItem | null>(null);
     const [newName, setNewName] = useState('');
     const [newGp, setNewGp] = useState(0);
@@ -49,7 +50,7 @@ export default function GemBagModal({
     }, 0);
 
     const handleAdd = async () => {
-        if (!newName) return;
+        if (!newName.trim()||valueError) return;
         if (onCreateItem) {
             await onCreateItem({
                 name: newName,
@@ -71,7 +72,7 @@ export default function GemBagModal({
     };
 
     const handleUpdate = async () => {
-        if (!editingGem) return;
+        if (!editingGem||!newName.trim()||valueError) return;
         if (onUpdateItem) {
             await onUpdateItem(editingGem.id, { name: newName, 'system.cost.gp': Number(newGp) });
             setEditingGem(null);
@@ -80,21 +81,22 @@ export default function GemBagModal({
         }
     };
 
-    const handleSell = async (gem: any) => { await onSell([gem]); };
+    const handleSell = async (gem: any) => { await onSell?.([gem]); };
 
     const handleSellAll = async () => {
         if (gems.length === 0) return;
-        await onSell(gems);
+        await onSell?.(gems);
     };
 
     const startEdit = (gem: any) => {
-        setEditingGem(gem);
+        setValueError('');setEditingGem(gem);
         setNewName(gem.name);
         setNewGp(gem.system?.cost?.gp || 0);
         setIsAdding(false);
     };
 
     const cancelEdit = () => {
+        setValueError('');
         setEditingGem(null);
         setNewName('');
         setNewGp(0);
@@ -138,6 +140,7 @@ export default function GemBagModal({
                                     <input
                                         type="text"
                                         value={newName}
+                                        maxLength={200}
                                         onChange={(e) => setNewName(e.target.value)}
                                         className="w-full bg-neutral-50 border-2 border-black p-2 font-serif focus:bg-white outline-none"
                                         placeholder="e.g. Ruby"
@@ -147,11 +150,12 @@ export default function GemBagModal({
                                 <div>
                                     <label className="block text-[10px] uppercase font-bold text-neutral-500 mb-1">Value (GP)</label>
                                     <input
-                                        type="number"
+                                        type="text" inputMode="numeric" pattern="[0-9]*"
                                         value={newGp}
-                                        onChange={(e) => setNewGp(Number(e.target.value))}
+                                        onChange={()=>{}} onInput={(e) => {const raw=e.currentTarget.value,n=Number(raw);if(!/^\d*$/.test(raw)||!Number.isSafeInteger(n)||n<0||n>1000000){setValueError('Enter a whole number from 0 to 1000000.');return;}setValueError('');setNewGp(n);}}
                                         className="w-full bg-neutral-50 border-2 border-black p-2 font-serif focus:bg-white outline-none"
                                     />
+                                    {valueError&&<p role="alert" className="text-red-700 text-sm">{valueError}</p>}
                                 </div>
                             </div>
                             <div className="flex justify-end gap-2 pt-2">
@@ -185,13 +189,13 @@ export default function GemBagModal({
                                     <div className="font-serif text-sm font-bold truncate pr-2">{gem.name}</div>
                                     <div className="text-right font-mono text-sm">{gem.system?.cost?.gp || 0}</div>
                                     <div className="flex justify-end gap-1">
-                                        <button
+                                        {onSell&&<button
                                             onClick={() => handleSell(gem)}
                                             className="p-1.5 text-amber-600 hover:text-amber-800 transition-colors"
                                             title="Sell Gem"
                                         >
                                             <Coins size={14} />
-                                        </button>
+                                        </button>}
                                         <button
                                             onClick={() => startEdit(gem)}
                                             className="p-1.5 text-neutral-400 hover:text-black transition-colors"
@@ -220,7 +224,7 @@ export default function GemBagModal({
                                 <span className="text-xs font-bold uppercase tracking-widest text-neutral-500">Total Value</span>
                                 <span className="text-lg font-bold text-amber-600">{totalValue.toFixed(2)} GP</span>
                             </div>
-                            {gems.length > 0 && (
+                            {onSell && gems.length > 0 && (
                                 <button
                                     onClick={handleSellAll}
                                     className="px-3 py-1 bg-amber-600 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-amber-700 transition-colors flex items-center gap-1 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
