@@ -13,6 +13,7 @@ import { prepareWeaponAttack } from '../logic/weapon-rules';
 import { ShadowdarkUIProvider } from '../ui/context/ShadowdarkUIContext';
 import { ShadowdarkActorProvider } from '../ui/context/ShadowdarkActorContext';
 import AbilitiesTab from '../ui/AbilitiesTab';
+import InventoryTab from '../ui/InventoryTab';
 import TalentsTab from '../ui/TalentsTab';
 import { groupPaperTalents } from '../ui/talent-display';
 import { SheetCharacterName } from '../ui/components/SheetCharacterName';
@@ -331,6 +332,20 @@ async function inventoryControls() {
         const source = armsman([torch(), lantern()]);
         assert.deepEqual(controlsFor(source, 'torch').map(control => control.id), ['stash', 'light']);
         assert.deepEqual(controlsFor(source, 'lantern').map(control => control.id), ['stash'], 'native Lantern is not itself a light source');
+    });
+    await check('C6', 'both inventories show active light remaining time from the current source', () => {
+        for (const component of [InventoryTab, ShadowdarkPaperSheet]) {
+            for (const [seconds, expected] of [[3600, '60 min remaining'], [125, '2 min 5 sec remaining'], [0, '0 sec remaining'], [undefined, 'Time remaining unavailable']] as const) {
+                const source: any = armsman([torch()]);
+                const light = source.items.find((item: any) => item._id === 'torch');
+                light.system.light.active = true;
+                light.system.light.remainingSecs = seconds;
+                const actor = hostActorProjection(prepare(source));
+                assert.ok(render(component, actor).includes(expected), `${component.name}: ${expected}`);
+                light.system.light.active = false;
+                assert.ok(!render(component, hostActorProjection(prepare(source))).includes(expected), 'unlit lights hide remaining time');
+            }
+        }
     });
     await check('C6', 'lighting a torch puts out other lit sources and marks it used', () => {
         const source = armsman([torch(), torch('torch2', { active: true, hasBeenUsed: true })]);

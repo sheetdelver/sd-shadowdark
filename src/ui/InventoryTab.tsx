@@ -1,6 +1,6 @@
 // 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSDK, useSDKComponents } from '@sheet-delver/sdk/react';
 import { shadowdarkTheme } from './themes/shadowdark';
 import { ItemRow } from './InventoryComponents';

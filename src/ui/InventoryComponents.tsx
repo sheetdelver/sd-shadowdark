@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useMemo } from 'react';
+import { LightRemaining } from './components/LightRemaining';
 import { useSDK } from '@sheet-delver/sdk/react';
 import { useShadowdarkActor } from './context/ShadowdarkActorContext';
 import { presentDescription } from '../logic/description';
@@ -76,7 +77,7 @@ export function ItemRow({ item, expandedItems, toggleItem, isTreasure, onSell, o
                 <button type="button" className="col-span-12 sm:col-span-6 font-bold flex items-center text-left min-h-11" aria-expanded={isExpanded}
                     onClick={() => toggleItem(itemId)}>
                     <img src={resolveImageUrl(item.img)} alt="" className="w-8 h-8 object-cover border border-black mr-2 bg-neutral-200 shrink-0" />
-                    <span className="break-words">{item.name}</span>
+                    <span className="break-words">{item.name}{view?.lightSource && <LightRemaining light={item.system?.light} />}</span>
                     {view?.scroll?.spent && <span className="ml-2 text-[10px] uppercase border border-black px-1">Spent</span>}
                     {view?.lightSource && <span className={`ml-2 text-xs ${lit ? 'text-amber-700 font-bold' : 'text-neutral-500'}`}>{lit ? 'Lit' : 'Unlit'}</span>}
                     {view && !view.identified && <span className="ml-2 text-[10px] uppercase border border-black px-1">Unidentified</span>}

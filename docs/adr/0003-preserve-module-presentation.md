@@ -3,6 +3,24 @@
 Status: User review corrections implemented and isolated-verified; target card layout confirmed, remaining functional review open
 Date: 2026-10-20
 
+## Active inventory light time — October 26
+
+Restore remaining time beneath active light names in tabbed Inventory and paper
+Gear, using one `LightRemaining` presentation component. Retain the existing Lit
+indicator and row controls. Format native `system.light.remainingSecs` as minutes
+and seconds, show zero honestly, and show unavailable for missing/invalid data.
+Unlit Items have no remaining-time label. The component reflects refreshed Item
+state; it neither starts a browser countdown nor writes timer values. Native
+`LightSourceTrackerSD` remains the timer authority, including world-time pause and
+GM updates. Existing light-control scope is unchanged.
+
+The existing row is the visual reference: secondary text beneath its name, no
+new card/control design. Regression renders both actual sheet surfaces for full,
+partial-minute, zero, unavailable and unlit values. Native-alignment64/64 and
+explicit module typing pass. Offline desktop/phone previews use the existing
+packaged module CSS and Core preflight; live tracker/operator verification remains
+separate. No new runtime dependency, service or compatibility change.
+
 ## Crawling Kit inventory contents — October 26
 
 Selecting the native Crawling Kit in Gear Selection adds its linked contents,

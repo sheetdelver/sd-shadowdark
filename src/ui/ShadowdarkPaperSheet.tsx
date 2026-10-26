@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { groupPaperTalents, talentLevelLabel } from './talent-display';
 import { Flame } from 'lucide-react';
+import { LightRemaining } from './components/LightRemaining';
 import { SheetCharacterName } from './components/SheetCharacterName';
 import NotesModal from './components/NotesModal';
 import { useShadowdarkActor } from './context/ShadowdarkActorContext';
@@ -247,7 +248,7 @@ export default function ShadowdarkPaperSheet({ onToggleView }: ShadowdarkPaperSh
                                             <button type="button" className={row} onClick={() => openCard({ kind: 'item', itemId: view.id })}>
                                                 <span className="flex gap-1 min-w-0">
                                                     <span className="w-5 text-xs font-bold shrink-0">{index + 1}.</span>
-                                                    <span className="text-xs font-bold uppercase break-words">{view.name}{view.quantity > 1 ? ` ×${view.quantity}` : ''}</span>
+                                                    <span className="text-xs font-bold uppercase break-words">{view.name}{view.quantity > 1 ? ` ×${view.quantity}` : ''}{view.lightSource && <LightRemaining light={item?.system?.light} />}</span>
                                                 </span>
                                                 <span className="flex items-center gap-1 shrink-0 text-[9px] font-bold uppercase">
                                                     {view.lightSource && item?.system?.light?.active && (

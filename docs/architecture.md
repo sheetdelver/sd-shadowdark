@@ -585,8 +585,10 @@ native sheet handlers: equipping clears stashed and stashing clears equipped;
 equipping a shield switches equipped two-handed Versatile weapons to one hand
 and unequips other two-handed weapons; lighting a source puts out any other lit
 source. Light sources come from `system.light.isSource`, not item names. The
-inventory row uses the same helper. Scene light, light chat cards and the light
-tracker are not run. Cards show
+inventory row uses the same helper. Both sheet inventories display active
+`system.light.remainingSecs` through `LightRemaining`, refreshed from Item updates.
+Missing time is unavailable, not a fabricated full duration. Scene light, light
+chat cards and the light tracker are not run; no independent browser clock is added. Cards show
 the current identified presentation only, never the alternate identification
 fields. Descriptions go through `logic/description.ts` and the SDK sanitizer.
 
