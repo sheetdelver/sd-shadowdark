@@ -8,6 +8,7 @@ interface Option {
     uuid?: string;
     description?: string;
     source?: string;
+    disabledReason?: string;
 }
 
 interface CompendiumSelectModalProps {
@@ -74,9 +75,10 @@ export default function CompendiumSelectModal({ isOpen, onClose, onSelect, title
                                 return (
                                     <button
                                         key={opt.uuid || i}
-                                        onClick={() => onSelect(opt)}
+                                        disabled={!!opt.disabledReason}
+                                        onClick={() => {if(!opt.disabledReason)onSelect(opt);}}
                                         className={`
-                                            flex items-center justify-between text-left px-4 py-3 border-2 transition-all
+                                            flex items-center justify-between text-left px-4 py-3 border-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed
                                             ${isSelected
                                                 ? 'bg-black text-white border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]'
                                                 : 'bg-white text-black border-neutral-200 hover:border-black shadow-sm'
@@ -87,6 +89,7 @@ export default function CompendiumSelectModal({ isOpen, onClose, onSelect, title
                                             <span className="font-serif font-black uppercase tracking-wider text-sm truncate">
                                                 {opt.name}
                                             </span>
+                                            {opt.disabledReason && <span className="text-xs font-bold">{opt.disabledReason}</span>}
                                             {opt.description && (
                                                 <span className={`text-[10px] font-medium line-clamp-1 ${isSelected ? 'text-white/60' : 'text-neutral-500'}`}>{String(opt.description ?? '').replace(/<[^>]*>?/gm, '')}</span>
                                             )}

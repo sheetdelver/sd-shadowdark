@@ -132,7 +132,7 @@ export default function ShadowdarkImportForm({ onCancel, onImportSuccess }: Shad
                 icon={<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v12m-4-4 4 4 4-4M4 16v5h16v-5" fill="none" stroke="currentColor" strokeWidth="2" /></svg>} />
 
             <div className="flex-1 px-4 max-w-5xl mx-auto w-full pt-6 mb-20 space-y-8">
-                <section className="bg-white p-6 border-2 border-black shadow-sm">
+                <section className="sd-tool-sheet" aria-label="Shadowdarklings import">
                     <h2 className="text-black font-black font-serif text-xl border-b-2 border-black mb-4 pb-1">Shadowdarklings.net Importer</h2>
 
                     {review && !importedId && (
@@ -262,9 +262,7 @@ export default function ShadowdarkImportForm({ onCancel, onImportSuccess }: Shad
                         </div>
                     )}
 
-                </section>
-
-                <div className="bg-neutral-900 text-white p-8 border-2 border-black shadow-lg flex flex-col items-center justify-center gap-4">
+                <div className="sd-tool-sheet-footer bg-neutral-900 text-white p-8 border-t-2 border-black flex flex-col items-center justify-center gap-4">
                     <p className="text-neutral-400 font-serif italic text-lg opacity-80">&quot;Protect the light!&quot;</p>
                     <div className="flex w-full max-w-md flex-col-reverse gap-3 sm:flex-row">
                     <button
@@ -295,6 +293,7 @@ export default function ShadowdarkImportForm({ onCancel, onImportSuccess }: Shad
                     )}
                     </div>
                 </div>
+                </section>
             </div>
         </main>
     );

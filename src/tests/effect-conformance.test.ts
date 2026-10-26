@@ -199,6 +199,14 @@ check('EC-3', 'the pre-4.0 note is attached to the effect shown on the Effects t
     assert.match(carrier.diagnostics.join(' '), /con\.bonus: pre-4\.0 key; native Shadowdark 4\.0\.6 ignores it\. Its 4\.0 equivalent is system\.abilities\.con\.value = "2"/);
 });
 if (haveNative) for (const shape of ['legacy', 'v14'] as const) {
+    check('EC-3', `[${shape}] two native Backstab awards stack at level4`, () => {
+        const pack = join(nativeRoot, 'data/packs/talents.db');
+        const talent = JSON.parse(readFileSync(join(pack, 'backstab__1_damage_dice__HzzgAIdhoAyfeItJ.json'), 'utf8'));
+        const effect = JSON.parse(readFileSync(join(pack, 'additional_backstab_die__AmcPerJgnykmMwVA.json'), 'utf8'));
+        const actor: any = probeActor([], shape); actor.system.level.value = 4;
+        actor.items.push(...[1,3].map(level => ({ ...structuredClone(talent), _id: `backstab-${level}`, system: { ...talent.system, level }, effects: [effectOf(effect.changes, shape, effect.name)] })));
+        assert.equal(prepareActorCore(actor, lookups).effective.bonus.backstabdice, 2);
+    });
     check('EC-3', `[${shape}] native Destined references resolve after its later die effect, including upgrades`, () => {
         const pack = join(nativeRoot, 'data/packs/talents.db');
         const talent = JSON.parse(readFileSync(join(pack, 'destined__Az2fXCwgo5C3x2X7.json'), 'utf8'));

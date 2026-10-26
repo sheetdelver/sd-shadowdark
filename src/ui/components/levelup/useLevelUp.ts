@@ -1,3 +1,4 @@
+import { STARTING_GOLD } from '../../../logic/advancement';
 import { statChoiceRule, validStatAllocation, type StatAllocation } from '../../../logic/stat-choices';
 import { knownSpellSources, grantedSpellSources } from '../../../logic/spell-model';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
@@ -1444,8 +1445,8 @@ export const useLevelUp = (props: LevelUpProps) => {
         setHpMax(max);
     }, [activeClassObj]);
 
-    const goldFormula = "2d6 x 5";
-    const goldMax = 60;
+    const goldFormula = STARTING_GOLD.label;
+    const goldMax = STARTING_GOLD.max;
 
     return {
         state: {

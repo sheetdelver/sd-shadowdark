@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { groupPaperTalents, talentLevelLabel } from './talent-display';
 import { Flame } from 'lucide-react';
 import NotesModal from './components/NotesModal';
 import { useShadowdarkActor } from './context/ShadowdarkActorContext';
@@ -49,7 +50,7 @@ export default function ShadowdarkPaperSheet({ onToggleView }: ShadowdarkPaperSh
     const attacks = [...(derived.attacks?.melee ?? []).map((a: any) => ({ ...a, _type: 'Melee' })), ...(derived.attacks?.ranged ?? []).map((a: any) => ({ ...a, _type: 'Ranged' }))];
     const spells = views.filter(view => view.type === 'Spell').sort((a, b) => (Number(itemById(a.id)?.system?.tier ?? 0) - Number(itemById(b.id)?.system?.tier ?? 0)) || a.name.localeCompare(b.name));
     const magic = views.filter(view => view.type === 'Scroll' || view.type === 'Wand');
-    const features = views.filter(view => FEATURE_TYPES.includes(view.type));
+    const features = groupPaperTalents(views.filter(view => FEATURE_TYPES.includes(view.type)), actor.items ?? []);
     const gear = views.filter(view => view.physical);
     const freeCarry = gear.filter(view => view.freeCarry > 0 && !view.stashed);
     const ownedClass = (actor.items ?? []).find((item: any) => item.type === 'Class');
@@ -197,10 +198,10 @@ export default function ShadowdarkPaperSheet({ onToggleView }: ShadowdarkPaperSh
                         <section className={`${box} flex flex-col min-h-[8rem]`} aria-label="Talents and abilities">
                             <span className={tag}>Talents</span>
                             <ul className="p-3 pt-8">
-                                {features.map(view => (
+                                {features.map(({ view, items }) => (
                                     <li key={view.id}>
                                         <button type="button" className={row} onClick={() => openCard({ kind: 'item', itemId: view.id })}>
-                                            <span className={`text-xs font-bold uppercase break-words ${view.lost ? 'line-through opacity-60' : ''}`}>{view.name}</span>
+                                            <span className={`text-xs font-bold uppercase break-words ${view.lost ? 'line-through opacity-60' : ''}`}>{view.name}{items.length > 1 ? ` (x${items.length})` : ''}{talentLevelLabel(items) && <span className="block text-[10px] font-normal normal-case text-neutral-600">{talentLevelLabel(items)}</span>}</span>
                                             <span className="text-[10px] text-neutral-600 shrink-0">{view.type === 'Talent' ? '' : view.type}{view.uses?.limited ? ` ${view.uses.available}/${view.uses.max}` : ''}</span>
                                         </button>
                                     </li>

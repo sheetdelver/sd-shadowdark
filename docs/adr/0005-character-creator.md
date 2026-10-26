@@ -3,6 +3,51 @@
 Status: Accepted — header/UI correction accepted; native creation and remaining functional gates open
 Date: 2026-10-23
 
+## Table result and resource shortcuts — October 26
+
+The user selected these follow-up refinements:
+
+- A rolled table total selects its containing native result range, not a nonexistent
+  option for every possible number. Show range labels and the actual rolled total;
+  preserve that total in the award payload. Instruction/choice results still use
+  their existing required choice controls; the placeholder is never a rolled award.
+- Each per-level HP input/roller row also has **Max**, which enters the native
+  Class die maximum for that level. The existing HP calculation applies first-level
+  CON and talents once. Show the selected Class hit die above the HP controls.
+- **Add starting gold** beside Add equipment opens the existing `GoldRollSection`
+  in `ModuleDialog`. Roll, Max (60 GP) and manual entry share the advancement
+  definition (2d6 × 5). The amount is optional, staged until Add, and added to current
+  GP; dismissal changes nothing. No new required money gate or implicit roll.
+- Generator adopts the Creator's connected paper surface while retaining its
+  existing field cards, controls, columns and CTA. See ADR-0003 for presentation.
+
+## Consecutive spell selection and completion — October 26
+
+Follow-up to the refinement checkpoint, selected by the user:
+
+- Ordinary spell choices are grouped by tier within each character level, starting
+  at level1. Reuse `advancementSpellChoices` against the exact native Class rows;
+  retain alternate casting-list identities without borrowing their progression.
+- Fill each level's new allowances before enabling later levels. Completed levels
+  remain reviewable. Choices fill each tier's earliest slots in selection order;
+  removing an earlier choice shifts remaining choices forward and reopens the
+  earliest unmet allowance. No new persisted acquisition-history schema is needed.
+- Fixed and talent/boon spells are additional, included automatically or through
+  their existing choice controls. All selected/granted identities disable the
+  corresponding picker row with **Known**; handlers and final server validation
+  also reject duplicates. Earlier grants cannot borrow a later ordinary spell's
+  tier to qualify a choice at their acquisition level.
+- Retain selections invalidated by a Class/level change in a removable review
+  group. Missing or decreasing intermediate progression blocks completion; no
+  inferred unlimited choices or progression beyond native data.
+- A confirmed create or explicit recovery check opens `/actors/<id>` directly.
+  Uncertain outcomes retain recovery without redirect/replay. A fresh Creator
+  visit still ignores a completed historical receipt.
+
+Use existing Creator bordered sections, typography and compendium dialog; this
+is a procedural refinement, not a new tool design. Evidence is recorded in the
+workflow audit. Native acceptance and the public shell discard hook remain open.
+
 ## Refinement checkpoint — October 26
 
 The user requested checkmarks, annotations and a commit of the selected work.
@@ -16,6 +61,10 @@ replace the separate native acceptance matrix or close the whole ADR.
 - [x] Treasure/gems, shared rich-text notes and procedural review.
 - [x] Permanent-effect duration reconciliation and fresh Creator re-entry.
 - [x] One shared sheet navigation bar, no top gap or paper frame, content-only height.
+- [x] Consecutive level/tier spell choices and known-spell exclusion.
+- [x] Direct navigation after confirmed creation or recovery.
+- [x] Native table range selection, per-level Max HP and optional starting gold.
+- [x] Connected Generator/importer surfaces and flush action footers (ADR-0003).
 - [x] Changelog, rules, architecture and evidence annotations.
 - [ ] Native v13/v14 Creator acceptance and actual saved-request recovery recheck (CC-R04/CC-07).
 - [ ] Public SDK hook for shell-wide discard protection (CC-R03).

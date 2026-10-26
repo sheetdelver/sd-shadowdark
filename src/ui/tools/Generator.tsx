@@ -823,9 +823,10 @@ function GeneratorContent() {
                     </button>
             } />
 
-            {/* Main Content Area */}
+            {/* One connected paper surface, matching the Character Creator. */}
             <div className="flex-1 px-4 max-w-5xl mx-auto w-full pt-6 mb-20 space-y-8">
 
+                <section className="sd-tool-sheet sd-generator-sheet space-y-8" aria-label="Character generation">
                 {/* Main Grid Layout */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
 
@@ -1433,7 +1434,7 @@ function GeneratorContent() {
 
 
                 {/* Create Character CTA Button (Full Width Bottom) */}
-                <div className="bg-neutral-900 text-white p-8 border-2 border-black shadow-lg flex flex-col items-center justify-center gap-4">
+                <div className="sd-tool-sheet-footer bg-neutral-900 text-white p-8 border-t-2 border-black flex flex-col items-center justify-center gap-4">
                     <p className="text-neutral-400 font-serif italic text-lg opacity-80">&quot;Protect the light!&quot;</p>
                     {creationError && (
                         <div className="w-full max-w-md bg-red-900/50 border border-red-500 text-red-200 px-4 py-2 rounded text-center text-sm font-bold animate-pulse">
@@ -1449,6 +1450,8 @@ function GeneratorContent() {
                     </button>
                     <p className="text-xs text-neutral-500">{(systemData?.titles?.main || 'Shadowdark')} {systemData?.titles?.version || ''}</p>
                 </div>
+
+                </section>
 
                 {/* Stat Selection Modal */}
                 {currentStatPrompt && (

@@ -9,10 +9,13 @@ import CreateTreasureModal from '../components/CreateTreasureModal';
 import GemBagModal from '../components/GemBagModal';
 import { shadowdarkTheme } from '../themes/shadowdark';
 import { allocateLanguageInventory } from '../../logic/languages';
-import { spellLimit } from '../../logic/spell-model';
+import { creatorSpellProgression } from '../../logic/creator-spell-progression';
 import { spellGrantClasses } from '../../logic/spell-grants';
 import { creatorAbilityGuidance } from '../../logic/creator-ability-guidance';
 import { NONREPEATABLE_CREATOR_AWARDS } from '../../logic/creator-awards';
+import ModuleDialog from '../components/ModuleDialog';
+import { GoldRollSection } from '../components/levelup/sections/GoldRollSection';
+import { STARTING_GOLD } from '../../logic/advancement';
 import ModulePageHeader from '../components/ModulePageHeader';
 import { StatPoolSelectionSection } from '../components/levelup/sections/StatPoolSelectionSection';
 import { LEVEL_ZERO_CLASS, emptyCharacterDraft, type CharacterDraft, type CreatorChoices } from '../../logic/character-creation';
@@ -38,8 +41,10 @@ export function CreatorContent() {
     const [busy,setBusy]=useState(false),[error,setError]=useState(''),[refresh,setRefresh]=useState(0);
     const [operation,setOperation]=useState<Operation|null>(null),[statusReady,setStatusReady]=useState(false);
     const [requestId,setRequestId]=useState(id),[confirm,setConfirm]=useState<{title:string;message:string;run:()=>void}|null>(null);
-    const [picker,setPicker]=useState<{title:string;options:any[];select:(row:any)=>void}|null>(null),[gearOpen,setGearOpen]=useState(false);
+    const [picker,setPicker]=useState<{title:string;options:any[];select:(row:any)=>void;spellChoice?:boolean}|null>(null),[gearOpen,setGearOpen]=useState(false);
     const [treasureOpen,setTreasureOpen]=useState(false),[gemsOpen,setGemsOpen]=useState(false);
+    const [goldOpen,setGoldOpen]=useState(false),[goldAmount,setGoldAmount]=useState<number|null>(null);
+    const [reviewSpellLevel,setReviewSpellLevel]=useState<number|null>(null);
     const [gains,setGains]=useState<Record<number,number|null>>({});
     const [fieldErrors,setFieldErrors]=useState<Record<string,string>>({});
     const [tableUuid,setTableUuid]=useState(''),[tableTotal,setTableTotal]=useState<number|null>(null);
@@ -57,11 +62,12 @@ export function CreatorContent() {
             setDraft(previous=>{const next=structuredClone(previous);if(!keepAcknowledgements)next.acknowledgements=[];change(next);if(hpInputs(next)!==hpInputs(previous))next.hp={value:{value:null,basis:'effective'},max:{value:null,basis:'effective'}};return next;});
     };
     useLayoutEffect(()=>{
-        epoch.current++;actionEpoch.current++;setPlan(null);setPicker(null);setGearOpen(false);setTreasureOpen(false);setGemsOpen(false);setConfirm(null);setBusy(false);setStatusReady(false);
+        epoch.current++;actionEpoch.current++;setPlan(null);setPicker(null);setGearOpen(false);setTreasureOpen(false);setGemsOpen(false);setGoldOpen(false);setGoldAmount(null);setConfirm(null);setBusy(false);setStatusReady(false);
         if(oldScope.current!==scope){setDraft(emptyCharacterDraft());setStep(0);setOperation(null);setRequestId(id());setGains({});setFieldErrors({});dismissedReceipt.current=null;oldScope.current=scope;}
     },[scope,isConnected,data.generation]);
     useEffect(()=>events.on('world:contextChanged',()=>{epoch.current++;actionEpoch.current++;setBusy(false);setPlan(null);setConfirm(null);setRefresh(n=>n+1);}),[events]);
     useEffect(()=>{heading.current?.focus();},[step]);
+    useEffect(()=>setReviewSpellLevel(null),[draft.classUuid,draft.level,scope]);
     useEffect(()=>{
         if(!isConnected)return;let active=true;setStatusReady(false);
         post('status',{}).then(result=>{if(active){if(result.operation?.requestId!==dismissedReceipt.current)setOperation(previous=>
@@ -115,16 +121,26 @@ export function CreatorContent() {
     const classDoc=(data.collections.classes??[]).find((r:any)=>r.uuid===draft.classUuid);
     const abilityGuidance=creatorAbilityGuidance(classDoc,data.collections['class-abilities']??[],draft.level);
     const chosenSpells=new Set([...draft.spells.map(s=>s.source),...(plan?.fixedSpells.map(s=>s.source)??[]),...Object.values(draft.fixedChoices).map(c=>c.spell),...draft.awards.flatMap(a=>Object.values(a.choices).map(c=>c.spell))].filter(Boolean));
+    const tableOutcome=plan?.tables.find(t=>t.uuid===tableUuid)?.outcomes.find(o=>tableTotal!==null&&o.range[0]<=tableTotal&&o.range[1]>=tableTotal);
     const nextSlot=plan?.awardAllocation.slots.find(s=>!s.awardId);
     const availableTables=(plan?.tables??[]).filter(t=>nextSlot&&(nextSlot.kind==='choice'||t.kind===nextSlot.kind));
     const awardOptions=(data.collections.talents??[]).filter((r:any)=>availableTables.some(t=>t.outcomes.some(o=>o.options.some((o:{source:string})=>o.source===r.uuid)))&&(!NONREPEATABLE_CREATOR_AWARDS.has(r.uuid)||!draft.awards.some(a=>a.source===r.uuid)));
     const availableLanguages=(data.collections.languages??[]).filter((r:any)=>plan&&!plan.languagePlan.fixed.includes(r.uuid)&&!draft.languages.includes(r.uuid)&&allocateLanguageInventory(plan.languagePlan,[...draft.languages,r.uuid]).extra.length===0);
-    const availableSpells=(data.collections.spells??[]).filter((s:any)=>{
-        if(!plan?.listUuid||!classDoc?.system?.spellcasting?.ability||draft.level===0||chosenSpells.has(s.uuid)||!s.system?.class?.includes(plan.listUuid))return false;
-        const limit=spellLimit(classDoc.system.spellcasting.spellsknown,draft.level,s.system.tier);
-        return limit.status==='known'&&draft.spells.filter(r=>(data.collections.spells??[]).find((d:any)=>d.uuid===r.source)?.system?.tier===s.system.tier).length<limit.value;
-    });
     const addValuable=(kind:'treasure'|'gem',item:any)=>edit(d=>{(d.valuables??=[]).push({id:id(),kind,name:item.name,quantity:item.system.quantity??1,cost:{...item.system.cost}});});
+    const ordinaryCatalog=(data.collections.spells??[]).filter((s:any)=>plan?.listUuid&&s.system?.class?.includes(plan.listUuid));
+    const spellStages=creatorSpellProgression(classDoc,draft.level,draft.spells,ordinaryCatalog);
+    const assignedSpells=new Set(spellStages.flatMap(stage=>stage.tiers.flatMap(t=>t.selected)));
+    const extraSpells=draft.spells.filter(s=>!assignedSpells.has(s.source));
+    const nextSpellLevel=spellStages.find(stage=>!stage.complete)?.level??draft.level;
+    const spellStage=spellStages.find(stage=>stage.level===Math.min(reviewSpellLevel??nextSpellLevel,nextSpellLevel));
+    const chooseOrdinarySpell=(tier:number)=>setPicker({title:`Level ${spellStage!.level} · Tier ${tier} spells`,spellChoice:true,
+        options:ordinaryCatalog.filter((s:any)=>s.system?.tier===tier),select:row=>{
+            if(chosenSpells.has(row.uuid)||!spellStage||spellStage.diagnostics.length)return;
+            const allowance=spellStage.tiers.find(t=>t.tier===tier);
+            if(!allowance||allowance.selected.length>=allowance.required)return;
+            setReviewSpellLevel(null);edit(d=>{if(!d.spells.some(s=>s.source===row.uuid))d.spells.push({source:row.uuid,castingClass:plan!.listUuid!});});
+        }});
+
     const choice=(p:any)=>{
         const award=draft.awards.find(a=>a.id===p.awardId);
         const choiceKey=award?.origin==='recorded'?award.source!:p.key===p.awardId?'stats':p.key.slice(p.awardId.length+1);
@@ -135,7 +151,7 @@ export function CreatorContent() {
                 onChange={(stat,delta)=>update(c=>{c.stats={...c.stats,[stat]:(c.stats?.[stat]??0)+delta};})}/>}
             {p.targetKind&&<label>Choose {p.targetKind}<select value={current.target??''} onChange={e=>update(c=>{c.target=e.target.value;})}>
                 <option value="">Choose…</option>{(plan?.targetCatalog[p.targetKind as keyof CreatorPlan['targetCatalog']]??[]).map((o:any)=><option key={o.slug} value={o.name}>{o.name}</option>)}</select></label>}
-            {p.spellGrant&&<><button type="button" onClick={()=>setPicker({title:`Spell for ${p.name}`,options:(data.collections.spells??[]).filter((s:any)=>!chosenSpells.has(s.uuid)&&p.level!==null&&spellGrantClasses({uuid:p.source},s,{level:p.level,classDoc,known:(data.collections.spells??[]).filter((s:any)=>draft.spells.some(r=>r.source===s.uuid)||plan?.fixedSpells.some(r=>r.source===s.uuid))}).length>0),select:row=>update(c=>{c.spell=row.uuid;c.castingClass='';})})}>
+            {p.spellGrant&&<><button type="button" onClick={()=>setPicker({title:`Spell for ${p.name}`,spellChoice:true,options:(data.collections.spells??[]).filter((s:any)=>p.level!==null&&spellGrantClasses({uuid:p.source},s,{level:p.level,classDoc,known:(data.collections.spells??[]).filter((s:any)=>spellStages.filter(stage=>stage.level<=p.level).some(stage=>stage.tiers.some(t=>t.selected.includes(s.uuid)))||plan?.fixedSpells.some(r=>r.source===s.uuid))}).length>0),select:row=>{if(!chosenSpells.has(row.uuid))update(c=>{c.spell=row.uuid;c.castingClass='';});}})}>
                 {(data.collections.spells??[]).find((s:any)=>s.uuid===current.spell)?.name??'Choose granted Spell…'}</button>
                 {!p.spellGrant.classUuid&&current.spell&&<label>Granted casting list<select aria-label={`Casting list for ${p.name}`} value={current.castingClass??''} onChange={e=>update(c=>{c.castingClass=e.target.value;})}>
                     <option value="">Choose…</option>{((data.collections.spells??[]).find((s:any)=>s.uuid===current.spell)?.system?.class??[]).map((ref:string)=><option key={ref} value={ref}>{(data.collections.classes??[]).find((r:any)=>r.uuid===ref)?.name??'Unavailable Class'}</option>)}</select></label>}
@@ -143,9 +159,9 @@ export function CreatorContent() {
             {feedback(`choice:${p.key}`)}
         </div>;
     };
-    const roll=async(kind:'score'|'hp'|'table',apply:(total:number)=>void,extra:any={})=>{
+    const roll=async(kind:'score'|'hp'|'table'|'gold',apply:(total:number)=>void,extra:any={})=>{
         const current=epoch.current,action=++actionEpoch.current;setBusy(true);setError('');
-        try {const result=await post('roll',{kind,...extra});if(current===epoch.current)apply(result.total);}catch(e){if(current===epoch.current)fieldError(kind==='hp'?`hp:${extra.level}`:'awards',(e as Error).message);}finally{if(action===actionEpoch.current)setBusy(false);}
+        try {const result=await post('roll',{kind,...extra});if(current===epoch.current)apply(result.total);}catch(e){if(current===epoch.current)fieldError(kind==='hp'?`hp:${extra.level}`:kind==='gold'?'coins':'awards',(e as Error).message);}finally{if(action===actionEpoch.current)setBusy(false);}
     };
     const rollName=async()=>{
         if(!draft.ancestryUuid)return;
@@ -183,7 +199,7 @@ export function CreatorContent() {
     };
     const checkCreation=async()=>{
         const current=epoch.current,action=++actionEpoch.current;
-        setBusy(true);try{const result=await post('status',operation?{requestId:operation.requestId}:{});if(current!==epoch.current)return;if(result.operation)setOperation(result.operation);else if(operation?.state==='uncertain')setError('The saved creation receipt is unavailable. This does not prove creation failed; review with your GM before any replacement.');setStatusReady(true);}catch(e){if(current===epoch.current)setError((e as Error).message);}finally{if(action===actionEpoch.current)setBusy(false);}
+        setBusy(true);try{const result=await post('status',operation?{requestId:operation.requestId}:{});if(current!==epoch.current)return;if(result.operation){setOperation(result.operation);if(result.operation.state==='complete'&&result.operation.actorId)navigate(`/actors/${result.operation.actorId}`);}else if(operation?.state==='uncertain')setError('The saved creation receipt is unavailable. This does not prove creation failed; review with your GM before any replacement.');setStatusReady(true);}catch(e){if(current===epoch.current)setError((e as Error).message);}finally{if(action===actionEpoch.current)setBusy(false);}
     };
     const create=async()=>{
         if(!plan?.ready||planStale||!statusReady)return;
@@ -197,7 +213,7 @@ export function CreatorContent() {
             if(current!==epoch.current)return;
             if(result.creationWrites==='none'){if(result.plan)setPlan(result.plan);setOperation(null);setError(result.error);}
             else if(result.reviewChanged){setPlan(result.plan);setOperation(null);setError('Sources or reviewed entries changed. Review the refreshed character before creating.');}
-            else setOperation(result.operation);
+            else {setOperation(result.operation);if(result.operation?.state==='complete'&&result.operation.actorId)navigate(`/actors/${result.operation.actorId}`);}
         }catch(e){if(current===epoch.current)setError((e as Error).message);}finally{if(action===actionEpoch.current)setBusy(false);}
     };
     const allItems=[...(data.collections.gear??[]),...(data.collections['magic-items']??[])];
@@ -243,10 +259,10 @@ export function CreatorContent() {
                     {!!plan?.classChoiceCount&&<fieldset><legend>Choose {plan.classChoiceCount} Class talents</legend>{plan.classOptions.map(o=><label key={o.uuid}><input type="checkbox" disabled={!draft.classTalents.includes(o.uuid)&&draft.classTalents.length>=plan.classChoiceCount} checked={draft.classTalents.includes(o.uuid)} onChange={()=>edit(d=>{d.classTalents=d.classTalents.includes(o.uuid)?d.classTalents.filter(r=>r!==o.uuid):[...d.classTalents,o.uuid];})}/>{o.name}</label>)}</fieldset>}{feedback('classTalents')}
                     {plan?.requirements.filter(r=>r.requiredTalents+r.requiredBoons+r.choiceRolls>0).map(r=><p key={r.level}>Level {r.level}: {r.requiredTalents} talents, {r.requiredBoons} boons{r.choiceRolls?`, ${r.choiceRolls} talent or boon choice`:''}</p>)}
                     <button type="button" disabled={!nextSlot||!awardOptions.length||planStale} onClick={()=>nextSlot&&setPicker({title:'Recorded Talent or Boon',options:awardOptions,select:row=>edit(d=>{d.awards.push({id:id(),origin:'recorded',level:nextSlot.level,source:row.uuid,choices:{}});})})}>{nextSlot?`Choose level ${nextSlot.level} ${nextSlot.kind==='choice'?'talent or boon':nextSlot.kind}`:'All level awards selected'}</button>{feedback('awards')}
-                    <details><summary>Choose or roll a native table result</summary><label>Award table<select value={tableUuid} onChange={e=>{setTableUuid(e.target.value);setTableTotal(null);}}><option value="">Choose…</option>{availableTables.map(t=><option key={t.uuid} value={t.uuid}>{t.name}</option>)}</select></label>
-                        <label>Native result group<select value={tableTotal??''} onChange={e=>setTableTotal(e.target.value===''?null:Number(e.target.value))}><option value="">Choose…</option>{plan?.tables.find(t=>t.uuid===tableUuid)?.outcomes.map((o:any)=><option key={o.total} value={o.total}>{o.total}: {o.options.map((r:any)=>r.label).join(' / ')||o.text}</option>)}</select></label>
-                        <button type="button" disabled={!availableTables.some(t=>t.uuid===tableUuid)||planStale} onClick={()=>void roll('table',setTableTotal,{tableUuid})}>Roll table</button>
-                        <button type="button" disabled={!nextSlot||!availableTables.some(t=>t.uuid===tableUuid)||tableTotal===null||planStale} onClick={()=>edit(d=>{const outcome=plan?.tables.find(t=>t.uuid===tableUuid)?.outcomes.find((o:any)=>o.range[0]<=tableTotal!&&o.range[1]>=tableTotal!);d.awards.push({id:id(),origin:'table',table:tableUuid,total:tableTotal!,results:outcome?.mode==='bundle'?outcome.options.map((o:any)=>o.id):[],level:nextSlot!.level,choices:{}});})}>Add table award</button></details>
+                    <details><summary>Choose or roll a native table result</summary><label>Award table<select aria-label="Award table" value={tableUuid} onChange={e=>{setTableUuid(e.target.value);setTableTotal(null);}}><option value="">Choose…</option>{availableTables.map(t=><option key={t.uuid} value={t.uuid}>{t.name}</option>)}</select></label>
+                        <label>Native result group<select aria-label="Native result group" value={tableOutcome?.total??''} onChange={e=>setTableTotal(e.target.value===''?null:Number(e.target.value))}><option value="">Choose…</option>{plan?.tables.find(t=>t.uuid===tableUuid)?.outcomes.map((o:any)=><option key={o.total} value={o.total}>{o.range[0]===o.range[1]?o.range[0]:`${o.range[0]}–${o.range[1]}`}: {o.options.map((r:any)=>r.label).join(' / ')||o.text}</option>)}</select></label>
+                        <button type="button" disabled={!availableTables.some(t=>t.uuid===tableUuid)||planStale} onClick={()=>void roll('table',setTableTotal,{tableUuid})}>Roll table</button>{tableTotal!==null&&<p>Table total: {tableTotal}{!tableOutcome?' — no matching native result.':''}</p>}
+                        <button type="button" disabled={!nextSlot||!availableTables.some(t=>t.uuid===tableUuid)||!tableOutcome||planStale} onClick={()=>edit(d=>{const outcome=plan?.tables.find(t=>t.uuid===tableUuid)?.outcomes.find((o:any)=>o.range[0]<=tableTotal!&&o.range[1]>=tableTotal!);d.awards.push({id:id(),origin:'table',table:tableUuid,total:tableTotal!,results:outcome?.mode==='bundle'?outcome.options.map((o:any)=>o.id):[],level:nextSlot!.level,choices:{}});})}>Add table award</button></details>
                     {draft.awards.map(a=>{const view=plan?.awards.find(r=>r.id===a.id),outcome=plan?.tables.find(t=>t.uuid===a.table)?.outcomes.find((o:any)=>o.range[0]<=a.total!&&o.range[1]>=a.total!);return <section className="sd-creator-award" key={a.id}><h3>{view?.name||'Recorded award'}</h3>
                         <label>Gained at level{numeric(`award:${a.id}`,'Gained at level',a.level,n=>edit(d=>{d.awards.find(r=>r.id===a.id)!.level=n;}),1,draft.level)}{feedback(`award:${a.id}`)}</label>
                         {a.origin==='table'&&outcome?.mode==='choose'&&<fieldset><legend>Choose {outcome.count} result</legend>{outcome.options.map((o:any)=><label key={o.id}><input type="checkbox" checked={a.results?.includes(o.id)??false} onChange={()=>edit(d=>{const target=d.awards.find(r=>r.id===a.id)!;target.results=target.results!.includes(o.id)?target.results!.filter(r=>r!==o.id):[...target.results!,o.id];})}/>{o.label}</label>)}</fieldset>}
@@ -258,19 +274,36 @@ export function CreatorContent() {
                     <button type="button" disabled={!availableLanguages.length||planStale} onClick={()=>setPicker({title:'Language on your sheet',options:availableLanguages,select:row=>edit(d=>{if(!d.languages.includes(row.uuid))d.languages.push(row.uuid);})})}>Add Language</button>{feedback('languages')}
                     <ul>{draft.languages.map(ref=><li key={ref}>{(data.collections.languages??[]).find((r:any)=>r.uuid===ref)?.name??'Source unavailable'} <button type="button" onClick={()=>edit(d=>{d.languages=d.languages.filter(r=>r!==ref);})}>Remove language</button></li>)}</ul>
                     <h3>Spells</h3><p>Fixed Spells: {plan?.fixedSpells.map(s=>s.name).join(', ')||'None'}. Fixed Spells are included automatically.</p>
-                    {classDoc?.system?.spellcasting?.ability&&draft.level>0&&[1,2,3,4,5].map(tier=>{const limit=spellLimit(classDoc.system.spellcasting.spellsknown,draft.level,tier);return <p key={tier}>Tier {tier}: {draft.spells.filter(s=>(data.collections.spells??[]).find((r:any)=>r.uuid===s.source)?.system?.tier===tier).length} / {limit.status==='known'?limit.value:'Progression unavailable'}</p>;})}
-                    <button type="button" disabled={!availableSpells.length||planStale} onClick={()=>setPicker({title:'Ordinary Spell on your sheet',options:availableSpells,select:row=>edit(d=>{d.spells.push({source:row.uuid,castingClass:plan!.listUuid!});})})}>Add ordinary Spell</button>{feedback('spells')}
-                    <ul>{draft.spells.map((s,i)=>{const row=(data.collections.spells??[]).find((r:any)=>r.uuid===s.source);return <li key={s.source}>{row?.name??'Source unavailable'} <label>Casting list<select disabled value={s.castingClass} onChange={e=>edit(d=>{d.spells[i].castingClass=e.target.value;})}>{row?.system?.class?.map((ref:string)=><option key={ref} value={ref}>{(data.collections.classes??[]).find((r:any)=>r.uuid===ref)?.name??'Unavailable Class'}</option>)}</select></label><button type="button" onClick={()=>edit(d=>{d.spells.splice(i,1);})}>Remove Spell</button></li>;})}</ul>
+                    {spellStages.length>0&&<>
+                        <label>Spell selection level<select aria-label="Spell selection level" value={spellStage?.level??1} onChange={e=>setReviewSpellLevel(Number(e.target.value))}>
+                            {spellStages.map(stage=><option key={stage.level} value={stage.level} disabled={stage.level>nextSpellLevel}>Level {stage.level}{stage.complete?' — complete':stage.level>nextSpellLevel?' — locked':''}</option>)}
+                        </select></label>
+                        <p>Complete each level in order. Granted spells are additional and do not use these choices.</p>
+                        {spellStage&&<section aria-label={`Level ${spellStage.level} spell choices`}>
+                            <h3>Level {spellStage.level} spells</h3>
+                            {spellStage.diagnostics.length>0&&<p role="alert">Native spell progression is unavailable for this level. Later levels remain locked.</p>}
+                            {spellStage.tiers.map(t=><section className="sd-creator-award" key={t.tier} aria-label={`Tier ${t.tier} spells`}>
+                                <h3>Tier {t.tier}</h3>
+                                <p>{t.limit.status!=='known'?'Progression unavailable':t.limit.value===0?'Not unlocked at this level':`${t.selected.length} / ${t.required} new spells selected · ${t.knownBefore} learned at earlier levels`}</p>
+                                <ul>{t.selected.map(ref=><li key={ref}>{ordinaryCatalog.find((s:any)=>s.uuid===ref)?.name??'Source unavailable'} <button type="button" onClick={()=>{setReviewSpellLevel(null);edit(d=>{d.spells=d.spells.filter(s=>s.source!==ref);});}}>Remove Spell</button></li>)}</ul>
+                                <button type="button" disabled={planStale||!!spellStage.diagnostics.length||t.selected.length>=t.required||!ordinaryCatalog.some((s:any)=>s.system?.tier===t.tier&&!chosenSpells.has(s.uuid))} onClick={()=>chooseOrdinarySpell(t.tier)}>Choose tier {t.tier} spell</button>
+                            </section>)}
+                        </section>}
+                    </>}
+                    {!spellStages.length&&<p>No ordinary Class spell choices. Any granted spells are selected through their talent or boon.</p>}
+                    {extraSpells.length>0&&<section aria-label="Spells outside the current allowance"><h3>Review earlier selections</h3><p>These spells no longer fit this Class or level. Remove them to continue.</p><ul>{extraSpells.map(s=><li key={s.source}>{(data.collections.spells??[]).find((row:any)=>row.uuid===s.source)?.name??'Source unavailable'} <button type="button" onClick={()=>edit(d=>{d.spells=d.spells.filter(row=>row.source!==s.source);})}>Remove Spell</button></li>)}</ul></section>}
+                    {feedback('spells')}
                     {plan?.choices.filter(p=>p.spellGrant).map(choice)}
                 </>}
                 {step===4&&<><p>{draft.level===0?'Level 0 HP uses your Constitution modifier (minimum 1), plus applicable talents.':'Enter or roll the hit die for each level. First-level Constitution and applicable talents are included in the total.'}</p>
+                    {draft.level>0&&<p><strong>{classDoc?.name??'Class'} hit die: {plan?.hitDie??'Unavailable'}</strong></p>}
                     {draft.level>0&&<button type="button" className="sd-creator-roll" onClick={()=>void rollAllHP()}>Roll all HP</button>}
                     <div className="sd-creator-hp-levels" style={{display:'grid',gridTemplateColumns:'minmax(0, 1fr)',gap:'1rem'}}>{Array.from({length:draft.level},(_,i)=>{const level=i+1;return <div className="sd-creator-score" key={level}>
                         <h3>Level {level}</h3><div className="sd-creator-hp-row" style={{display:'flex',alignItems:'center',gap:'.75rem'}}><div style={{flex:'1 1 0%',minWidth:0}}>{numeric(`hp:${level}`,`Level ${level} HP roll`,gains[level]??null,n=>setHPGain(level,n),1,Number(plan?.hitDie?.slice(1))||0)}</div>
-                        {diceButton(`Roll level ${level} HP`,()=>void roll('hp',total=>setHPGain(level,total),{classUuid:draft.classUuid,draft,level}))}</div>{feedback(`hp:${level}`)}{gains[level]==null&&!fieldErrors[`hp:${level}`]&&<p style={{color:'#b91c1c',fontSize:'.875rem'}}>Enter or roll 1–{Number(plan?.hitDie?.slice(1))||'…'} HP for this level.</p>}</div>;})}</div>
+                        {diceButton(`Roll level ${level} HP`,()=>void roll('hp',total=>setHPGain(level,total),{classUuid:draft.classUuid,draft,level}))}<button type="button" aria-label={`Max level ${level} HP`} disabled={planStale||!/^d(?:4|6|8|10|12)$/.test(plan?.hitDie??'')} onClick={()=>setHPGain(level,Number(plan!.hitDie!.slice(1)))}>Max</button></div>{feedback(`hp:${level}`)}{gains[level]==null&&!fieldErrors[`hp:${level}`]&&<p style={{color:'#b91c1c',fontSize:'.875rem'}}>Enter or roll 1–{Number(plan?.hitDie?.slice(1))||'…'} HP for this level.</p>}</div>;})}</div>
                     {feedback('hp')}<p role="status">Total HP: {draft.hp.max.value===null||planStale?'—':plan?.preview.hp.max??'—'}</p><p>Your character starts at full HP.</p>
                 </>}
-                {step===5&&<><p>Add actual current possessions. No starting kit, shopping budget or money roll is required.</p><button type="button" onClick={()=>setGearOpen(true)}>Add equipment</button>
+                {step===5&&<><p>Add actual current possessions. No starting kit, shopping budget or money roll is required.</p><button type="button" onClick={()=>setGearOpen(true)}>Add equipment</button> <button type="button" onClick={()=>{setGoldAmount(null);fieldError('coins','');setGoldOpen(true);}}>Add starting gold</button>
                     <div className="sd-creator-grid">{(['gp','sp','cp'] as const).map(coin=><label key={coin}>{coin.toUpperCase()}{numeric(`coin:${coin}`,coin.toUpperCase(),draft.coins[coin],n=>edit(d=>{d.coins[coin]=n??0;}))}{feedback(`coin:${coin}`)}</label>)}</div>
                     {draft.gear.map((g,i)=>{const row=allItems.find((r:any)=>r.uuid===g.source);return <section key={g.id} className="sd-creator-award"><h3>{row?.name??'Source unavailable'}</h3>
                         <label>Quantity{numeric(`quantity:${g.id}`,'Quantity',g.quantity,n=>edit(d=>{d.gear[i].quantity=n??0;}))}{feedback(`quantity:${g.id}`)}</label>
@@ -303,9 +336,13 @@ export function CreatorContent() {
                 {step<6?<button type="button" className="sd-creator-primary" disabled={!canVisit(step+1)} onClick={()=>{if(canVisit(step+1))setStep(s=>s+1);}}>Next</button>:<button type="button" className="sd-creator-primary" disabled={Object.values(fieldErrors).some(Boolean)||!plan?.ready||planStale||locked||!statusReady||!isConnected} onClick={()=>setConfirm({title:'Create this character?',message:`Create ${draft.name.trim()} as a level ${draft.level} character?`,run:()=>void create()})}>Create character</button>}
                 <button type="button" className="sd-creator-refresh" disabled={busy} onClick={()=>{setRefresh(n=>n+1);data.retry();}}>Refresh sources and review</button>{error&&<p role="alert">{error}</p>}</footer>
         </div></div>
+        <ModuleDialog open={goldOpen} title="Starting gold" onClose={()=>{if(!busy){fieldError('coins','');setGoldOpen(false);}}} footer={<button type="button" disabled={busy||goldAmount===null||draft.coins.gp+goldAmount>1000000} onClick={()=>{if(goldAmount!==null){fieldError('coins','');edit(d=>{d.coins.gp+=goldAmount;});setGoldOpen(false);}}}>{goldAmount===null?'Add gold':`Add ${goldAmount} GP`}</button>}>
+            <p>Optional starting gold. Add the chosen amount to your current GP ({draft.coins.gp}).</p>
+            <fieldset disabled={busy}><GoldRollSection goldRoll={goldAmount} goldFormula={STARTING_GOLD.label} goldMax={STARTING_GOLD.max} status={busy?'LOADING':'IDLE'} onRoll={()=>void roll('gold',setGoldAmount)} onManualChange={setGoldAmount} onClear={()=>setGoldAmount(null)}/></fieldset>{feedback('coins')}
+        </ModuleDialog>
         <CreateTreasureModal isOpen={treasureOpen} onClose={()=>setTreasureOpen(false)} onCreate={item=>addValuable('treasure',item)} />
         <GemBagModal isOpen={gemsOpen} onClose={()=>setGemsOpen(false)} actor={{items:(draft.valuables??[]).filter(v=>v.kind==='gem').map(v=>({id:v.id,name:v.name,type:'Gem',system:{cost:v.cost,quantity:v.quantity}}))}} onCreateItem={async item=>addValuable('gem',item)} onUpdateItem={async(itemId,patch)=>edit(d=>{const gem=d.valuables?.find(v=>v.id===itemId);if(gem){if(typeof patch.name==='string')gem.name=patch.name;if(typeof patch['system.cost.gp']==='number')gem.cost.gp=patch['system.cost.gp'];}})} onDeleteItem={itemId=>edit(d=>{d.valuables=d.valuables?.filter(v=>v.id!==itemId);})} />
-        {picker&&data.ready&&<CompendiumSelectModal isOpen sharedFrame title={picker.title} options={picker.options.map(row=>({name:label(row),uuid:row.uuid,description:String(row.system?.description??'').replace(/<[^>]*>/g,' ')}))} onClose={()=>setPicker(null)} onSelect={selected=>{const row=picker.options.find(r=>r.uuid===selected.uuid);if(row)picker.select(row);setPicker(null);}}/>}
+        {picker&&data.ready&&<CompendiumSelectModal isOpen sharedFrame title={picker.title} options={picker.options.map(row=>({name:label(row),uuid:row.uuid,disabledReason:picker.spellChoice&&chosenSpells.has(row.uuid)?'Known':undefined,description:String(row.system?.description??'').replace(/<[^>]*>/g,' ')}))} onClose={()=>setPicker(null)} onSelect={selected=>{const row=picker.options.find(r=>r.uuid===selected.uuid);if(row&&!(picker.spellChoice&&chosenSpells.has(row.uuid)))picker.select(row);setPicker(null);}}/>}
         <GearSelectionModal isOpen={gearOpen} onClose={()=>setGearOpen(false)} onCreate={async item=>{const source=canonicalUuid(item._stats?.compendiumSource??item.flags?.core?.sourceId);if(!source){setError('Equipment needs its exact native source.');return;}edit(d=>{d.gear.push({id:id(),source,quantity:item.system?.quantity??1,equipped:false,stashed:false});});setGearOpen(false);}}/>
         {confirm&&<ConfirmationModal isOpen title={confirm.title} message={confirm.message} confirmLabel="Continue" onCancel={()=>setConfirm(null)} onConfirm={()=>{const action=confirm.run;setConfirm(null);action();}}/>}
     </main>;

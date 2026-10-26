@@ -3,6 +3,37 @@
 Status: User review corrections implemented and isolated-verified; target card layout confirmed, remaining functional review open
 Date: 2026-10-20
 
+## Talent acquisition and repeat display — October 26
+
+Use native `system.level` for level/patron-boon acquisition labels on the tabbed
+Talents view; missing values display unknown rather than inferring from Actor
+level. Keep each owned award separately visible there.
+
+On the paper sheet, identical native Talent/Boon copies may share one display
+row, with a parenthesized **(x2)** count and their gained levels underneath.
+The parentheses are the user's clarification: the count describes copies of the
+whole talent, not a multiplier on its damage wording. Match exact origin, name,
+system choices (except acquisition level), effect changes/state and usage state.
+Different choices/effects, source-less lookalikes and limited-use abilities stay
+separate. Grouping never changes/deletes owned Items or their effects; the row
+opens the first matching owned card and the tabbed sheet retains every copy.
+
+Native4.0.6 Quickstart `level_advancement__v4FffM1SjPE4hLgq.json` says duplicate
+talents stack unless noted. Backstab +1 Damage Dice (`HzzgAIdhoAyfeItJ`) transfers
+an ADD1 to `system.bonus.backstabdice`; two awards at levels1/3 give +2 dice at
+level4. This is an addition to the normal Backstab formula, not doubled damage.
+Existing native preparation is retained, with a direct two-copy regression.
+
+## Connected Generator surface — October 26
+
+The user prefers the Creator's continuous sheet and selected the same treatment
+for Generator. Wrap its existing field grid, Details and Create action in one
+bordered `#fafafa` paper surface with Creator-matched padding. Preserve the shared
+header, existing field styling and responsive column behavior; do not invent a
+new control design. The world background remains outside the sheet. Creator's
+resource shortcuts and table-result correction belong to ADR-0005. Verify the
+source and distributable at desktop and phone widths before claiming completion.
+
 ## Current review status — 2026-10-22
 
 The user verified the legacy wand correction (SD-UI22) working and requested a
@@ -576,3 +607,7 @@ paired/bold fact layout are committed in `5ea2bc3`. No additional artwork repair
 was needed after that report. This records user acceptance for this checkpoint,
 not exhaustive native coverage or closure of the broader presentation ADR.
 The subsequent Character Creator request has its own [ADR-0005](0005-character-creator.md).
+
+Footer follow-up: Generator and Shadowdarklings Importer share a continuous
+paper surface whose action footer meets the inner left, right and bottom borders.
+Content retains its padding; footer controls retain their own internal spacing.

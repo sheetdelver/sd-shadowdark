@@ -5,7 +5,12 @@
 The current rules-guided flow enforces source-defined level award entitlements,
 language pools and ordinary spell counts in the UI and server. Grant spells are
 filtered with existing eligibility helpers and share exact-identity duplicate
-checks with fixed/ordinary spells. `creatorAwardAllocation` matches awards to
+checks with fixed/ordinary spells. `creator-spell-progression.ts` assigns ordinary
+selections to each tier's earliest native level allowances using the existing
+advancement delta helper. The UI gates subsequent levels; the server validates
+intermediate progression and acquisition-level grant eligibility as well as final
+totals. Known picker rows are disabled, and invalidated selections remain removable.
+`creatorAwardAllocation` matches awards to
 Class/Patron entitlements; missing rows never mean unlimited choices. Valuables
 are bounded draft data converted to native Basic/Gem Items, and rich-text notes
 use public SDK sanitization. The review stays procedural with final values. Planner issues carry field/choice
@@ -20,7 +25,11 @@ numeric reconciliation stays internal. HP dice use the existing advantage helper
 per-level Class dice and first-level CON; constant bonuses prepare once. The HP
 UI keeps one input/roller block per level and calculates the full starting total
 automatically. Relevant rule-input changes invalidate the old total; increasing
-level keeps earlier rolls and adds required entries.
+level keeps earlier rolls and adds required entries. Per-level Max uses the native
+hit die and the same HP calculator. Starting gold reuses `GoldRollSection` and
+`advancement.STARTING_GOLD` with staged Add/Cancel behavior. Table dropdowns map
+rolled totals to result ranges while preserving the original total. Generator
+uses the Creator’s continuous paper surface around its existing controls.
 
 
 [ADR-0005](adr/0005-character-creator.md) implements a separate player tool for
@@ -62,6 +71,8 @@ Prepare/HP never write documents; optional dice use the request roll runtime.
 `creation-operation.ts` persists caller/world-bound bookkeeping before one Actor
 create with all Items. Exact positive primary-source marker evidence can settle
 uncertain receipts without writes; absent/ambiguous/changed evidence cannot.
+Confirmed create/explicit recovery responses navigate directly to the Actor sheet;
+uncertain responses retain recovery without redirecting.
 Generated document IDs, native defaults and canonical legacy/modern effect
 migration are the permitted source-comparison normalizations, including the
 verified v14 permanent-duration replacement for explicitly all-null legacy

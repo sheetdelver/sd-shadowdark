@@ -1,3 +1,4 @@
+import { creatorSpellProgression } from '../logic/creator-spell-progression';
 import { creatorAbilityGuidance } from '../logic/creator-ability-guidance';
 /** Real creator planner/routes/journal with pinned sources and public runtime
  * contracts. All storage/transport is isolated; this is not native acceptance. */
@@ -48,6 +49,37 @@ const base=(level=3,cls=FIGHTER):CharacterDraft=>{
 const checks:any[]=[];
 async function check(name:string,run:()=>Promise<void>){try{await run();checks.push({name,pass:true});}catch(e){checks.push({name,pass:false,error:String(e)});}}
 async function ready(d:CharacterDraft){let p=await prepareCreator(req({}),d);assert.deepEqual(p.errors,[],JSON.stringify(p.errors));d.acknowledgements=p.warnings.map(w=>w.id);p=await prepareCreator(req({}),d);assert.equal(p.ready,true);return p;}
+await check('native spell allowances fill consecutive levels and reopen earlier missing choices',async()=>{
+    const wizard=sources.get(WIZARD),d=base(3,WIZARD);
+    const stages=creatorSpellProgression(wizard,3,d.spells,rows);
+    assert.deepEqual(stages.map(s=>s.tiers.map(t=>t.required)),[[3,0,0,0,0],[1,0,0,0,0],[0,1,0,0,0]]);
+    assert.ok(stages.every(s=>s.complete));
+    assert.deepEqual(creatorSpellProgression(wizard,3,[],rows).map(s=>s.complete),[false,false,false]);
+    const partial=d.spells.filter(s=>sources.get(s.source).system.tier===1).slice(0,3);
+    assert.equal(creatorSpellProgression(wizard,3,partial,rows).find(s=>!s.complete)?.level,2);
+    partial.pop();assert.equal(creatorSpellProgression(wizard,3,partial,rows).find(s=>!s.complete)?.level,1);
+    assert.deepEqual(creatorSpellProgression(wizard,0,[],rows),[]);
+    assert.deepEqual(creatorSpellProgression(sources.get(FIGHTER),3,[],rows),[]);
+    for(const cls of rows.filter(r=>r.type==='Class'&&r.system?.spellcasting?.ability)){
+        const all=creatorSpellProgression(cls,10,[],rows);
+        for(let tier=1;tier<=5;tier++)assert.equal(all.reduce((sum,s)=>sum+s.tiers[tier-1].required,0),cls.system.spellcasting.spellsknown[10][tier]??0);
+    }
+});
+await check('missing intermediate progression blocks creation even with valid final totals',async()=>{
+    const original=adapter.resolveDocumentFor;
+    adapter.resolveDocumentFor=async function(uuid,caller){const doc=await original.call(this,uuid,caller);if(uuid!==WIZARD)return doc;const changed=copy(doc);delete changed.system.spellcasting.spellsknown[2];return changed;};
+    try{const p=await prepareCreator(req({}),base(3,WIZARD));assert.equal(p.ready,false);assert.ok(p.errors.some(e=>e.message.startsWith('Level 2: native spell progression')));}
+    finally{adapter.resolveDocumentFor=original;}
+});
+await check('ordinary duplicates and future-tier grant choices fail server validation',async()=>{
+    const d=base(3,WIZARD);d.spells[1]={...d.spells[0]};assert.ok((await prepareCreator(req({}),d)).errors.some(e=>e.message.includes('distinct')));
+    const fresh=base(3,WIZARD),grant='Compendium.shadowdark.talents.Item.T5nkdUM75LSnDpu5';
+    const future=rows.find(r=>r.type==='Spell'&&r.system.tier===2&&r.system.class.includes(WIZARD)&&!fresh.spells.some(s=>s.source===r.uuid));
+    fresh.awards[0]={id:'early-grant',origin:'recorded',source:grant,level:1,choices:{[grant]:{spell:future.uuid}}};
+    assert.ok((await prepareCreator(req({}),fresh)).errors.some(e=>e.message.includes('acquisition level 1')));
+    fresh.awards[0].choices[grant].spell=fresh.spells[0].source;
+    assert.ok((await prepareCreator(req({}),fresh)).errors.some(e=>e.message.includes('distinct Spell')));
+});
 await check('ability guidance follows selected native casting/check data and exact core identities',async()=>{
     assert.equal(creatorAbilityGuidance(sources.get(FIGHTER),[],1)[0].ability,'str');
     assert.equal(creatorAbilityGuidance(sources.get(WIZARD),[],1)[0].ability,'int');
@@ -128,7 +160,7 @@ await check('final malformed preflight proves zero writes and remains editable',
     const before=writeCount,d=base();(d as any).level=21;const response=await handleCreatorCreate(req({requestId:'bad-preflight',draft:d,review:'none',contextRevision:revision}));assert.equal(response.status,400);assert.equal((await response.json() as any).creationWrites,'none');assert.equal(writeCount,before);
 });
 await check('caller permission revocation blocks preparation; no warmed registry bypass',async()=>{deny=true;try{await assert.rejects(()=>prepareCreator(req({}),base()));}finally{deny=false;}});
-await check('optional rolls are explicit and use public runtime only',async()=>{const before=rollCount;await prepareCreator(req({}),base());assert.equal(rollCount,before);const r=await handleCreatorRoll(req({kind:'score'}));assert.equal(r.status,200);assert.equal(rollCount,before+1);});
+await check('optional rolls are explicit and use public runtime only',async()=>{const before=rollCount;await prepareCreator(req({}),base());assert.equal(rollCount,before);const r=await handleCreatorRoll(req({kind:'score'}));assert.equal(r.status,200);assert.equal(rollCount,before+1);const gold=await handleCreatorRoll(req({kind:'gold'}));assert.equal(gold.status,200);assert.equal((await gold.json() as any).formula,'2d6 * 5');assert.equal(rollCount,before+2);});
 await check('optional HP gains use first-level prepared CON and later die totals',async()=>{
     const d=base(3,FIGHTER);
     const response=await handleCreatorHP(req({draft:d,gains:[5,3,4]})),body:any=await response.json();assert.equal(response.status,200,JSON.stringify(body));assert.equal(body.hp.max,15);assert.equal((await handleCreatorHP(req({draft:d,gains:[9,3,4]}))).status,400);const roll=await handleCreatorRoll(req({kind:'hp',draft:d,classUuid:FIGHTER,level:1}));assert.equal(roll.status,200);assert.match((await roll.json() as any).formula,/2d8kh/);

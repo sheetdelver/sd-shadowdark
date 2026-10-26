@@ -1,8 +1,146 @@
 # Character Creator workflow audit
 
 Date: 2026-10-23
-Status: October 26 refinement checkpoint approved; native acceptance/recovery recheck and shell SDK gate remain open
+Status: October 26 follow-ups accepted for checkpoint; native acceptance/recovery recheck and shell SDK gate remain open
 Decision: [ADR-0005](../adr/0005-character-creator.md)
+
+## Follow-up checkpoint — October 26
+
+The user accepted the parenthesized talent count and requested a local checkpoint
+of the accumulated refinements after `6cdb508`. This includes progressive spell
+choices, direct creation navigation, table/HP/gold controls, connected tool
+surfaces with flush footers, and acquisition-level/repeated-talent presentation.
+ADRs 0003/0005, rules, architecture and the Unreleased changelog record the scope.
+This checkpoint does not close native Creator acceptance or the public shell
+navigation-discard dependency. Core is unchanged; module version and requirements
+remain unchanged. Push and release are separate operations.
+
+Latest runtime verification: native-alignment **62/62**, effect conformance
+**93/93**, explicit module typing and package checks pass. Current archive SHA256:
+`c08e1c69f53cf2add477bd51383ecf923fac4e4034017d2d2d13908d1c831c42`.
+The talent presentation has source-render coverage; preceding browser evidence
+below remains tied to its own artifacts. Documentation updates postdate packaging.
+No live Foundry operations or retained test services.
+
+## Talent acquisition visibility and paper repeats — October 26
+
+User comparison with Foundry exposed omitted `system.level` in TalentsTab.
+The tab now shows each acquisition level; paper groups matching native copies
+as **(x2)** with gained levels below, following the user's punctuation correction.
+Exact-source/different-effect, unknown-level and no-mutation cases are covered in
+an added existing native-alignment case (62/62 pass). Native effect conformance
+(93/93 with the pinned native checkout) confirms two separate Backstab awards
+add2 to `bonus.backstabdice`, in legacy and v14 shapes. Explicit typing passes.
+No stacking rules, Actor data or effects were modified. Grouping is presentation
+only; source-less lookalikes and limited-use actions remain separate.
+
+Native evidence at commit9677d16b3903b3b640f00d4efd48249142ac8334:
+`data/packs/quickstart-guides.db/level_advancement__v4FffM1SjPE4hLgq.json`,
+`talents.db/backstab__1_damage_dice__HzzgAIdhoAyfeItJ.json` and
+`talents.db/additional_backstab_die__AmcPerJgnykmMwVA.json`.
+The user's screenshot confirms the paper grouping was visible before requesting
+parentheses; this is not acceptance of every unknown/custom-source case.
+Logs: `/tmp/sd-talent-{display-tests,stack-tests,level-types}.log`.
+
+## Flush tool footers — October 26
+
+Operator correction: Generator's action footer should meet the sheet's side and
+bottom borders. Shadowdarklings Importer uses the same treatment. Shared tool
+surface spacing now places the footer flush with those borders while retaining
+content and button padding. Source and archive layout probes at390/1280px cover
+both tools; typography/content actions are retained. Module typing and packaging
+pass. This is a narrow presentation change, with no new maintained test suite.
+Evidence: `/tmp/sd-tool-footer-*`; runtime archive SHA256
+`bb3b8ea80b0518d1eecc78fc5a707eb68a58c44f7345b988a3968fd91bd1d72e`.
+
+## Table ranges, HP/gold shortcuts and connected Generator — October 26
+
+Selected follow-up to the consecutive-spell work; implementation remains on the
+same branch, with no Core changes, version bump, commit or live world operations.
+
+The table defect was a range/option mismatch: native outcomes expose one option
+per lower bound, so rolling4 in Fighter's3–6 group had no select option and showed
+Choose. The UI now selects the containing range while retaining total4 in the
+award. Labels identify the range and show the actual total separately. Both table
+controls have explicit accessible names.
+
+Per-level Max enters the native hit-die maximum and keeps existing HP preparation;
+the Class die is shown above the controls. Optional starting gold reuses
+`GoldRollSection` in `ModuleDialog`; advancement and Creator share the same
+2d6 × 5/60 definition. Gold is staged, added to current GP on explicit Add, and
+unchanged on dismissal. A failed optional roll can also be dismissed without
+leaving a hidden validation gate. Generator now wraps its existing grid, Details
+and CTA in a continuous Creator-style paper surface (ADR-0003).
+
+Evidence stays in existing suites:
+
+- 35 Creator source cases pass, including the extended public-runtime gold-formula
+ check. No new source suite or application dependency.
+- Source browser workflows pass after correcting the new test's Fighter table
+ reference and adding the explicit control names. Fighter flows at390/1280px
+ verify rolled4→range3–6, Max→d8 ceiling, class die text, gold
+ roll/Max/additive application/cancel and successful creation. Generator geometry
+ at390/1280px has one continuous surface and no horizontal overflow. The unchanged
+ progression, language, context and other Creator workflows also pass.
+- Explicit module typing, package contract/boundary checks and compiled Creator
+ creation/recovery checks pass. All four affected archive workflows pass at390/1280px, including optional-roll
+ failure/dismissal recovery. Current artifact and logs are recorded in the handoff.
+
+Visual inspection: Generator desktop/phone layout, HP input/die/Max alignment,
+and reused Gold dialog fit their existing module styles. Isolated screenshot
+fixtures block image/network loads, so they establish geometry/control styling,
+not the unchanged dice artwork or live world-background loading.
+
+Artifacts: `/tmp/sd-creator-controls-*`; final runtime archive SHA256
+`0a9cc88912d315c19578f2c1d0b820407a9400877853d75a38b49036e4a75bf5`.
+The final affected browser run includes optional-roll failure/dismissal recovery.
+Native/operator acceptance and the shell discard-hook gap remain open.
+
+## Consecutive spells and direct creation navigation — October 26
+
+Follow-up after checkpoint `6cdb508`, on `fix/restore-module-presentation`.
+The user selected per-level/tier spell choices, duplicate prevention and opening
+confirmed new characters directly. Core, native sources, release version0.9.6
+and compatibility requirements remain unchanged. No live Foundry operations.
+
+Implementation reuses native Class progression deltas. Ordinary choices fill
+levels in order; fixed/talent/boon sources disable duplicate picker rows and stay
+outside ordinary counts. Invalidated selections remain removable. Final server
+validation also blocks missing intermediate progression and prevents an earlier
+grant from borrowing a later ordinary spell's tier. Confirmed create/explicit
+recovery navigates directly, while uncertainty and historical re-entry preserve
+existing receipt rules. See the ADR for the full behavioral decision.
+
+Verification:
+
+- 35 maintained Creator source cases pass (three added cases in the existing
+ suite): native Wizard deltas1–3, all supplied caster tier totals through10,
+ earlier-choice removal, noncaster/level0, missing intermediate data, ordinary/
+ grant duplicates and future-tier grant rejection. Existing fixed Priest spell
+ rejection remains covered. No extra test suite was added.
+- Source browser checks cover the existing six other workflows plus the expanded
+ Wizard progression workflow. The first run's option-state assertion used
+ Playwright's `isDisabled()` on a native option, which returned false despite its
+ disabled DOM property. The corrected assertion reads `option.disabled`; the
+ focused Wizard workflow passes through levels1–3, disabled known grant/ordinary
+ rows, earlier removal/refill and native language limits. This was a test-query
+ correction, not a relaxation of the lock.
+- All eight packaged browser workflows pass, including the expanded Wizard flow
+ at390/900px, direct creation/recovery navigation at390/1280px, fresh re-entry
+ and caller retirement. The packaged tier sections and disabled Known picker
+ rows were visually inspected; phone content has no horizontal overflow.
+- Explicit module typing and isolated packaging pass. Compiled Creator routes
+ pass exact source round trips, one-payload creation, duplicate/uncertain recovery
+ and revoked-source checks. No new Core/Foundry service was started.
+
+Reproduction from Core root: run the existing
+`src/tests/character-creator.test.ts`, `character-creator.browser.mjs` and
+`creator-packaged.mjs` under this module using the commands below. The browser
+runner accepts `SHADOWDARK_CREATOR_CASE=wizard` for a focused affected workflow.
+Artifacts/logs: `/tmp/sd-creator-progression-*`. Runtime archive SHA256:
+`5e165d40e750044240f1f7c2da5b13632b0a09bae4798dcf25d1f033296aa7f5`.
+Docs and runner-only refinements postdate packaging; runtime code is unchanged.
+Native v13/v14/operator acceptance and shell discard protection remain open.
 
 ## October 26 checkpoint
 

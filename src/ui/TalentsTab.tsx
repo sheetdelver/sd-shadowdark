@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useSDK } from '@sheet-delver/sdk/react';
+import { talentLevelLabel } from './talent-display';
 import { presentDescription } from '../logic/description';
 
 import { useShadowdarkActor } from './context/ShadowdarkActorContext';
@@ -111,6 +112,7 @@ export default function TalentsTab() {
                                                     'Class'
                                         )}
                                     </div>
+                                    {talentLevelLabel([item]) && <div className="text-xs text-neutral-600 mt-1">{talentLevelLabel([item])}</div>}
                                 </div>
 
                                 {/* Toggle Icon */}

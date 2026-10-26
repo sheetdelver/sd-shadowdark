@@ -8,6 +8,7 @@ import { statChoiceRule, applyStatAllocation } from '../logic/stat-choices';
 import { talentChoiceKind, applyChoice, assertResolvedTalentChoices, choiceCatalog } from '../logic/talent-choices';
 import { canonicalUuid, ownedCopy, formatUuid } from '../logic/identity';
 import { spellChoiceGrant, spellGrantClasses, grantSource, FIXED_SPELL_GRANTS } from '../logic/spell-grants';
+import { creatorSpellProgression } from '../logic/creator-spell-progression';
 import { spellLimit, spellListIdentity } from '../logic/spell-model';
 import { allocateLanguageInventory } from '../logic/languages';
 import { prepareShadowdarkView } from '../logic/prepared-view';
@@ -144,13 +145,15 @@ export async function prepareCreator(req: ModuleServerRequest, input: unknown):P
         used.add(s.source);const copy=ownedCopy(doc,s.source);ordinary.push(copy);items.push(copy);
         if(s.castingClass!==list)issue(4,`${doc.name} is outside this Class’s ordinary spell list.`);
     }
+    const ordinaryStages=creatorSpellProgression(cls,draft.level,draft.spells,ordinary.map(doc=>({...doc,uuid:grantSource(doc)})));
     for(const p of pending) {
         const rule=spellChoiceGrant(p.doc);if(!rule)continue;
         if(p.level===null){issue(4,`${p.doc.name} requires its acquisition level to validate the Spell choice.`,`choice:${p.key}`);continue;}
         const selected=p.selection.spell;
         if(!selected){issue(4,`Choose the Spell granted by ${p.doc.name}.`,`choice:${p.key}`);continue;}
         const spell=await resolve(selected,['Spell']);
-        const context={level:p.level,known:[...ordinary,...fixedSpells],classDoc:cls};
+        const learned=new Set(ordinaryStages.filter(stage=>stage.level<=p.level!).flatMap(stage=>stage.tiers.flatMap(t=>t.selected)));
+        const context={level:p.level,known:[...ordinary.filter(doc=>learned.has(grantSource(doc)!)),...fixedSpells],classDoc:cls};
         const classes=spellGrantClasses(p.doc,spell,context), casting=p.selection.castingClass||classes[0];
         if(!casting||!classes.includes(casting)||used.has(selected)){issue(4,`Choose an eligible, distinct Spell for ${p.doc.name} at acquisition level ${p.level}. An unsupported tier cannot be waived.`,`choice:${p.key}`);continue;}
         await resolve(casting,['Class']);
@@ -220,6 +223,9 @@ export async function prepareCreator(req: ModuleServerRequest, input: unknown):P
     if(prepared.slotUsage&&prepared.maxSlots!==null&&prepared.slotUsage.total>prepared.maxSlots)warn(6,`Inventory uses ${prepared.slotUsage.total} of ${prepared.maxSlots} slots. Keep actual possessions and review encumbrance.`);
     if(cls?.system?.spellcasting?.ability&&draft.level>0) {
         if(!view.spellModel.sources.some(s=>s.classUuid===cls.uuid))issue(4,'The native Class casting grant or its exact dependencies are unavailable.');
+        for(const stage of creatorSpellProgression(cls,draft.level,[],[])) {
+            if(stage.diagnostics.length)issue(4,`Level ${stage.level}: native spell progression is unavailable or decreases. Review the Class source.`);
+        }
         for(let tier=1;tier<=5;tier++) {
             const limit=spellLimit(cls.system.spellcasting.spellsknown,draft.level,tier);
             const count=ordinary.filter(i=>i.system.tier===tier&&i.system.class?.includes(list)).length;

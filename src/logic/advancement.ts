@@ -1,5 +1,8 @@
 import type { PreparedActorCore } from './actor-preparation';
 
+/** Native 4.0.6 starting wealth, shared by advancement and Creator controls. */
+export const STARTING_GOLD = { formula: '2d6 * 5', label: '2d6 × 5', max: 60 } as const;
+
 /** Native 4.0.6 LevelUpSD._finalizeLevelUp, after preparing the new grants. */
 export function advancementHitPoints(prepared: PreparedActorCore, targetLevel: number, hitDieTotal: number) {
     if (!Number.isFinite(hitDieTotal) || hitDieTotal <= 0) throw new Error('A positive hit-point roll is required.');

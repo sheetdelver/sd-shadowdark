@@ -3,6 +3,14 @@
 Historical entries are reconstructed from [published releases](https://github.com/sheetdelver/sd-shadowdark/releases), their tags, and merged changes. Version numbers follow the published tags; the Unreleased section collects notes for the next authorized release.
 
 ## Unreleased
+- Show talent acquisition levels
+- Group matching paper talents
+- Match rolled talent result ranges
+- Add HP and gold shortcuts
+- Connect character tool panels
+- Select spells progressively by level
+- Disable already-known spell choices
+- Open newly created characters
 - Show class ability guidance
 - Enforce Creator fields and allowances
 - Simplify Creator HP and dice

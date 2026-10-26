@@ -21,17 +21,26 @@ Talents and boons follow the selected Class, ancestry, Patron and level. Fixed
 grants are automatic. Each earned award fills one level entitlement; repeatable
 awards remain independent, while native duplicate-reroll rules are retained.
 Resolve each award's stat allocations, target and Spell choice. Missing/extra or
-wrong-level/table awards cannot be waived at review.
+wrong-level/table awards cannot be waived at review. A table roll shows its
+actual total and selects the matching native result range; any required choices
+within that result still need completing.
 
 Languages must fill the source-defined pools. Ordinary Spells follow the Class
-list and tier allowances; fixed and talent/boon-granted Spells are separate and
-cannot be selected again. The same restrictions are checked before creation.
+list and tier allowances. Choose each level's new spells in order, with separate
+tier groups; later levels remain locked until earlier choices are filled. Use
+**Spell selection level** to review completed levels. Removing a spell reopens
+the earliest unmet allowance of its tier. Fixed and talent/boon-granted Spells
+are separate and do not spend ordinary choices. Known spells are disabled in
+both ordinary and grant pickers. Earlier grants cannot use a later level's
+ordinary spells to unlock a tier. The same restrictions are checked before creation.
+Selections outside a changed Class/level remain visible for removal.
 The level selector supports 0–20, but the supplied native caster progression
 only defines levels 1–10. A caster above its available source data cannot be
 completed until supported progression data exists; limits are never extrapolated.
 
 Each level has its own HP card, stacked in one column. Enter the hit-die result or use the die button
-beside the input, or use **Roll all HP** above the cards. The total below updates automatically, including native HP-roll
+beside the input. **Max** enters that level’s maximum die result; the selected
+Class hit die is shown above the cards. Use **Roll all HP** to roll every level. The total below updates automatically, including native HP-roll
 advantage, first-level Constitution and applicable talents. Constant HP bonuses
 are applied once. Increasing the selected level adds required blocks and keeps
 earlier rolls; changing Class clears the old Class dice. Level zero calculates
@@ -42,14 +51,17 @@ by this per-level calculation rather than guessed.
 Equipment supports current quantities, locations, spent scrolls and wand states.
 Enter coins, treasure and gems using the existing inventory controls. These edit
 the draft only; no Actor or Item is written before final confirmation. There is
-no required starting kit or shopping budget. Notes use the shared rich-text
+no required starting kit or shopping budget. Optional **Add starting gold**
+reuses the level-up Gold controls: roll 2d6 × 5, use Max (60 GP), or enter an amount.
+Add applies it to current GP; closing the dialog leaves your money unchanged. Notes use the shared rich-text
 editor and retain sanitized formatting.
 
 The procedural review shows identity, final scores/modifiers, grants, languages,
 Spells, HP, inventory, money, notes and remaining requirements. Capacity notices
 remain informational acknowledgements; progression violations are blocking
 errors. Final creation refreshes source/access/context checks and sends one Actor
-payload containing all Items. If interrupted, use **Check creation**; an empty
+payload containing all Items. Confirmed creation opens the new character sheet
+immediately, as does a successful recovery check. If interrupted, use **Check creation**; an empty
 lookup never proves failure and must not cause automatic replacement. If a
 created character has differing saved details, use **Review created character**
 to open it. **Verification details** lists the differing fields; checking again

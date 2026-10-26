@@ -13,6 +13,8 @@ import { prepareWeaponAttack } from '../logic/weapon-rules';
 import { ShadowdarkUIProvider } from '../ui/context/ShadowdarkUIContext';
 import { ShadowdarkActorProvider } from '../ui/context/ShadowdarkActorContext';
 import AbilitiesTab from '../ui/AbilitiesTab';
+import TalentsTab from '../ui/TalentsTab';
+import { groupPaperTalents } from '../ui/talent-display';
 import ShadowdarkPaperSheet from '../ui/ShadowdarkPaperSheet';
 import {
     armsman, bastardSword, contextWith, coreActorResponse, dagger, greatsword, lantern, torch, hostActorProjection, legacyMastery, longsword, MASTERY_UUID, preparationContext, primLike,
@@ -51,6 +53,28 @@ function render(component: any, actor: any) {
             onRoll: noop, onToggleEffect: noop, onDeleteEffect: noop, onCreateEffect: noop,
             onUpdateEffect: noop, onAddPredefinedEffect: noop, onRefresh: noop,
         } as any))));
+}
+
+async function talentAcquisitionDisplay() {
+    await check('UI-talents', 'separate acquisition levels and paper repeat counts preserve owned talents', () => {
+        const source = 'Compendium.shadowdark.talents.Item.HzzgAIdhoAyfeItJ';
+        const talent = (id: string, level: number | null) => ({ _id: id, name: 'Backstab +1 Damage Dice', type: 'Talent', _stats: { compendiumSource: source }, system: { level, talentClass: 'level', description: 'Your Backstab deals +1 dice of damage.' }, effects: [{ disabled: false, transfer: true, changes: [{ key: 'system.bonus.backstabdice', mode: 2, value: '1' }] }] });
+        const actor: any = hostActorProjection(prepare(primLike()));
+        actor.items = [talent('first', 1), talent('second', 3)];
+        actor.derived.items = actor.items.map((item: any) => ({ id: item._id, name: item.name, type: item.type }));
+        const original = structuredClone(actor.items);
+        const tab = render(TalentsTab, actor), paper = render(ShadowdarkPaperSheet, actor);
+        assert.match(tab, /Level gained: 1/); assert.match(tab, /Level gained: 3/);
+        assert.match(paper, /\(x2\)/); assert.match(paper, /Levels gained: 1, 3/);
+        assert.equal((paper.match(/Backstab \+1 Damage Dice/g) ?? []).length, 1);
+        assert.deepEqual(actor.items, original);
+        actor.items[1].effects[0].changes[0].value = '2';
+        assert.equal(groupPaperTalents(actor.derived.items, actor.items).length, 2, 'different effects stay separate');
+        delete actor.items[1]._stats;
+        assert.equal(groupPaperTalents(actor.derived.items, actor.items).length, 2, 'same name alone is not identity');
+        actor.items[1].system.level = null;
+        assert.match(render(TalentsTab, actor), /Level gained: unknown/);
+    });
 }
 
 async function issue23() {
@@ -502,6 +526,7 @@ export async function run(options: { report?: boolean } = {}) {
     await effectsAndStats();
     await choicesAndIdentity();
     await attackModes();
+    await talentAcquisitionDisplay();
     await inventoryControls();
     await luck();
     await spellCardFacts();

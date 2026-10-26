@@ -215,3 +215,9 @@
 .sdk-module--shadowdark .sd-creator-dice img { width:2rem; height:2rem; filter:brightness(0) invert(1); }
 
 .sdk-module--shadowdark .sd-creator-identity>.sd-creator-field>button.sd-creator-clear { align-self:flex-start; border:0; padding:.25rem 0; margin-top:.5rem; font:400 .875rem Arial,sans-serif; text-decoration:underline; color:#525252; }
+
+/* Tool paper surfaces share spacing; their action footer meets the sheet edges. */
+.sdk-module--shadowdark .sd-tool-sheet { --sd-tool-padding:1.5rem; min-width:0; background:#fafafa; border:2px solid #000; padding:var(--sd-tool-padding); }
+@media (max-width:640px) { .sdk-module--shadowdark .sd-tool-sheet { --sd-tool-padding:1rem; } }
+
+.sdk-module--shadowdark .sd-tool-sheet > .sd-tool-sheet-footer { margin-top:2rem; margin-inline:calc(-1 * var(--sd-tool-padding)); margin-bottom:calc(-1 * var(--sd-tool-padding)); }

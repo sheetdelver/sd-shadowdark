@@ -6,7 +6,7 @@ import { requestRevision,contextConflict,callerOf } from '../access';
 import { shadowdarkAdapter } from '../ShadowdarkAdapter';
 import { prepareActorCore } from '../../logic/actor-preparation';
 import { hitPointRollFormula } from '../../logic/actions';
-import { advancementHitPoints } from '../../logic/advancement';
+import { advancementHitPoints, STARTING_GOLD } from '../../logic/advancement';
 import { requestRules } from '../access';
 const route=async(req:ModuleServerRequest,run:()=>Promise<unknown>)=>{
     const revision=requestRevision(req.runtime);
@@ -39,6 +39,7 @@ export const handleCreatorCreate=(req:ModuleServerRequest)=>route(req,async()=>{
 export const handleCreatorRoll=(req:ModuleServerRequest)=>route(req,async()=>{
     const body=await req.json<any>();let formula:string;
     if(body.kind==='score')formula='3d6';
+    else if(body.kind==='gold')formula=STARTING_GOLD.formula;
     else if(body.kind==='hp') {
         const cls=await shadowdarkAdapter.resolveDocumentFor(body.classUuid,callerOf(req));
         if(cls?.type!=='Class'||!/^d(?:4|6|8|10|12)$/.test(cls.system?.hitPoints??''))throw new SdkError('validation','The exact Class HP die is unavailable.');
@@ -53,7 +54,7 @@ export const handleCreatorRoll=(req:ModuleServerRequest)=>route(req,async()=>{
         const table=await shadowdarkAdapter.resolveDocumentFor(body.tableUuid,callerOf(req));
         if(!Array.isArray(table?.results)||!/^\d{1,2}d\d{1,3}(?:[+-]\d{1,3})?$/.test(table?.formula??''))throw new SdkError('validation','This exact table has no supported native roll formula.');
         formula=table.formula;
-    }else throw new SdkError('validation','Choose a score, HP die or exact award table to roll.');
+    }else throw new SdkError('validation','Choose a score, HP die, starting gold or exact award table to roll.');
     const result=await req.runtime.rolls.roll(formula,'Character Creator',{displayChat:false});
     return {success:true,formula,total:result.total};
 });

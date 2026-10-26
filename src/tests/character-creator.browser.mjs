@@ -18,19 +18,20 @@ const hostCss=(await postcss([tailwind({base:core})]).process(fs.readFileSync(pa
 const {compileModuleTailwind}=await import(pathToFileURL(path.join(core,'src/scripts/tools/modules/tailwind-compile.ts')).href);
 const previousDirectory=process.cwd();process.chdir(core);
 const moduleCss=process.env.SHADOWDARK_CREATOR_CSS?fs.readFileSync(process.env.SHADOWDARK_CREATOR_CSS,'utf8'):await compileModuleTailwind(root,'shadowdark');process.chdir(previousDirectory);
-const creatorImport=process.env.SHADOWDARK_CREATOR_UI?`import manifest from ${JSON.stringify(process.env.SHADOWDARK_CREATOR_UI)};const Creator=React.lazy(manifest.tools.creator);`:`import Creator from '${root}/src/ui/tools/CharacterCreator';`;
+const creatorImport=process.env.SHADOWDARK_CREATOR_UI?`import manifest from ${JSON.stringify(process.env.SHADOWDARK_CREATOR_UI)};const Creator=React.lazy(manifest.tools.creator);const Generator=React.lazy(manifest.tools.generator);`:`import Creator from '${root}/src/ui/tools/CharacterCreator';import Generator from '${root}/src/ui/tools/Generator';`;
 const bundle=await build({stdin:{resolveDir:root,loader:'tsx',contents:`
 import React from 'react';import{createRoot}from'react-dom/client';${creatorImport}
 window.calls=[];window.pending=[];window.pendingStatuses=[];const listeners=new Map();
 window.sdk={isConnected:true,worldId:'w',moduleId:'shadowdark',currentUser:{id:'owner',role:1},foundryUrl:'',resolveImageUrl:x=>x||'',navigate:target=>window.testNavigation=target,
  events:{on:(event,fn)=>{if(!listeners.has(event))listeners.set(event,new Set());listeners.get(event).add(fn);return()=>listeners.get(event).delete(fn)}},
  fetchWithAuth:async(url,options={})=>{const body=options.body?JSON.parse(options.body):null;window.calls.push({url,body});
+  if(window.failGoldRoll&&body?.kind==='gold')return Response.json({error:'Starting gold roll unavailable.'},{status:400});
   const result=await window.request(url,body,window.sdk.currentUser.id);if(window.hold&&url.endsWith('/prepare'))await new Promise(resolve=>window.pending.push(resolve));if(window.holdStatuses&&url.endsWith('/status'))await new Promise(resolve=>window.pendingStatuses.push(resolve));return Response.json(result.body,{status:result.status});}};
 window.emitContext=()=>listeners.get('world:contextChanged')?.forEach(fn=>fn({keys:[]}));
-const app=createRoot(document.getElementById('root'));window.mountKey=0;window.render=()=>app.render(<React.Suspense fallback={<p>Loading creator…</p>}><Creator key={window.mountKey}/></React.Suspense>);window.render();
+const app=createRoot(document.getElementById('root'));window.mountKey=0;window.render=()=>app.render(<React.Suspense fallback={<p>Loading creator…</p>}>{window.activeTool==='generator'?<Generator/>:<Creator key={window.mountKey}/>}</React.Suspense>);window.render();
 `},bundle:true,write:false,format:'iife',platform:'browser',jsx:'automatic',nodePaths:[path.join(core,'node_modules')],plugins:[{name:'public-sdk-boundary',setup(b){
     b.onResolve({filter:/^(?:@sheet-delver\/sdk(?:\/react)?|@shared\/sdk\/react)$/},a=>({path:a.path,namespace:'stub'}));
-    b.onLoad({filter:/.*/,namespace:'stub'},a=>({loader:'tsx',resolveDir:root,contents:a.path.endsWith('/react')?`import PageHeader from '${path.resolve(process.env.SHADOWDARK_CORE||process.cwd())}/src/client/ui/components/PageHeader.tsx';import {ConfirmationModal} from '${core}/src/client/ui/components/ConfirmationModal.tsx';import RichTextEditor from '${core}/src/client/ui/components/RichTextEditor.tsx';export const useSDK=()=>window.sdk;export const useSDKComponents=()=>({PageHeader,ConfirmationModal,RichTextEditor});`:`export const logger={info(){},warn(){},error(){},debug(){}};export const processHtmlContent=x=>x;export const getErrorMessage=e=>String(e);`}));
+    b.onLoad({filter:/.*/,namespace:'stub'},a=>({loader:'tsx',resolveDir:root,contents:a.path.endsWith('/react')?`import PageHeader from '${path.resolve(process.env.SHADOWDARK_CORE||process.cwd())}/src/client/ui/components/PageHeader.tsx';import {ConfirmationModal} from '${core}/src/client/ui/components/ConfirmationModal.tsx';import RichTextEditor from '${core}/src/client/ui/components/RichTextEditor.tsx';export const useSDK=()=>window.sdk;export const useSDKComponents=()=>({PageHeader,ConfirmationModal,RichTextEditor,LoadingModal:()=>null});`:`export const logger={info(){},warn(){},error(){},debug(){}};export const processHtmlContent=x=>x;export const getErrorMessage=e=>String(e);`}));
 }}]});
 let writes=0,rolls=0,revision=1;
 const store=new Map(),actors=new Map();
@@ -39,15 +40,17 @@ const runtime={world:{snapshot:()=>worldSnapshot(revision),assertRevision:r=>{if
     dataStore:{get:async key=>structuredClone(store.get(key)||null),set:async(key,value)=>{store.set(key,structuredClone(value));},keys:async(prefix='')=>[...store.keys()].filter(k=>k.startsWith(prefix))},
     documents:{get:async(type,id)=>structuredClone(type==='Actor'?actors.get(id)||null:null),list:async()=>({rows:[...actors.values()],total:actors.size}),
         create:async(type,source)=>{writes++;const actor={...structuredClone(source),_id:'created-'+writes};actors.set(actor._id,actor);return actor;}},
-    rolls:{roll:async formula=>{rolls++;return{formula,total:formula==='3d6'?11:4};}}};
+    rolls:{roll:async formula=>{rolls++;return{formula,total:formula==='3d6'?11:formula==='2d6 * 5'?35:4};}}};
 await adapter.initialize({...runtime,logger:console});
 const handlers={prepare:handleCreatorPrepare,create:handleCreatorCreate,status:handleCreatorStatus,roll:handleCreatorRoll,hp:handleCreatorHP};
 const browser=await chromium.launch({...(process.env.SHADOWDARK_CHROME?{executablePath:process.env.SHADOWDARK_CHROME}:{}),headless:true,args:['--no-sandbox','--disable-background-networking']});
 const results=[];
 async function test(name,width,run){
+    if(process.env.SHADOWDARK_CREATOR_CASE&&!new RegExp(process.env.SHADOWDARK_CREATOR_CASE).test(name))return;
     store.clear();actors.clear();const page=await browser.newPage({viewport:{width,height:1100}}),errors=[];page.setDefaultTimeout(8000);page.on('pageerror',e=>errors.push(e.message));await page.route('**/*',r=>r.abort());
     await page.exposeFunction('request',async(url,body,userId)=>{
         if(url.endsWith('/actors/randomize/name')){assert.ok(body.ancestryUuid);return{status:200,body:{name:'Ancestry name'}};}
+        if(url.includes('/document/'))return {status:200,body:sources.get(url.split('/document/')[1])??null};
         if(url.endsWith('/index'))return{status:200,body:await adapter.getSystemDataForUser(runtime)};
         if(url.includes('/fetch-pack/'))return{status:200,body:await adapter.getCollection(url.split('/').at(-1),{caller:{runtime,isGM:false}})};
         const handler=handlers[url.split('/').at(-1)];if(!handler)throw Error('Unexpected route '+url);
@@ -56,7 +59,7 @@ async function test(name,width,run){
     try{
         await page.setContent('<div id="root" class="sdk-module--shadowdark"></div>');await page.addStyleTag({content:hostCss});await page.addStyleTag({content:moduleCss});await page.addStyleTag({path:process.env.SHADOWDARK_CREATOR_PRESENTATION||path.join(root,'assets/presentation.css')});await page.addScriptTag({content:bundle.outputFiles[0].text});
         await run(page);assert.deepEqual(errors,[]);results.push({name,pass:true});console.log('✓ '+name);
-    }catch(e){results.push({name,pass:false,error:String(e),errors,text:await page.locator('body').innerText()});await page.screenshot({path:path.join(out,'failure-'+results.length+'.png')});console.error('✗ '+name+': '+e.message);}finally{await page.close();}
+    }catch(e){results.push({name,pass:false,error:e.stack??String(e),errors,text:await page.locator('body').innerText()});await page.screenshot({path:path.join(out,'failure-'+results.length+'.png')});console.error('✗ '+name+': '+e.message);}finally{await page.close();}
 }
 const waitPlan=async p=>{await p.waitForFunction(()=>window.calls.some(c=>c.url.endsWith('/prepare')));await p.waitForTimeout(450);};
 const step=async(p,name)=>{await waitPlan(p);await p.getByRole('button',{name:new RegExp('^\\d\\. '+name+'$')}).click();};
@@ -88,13 +91,14 @@ try{
         await waitPlan(p);await p.screenshot({path:path.join(out,`scores-${width}.png`),fullPage:true});
         await step(p,'Talents and boons');await waitPlan(p);assert.equal(writes,before);assert.equal(rolls,beforeRolls);
         await p.locator('.sd-creator-award').filter({has:p.getByRole('heading',{name:'Weapon Mastery',exact:true})}).locator('select').selectOption('Club');await waitPlan(p);
-        for(const level of [1,3]){await p.getByRole('button',{name:`Choose level ${level} talent`,exact:true}).click();await p.getByRole('button',{name:/^\+1 to Melee and Ranged Attacks —/}).click();await waitPlan(p);}
+        await p.getByText('Choose or roll a native table result',{exact:true}).click();await p.getByLabel('Award table',{exact:true}).selectOption(sources.get('Compendium.shadowdark.classes.Item.hO7KrvqDRH6kvftJ').system.classTalentTable);await p.getByRole('button',{name:'Roll table',exact:true}).click();await p.getByText('Table total: 4',{exact:true}).waitFor();assert.equal(await p.getByLabel('Native result group',{exact:true}).inputValue(),'3');await p.getByRole('button',{name:'Add table award',exact:true}).click();await waitPlan(p);
+        for(const level of [3]){await p.getByRole('button',{name:`Choose level ${level} talent`,exact:true}).click();await p.getByRole('button',{name:/^\+1 to Melee and Ranged Attacks —/}).click();await waitPlan(p);}
         assert.equal(await p.getByRole('button',{name:'All level awards selected',exact:true}).isDisabled(),true);
         await p.screenshot({path:path.join(out,`grants-${width}.png`),fullPage:true});
         await step(p,'Languages and spells');await step(p,'Hit points');assert.equal(await p.getByLabel('Current HP',{exact:true}).count(),0);await waitPlan(p);assert.equal(await p.getByText('Enter or roll 1–8 HP for this level.',{exact:true}).count(),3);await p.getByLabel('Level 1 HP roll',{exact:true}).fill('12');assert.equal(await p.getByLabel('Level 1 HP roll',{exact:true}).inputValue(),'');await p.locator('.sd-creator-hp-levels > .sd-creator-score').first().getByRole('alert').filter({hasText:'Enter a whole number from 1 to 8.'}).waitFor();await p.screenshot({path:path.join(out,`hp-validation-${width}.png`),fullPage:true});
         const cards=p.locator('.sd-creator-hp-levels > .sd-creator-score');const first=await cards.nth(0).boundingBox(),second=await cards.nth(1).boundingBox();assert.equal(first.x,second.x);assert.ok(second.y>=first.y+first.height);
-        const hpInput=await cards.nth(0).locator('input').boundingBox(),hpDie=await cards.nth(0).getByRole('button').boundingBox();assert.ok(Math.abs(hpInput.y+hpInput.height/2-hpDie.y-hpDie.height/2)<2);for(const [i,total] of [5,6,7].entries())await p.getByLabel(`Level ${i+1} HP roll`,{exact:true}).fill(String(total));await p.getByText('Total HP: 21',{exact:true}).waitFor();await p.screenshot({path:path.join(out,`hp-${width}.png`),fullPage:true});
-        await step(p,'Equipment and money');await p.getByLabel('GP',{exact:true}).fill('17');await p.getByRole('button',{name:'Add equipment',exact:true}).click();await p.getByPlaceholder('Search gear...').fill('Rope');
+        const hpInput=await cards.nth(0).locator('input').boundingBox(),hpDie=await cards.nth(0).getByRole('button',{name:'Roll level 1 HP',exact:true}).boundingBox();assert.ok(Math.abs(hpInput.y+hpInput.height/2-hpDie.y-hpDie.height/2)<2);await p.getByText('Fighter hit die: d8',{exact:true}).waitFor();await p.getByRole('button',{name:'Max level 1 HP',exact:true}).click();assert.equal(await p.getByLabel('Level 1 HP roll',{exact:true}).inputValue(),'8');for(const [i,total] of [5,6,7].entries())await p.getByLabel(`Level ${i+1} HP roll`,{exact:true}).fill(String(total));await p.getByText('Total HP: 21',{exact:true}).waitFor();await p.screenshot({path:path.join(out,`hp-${width}.png`),fullPage:true});
+        await step(p,'Equipment and money');await p.getByLabel('GP',{exact:true}).fill('17');await p.getByRole('button',{name:'Add starting gold',exact:true}).click();let gold=p.getByRole('dialog',{name:'Starting gold',exact:true});await gold.getByRole('button',{name:'MAX',exact:true}).click();await p.keyboard.press('Escape');assert.equal(await p.getByLabel('GP',{exact:true}).inputValue(),'17');await p.getByRole('button',{name:'Add starting gold',exact:true}).click();await p.evaluate(()=>window.failGoldRoll=true);await p.getByRole('dialog',{name:'Starting gold',exact:true}).getByRole('button',{name:'Roll',exact:true}).click();await p.getByText('Starting gold roll unavailable.',{exact:true}).waitFor();await p.keyboard.press('Escape');await p.evaluate(()=>window.failGoldRoll=false);await waitPlan(p);assert.equal(await p.getByRole('button',{name:'Next',exact:true}).isEnabled(),true);await p.getByRole('button',{name:'Add starting gold',exact:true}).click();gold=p.getByRole('dialog',{name:'Starting gold',exact:true});await gold.getByRole('button',{name:'Roll',exact:true}).click();await gold.getByRole('button',{name:'Add 35 GP',exact:true}).waitFor();await gold.getByRole('button',{name:'MAX',exact:true}).click();await p.screenshot({path:path.join(out,`starting-gold-${width}.png`)});await gold.getByRole('button',{name:'Add 60 GP',exact:true}).click();assert.equal(await p.getByLabel('GP',{exact:true}).inputValue(),'77');await p.getByRole('button',{name:'Add equipment',exact:true}).click();await p.getByPlaceholder('Search gear...').fill('Rope');
         // The real gear selector's Add callback is exercised, retaining its exact origin.
         const add=p.getByRole('button',{name:/Add Rope/});if(await add.count())await add.first().click();else {await p.keyboard.press('Escape');}
         await p.getByRole('button',{name:'Add treasure',exact:true}).click();await p.getByPlaceholder('e.g. Golden Idol').fill('Golden idol');await p.getByRole('button',{name:'Create',exact:true}).click();
@@ -103,20 +107,20 @@ try{
         await p.getByRole('button',{name:'Edit Notes',exact:true}).click();await p.locator('[contenteditable=true]').fill('Character history');await p.getByRole('button',{name:'Save',exact:true}).click();await waitPlan(p);
         while(await p.locator('.sd-creator-notice input[type=checkbox]:not(:checked)').count()){await p.locator('.sd-creator-notice input[type=checkbox]:not(:checked)').first().check();await waitPlan(p);}
         await p.getByRole('button',{name:'Create character',exact:true}).waitFor();await p.waitForFunction(()=>!Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='Create character')?.disabled);
-        assert.equal(writes,before);assert.equal(rolls,beforeRolls);assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+        assert.equal(writes,before);assert.equal(rolls,beforeRolls+2);assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
         await p.screenshot({path:path.join(out,`review-${width}.png`),fullPage:true});
         await p.getByRole('button',{name:'Create character',exact:true}).click();await p.getByRole('alertdialog',{name:'Create this character?'}).getByRole('button',{name:'Continue'}).click();await p.getByRole('button',{name:'Open character',exact:true}).waitFor();assert.equal(writes,before+1);
-        const source=[...actors.values()][0];assert.equal(source.system.level.value,3);assert.equal(source.system.attributes.hp.value,21);assert.equal(source.system.attributes.hp.max,19);assert.equal(source.items.some(i=>i.name==='Stout'),true);assert.equal(source.system.coins.gp,17);assert.match(source.system.notes,/<p>Character history<\/p>/);assert.equal(source.items.find(i=>i.name==='Ruby').type,'Gem');assert.equal(source.items.find(i=>i.name==='Golden idol').system.treasure,true);
+        const source=[...actors.values()][0];assert.equal(await p.evaluate(()=>window.testNavigation),`/actors/${source._id}`);assert.equal(source.system.level.value,3);assert.equal(source.system.attributes.hp.value,21);assert.equal(source.system.attributes.hp.max,19);assert.equal(source.items.some(i=>i.name==='Stout'),true);assert.equal(source.system.coins.gp,77);assert.match(source.system.notes,/<p>Character history<\/p>/);assert.equal(source.items.find(i=>i.name==='Ruby').type,'Gem');assert.equal(source.items.find(i=>i.name==='Golden idol').system.treasure,true);
         if(width===1280){
             // Model a saved dispatch whose native result differs before confirmation.
             for(const saved of store.values())if(saved?.payload&&saved?.state==='complete')saved.state='dispatched';
-            source.system.coins.gp++;await p.getByRole('button',{name:'Check creation',exact:true}).click();await p.getByRole('button',{name:'Review created character',exact:true}).waitFor();
-            await p.getByText('Verification details',{exact:true}).click();await p.getByText('system.coins.gp',{exact:true}).waitFor();assert.equal(writes,before+1);
+            await p.evaluate(()=>delete window.testNavigation);source.system.coins.gp++;await p.getByRole('button',{name:'Check creation',exact:true}).click();await p.getByRole('button',{name:'Review created character',exact:true}).waitFor();
+            assert.equal(await p.evaluate(()=>window.testNavigation),undefined);await p.getByText('Verification details',{exact:true}).click();await p.getByText('system.coins.gp',{exact:true}).waitFor();assert.equal(writes,before+1);
             await p.getByRole('button',{name:'Review created character',exact:true}).click();assert.equal(await p.evaluate(()=>window.testNavigation),`/actors/${source._id}`);
-            source.system.coins.gp--;await p.getByRole('button',{name:'Check creation',exact:true}).click();await p.getByRole('button',{name:'Open character',exact:true}).waitFor();
-            await p.evaluate(()=>{window.mountKey++;window.render();});await p.getByLabel('Name',{exact:true}).fill('Next character');await waitPlan(p);
+            await p.evaluate(()=>delete window.testNavigation);source.system.coins.gp--;await p.getByRole('button',{name:'Check creation',exact:true}).click();await p.getByRole('button',{name:'Open character',exact:true}).waitFor();
+            assert.equal(await p.evaluate(()=>window.testNavigation),`/actors/${source._id}`);await p.evaluate(()=>{delete window.testNavigation;window.mountKey++;window.render();});await p.getByLabel('Name',{exact:true}).fill('Next character');await waitPlan(p);
             assert.equal(await p.getByRole('region',{name:'Creation outcome'}).count(),0,'a confirmed earlier creation must not lock a fresh Creator visit');
-            assert.equal(await p.getByLabel('Name',{exact:true}).inputValue(),'Next character');assert.equal(writes,before+1);
+            assert.equal(await p.evaluate(()=>window.testNavigation),undefined);assert.equal(await p.getByLabel('Name',{exact:true}).inputValue(),'Next character');assert.equal(writes,before+1);
 
         }
         if(width===390){
@@ -151,19 +155,52 @@ try{
         const strength=p.getByRole('row').filter({has:p.getByRole('rowheader',{name:'STR',exact:true})});assert.deepEqual(await strength.getByRole('cell').allTextContents(),['16','3']);
         const submitted=await p.evaluate(()=>window.calls.filter(c=>c.url.endsWith('/prepare')).at(-1).body.draft);assert.equal(submitted.awards.length,2);assert.notEqual(submitted.awards[0].id,submitted.awards[1].id);assert.equal(submitted.fixedChoices['class:Compendium.shadowdark.talents.Item.5bpWuaT0KTNzuzCu'].target,'Club');assert.equal(writes,before);
     });
-    await test('wizard spell grants and language choices obey native limits without duplicates',900,async p=>{
+    for(const width of [390,900])await test(`wizard ${width}px: progressive tiers, spell grants and language limits without duplicates`,width,async p=>{
         const wizard='Compendium.shadowdark.classes.Item.035nuVkU9q2wtMPs';
-        await p.getByLabel('Name',{exact:true}).fill('Wizard');await pick(p,'Class','Wizard');await pick(p,'Ancestry','Dwarf');await finishIdentity(p);await step(p,'Ability scores');for(const stat of ['STR','DEX','CON','INT','WIS','CHA'])await p.getByLabel(stat,{exact:true}).fill('12');await step(p,'Talents and boons');await waitPlan(p);
+        await p.getByLabel('Name',{exact:true}).fill('Wizard');await p.getByLabel('Level',{exact:true}).selectOption('3');await pick(p,'Class','Wizard');await pick(p,'Ancestry','Dwarf');await finishIdentity(p);await step(p,'Ability scores');for(const stat of ['STR','DEX','CON','INT','WIS','CHA'])await p.getByLabel(stat,{exact:true}).fill('12');await step(p,'Talents and boons');await waitPlan(p);
         await p.getByRole('button',{name:'Choose level 1 talent',exact:true}).click();await p.getByRole('button',{name:/^Learn Wizard Spell —/}).click();await waitPlan(p);
         await p.getByRole('button',{name:'Choose granted Spell…',exact:true}).click();
         const dialog=p.getByRole('dialog',{name:'Select Spell for Learn Wizard Spell',exact:true});await dialog.getByRole('button').filter({hasText:' — '}).first().click();await waitPlan(p);
         const grant=await p.evaluate(()=>Object.values(window.calls.filter(c=>c.url.endsWith('/prepare')).at(-1).body.draft.awards[0].choices)[0].spell);
+        await p.getByRole('button',{name:'Choose level 3 talent',exact:true}).click();await p.getByRole('button',{name:/^\+1 on Spellcasting Checks —/}).click();await waitPlan(p);
         await step(p,'Languages and spells');
-        for(let i=0;i<3;i++){await p.getByRole('button',{name:'Add ordinary Spell',exact:true}).click();const picker=p.getByRole('dialog',{name:'Select Ordinary Spell on your sheet',exact:true});const known=rows.find(r=>r.uuid===grant);assert.equal(await picker.getByRole('button').filter({hasText:known.name+' —'}).count(),0);await picker.getByRole('button').filter({hasText:' — '}).first().click();await waitPlan(p);}
-        assert.equal(await p.getByRole('button',{name:'Add ordinary Spell',exact:true}).isDisabled(),true);
+        const level=p.getByLabel('Spell selection level',{exact:true});
+        assert.equal(await level.inputValue(),'1');assert.equal(await level.locator('option[value="2"]').evaluate(option=>option.disabled),true);assert.equal(await level.locator('option[value="3"]').evaluate(option=>option.disabled),true);
+        const selected=[grant];
+        for(const [at,tier,count] of [[1,1,3],[2,1,1],[3,2,1]]){
+            assert.equal(await level.inputValue(),String(at));
+            for(let i=0;i<count;i++){
+                assert.equal(await p.getByRole('button',{name:'Choose tier 3 spell',exact:true}).isDisabled(),true);
+                if(at<3)assert.equal(await p.getByRole('button',{name:'Choose tier 2 spell',exact:true}).isDisabled(),true);
+                await p.getByRole('button',{name:`Choose tier ${tier} spell`,exact:true}).click();
+                const picker=p.getByRole('dialog',{name:`Select Level ${at} · Tier ${tier} spells`,exact:true});
+                for(const ref of selected){const known=rows.find(r=>r.uuid===ref);if(known.system.tier===tier)assert.equal(await picker.getByRole('button').filter({hasText:known.name+' —'}).isDisabled(),true);}
+                await picker.locator('button:enabled').filter({hasText:' — '}).first().click();await waitPlan(p);
+                const picks=await p.evaluate(()=>window.calls.filter(c=>c.url.endsWith('/prepare')).at(-1).body.draft.spells);selected.push(picks.at(-1).source);
+            }
+        }
+        await p.screenshot({path:path.join(out,`spell-tiers-${width}.png`),fullPage:true});
+        // Reopening an earlier level shows its choices; removing one reopens its first unmet allowance.
+        await level.selectOption('1');await p.getByRole('button',{name:'Remove Spell',exact:true}).first().click();await waitPlan(p);assert.equal(await level.inputValue(),'2');assert.equal(await level.locator('option[value="3"]').evaluate(option=>option.disabled),true);
+        await p.getByRole('button',{name:'Choose tier 1 spell',exact:true}).click();await p.getByRole('dialog',{name:'Select Level 2 · Tier 1 spells',exact:true}).locator('button:enabled').filter({hasText:' — '}).first().click();await waitPlan(p);
+        const grantName=rows.find(r=>r.uuid===grant).name;await p.getByRole('button',{name:grantName,exact:true}).click();
+        const grantPicker=p.getByRole('dialog',{name:'Select Spell for Learn Wizard Spell',exact:true});
+        const ordinary=await p.evaluate(()=>window.calls.filter(c=>c.url.endsWith('/prepare')).at(-1).body.draft.spells[0].source);
+        assert.equal(await grantPicker.getByRole('button').filter({hasText:rows.find(r=>r.uuid===ordinary).name+' —'}).isDisabled(),true);
+        await p.screenshot({path:path.join(out,`known-spell-picker-${width}.png`),fullPage:true});await p.keyboard.press('Escape');
         for(let i=0;i<4;i++){await p.getByRole('button',{name:'Add Language',exact:true}).click();await p.getByRole('dialog',{name:'Select Language on your sheet',exact:true}).getByRole('button').filter({hasText:' — '}).first().click();await waitPlan(p);}
         assert.equal(await p.getByRole('button',{name:'Add Language',exact:true}).isDisabled(),true);
-        const draft=await p.evaluate(()=>window.calls.filter(c=>c.url.endsWith('/prepare')).at(-1).body.draft);assert.equal(draft.spells.length,3);assert.ok(draft.spells.every(s=>s.source!==grant&&s.castingClass===wizard));assert.equal(draft.languages.length,4);
+        const draft=await p.evaluate(()=>window.calls.filter(c=>c.url.endsWith('/prepare')).at(-1).body.draft);assert.equal(draft.spells.length,5);assert.ok(draft.spells.every(s=>s.source!==grant&&s.castingClass===wizard));assert.equal(draft.languages.length,4);assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+    });
+    for(const width of [390,1280])await test(`generator ${width}px: connected paper surface`,width,async p=>{
+        await p.evaluate(()=>{window.activeTool='generator';window.render();});
+        const sheet=p.getByRole('region',{name:'Character generation',exact:true});await sheet.waitFor();
+        await sheet.getByPlaceholder('Character Name').fill('Generator hero');
+        assert.equal(await sheet.getByRole('button',{name:'Create Character',exact:true}).count(),1);
+        assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+        const surface=await sheet.evaluate(el=>({background:getComputedStyle(el).backgroundColor,border:getComputedStyle(el).borderTopWidth}));
+        assert.deepEqual(surface,{background:'rgb(250, 250, 250)',border:'2px'});
+        await p.screenshot({path:path.join(out,`generator-${width}.png`),fullPage:true});
     });
     await test('context/identity retires delayed reviews while manual input survives; caller retirement clears draft',900,async p=>{
         const before=writes;

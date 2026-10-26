@@ -11,7 +11,7 @@ import { statChoiceRule } from '../../logic/stat-choices';
 import { callerOf, requestRules, requestRevision, contextConflict, requireOwnedActor } from '../access';
 import { hitPointRollFormula } from '../../logic/actions';
 import { prepareActorCore } from '../../logic/actor-preparation';
-import { advancementHitPoints } from '../../logic/advancement';
+import { advancementHitPoints, STARTING_GOLD } from '../../logic/advancement';
 import { knownSpellSources, advancementSpellChoices, grantedSpellSources, prepareSpellModel, spellListIdentity } from '../../logic/spell-model';
 import { callerLanguagePlan } from '../languages';
 import { validateLanguageSelections } from '../../logic/languages';
@@ -189,7 +189,7 @@ export async function handleRollHP(actorId: string | undefined, req: ModuleServe
 
 export async function handleRollGold(actorId: string | undefined, req: ModuleServerRequest) {
     // Shadowdark Standard Gold: 2d6 * 5
-    const formula = `2d6 * 5`;
+    const formula = STARTING_GOLD.formula;
 
     try {
         // Determine speaker override
