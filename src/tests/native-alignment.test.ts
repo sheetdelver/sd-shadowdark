@@ -15,6 +15,7 @@ import { ShadowdarkActorProvider } from '../ui/context/ShadowdarkActorContext';
 import AbilitiesTab from '../ui/AbilitiesTab';
 import TalentsTab from '../ui/TalentsTab';
 import { groupPaperTalents } from '../ui/talent-display';
+import { SheetCharacterName } from '../ui/components/SheetCharacterName';
 import ShadowdarkPaperSheet from '../ui/ShadowdarkPaperSheet';
 import {
     armsman, bastardSword, contextWith, coreActorResponse, dagger, greatsword, lantern, torch, hostActorProjection, legacyMastery, longsword, MASTERY_UUID, preparationContext, primLike,
@@ -53,6 +54,26 @@ function render(component: any, actor: any) {
             onRoll: noop, onToggleEffect: noop, onDeleteEffect: noop, onCreateEffect: noop,
             onUpdateEffect: noop, onAddPredefinedEffect: noop, onRefresh: noop,
         } as any))));
+}
+
+async function sheetNameStatus() {
+    await check('UI-zero-hp', 'sheet names show zero HP without changing the editable name or treating unknown HP as zero', () => {
+        const actor: any = hostActorProjection(prepare(primLike()));
+        for (const hp of [0, 5, undefined]) {
+            actor.derived.hp.value = hp;
+            const before = structuredClone(actor);
+            const paper = render(ShadowdarkPaperSheet, actor);
+            const heading = renderToStaticMarkup(createElement(SheetCharacterName, { hp, dark: true, children: actor.name }));
+            for (const html of [paper, heading]) {
+                assert.equal(html.includes('aria-label="At 0 hit points"'), hp === 0);
+                assert.equal(html.includes('(💀)'), hp === 0);
+                assert.equal(html.includes('sd-sheet-character-name-zero'), hp === 0);
+            }
+            assert.equal(heading.includes('sd-sheet-character-name-dark'), hp === 0);
+            assert.ok(paper.includes(`value="${actor.name}"`), 'editable name never includes status text');
+            assert.deepEqual(actor, before);
+        }
+    });
 }
 
 async function talentAcquisitionDisplay() {
@@ -527,6 +548,7 @@ export async function run(options: { report?: boolean } = {}) {
     await choicesAndIdentity();
     await attackModes();
     await talentAcquisitionDisplay();
+    await sheetNameStatus();
     await inventoryControls();
     await luck();
     await spellCardFacts();

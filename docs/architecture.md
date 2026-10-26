@@ -1074,3 +1074,12 @@ without module panel CSS. Core supplies settings typography/colors/widgets and
 retains SDK identity without the module stylesheet scope (Core ADR0072 R72-02).
 The sheet itself keeps its paper styling. This supersedes the initial pilot's
 paper-panel presentation, not its preference storage behavior.
+
+## Gear selection and bundles
+
+`logic/gear-additions.ts` expands the exact native Crawling Kit using its own
+linked source list and component quantities. The shared Gear Selection picker
+preflights all components and passes each `ownedCopy` to existing sheet writes
+or Creator draft additions. It stops on failure/context retirement and reports
+partial additions; the public Item writer is not an atomic batch. No name-only
+recognition, existing-kit migration, currency deduction or implicit stack merge.

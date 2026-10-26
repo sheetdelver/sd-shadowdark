@@ -320,10 +320,7 @@ export default function InventoryTab() {
             <GearSelectionModal
                 isOpen={isGearSelectionModalOpen}
                 onClose={() => setIsGearSelectionModalOpen(false)}
-                onCreate={async (data) => {
-                    setIsGearSelectionModalOpen(false);
-                    await createItem(data);
-                }}
+                onCreate={createItem}
             />
         </div>
     );

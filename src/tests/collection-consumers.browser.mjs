@@ -115,7 +115,7 @@ case 'advancement':return <Advancement/>;
 case 'bonus-advancement':return <BonusAdvancement/>;
 case 'effect-advancement':return <EffectAdvancement/>;
 case 'dialog':return <><button style={{position:'fixed',bottom:0,left:0,width:'100%',height:80,zIndex:150}}>Host tools</button><ModuleDialog open title="Resource card" suspended={!!window.suspendDialog} onClose={()=>{}} footer={<button onClick={()=>window.cardClicked=true}>Use resource</button>}>Resource details</ModuleDialog>{window.suspendDialog&&<div style={{position:'fixed',inset:0,zIndex:100}}><button onClick={()=>window.hostClicked=true}>Shared host action</button></div>}</>;
-case 'gear':return <Gear isOpen onClose={()=>{}} onCreate={async item=>{window.addedGear=item}}/>;
+case 'gear':return <Gear isOpen onClose={()=>{}} onCreate={async item=>{window.gearAttempts=(window.gearAttempts||0)+1;if(window.initial.failGearAt===window.gearAttempts)return false;window.addedGear=item;(window.addedGearEntries??=[]).push(item)}}/>;
 case 'spell-picker':return <SpellPicker isOpen onClose={()=>{}} onSave={()=>{}} title="Manage spells" tier={1} classUuid="Compendium.shadowdark.classes.Item.wizard" knownSpells={[]}/>;
 case 'native-language-edit':return <LanguagePicker isOpen onClose={()=>{}} onSelect={selected=>window.savedLanguages=selected} currentLanguages={window.initial.current||[]} actorId="a"/>;
 case 'languages':return <LanguagePicker isOpen onClose={()=>{}} onSelect={()=>{}} currentLanguages={[]} actorId="a"/>;
@@ -415,6 +415,21 @@ try {
         await settled(p);assert.equal(await cast.isEnabled(),true);
         await p.evaluate(()=>window.failWand(true));await settled(p);assert.equal(await cast.isDisabled(),true);
         assert.equal(await p.getByRole('button',{name:/Restore .*after a full rest/}).count(),0);
+    });
+    const gearRoot=path.resolve(process.env.SHADOWDARK_NATIVE||'temp/shadowdark','data/packs/gear.db');
+    const kitCatalog=fs.readdirSync(gearRoot).filter(name=>name.endsWith('.json')).map(name=>{const row=JSON.parse(fs.readFileSync(path.join(gearRoot,name),'utf8'));return {...row,pack:'shadowdark.gear',uuid:`Compendium.shadowdark.gear.Item.${row._id}`}});
+    for(const mode of ['complete','missing','partial']) await test(`SD-kit: ${mode} native kit addition`,{which:'gear',failGearAt:mode==='partial'?3:undefined,policy:{gear:{body:mode==='missing'?kitCatalog.filter(item=>item.name!=='Rations'):kitCatalog}}},async p=>{
+        await p.getByPlaceholder('Search gear...').fill('Crawling Kit');
+        await p.getByRole('button',{name:'Add Crawling Kit to inventory',exact:true}).click();
+        if(mode==='complete') {
+            await p.waitForFunction(()=>window.addedGearEntries?.length===7);
+            assert.deepEqual(await p.evaluate(()=>window.addedGearEntries.map(item=>[item.name,item.system.quantity])),[['Backpack',1],['Flint and Steel',1],['Torch',2],['Iron Spikes',10],['Rations',3],['Grappling Hook',1],["Rope, 60'",1]]);
+            assert.ok(await p.evaluate(()=>window.addedGearEntries.every(item=>!item._id&&item._stats.compendiumSource)));
+        } else {
+            await p.getByRole('alert').waitFor();
+            assert.equal(await p.evaluate(()=>window.gearAttempts||0),mode==='missing'?0:3);
+            if(mode==='partial') assert.equal(await p.getByRole('button',{name:'Add Crawling Kit to inventory',exact:true}).isDisabled(),true);
+        }
     });
     const sourceGear={_id:'N27A6nb0epkHZ3lR',uuid:'Compendium.shadowdark.magic-items.Item.N27A6nb0epkHZ3lR',pack:'shadowdark.magic-items',name:'Scroll of Burning Hands',type:'Basic',
         img:'icons/sundries/scrolls/scroll-writing-orange-black.webp',system:{magicItem:true,description:'<p>@UUID[Compendium.shadowdark.spells.ItN82uLU3PhJFLNm]{Burning Hands}</p>'},

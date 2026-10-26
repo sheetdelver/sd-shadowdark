@@ -3,6 +3,65 @@
 Status: User review corrections implemented and isolated-verified; target card layout confirmed, remaining functional review open
 Date: 2026-10-20
 
+## Crawling Kit inventory contents — October 26
+
+Selecting the native Crawling Kit in Gear Selection adds its linked contents,
+not a kit Item: Backpack, Flint and Steel, two Torches, ten Iron Spikes, three
+Rations, Grappling Hook and Rope (60 feet). Quantities come from component
+source bundles multiplied by the kit's explicit count. The exact native kit
+identity gates expansion; same-name custom Items remain ordinary gear.
+
+`logic/gear-additions.ts` resolves the complete native description list against
+caller-readable loaded gear before creating anything and uses `ownedCopy` to
+preserve each component's origin, flags and effects. Missing content blocks the
+addition. Existing sheet Item writes remain caller-bound; Creator stages the same
+contents in its draft. Close only after all additions, stop on failure/context
+retirement and show partial results without retrying creates. This is not an
+atomic multi-Item transaction. Existing kit Items are not retroactively unpacked;
+no coins are deducted and no existing stacks are silently merged.
+
+Native-source regression and three mounted picker cases verify complete contents,
+missing-source zero writes and stop-on-partial-failure. Ordinary exact-source
+Gear Add remains covered in the existing consumer suite.
+
+## Sheet-only zero-HP name indication — October 26
+
+User selected a red character name followed by `(💀)` at exactly zero HP in
+both tabbed and single-page sheets. Use prepared HP and a shared presentation
+component. Restore normal presentation after healing; unknown HP is not zero.
+The paper name remains editable, with the status suffix outside the input so
+saving never changes the character's name. The cue is labeled “At 0 hit points”
+for accessibility; it does not infer or write a death condition. Use red shades
+suited to the existing dark header and light paper backgrounds.
+
+Core dashboard name/status styling and its SDK contract are explicitly deferred
+by the user for a later dashboard design pass (Core local ledger DW-22). The
+preceding dashboard HP/AC refresh correction is retained. No Core feature branch,
+SDK changes, compatibility bumps or dashboard status decoration are selected.
+
+Existing native-alignment checks cover zero, healed and unavailable HP, preserved
+source/name input and both status themes. This is presentation-only and does not
+alter any HP, death, recovery or healing rules.
+
+## Dashboard stats after sheet edits — October 26
+
+The operator reported that HP saves reached the sheet and Foundry but returning
+via Back to Dashboard showed the old value. Core's realtime Actor handler refreshes
+card data independently of the original list Actor. Shadowdark supplied identity
+only, leaving HP/AC rendered from that retained list snapshot.
+
+`getActorCardData` now supplies HP/current maximum and AC as SDK card blocks from
+the same prepared `derived.hp`/`derived.ac` used by the sheet. Keep the existing
+HP/AC order, labels and styling, preserve zero values, and show unavailable data
+as `?`. Core retains refresh, authorization and lifecycle ownership; no navigation
+refetch, local cache or duplicated rules are introduced.
+
+The existing prepared-Actor regression failed on the missing blocks before the
+fix and passes afterwards. It retains the old list snapshot while asserting a
+new card reflects changed current/max HP (including zero) and prepared AC.
+Explicit module typing passes. Live/operator return-navigation recheck remains
+pending; no live world access was used.
+
 ## Talent acquisition and repeat display — October 26
 
 Use native `system.level` for level/patron-boon acquisition labels on the tabbed

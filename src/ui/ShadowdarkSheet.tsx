@@ -22,6 +22,7 @@ import ResourceDetailModal from './components/ResourceDetailModal';
 
 
 import ShadowdarkPaperSheet from './ShadowdarkPaperSheet';
+import { SheetCharacterName } from './components/SheetCharacterName';
 import { logger } from '@sheet-delver/sdk';
 import { useSheetViewPreference, type SheetViewMode } from './settings/sheet-view-preference';
 
@@ -209,7 +210,7 @@ export default function ShadowdarkSheet(props: ShadowdarkSheetProps) {
                             />
                             <div className="py-2 flex-1 flex flex-row items-center justify-between md:block">
                                 <div>
-                                    <h1 className="text-2xl md:text-3xl font-serif font-bold leading-none tracking-tight">{actor.name}</h1>
+                                    <h1 className="text-2xl md:text-3xl font-serif font-bold leading-none tracking-tight"><SheetCharacterName hp={actor.derived?.hp?.value} dark>{actor.name}</SheetCharacterName></h1>
                                     <div className="flex flex-col md:flex-row md:items-center gap-x-3 gap-y-1">
                                         <p className="text-xs text-neutral-400 font-sans tracking-widest uppercase mt-1">
                                             {actor.details?.title && <span className="text-amber-500 mr-2">{actor.details.title}</span>}

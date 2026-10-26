@@ -10,12 +10,33 @@ import { nativePacks } from './core0191/world';
 import { shadowdarkAdapter as adapter } from '../server/ShadowdarkAdapter';
 import { DECLARED_PACKS, ownedCopy } from '../logic/identity';
 import { creationGrants } from '../logic/creation-grants';
+import { gearAdditionItems } from '../logic/gear-additions';
 import { primLike, worldSnapshot } from './fixtures/native-406';
 import { handleFinalizeLevelUp } from '../server/api/level-up';
 import { handleCreateCharacter } from '../server/api/languages';
 const packs = nativePacks(process.env.SHADOWDARK_NATIVE ?? path.resolve('temp/shadowdark'), DECLARED_PACKS.map(p => p.id));
 const rows: any[] = Object.entries(packs).flatMap(([pack, docs]) => docs.map(doc => ({ ...doc, pack, uuid: `Compendium.${pack}.${['Player','NPC'].includes(doc.type) ? 'Actor' : pack.endsWith('tables') ? 'RollTable' : 'Item'}.${doc._id}` })));
 const byUuid = new Map(rows.map(doc => [doc.uuid, doc]));
+// Native kit expansion uses component quantities and exact origins, never names.
+const kit = byUuid.get('Compendium.shadowdark.gear.Item.fJHwwn6TEfbdr8CM');
+const kitBefore = structuredClone(kit);
+const kitItems = gearAdditionItems(kit, rows);
+assert.deepEqual(kitItems.map(item => [item.name, item.system.quantity]), [
+    ['Backpack', 1], ['Flint and Steel', 1], ['Torch', 2], ['Iron Spikes', 10],
+    ['Rations', 3], ['Grappling Hook', 1], ["Rope, 60'", 1],
+]);
+for (const item of kitItems) {
+    assert.equal(item._id, undefined);
+    const original = byUuid.get(item._stats.compendiumSource);
+    assert.ok(original);
+    assert.deepEqual(item.effects, original.effects);
+    assert.deepEqual(item.flags, original.flags);
+}
+assert.deepEqual(kit, kitBefore);
+assert.throws(() => gearAdditionItems(kit, rows.filter(item => item.name !== 'Rations')), /component is unavailable/);
+const customKit = {...structuredClone(kit), uuid: 'Item.customKit'};
+assert.equal(gearAdditionItems(customKit, rows).length, 1, 'same-name custom gear is not silently expanded');
+
 const WIZARD = 'Compendium.shadowdark.classes.Item.035nuVkU9q2wtMPs';
 const zero = { common: 0, rare: 0, select: 0, selectOptions: [], fixed: [] };
 // Explicit world fixture: native Wizard rules/grants, exact Wizard alternate

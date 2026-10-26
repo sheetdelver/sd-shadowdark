@@ -5,12 +5,12 @@ import { useSDK } from '@sheet-delver/sdk/react';
 import { useShadowdarkUI, useShadowdarkCollections } from '../context/ShadowdarkUIContext';
 import { CollectionStatus } from './CollectionStatus';
 import { presentDescription } from '../../logic/description';
-import { ownedCopy } from '../../logic/identity';
+import { gearAdditionItems } from '../../logic/gear-additions';
 
 interface GearSelectionModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onCreate: (itemData: any) => Promise<void>;
+    onCreate: (itemData: any) => Promise<void | boolean>;
 }
 
 type GearCategory = 'Armor' | 'Basic Gear' | 'Herbal Remedies' | 'Starting Gear' | 'Weapons' | 'Magic Items';
@@ -33,6 +33,14 @@ export default function GearSelectionModal({ isOpen, onClose, onCreate }: GearSe
     const [searchTerm, setSearchTerm] = useState('');
     const [expandedCategories, setExpandedCategories] = useState<Set<GearCategory>>(new Set(['Basic Gear']));
     const dialogRef = useRef<HTMLDialogElement>(null);
+    const adding = useRef(false);
+    const scope = useRef({ generation: data.generation, ready: data.ready, open: isOpen });
+    scope.current = { generation: data.generation, ready: data.ready, open: isOpen };
+    useEffect(() => () => { scope.current.open = false; }, []);
+    const [busy, setBusy] = useState(false);
+    const [addError, setAddError] = useState('');
+    const [needsReview, setNeedsReview] = useState(false);
+    useEffect(() => { if (isOpen) { setAddError(''); setNeedsReview(false); } }, [isOpen]);
 
     useEffect(() => {
         if (!isOpen || !dialogRef.current) return;
@@ -135,17 +143,34 @@ export default function GearSelectionModal({ isOpen, onClose, onCreate }: GearSe
     };
 
     const handleAdd = async (item: any) => {
-        if (!data.ready) return;
-        // Preserve exact source identity, effects and flags on the owned copy.
-        await onCreate(ownedCopy(item));
-        // Optional: show toast or feedback
+        if (!data.ready || adding.current || needsReview) return;
+        adding.current = true; setBusy(true); setAddError('');
+        let attempted = 0, completed = 0, count = 0;
+        const generation = data.generation;
+        try {
+            // Resolve the complete kit before the first create; never add its container.
+            const additions = gearAdditionItems(item, items); count = additions.length;
+            for (const copy of additions) {
+                if (!scope.current.open || !scope.current.ready || scope.current.generation !== generation) throw new Error('Gear sources changed. Refresh before adding items.');
+                attempted++;
+                if (await onCreate(copy) === false) throw new Error('Item creation could not be confirmed.');
+                completed++;
+            }
+            onClose();
+        } catch (error) {
+            const partialKit = count > 1 && attempted > 0;
+            setNeedsReview(partialKit);
+            setAddError(partialKit
+                ? `${completed} of ${count} kit entries confirmed. Check your inventory before adding anything else; the last item may have been saved. No items will be retried automatically.`
+                : (error as Error).message);
+        } finally { adding.current = false; setBusy(false); }
     };
 
     return (
         <dialog ref={dialogRef} aria-labelledby="shadowdark-gear-title"
             className="m-auto w-[calc(100%-1rem)] max-w-4xl max-h-[calc(100dvh-1rem)] border-0 p-0 bg-transparent text-black backdrop:bg-black/60 backdrop:backdrop-blur-sm"
-            onCancel={event => { event.preventDefault(); onClose(); }}
-            onClick={event => { if (event.target === event.currentTarget) onClose(); }}>
+            onCancel={event => { event.preventDefault(); if (!adding.current) onClose(); }}
+            onClick={event => { if (event.target === event.currentTarget && !adding.current) onClose(); }}>
             <div className="bg-neutral-100 w-full h-[min(85dvh,calc(100dvh-1rem))] flex flex-col border-2 border-black overflow-hidden">
 
                 {/* Header */}
@@ -154,7 +179,7 @@ export default function GearSelectionModal({ isOpen, onClose, onCreate }: GearSe
                         <Backpack size={24} />
                         Gear Selection
                     </h2>
-                    <button type="button" aria-label="Close gear selection" onClick={onClose} className="shrink-0 min-h-11 min-w-11 flex items-center justify-center hover:text-red-400 transition-colors">
+                    <button type="button" aria-label="Close gear selection" disabled={busy} onClick={onClose} className="shrink-0 min-h-11 min-w-11 flex items-center justify-center hover:text-red-400 transition-colors">
                         <X size={24} />
                     </button>
                 </div>
@@ -176,6 +201,7 @@ export default function GearSelectionModal({ isOpen, onClose, onCreate }: GearSe
                 {/* Content */}
                 <div className="min-h-0 flex-1 overflow-y-auto p-2 sm:p-4 space-y-4">
                     <CollectionStatus state={data} label="Loading gear…" />
+                    {addError && <p role="alert" className="border-l-4 border-red-700 p-3 text-red-800">{addError}</p>}
                     {data.ready && items.length === 0 && <p>No gear is available in the readable collections.</p>}
                     {data.ready && (
                         (Object.keys(categorizedItems) as GearCategory[]).map(category => {
@@ -299,7 +325,8 @@ export default function GearSelectionModal({ isOpen, onClose, onCreate }: GearSe
                                                         <div className="col-start-2 row-start-1 row-span-3 lg:col-start-auto lg:row-start-auto lg:row-span-1 lg:col-span-1 flex items-start lg:items-stretch">
                                                             <button
                                                                 type="button"
-                                                                onClick={() => handleAdd(item)}
+                                                                disabled={busy || needsReview}
+                                                                onClick={() => void handleAdd(item)}
                                                                 aria-label={`Add ${item.name} to inventory`}
                                                                 className="w-full min-h-11 bg-black text-white hover:bg-neutral-800 transition-colors rounded-sm flex items-center justify-center"
                                                                 title="Add to Inventory"

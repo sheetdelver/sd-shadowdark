@@ -4,6 +4,57 @@ Date: 2026-10-23
 Status: October 26 follow-ups accepted for checkpoint; native acceptance/recovery recheck and shell SDK gate remain open
 Decision: [ADR-0005](../adr/0005-character-creator.md)
 
+## Crawling Kit and sheet checkpoint — October 26
+
+User authorized the kit correction followed by a local checkpoint of the pending
+module work, before resting design review. Gear Selection now expands exact native
+kit links using the original component bundles: quantities1,1,2,10,3,1,1. It
+preflights every component, preserves provenance/flags/effects, prevents concurrent
+adds and stops with an explicit inventory review on partial failure. Creator's
+shared picker retains all seven staged entries. No conversion of already-owned
+kits or implicit purchase was selected. ADR-0003 records the behavior.
+
+Native creation-validation suite (including exact kit/quantity/source checks),
+three mounted kit workflows and explicit module typing pass. Previous dashboard
+HP/AC and sheet-only zero-HP evidence remains above/below with its own artifacts.
+No Core runtime, SDK/version metadata, live services or world data were changed.
+Package validation/build passes. Runtime archive SHA256:
+`057bfd8980e56afaba0f850079393f94a5c700819b5cc8cbc20d7a56962318e1`.
+Evidence: `/tmp/sd-kit-source.log`, `/tmp/sd-kit-browser-final/results.json`,
+`/tmp/sd-kit-package.log`. Native/operator kit recheck remains separate.
+Resting is a separate proposed ADR; no resting runtime is part of this checkpoint.
+
+## Sheet-only zero-HP cue — October 26
+
+User deferred the dashboard name/skull proposal and selected both module sheet
+layouts. Shared name presentation uses prepared HP, red text and `(💀)` only
+at zero; healing restores normal styling. Paper name input excludes the marker.
+No death flag, saved name, Core code or SDK contract changes. Core local ledger
+DW-22 records the future dashboard scope. ADR-0003 owns the selected behavior.
+
+Native-alignment63/63 and explicit module typing pass, including zero/healed/
+unknown HP, accessible cue, original input value and source preservation.
+Isolated packaging passes. Source and actual archive CSS previews at390/1280px
+verify red text on dark/light backgrounds, unchanged input value, skull removal
+when healed and no horizontal overflow; captures were visually inspected. These
+are focused shared-name previews, not full live-sheet acceptance. Current archive
+SHA256: `4e59738d216b326fbb0c029789c7b7ac14da792e6c24d3d6186841a54aa84892`.
+Evidence: `/tmp/sd-zero-hp-*`. No live world write, new maintained test suite or
+application dependency. Changes remain uncommitted.
+
+## Dashboard stat refresh correction — October 26
+
+Follow-up to `63a7d1e`: user reports HP saves correctly in the sheet and Foundry,
+but the dashboard retains old stats. Read-only Core tracing identified card-only
+realtime refresh against a retained Actor-list snapshot; Shadowdark omitted stat
+blocks, forcing Core's fallback to that snapshot. Module card data now includes
+prepared HP/max HP and AC, retaining the existing appearance. Decision: ADR-0003.
+
+The existing prepared-Actor suite reproduces missing blocks before the correction
+and passes with changed HP/max/AC and zero HP afterwards. Explicit module typing
+passes. Core unchanged; no live services, writes, version bumps or new test suite.
+This follow-up is uncommitted; operator navigation verification remains pending.
+
 ## Follow-up checkpoint — October 26
 
 The user accepted the parenthesized talent count and requested a local checkpoint

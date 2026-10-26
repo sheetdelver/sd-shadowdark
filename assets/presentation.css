@@ -221,3 +221,9 @@
 @media (max-width:640px) { .sdk-module--shadowdark .sd-tool-sheet { --sd-tool-padding:1rem; } }
 
 .sdk-module--shadowdark .sd-tool-sheet > .sd-tool-sheet-footer { margin-top:2rem; margin-inline:calc(-1 * var(--sd-tool-padding)); margin-bottom:calc(-1 * var(--sd-tool-padding)); }
+
+/* Shared sheet-only zero-HP name cue; the editable name stays unmodified. */
+.sdk-module--shadowdark .sd-sheet-character-name { display:inline-flex; align-items:center; gap:.35em; min-width:0; }
+.sdk-module--shadowdark .sd-sheet-character-name-zero { color:#b91c1c; }
+.sdk-module--shadowdark .sd-sheet-character-name-zero input { color:inherit; }
+.sdk-module--shadowdark .sd-sheet-character-name-dark { color:#f87171; }

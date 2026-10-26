@@ -3,6 +3,9 @@
 Historical entries are reconstructed from [published releases](https://github.com/sheetdelver/sd-shadowdark/releases), their tags, and merged changes. Version numbers follow the published tags; the Unreleased section collects notes for the next authorized release.
 
 ## Unreleased
+- Expand Crawling Kit contents
+- Mark zero-HP sheet names
+- Refresh dashboard HP and AC
 - Show talent acquisition levels
 - Group matching paper talents
 - Match rolled talent result ranges

@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { groupPaperTalents, talentLevelLabel } from './talent-display';
 import { Flame } from 'lucide-react';
+import { SheetCharacterName } from './components/SheetCharacterName';
 import NotesModal from './components/NotesModal';
 import { useShadowdarkActor } from './context/ShadowdarkActorContext';
 import { LuckControl } from './components/LuckControl';
@@ -76,12 +77,12 @@ export default function ShadowdarkPaperSheet({ onToggleView }: ShadowdarkPaperSh
                             Manage Character Sheet
                         </button>
                     </div>
-                    <div className={`w-full md:col-span-6 xl:col-span-4 ${box} p-2 pt-6 h-24 flex flex-col`}>
+                    <div className={`w-full md:col-span-6 xl:col-span-4 ${box} p-2 pt-6 h-24 flex flex-col text-2xl font-bold`}>
                         <span className={tag}>Name</span>
                         <label className="sr-only" htmlFor="sd-paper-name">Name</label>
-                        <input id="sd-paper-name" key={actor.name} type="text" defaultValue={actor.name}
+                        <SheetCharacterName hp={derived.hp?.value} className="flex-1 w-full"><input id="sd-paper-name" key={actor.name} type="text" defaultValue={actor.name}
                             onBlur={(e) => e.target.value !== actor.name && updateActor('name', e.target.value, { immediate: true })}
-                            className="w-full h-full text-2xl font-bold bg-transparent outline-none px-1" />
+                            className="w-full min-w-0 h-full text-2xl font-bold bg-transparent outline-none px-1" /></SheetCharacterName>
                     </div>
                 </div>
 

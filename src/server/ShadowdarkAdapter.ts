@@ -132,7 +132,13 @@ export class ShadowdarkAdapter extends BaseSystemAdapter {
             subtext: [ancestry, className || 'Adventurer', `Level ${level}`].filter(Boolean).join(' • '),
             ancestry,
             class: className,
-            level
+            level,
+            // Core refreshes cards independently of the dashboard's Actor list.
+            // Keep displayed stats in this projection, using shared preparation.
+            blocks: [
+                { title: 'HP', value: derived.hp?.value ?? '?', subValue: `/ ${derived.hp?.max ?? '?'}`, valueClass: 'sd-ui-success' },
+                { title: 'AC', value: derived.ac ?? '?' },
+            ],
         };
     }
 
