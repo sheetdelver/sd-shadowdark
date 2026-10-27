@@ -214,6 +214,7 @@ export default function ShadowdarkActorPage({ actorId }: ShadowdarkActorPageProp
                         <ShadowdarkActorProvider
                             actor={actor}
                             onUpdate={handleUpdate}
+                            onPatch={patch => refreshAfter(() => request(`/api/actors/${id}/update`, { method: 'POST', body: JSON.stringify(patch) }))}
                             onDeleteItem={handleDeleteItem}
                             onCreateItem={handleCreateItem}
                             onUpdateItem={handleUpdateItem}

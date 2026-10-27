@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import ErrorBoundary from './components/ErrorBoundary';
 import { shadowdarkTheme } from './themes/shadowdark';
 
-import { Menu, X, Check, FlameKindling } from 'lucide-react';
+import { Menu, X, Check, FlameKindling, Pencil, ArrowLeftRight } from 'lucide-react';
 import { useSDK, useSDKComponents } from '@sheet-delver/sdk/react';
 import { ShadowdarkUIProvider, useShadowdarkUI } from './context/ShadowdarkUIContext';
 import { useShadowdarkActor } from './context/ShadowdarkActorContext';
@@ -53,6 +53,7 @@ export default function ShadowdarkSheet(props: ShadowdarkSheetProps) {
         cancelConfirmation,
         isSaving,
         openRest,
+        openEditCharacter,
     } = useShadowdarkActor();
     
     const { resolveImageUrl, addNotification } = useSDK();
@@ -217,16 +218,11 @@ export default function ShadowdarkSheet(props: ShadowdarkSheetProps) {
                                             {actor.details?.title && <span className="text-amber-500 mr-2">{actor.details.title}</span>}
                                             {actor.details?.ancestry || ''} {actor.details?.class || ''}
                                         </p>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                handleToggleView('simple');
-                                            }}
-                                            className="text-[10px] text-amber-500 hover:text-amber-400 font-bold uppercase tracking-widest mt-1 border border-amber-500/30 px-2 py-0.5 rounded w-fit"
-                                        >
-                                            View Single Page Sheet
-                                        </button>
-                                        <button type="button" onClick={openRest} className="print:hidden text-[10px] text-amber-500 hover:text-amber-400 font-bold uppercase tracking-widest mt-1 border border-amber-500/30 px-2 py-0.5 inline-flex items-center gap-1"><FlameKindling size={14} aria-hidden="true" />Rest</button>
+                                        <div role="group" aria-label="Character sheet controls" className="flex flex-wrap items-center gap-2">
+                                            {actor.canEdit === true && actor.type === 'Player' && <button type="button" onClick={openEditCharacter} className="print:hidden text-[10px] text-amber-500 hover:text-amber-400 font-bold uppercase tracking-widest mt-1 border border-amber-500/30 px-2 py-0.5 inline-flex items-center gap-1"><Pencil size={14} aria-hidden="true" />Edit</button>}
+                                            <button type="button" onClick={() => handleToggleView('simple')} className="print:hidden text-[10px] text-amber-500 hover:text-amber-400 font-bold uppercase tracking-widest mt-1 border border-amber-500/30 px-2 py-0.5 inline-flex items-center gap-1"><ArrowLeftRight size={14} aria-hidden="true" />Single</button>
+                                            <button type="button" onClick={openRest} className="print:hidden text-[10px] text-amber-500 hover:text-amber-400 font-bold uppercase tracking-widest mt-1 border border-amber-500/30 px-2 py-0.5 inline-flex items-center gap-1"><FlameKindling size={14} aria-hidden="true" />Rest</button>
+                                        </div>
                                     </div>
                                 </div>
                                 {/* Level displayed inline on mobile for space or block on desktop */}

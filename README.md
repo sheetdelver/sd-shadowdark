@@ -4,6 +4,7 @@ Character sheets and tools for playing Shadowdark RPG with SheetDelver.
 
 ## Character sheets
 
+- **Edit character:** change the name, base ability scores and base maximum HP in one shared dialog on either sheet. Talent, boon and effect bonuses stay separate.
 - Interactive tabbed and paper-style character sheets.
 - Ability checks, attacks and spellcasting with dice rolls and formatted chat cards.
 - Spell, talent, equipment and monster detail cards.

@@ -28,8 +28,9 @@ export async function handleActorView(actorId: string, req: ModuleServerRequest)
         const normalized = ShadowdarkNormalizer.normalizeActorData(latest, {}, lookups, undefined, requestRules(req.runtime));
         const token = reviewToken(latest);
         const missingGrants = latest.type === 'Player' && missingSpellGrants(Array.isArray(latest.items) ? latest.items : []).length > 0;
-        const canApplyGrants = missingGrants && !advancementPending && !!await req.runtime.documents.get('Actor', actorId, { minOwnership: 'owner' });
-        return json({ actor: { ...latest, ...normalized, advancementPending, spellGrants: { missing: missingGrants, canApply: canApplyGrants }, worldContextRevision: revision, spellReviewToken: token }, derived: normalized.derived, baseline: token });
+        const canEdit = !!await req.runtime.documents.get('Actor', actorId, { minOwnership: 'owner' });
+        const canApplyGrants = missingGrants && !advancementPending && canEdit;
+        return json({ actor: { ...latest, ...normalized, canEdit, advancementPending, spellGrants: { missing: missingGrants, canApply: canApplyGrants }, worldContextRevision: revision, spellReviewToken: token }, derived: normalized.derived, baseline: token });
     } catch (e) {
         return contextConflict(req.runtime, revision) ?? error(isSdkError(e) ? e.code : 'internal', getErrorMessage(e));
     }

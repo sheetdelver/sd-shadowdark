@@ -54,15 +54,15 @@ try {
         });
     };
     await setup();
-    await page.getByRole('button', { name: 'Manage Character Sheet', exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Tabbed', exact: true }).waitFor();
     const open = () => page.getByRole('button', { name: 'Open settings', exact: true }).click();
     const sheetTab = () => page.getByRole('tab', { name: 'Shadowdark', exact: true }).click();
     await open(); await sheetTab();
     await page.getByLabel('Sheet view', { exact: true }).selectOption('advanced');
     assert.equal(await page.evaluate(() => localStorage.getItem('shadowdark_view_mode')), 'advanced');
     await page.getByRole('button', { name: 'Done', exact: true }).click();
-    await page.getByRole('button', { name: 'View Single Page Sheet' }).waitFor();
-    await page.getByRole('button', { name: 'View Single Page Sheet' }).click();
+    await page.getByRole('button', { name: 'Single' }).waitFor();
+    await page.getByRole('button', { name: 'Single' }).click();
     await open(); await sheetTab();
     assert.equal(await page.getByLabel('Sheet view', { exact: true }).inputValue(), 'simple', 'existing sheet button changes same preference');
     await page.evaluate(() => {
@@ -78,7 +78,7 @@ try {
     await page.getByLabel('Sheet view', { exact: true }).selectOption('advanced');
     await page.getByRole('button', { name: 'Done', exact: true }).click();
     await setup(); // Real reload, preserving only browser storage.
-    await page.getByRole('button', { name: 'View Single Page Sheet' }).waitFor();
+    await page.getByRole('button', { name: 'Single' }).waitFor();
     await open(); await sheetTab();
     assert.equal(await page.getByLabel('Sheet view', { exact: true }).inputValue(), 'advanced');
     await page.getByRole('button', { name: 'Reset sheet view' }).click();

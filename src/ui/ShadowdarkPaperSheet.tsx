@@ -4,7 +4,7 @@ import { MAX_CHARACTER_LEVEL } from '../logic/advancement';
 
 import React, { useState } from 'react';
 import { groupPaperTalents, talentLevelLabel } from './talent-display';
-import { Flame, FlameKindling } from 'lucide-react';
+import { Flame, FlameKindling, Pencil, ArrowLeftRight } from 'lucide-react';
 import { LightRemaining } from './components/LightRemaining';
 import { SheetCharacterName } from './components/SheetCharacterName';
 import NotesModal from './components/NotesModal';
@@ -29,7 +29,7 @@ const row = 'w-full text-left flex justify-between items-baseline gap-2 border-b
 const FEATURE_TYPES = ['Talent', 'Boon', 'Class Ability'];
 
 export default function ShadowdarkPaperSheet({ onToggleView }: ShadowdarkPaperSheetProps) {
-    const { actor, updateActor, startAction, openCard, triggerLevelUp, isActionBusy, openRest } = useShadowdarkActor();
+    const { actor, updateActor, startAction, openCard, triggerLevelUp, isActionBusy, openRest, openEditCharacter } = useShadowdarkActor();
     const [notesModalOpen, setNotesModalOpen] = useState(false);
     const derived = actor.derived ?? {};
     const atMaxLevel = Number(actor.derived?.level ?? actor.system?.level?.value ?? 0) >= MAX_CHARACTER_LEVEL;
@@ -77,20 +77,15 @@ export default function ShadowdarkPaperSheet({ onToggleView }: ShadowdarkPaperSh
                 <div className="flex flex-col md:grid md:grid-cols-12 gap-4 items-start mb-4">
                     <div className="w-full md:col-span-6 xl:col-span-8 flex flex-col items-center gap-2 text-center pt-2">
                         <h1 className="text-[clamp(2rem,5vw,3.75rem)] font-black tracking-tighter uppercase leading-none">ShadowDark</h1>
-                        <div className="flex flex-wrap justify-center items-center gap-2">
-                        <button type="button" onClick={onToggleView}
-                            className="print:hidden text-xs font-bold uppercase tracking-widest border-2 border-black px-3 py-2 hover:bg-black hover:text-white shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
-                            Manage Character Sheet
-                        </button>
+                        <div role="group" aria-label="Character sheet controls" className="flex flex-wrap justify-center items-center gap-2">
+                        {actor.canEdit === true && actor.type === 'Player' && <button type="button" onClick={openEditCharacter} className="print:hidden text-xs font-bold uppercase tracking-widest border-2 border-black px-3 py-2 hover:bg-black hover:text-white shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] inline-flex items-center gap-1"><Pencil size={14} aria-hidden="true" />Edit</button>}
+                        <button type="button" onClick={onToggleView} className="print:hidden text-xs font-bold uppercase tracking-widest border-2 border-black px-3 py-2 hover:bg-black hover:text-white shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] inline-flex items-center gap-1"><ArrowLeftRight size={14} aria-hidden="true" />Tabbed</button>
                         <button type="button" onClick={openRest} className="print:hidden text-xs font-bold uppercase tracking-widest border-2 border-black px-3 py-2 hover:bg-black hover:text-white shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] inline-flex items-center gap-1"><FlameKindling size={14} aria-hidden="true" />Rest</button>
                         </div>
                     </div>
-                    <div className={`w-full md:col-span-6 xl:col-span-4 ${box} p-2 pt-6 h-24 flex flex-col text-2xl font-bold`}>
+                    <div className={`w-full md:col-span-6 xl:col-span-4 ${box} p-2 pt-6 min-h-24 flex flex-col text-2xl font-bold`}>
                         <span className={tag}>Name</span>
-                        <label className="sr-only" htmlFor="sd-paper-name">Name</label>
-                        <SheetCharacterName hp={derived.hp?.value} className="flex-1 w-full"><input id="sd-paper-name" key={actor.name} type="text" defaultValue={actor.name}
-                            onBlur={(e) => e.target.value !== actor.name && updateActor('name', e.target.value, { immediate: true })}
-                            className="w-full min-w-0 h-full text-2xl font-bold bg-transparent outline-none px-1" /></SheetCharacterName>
+                        <SheetCharacterName hp={derived.hp?.value} className="flex-1 w-full break-words">{actor.name}</SheetCharacterName>
                     </div>
                 </div>
 

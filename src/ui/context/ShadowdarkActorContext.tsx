@@ -8,6 +8,7 @@ import type { PreparedAction, ActionRequest } from '../../logic/actions';
 import type { ItemControl } from '../../logic/inventory-controls';
 import ModuleDialog from '../components/ModuleDialog';
 import RestModal from '../components/RestModal';
+import EditCharacterModal from '../components/EditCharacterModal';
 
 /**
  * ShadowdarkActorContext — client state for one Actor sheet.
@@ -80,6 +81,7 @@ interface ShadowdarkActorState {
     cancelConfirmation: () => void;
     refreshActor: () => Promise<void>;
     openRest: () => void;
+    openEditCharacter: () => void;
     card: CardTarget | null;
     openCard: (target: CardTarget) => void;
     closeCard: () => void;
@@ -98,6 +100,7 @@ export function ShadowdarkActorProvider({
     children,
     actor: initialActor,
     onUpdate,
+    onPatch,
     onDeleteItem,
     onCreateItem,
     onUpdateItem,
@@ -113,6 +116,7 @@ export function ShadowdarkActorProvider({
     children: React.ReactNode;
     actor: any;
     onUpdate: (path: string, value: any) => Promise<void>;
+    onPatch?: (patch: Record<string, unknown>) => Promise<void>;
     onDeleteItem: (itemId: string) => Promise<void>;
     onCreateItem: (itemData: any) => Promise<void>;
     onUpdateItem: (itemId: string, patch: Record<string, unknown>, deletedEffectRefs?: string[]) => Promise<void>;
@@ -133,6 +137,8 @@ export function ShadowdarkActorProvider({
     if (authority.current.key !== authorityKey) authority.current = { key: authorityKey, generation: authority.current.generation + 1 };
     const [pending, setPending] = useState(0);
     const [restOpen,setRestOpen] = useState(false);
+    const [editOpen, setEditOpen] = useState(false);
+    useEffect(() => { setEditOpen(false); }, [authorityKey]);
     const [drafts, setDrafts] = useState<{ actorId: string; values: Record<string, any> }>({ actorId, values: {} });
     const [optimisticDeletedIds, setOptimisticDeletedIds] = useState<Set<string>>(new Set());
     const controlsInFlight = useRef(new Set<string>());
@@ -151,6 +157,7 @@ export function ShadowdarkActorProvider({
     // A different Actor discards drafts, timers, optimistic state, dialogs and cards.
     useEffect(() => {
         actorIdRef.current = actorId;
+        setEditOpen(false);
         setDrafts({ actorId, values: {} });
         setOptimisticDeletedIds(new Set());
         setCard(null);
@@ -420,6 +427,11 @@ export function ShadowdarkActorProvider({
         triggerLevelUp, showLevelUpModal, levelUpData, closeLevelUp,
         rollDialog, startAction, triggerRollDialog, closeRollDialog, isActionBusy, runItemControl,
         actionRecovery,
+        openEditCharacter: () => {
+            if (!onPatch || initialActor?.canEdit !== true || initialActor?.type !== 'Player') return;
+            if (pending || busyActions.size || recovery.current || Object.keys(timers.current).length) { addNotification('Wait for pending changes before editing.', 'warning'); return; }
+            setEditOpen(true);
+        },
         openRest: () => { if(pending || busyActions.size || recovery.current || Object.keys(timers.current).length) { addNotification('Wait for pending changes before resting.', 'warning'); return; } setRestOpen(true); },
         pendingConfirmation, cancelConfirmation: () => setPendingConfirmation(null),
         card, openCard: setCard, closeCard: () => setCard(null),
@@ -439,7 +451,14 @@ export function ShadowdarkActorProvider({
             </div>}
             </ModuleDialog>
             <RestModal open={restOpen} onClose={()=>setRestOpen(false)} actor={initialActor} onRefresh={refreshActor} />
-            <div className="contents" inert={restOpen}>{children}</div>
+            {editOpen && <EditCharacterModal key={authorityKey} actor={initialActor} onClose={() => setEditOpen(false)}
+                onSave={async patch => {
+                    if (!onPatch) return false;
+                    const generation = authority.current.generation;
+                    const result = await track('Edit character', () => onPatch(patch));
+                    return result.ok && generation === authority.current.generation;
+                }} />}
+            <div className="contents" inert={restOpen || editOpen}>{children}</div>
         </ShadowdarkActorContext.Provider>
     );
 }

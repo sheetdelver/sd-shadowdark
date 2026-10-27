@@ -3,6 +3,8 @@
 Historical entries are reconstructed from [published releases](https://github.com/sheetdelver/sd-shadowdark/releases), their tags, and merged changes. Version numbers follow the published tags; the Unreleased section collects notes for the next authorized release.
 
 ## Unreleased
+
+- Shared character base editor.
 - Add Renown sheet controls
 - Share ability card counters
 - Show MAX at level cap

@@ -136,6 +136,18 @@ await check('SD02-02 caller world Class reaches shared display/action preparatio
     const lookups = await adapter.callerLookups(a, { runtime, isGM: false });
     assert.deepEqual(prepareShadowdarkView(a, lookups).spellModel.owned.map(row => row.itemId), ['spellA', 'spellB']);
 });
+await check('Character editor capability is owner-qualified; observer view preserves source', async () => {
+    const a = castingActor();
+    for (const owner of [false, true]) {
+        const runtime: any = { documents: { get: async (type: string, id: string, options: any) =>
+            type === 'Actor' && id === a._id && (options?.minOwnership !== 'owner' || owner) ? structuredClone(a) : null } };
+        const response = await handleActorView(a._id, { runtime, method: 'GET' } as any);
+        assert.equal(response.status, 200);
+        const body: any = await response.json();
+        assert.equal(body.actor.canEdit, owner);
+        assert.deepEqual(body.actor.system.abilities, a.system.abilities);
+    }
+});
 await check('SD02-02 exact embedded Class and denied/retired dependencies', async () => {
     const a = castingActor(); a.items[0].system.class = ['Actor.other.Item.class'];
     const worldClass = { ...structuredClone(byUuid.get(WIZARD)), _id: 'class' };

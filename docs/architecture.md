@@ -1136,7 +1136,7 @@ The existing leave-warning behavior is accepted; additional Core draft protectio
 and editable-draft restoration are not required. Creation operation receipts
 still prevent duplicate writes after uncertain responses; they are not drafts.
 User acceptance closes the implemented presentation/settings/Creator/rest scope,
-with wand-rest operator verification specifically unperformed. See the owning
+with wand-rest operator verification subsequently accepted on October 27. See the owning
 ADRs for evidence and remaining explicit limitations.
 
 `logic/advancement.ts` owns `MAX_CHARACTER_LEVEL = 10`, shared with Creator.
@@ -1155,3 +1155,14 @@ no gameplay maximum or automatic recalculation. AbilityStateControls reuses the
 native prepared `uses`/`lost` state on ability rows and owned resource cards;
 writes go through the existing exact-owned-item update path. Catalog cards do
 not mount these controls. Normal ability actions and rest recovery are unchanged.
+
+
+## Character base editing
+
+`EditCharacterModal` is mounted once in `ShadowdarkActorProvider` and opened
+from either sheet header. `logic/character-edit.ts` reads preserved source fields
+and produces a sparse name/score/max-HP patch. ActorPage sends that patch through
+the existing public actor-update endpoint in one request; current HP and effect
+documents are excluded. The caller view's `canEdit` is an owner-qualified read,
+with server write authorization still authoritative. See ADR-0008 for validation,
+stale-editor behavior and acceptance.

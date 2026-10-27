@@ -145,11 +145,16 @@ validation and unchanged Core0.19.2 toolchain identity. It also rejects packagin
 or dependency installation in publication. No presentation/runtime source changed.
 
 
-October22 compatibility closeout supersedes the earlier toolchain pin: the next
-release requires Core>=0.20.0/module-api>=1.7.0/UI>=3.3.0, and validation checkout
-plus both workflow fingerprints use v0.20.0. Publish Core first; until then the
-module's remote validation cannot resolve the planned toolchain tag. Current
-local Core0.19.8 metadata also fails the raised application floor. Release version
-metadata remains0.9.6; use the module release helper only after Core publication,
-merged module changes and successful validation. The source-only presentation and
-migration assertions now check the new floor without changing migration behavior.
+## Current baseline — October 27
+
+Core 0.22.2 is released and is the local validation checkout. Module version
+remains 0.9.6. Current CI and release workflow fingerprints use v0.22.0; README
+requires Core 0.22.0+, while the manifest retains >=0.20.0 and UI API >=3.6.
+The earlier instruction to wait for publication of Core 0.20.0 is superseded.
+
+Before 1.0, align the selected Core baseline across these files. The
+[readiness review](audits/2026-10-27-one-point-zero-readiness.md) recommends
+0.22.2 to include the accepted compendium-cache freshness fix; it does not itself
+authorize metadata changes or publication. Use the release helper only after
+selected changes are merged, validation succeeds and release preparation is
+explicitly authorized.

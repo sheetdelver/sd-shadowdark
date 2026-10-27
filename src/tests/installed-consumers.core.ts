@@ -523,7 +523,7 @@ async function main() {
             await noOverflow(page, `${label} paper after dialogs`);
 
             // Tabbed sheet and every tab.
-            await page.getByRole('button', { name: 'Manage Character Sheet' }).click();
+            await page.getByRole('button', { name: 'Tabbed' }).click();
             await page.getByRole('button', { name: 'Open dice tray' }).waitFor({ timeout: 60_000 });
             const tabs: string[] = [];
             for (const tab of ['Abilities', 'Details', 'Inventory', 'Spells', 'Talents', 'Effects', 'Notes']) {
@@ -653,7 +653,7 @@ async function main() {
         const gate = await page.evaluate(() => { const w = window as any; clearInterval(w.__gateTimer); return w.__gate; });
         await page.waitForFunction(() => !document.body.innerText.includes('Loading System Data'), null, { timeout: 60_000 });
         await shot(page, 'live-pulp-paper');
-        await page.getByRole('button', { name: 'Manage Character Sheet' }).click();
+        await page.getByRole('button', { name: 'Tabbed' }).click();
         const abilities = page.getByRole('button', { name: 'Abilities', exact: true });
         if (await abilities.count()) await abilities.first().click();
         await page.locator('input[type="number"][aria-label="Luck tokens"]').waitFor({ timeout: 30_000 });
@@ -727,7 +727,7 @@ async function main() {
         pass('RV-11 installed UI: generator partial success stays blocked on classes 403 and recovers after a real context change');
 
         await page.goto(`${origin}/actors/${WIZARD._id}`,{timeout:300000});
-        await page.getByRole('button',{name:'Manage Character Sheet'}).click();
+        await page.getByRole('button',{name:'Tabbed'}).click();
         await page.getByRole('button',{name:'Spells',exact:true}).first().click();
         await page.getByRole('button',{name:/TIER 1/}).first().click();
         const spellManager=page.getByRole('dialog',{name:/Manage Wizard Spells/});

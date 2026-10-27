@@ -111,6 +111,7 @@ jobs:
           npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/creation-validation.test.ts"
           npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/creator-contracts.test.ts"
           npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/character-creator.test.ts"
+          npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/character-edit.test.ts"
 
       - name: Explicit module, UI and migration typing
         if: steps.reuse.outputs.reused != 'true'
