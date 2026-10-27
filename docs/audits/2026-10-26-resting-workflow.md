@@ -1,9 +1,15 @@
 # Resting workflow audit
 
 Date: 2026-10-26
-Status: User accepted rest; wand operator check remains unverified
+Status: User accepted rest, including wand spell-loss reset
 Decision: [ADR-0006](../adr/0006-shared-character-rest.md)
 Baseline: module `5fade4e`, version0.9.6; Core0.22.0, SDK3.8/UI3.6.
+
+## Acceptance update — October 27
+
+User verified wand spell-loss reset after rest. The outstanding wand operator
+check is closed; the October 26 untested statement below is historical. No new
+exhaustive native version/item matrix is claimed.
 
 ## Current disposition — October 26 operator closeout
 

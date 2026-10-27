@@ -3,6 +3,57 @@
 Status: Completed — user accepted Creator; additional draft protection withdrawn
 Date: 2026-10-23
 
+## Spell progression correction — October 27
+
+The user reported that level-by-level selection hid the overall allowances and
+blocked Knight of St. Ydris on page 4 after selections were complete. This is a
+corrective follow-up to the accepted Creator, not a reopening of prior gates.
+
+- Replace the level dropdown and five repeated tier cards with one table:
+  levels 1 through the selected level are rows, tiers 1–5 are columns. Show
+  selected/required new choices, names/removal controls and cumulative totals.
+  Keep top-to-bottom choice gating, exact-source duplicate protection and the
+  shared progression helper. No altered spell entitlement or new draft schema.
+- Distinguish no increase from a locked tier. Show the progression Class and,
+  when different, its casting list. Keep grants separate. Reuse the existing
+  procedural review's white paper table, serif headings and square controls;
+  a bounded horizontal scroller with a sticky level column serves phones.
+- Explain casting-source failures under Class on the Identity step. If a later
+  source change introduces the failure, also show it beside Spells with Review
+  Class navigation. Do not delay an unresolvable Class error until page 4 or
+  suppress it by granting casting from a class name.
+
+Rules checked directly in the full core book v4.9, printed pp. 20–25: ordinary
+spells are per-tier table increases. Wizard talent 10–11 and scroll learning are
+separate exceptions. Wizard's level-10 ordinary totals are 4/4/4/2/2. Native
+Knight Class `0uVUOXKuX9xfJ600` instead ends at 3/3/2/0/0 and explicitly selects
+Witch Class `KGnBAFiTiLHZJUND` as its spell list.
+
+The user's cached native Knight talent `XRW3jhpTni15hwFc`, effect
+`z7bM0dO1y64K6091`, grants `knight-of-st.-ydris` in `system.spellcasting.classes`.
+Pinned native4.0.6 grants `witch` in that same effect. The cached variant
+reproduces the blocked casting-source check. Native PlayerSD.getSpellcastingAbility
+also matches the spell's list against active grants; accepting the mismatch in
+Creator alone would leave casting broken. No live Foundry source or cache is
+rewritten. The user subsequently supplied a production screenshot proving the
+installed talent already grants `witch`; direct inspection of an isolated local
+v14 pack copy agrees. Core's ID/name-only freshness check retained the older
+cached effect. Core ADR-0075 fixes source revalidation on the separately approved
+`fix/compendium-cache-freshness` branch. No Foundry talent edit is needed.
+
+Implementation and isolated verification are recorded in the Creator audit.
+The operator restarted corrected Core, which refreshed all 16 declared packs,
+and subsequently verified the Character Creator on October 27. The persisted
+Knight casting grant now reads `witch`. This closes the reported source-cache
+blocker; previous accepted Creator/rest workflows are unchanged.
+
+October 27 operator confirmation: the Creator spell-progression table reflects
+the book, is clearer to follow, and works in the user's tested workflow.
+
+Core 0.22.2 is released (user report and current Core checkout); the generic
+compendium freshness correction supplies the correct casting grant. No module
+version or compatibility requirement changes are part of this checkpoint.
+
 ## Operator closeout — October 26
 
 The user accepts the current Creator and its navigation warning. CC-R03's extra

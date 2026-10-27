@@ -44,7 +44,6 @@ export function CreatorContent() {
     const [picker,setPicker]=useState<{title:string;options:any[];select:(row:any)=>void;spellChoice?:boolean}|null>(null),[gearOpen,setGearOpen]=useState(false);
     const [treasureOpen,setTreasureOpen]=useState(false),[gemsOpen,setGemsOpen]=useState(false);
     const [goldOpen,setGoldOpen]=useState(false),[goldAmount,setGoldAmount]=useState<number|null>(null);
-    const [reviewSpellLevel,setReviewSpellLevel]=useState<number|null>(null);
     const [gains,setGains]=useState<Record<number,number|null>>({});
     const [fieldErrors,setFieldErrors]=useState<Record<string,string>>({});
     const [tableUuid,setTableUuid]=useState(''),[tableTotal,setTableTotal]=useState<number|null>(null);
@@ -67,7 +66,6 @@ export function CreatorContent() {
     },[scope,isConnected,data.generation]);
     useEffect(()=>events.on('world:contextChanged',()=>{epoch.current++;actionEpoch.current++;setBusy(false);setPlan(null);setConfirm(null);setRefresh(n=>n+1);}),[events]);
     useEffect(()=>{heading.current?.focus();},[step]);
-    useEffect(()=>setReviewSpellLevel(null),[draft.classUuid,draft.level,scope]);
     useEffect(()=>{
         if(!isConnected)return;let active=true;setStatusReady(false);
         post('status',{}).then(result=>{if(active){if(result.operation?.requestId!==dismissedReceipt.current)setOperation(previous=>
@@ -132,14 +130,17 @@ export function CreatorContent() {
     const assignedSpells=new Set(spellStages.flatMap(stage=>stage.tiers.flatMap(t=>t.selected)));
     const extraSpells=draft.spells.filter(s=>!assignedSpells.has(s.source));
     const nextSpellLevel=spellStages.find(stage=>!stage.complete)?.level??draft.level;
-    const spellStage=spellStages.find(stage=>stage.level===Math.min(reviewSpellLevel??nextSpellLevel,nextSpellLevel));
-    const chooseOrdinarySpell=(tier:number)=>setPicker({title:`Level ${spellStage!.level} · Tier ${tier} spells`,spellChoice:true,
-        options:ordinaryCatalog.filter((s:any)=>s.system?.tier===tier),select:row=>{
-            if(chosenSpells.has(row.uuid)||!spellStage||spellStage.diagnostics.length)return;
-            const allowance=spellStage.tiers.find(t=>t.tier===tier);
-            if(!allowance||allowance.selected.length>=allowance.required)return;
-            setReviewSpellLevel(null);edit(d=>{if(!d.spells.some(s=>s.source===row.uuid))d.spells.push({source:row.uuid,castingClass:plan!.listUuid!});});
-        }});
+    const chooseOrdinarySpell=(level:number,tier:number)=>{
+        const stage=spellStages.find(s=>s.level===level);
+        if(!stage||level>nextSpellLevel||stage.diagnostics.length)return;
+        setPicker({title:`Level ${level} · Tier ${tier} spells`,spellChoice:true,
+            options:ordinaryCatalog.filter((s:any)=>s.system?.tier===tier),select:row=>{
+                if(chosenSpells.has(row.uuid))return;
+                const allowance=stage.tiers.find(t=>t.tier===tier);
+                if(!allowance||allowance.selected.length>=allowance.required)return;
+                edit(d=>{if(!d.spells.some(s=>s.source===row.uuid))d.spells.push({source:row.uuid,castingClass:plan!.listUuid!});});
+            }});
+    };
 
     const choice=(p:any)=>{
         const award=draft.awards.find(a=>a.id===p.awardId);
@@ -274,21 +275,34 @@ export function CreatorContent() {
                     <button type="button" disabled={!availableLanguages.length||planStale} onClick={()=>setPicker({title:'Language on your sheet',options:availableLanguages,select:row=>edit(d=>{if(!d.languages.includes(row.uuid))d.languages.push(row.uuid);})})}>Add Language</button>{feedback('languages')}
                     <ul>{draft.languages.map(ref=><li key={ref}>{(data.collections.languages??[]).find((r:any)=>r.uuid===ref)?.name??'Source unavailable'} <button type="button" onClick={()=>edit(d=>{d.languages=d.languages.filter(r=>r!==ref);})}>Remove language</button></li>)}</ul>
                     <h3>Spells</h3><p>Fixed Spells: {plan?.fixedSpells.map(s=>s.name).join(', ')||'None'}. Fixed Spells are included automatically.</p>
+                    {!planStale&&plan?.errors.some(e=>e.field==='classUuid')&&<div>{feedback('classUuid')}<button type="button" onClick={()=>setStep(0)}>Review Class</button></div>}
                     {spellStages.length>0&&<>
-                        <label>Spell selection level<select aria-label="Spell selection level" value={spellStage?.level??1} onChange={e=>setReviewSpellLevel(Number(e.target.value))}>
-                            {spellStages.map(stage=><option key={stage.level} value={stage.level} disabled={stage.level>nextSpellLevel}>Level {stage.level}{stage.complete?' — complete':stage.level>nextSpellLevel?' — locked':''}</option>)}
-                        </select></label>
-                        <p>Complete each level in order. Granted spells are additional and do not use these choices.</p>
-                        {spellStage&&<section aria-label={`Level ${spellStage.level} spell choices`}>
-                            <h3>Level {spellStage.level} spells</h3>
-                            {spellStage.diagnostics.length>0&&<p role="alert">Native spell progression is unavailable for this level. Later levels remain locked.</p>}
-                            {spellStage.tiers.map(t=><section className="sd-creator-award" key={t.tier} aria-label={`Tier ${t.tier} spells`}>
-                                <h3>Tier {t.tier}</h3>
-                                <p>{t.limit.status!=='known'?'Progression unavailable':t.limit.value===0?'Not unlocked at this level':`${t.selected.length} / ${t.required} new spells selected · ${t.knownBefore} learned at earlier levels`}</p>
-                                <ul>{t.selected.map(ref=><li key={ref}>{ordinaryCatalog.find((s:any)=>s.uuid===ref)?.name??'Source unavailable'} <button type="button" onClick={()=>{setReviewSpellLevel(null);edit(d=>{d.spells=d.spells.filter(s=>s.source!==ref);});}}>Remove Spell</button></li>)}</ul>
-                                <button type="button" disabled={planStale||!!spellStage.diagnostics.length||t.selected.length>=t.required||!ordinaryCatalog.some((s:any)=>s.system?.tier===t.tier&&!chosenSpells.has(s.uuid))} onClick={()=>chooseOrdinarySpell(t.tier)}>Choose tier {t.tier} spell</button>
-                            </section>)}
-                        </section>}
+                        <p><strong>{classDoc?.name} progression</strong>{plan?.listUuid!==draft.classUuid&&<> · Spell list: {(data.collections.classes??[]).find((c:any)=>c.uuid===plan?.listUuid)?.name??'Unavailable'}</>}</p>
+                        <p>Choose the new spells earned at each level, from top to bottom. Each cell shows selected / required new spells; the total includes earlier levels. Fixed and granted spells are additional.</p>
+                        <p role="status">{spellStages.every(s=>s.complete)?'All level spell choices complete.':`Next: level ${nextSpellLevel} spell choices.`}</p>
+                        <div className="sd-creator-table sd-creator-spell-scroll" role="region" aria-label="Spell progression table" tabIndex={0}>
+                            <table className="sd-creator-spell-progression">
+                                <caption>New spell choices by level and tier</caption>
+                                <thead><tr><th scope="col">Level</th>{[1,2,3,4,5].map(tier=><th scope="col" key={tier}>Tier {tier}</th>)}</tr></thead>
+                                <tbody>{spellStages.map(stage=><tr key={stage.level} data-current={!stage.complete&&stage.level===nextSpellLevel}>
+                                    <th scope="row">{stage.level}<small>{stage.complete?'Complete':stage.level>nextSpellLevel?'Later':'Choose now'}</small></th>
+                                    {stage.tiers.map(t=><td key={t.tier} aria-label={`Level ${stage.level}, tier ${t.tier}`}>
+                                        {t.limit.status!=='known'?<span role="alert">Progression unavailable</span>:<>
+                                            {t.required>0?<><strong>{t.selected.length} / {t.required} new</strong><small>{t.limit.value} total at this level</small></>:<><span>{t.limit.value===0?'Not unlocked':'No new spells'}</span>{t.limit.value>0&&<small>{t.limit.value} total at this level</small>}</>}
+                                            {t.selected.length>0&&<ul>{t.selected.map(ref=><li key={ref}>
+                                                <span>{ordinaryCatalog.find((s:any)=>s.uuid===ref)?.name??'Source unavailable'}</span>
+                                                <button type="button" aria-label={`Remove ${ordinaryCatalog.find((s:any)=>s.uuid===ref)?.name??'spell'} from level ${stage.level}`} onClick={()=>edit(d=>{d.spells=d.spells.filter(s=>s.source!==ref);})}>Remove</button>
+                                            </li>)}</ul>}
+                                            {t.required>t.selected.length&&<button type="button" aria-label={`Choose level ${stage.level} tier ${t.tier} spell`} disabled={planStale||stage.level>nextSpellLevel||!!stage.diagnostics.length||!ordinaryCatalog.some((s:any)=>s.system?.tier===t.tier&&!chosenSpells.has(s.uuid))} onClick={()=>chooseOrdinarySpell(stage.level,t.tier)}>Choose spell</button>}
+                                            {stage.level===nextSpellLevel&&t.required>t.selected.length&&!ordinaryCatalog.some((s:any)=>s.system?.tier===t.tier&&!chosenSpells.has(s.uuid))&&<small role="alert">No unselected spells available in this list. Check the spell sources.</small>}
+                                        </>}
+                                    </td>)}
+                                </tr>)}</tbody>
+                                <tfoot><tr><th scope="row">Level {draft.level} total</th>{spellStages.at(-1)!.tiers.map(t=><td key={t.tier}><strong>{t.limit.status==='known'?t.limit.value:'Unavailable'}</strong></td>)}</tr></tfoot>
+                            </table>
+                        </div>
+                        <p className="sd-creator-spell-scroll-hint">On narrow screens, scroll the table sideways to see all tiers.</p>
+                        {spellStages.filter(s=>s.diagnostics.length).map(s=><p role="alert" key={s.level}>Level {s.level}: spell progression is missing or decreases. Check the Class source before continuing.</p>)}
                     </>}
                     {!spellStages.length&&<p>No ordinary Class spell choices. Any granted spells are selected through their talent or boon.</p>}
                     {extraSpells.length>0&&<section aria-label="Spells outside the current allowance"><h3>Review earlier selections</h3><p>These spells no longer fit this Class or level. Remove them to continue.</p><ul>{extraSpells.map(s=><li key={s.source}>{(data.collections.spells??[]).find((row:any)=>row.uuid===s.source)?.name??'Source unavailable'} <button type="button" onClick={()=>edit(d=>{d.spells=d.spells.filter(row=>row.source!==s.source);})}>Remove Spell</button></li>)}</ul></section>}

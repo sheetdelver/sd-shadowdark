@@ -227,3 +227,22 @@
 .sdk-module--shadowdark .sd-sheet-character-name-zero { color:#b91c1c; }
 .sdk-module--shadowdark .sd-sheet-character-name-zero input { color:inherit; }
 .sdk-module--shadowdark .sd-sheet-character-name-dark { color:#f87171; }
+
+/* Creator progression uses the existing paper review table, with a bounded
+ * horizontal viewport on phones rather than hiding other levels in a selector. */
+.sdk-module--shadowdark .sd-creator-spell-scroll { max-width:100%; border:2px solid #000; }
+.sdk-module--shadowdark table.sd-creator-spell-progression { min-width:740px; table-layout:fixed; }
+.sdk-module--shadowdark .sd-creator-spell-progression caption { text-align:left; padding:.75rem; font-weight:bold; }
+.sdk-module--shadowdark .sd-creator-spell-progression :is(th,td) { vertical-align:top; border:1px solid #d4d4d4; }
+.sdk-module--shadowdark .sd-creator-spell-progression thead { background:#000; color:#fff; }
+.sdk-module--shadowdark .sd-creator-spell-progression th:first-child { width:6rem; }
+.sdk-module--shadowdark .sd-creator-spell-progression small { display:block; margin-top:.35rem; font:400 .75rem/1.4 Arial,sans-serif; }
+.sdk-module--shadowdark .sd-creator-spell-progression [data-current="true"] > th { border-left:4px solid #000; }
+.sdk-module--shadowdark .sd-creator-spell-progression ul { list-style:none; padding:0; margin:.5rem 0 0; }
+.sdk-module--shadowdark .sd-creator-spell-progression li { padding:.5rem 0; border-top:1px dotted #777; overflow-wrap:anywhere; }
+.sdk-module--shadowdark .sd-creator-spell-progression li span { display:block; }
+.sdk-module--shadowdark .sd-creator-spell-progression button { margin-top:.5rem; font-size:.75rem; padding:.4rem; min-height:36px; }
+.sdk-module--shadowdark .sd-creator-spell-progression tfoot { border-top:2px solid #000; }
+.sdk-module--shadowdark .sd-creator-spell-scroll-hint { font-size:.75rem; }
+.sdk-module--shadowdark .sd-creator-spell-progression tr > th:first-child { position:sticky; left:0; z-index:1; background:#fff; box-shadow:1px 0 #777; }
+.sdk-module--shadowdark .sd-creator-spell-progression thead tr > th:first-child { background:#000; }

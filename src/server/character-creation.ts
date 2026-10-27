@@ -136,7 +136,7 @@ export async function prepareCreator(req: ModuleServerRequest, input: unknown):P
     for(const ref of fixedRefs)if(!items.some(i=>i.type==='Spell'&&grantSource(i)===ref))items.push(ownedCopy(await resolve(ref,['Spell']),ref));
     const fixedSpells=items.filter(i=>i.type==='Spell');
     const list=cls?spellListIdentity(cls,cls.uuid):null;
-    if(list)await resolve(list,['Class']);
+    const listDoc=list?await resolve(list,['Class']):null;
     const ordinary:any[]=[];const used=new Set(items.filter(i=>i.type==='Spell').map(grantSource));
     for(const s of draft.spells) {
         const doc=await resolve(s.source,['Spell']);await resolve(s.castingClass,['Class']);
@@ -222,7 +222,13 @@ export async function prepareCreator(req: ModuleServerRequest, input: unknown):P
     if(prepared.hp.value>prepared.hp.max)issue(5,`Current HP ${prepared.hp.value} exceeds maximum ${prepared.hp.max}. Enter current HP no greater than maximum HP.`);
     if(prepared.slotUsage&&prepared.maxSlots!==null&&prepared.slotUsage.total>prepared.maxSlots)warn(6,`Inventory uses ${prepared.slotUsage.total} of ${prepared.maxSlots} slots. Keep actual possessions and review encumbrance.`);
     if(cls?.system?.spellcasting?.ability&&draft.level>0) {
-        if(!view.spellModel.sources.some(s=>s.classUuid===cls.uuid))issue(4,'The native Class casting grant or its exact dependencies are unavailable.');
+        if(!view.spellModel.sources.some(s=>s.classUuid===cls.uuid)) {
+            const grants=view.spellModel.grants;
+            const reason=!listDoc?'Its spell-list Class is unavailable.':grants.length
+                ? `Its spellcasting talents grant “${grants.join(', ')}”, which does not match the ${listDoc.name} spell list.`
+                : 'Its talents do not provide an active spellcasting grant.';
+            issue(1,`${cls.name} cannot use its spell list. ${reason} Check the Class and its spellcasting talent in Foundry, then refresh sources.`, 'classUuid');
+        }
         for(const stage of creatorSpellProgression(cls,draft.level,[],[])) {
             if(stage.diagnostics.length)issue(4,`Level ${stage.level}: native spell progression is unavailable or decreases. Review the Class source.`);
         }

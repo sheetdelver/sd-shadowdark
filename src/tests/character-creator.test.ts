@@ -65,6 +65,35 @@ await check('native spell allowances fill consecutive levels and reopen earlier 
         for(let tier=1;tier<=5;tier++)assert.equal(all.reduce((sum,s)=>sum+s.tiers[tier-1].required,0),cls.system.spellcasting.spellsknown[10][tier]??0);
     }
 });
+await check('Knight of St. Ydris keeps its own progression and the Witch casting list',async()=>{
+    const knight='Compendium.shadowdark.classes.Item.0uVUOXKuX9xfJ600',witch='Compendium.shadowdark.classes.Item.KGnBAFiTiLHZJUND';
+    const d=base(10,knight),cls=sources.get(knight);
+    d.spells=[];
+    for(let tier=1;tier<=5;tier++)d.spells.push(...rows.filter(r=>r.type==='Spell'&&r.system.tier===tier&&r.system.class.includes(witch)).slice(0,cls.system.spellcasting.spellsknown[10][tier]??0).map(r=>({source:r.uuid,castingClass:witch})));
+    const p=await prepareCreator(req({}),d);
+    assert.deepEqual(p.errors.filter(e=>e.step===4),[]);
+    assert.equal(p.listUuid,witch);
+    assert.deepEqual(p.preview.spellModel.sources.map(s=>[s.classUuid,s.listUuid]),[[knight,witch]]);
+    assert.deepEqual(creatorSpellProgression(cls,10,d.spells,rows).at(-1)!.tiers.map(t=>t.limit.value),[3,3,2,0,0]);
+});
+await check('mismatched cached Knight casting grant is diagnosed at identity before spell selection',async()=>{
+    const original=adapter.resolveDocumentFor;
+    adapter.resolveDocumentFor=async function(uuid,caller){
+        const doc=await original.call(this,uuid,caller);
+        if(uuid!=='Compendium.shadowdark.talents.Item.XRW3jhpTni15hwFc')return doc;
+        const changed=copy(doc);
+        changed.effects[0].changes[0].value='knight-of-st.-ydris';
+        return changed;
+    };
+    try {
+        const p=await prepareCreator(req({}),base(10,'Compendium.shadowdark.classes.Item.0uVUOXKuX9xfJ600'));
+        assert.equal(p.ready,false);
+        const error=p.errors.find(e=>e.field==='classUuid');
+        assert.equal(error?.step,1);
+        assert.match(error!.message,/Knight of St. Ydris.*knight-of-st.-ydris.*Witch spell list/);
+        assert.equal(p.source.items.find((i:any)=>i._stats?.compendiumSource==='Compendium.shadowdark.talents.Item.XRW3jhpTni15hwFc').effects[0].changes[0].value,'knight-of-st.-ydris');
+    }finally{adapter.resolveDocumentFor=original;}
+});
 await check('missing intermediate progression blocks creation even with valid final totals',async()=>{
     const original=adapter.resolveDocumentFor;
     adapter.resolveDocumentFor=async function(uuid,caller){const doc=await original.call(this,uuid,caller);if(uuid!==WIZARD)return doc;const changed=copy(doc);delete changed.system.spellcasting.spellsknown[2];return changed;};

@@ -7,7 +7,7 @@ language pools and ordinary spell counts in the UI and server. Grant spells are
 filtered with existing eligibility helpers and share exact-identity duplicate
 checks with fixed/ordinary spells. `creator-spell-progression.ts` assigns ordinary
 selections to each tier's earliest native level allowances using the existing
-advancement delta helper. The UI gates subsequent levels; the server validates
+advancement delta helper. The UI exposes all levels and tiers in one progression table, gates subsequent choices, and keeps selected spells visible. The server validates
 intermediate progression and acquisition-level grant eligibility as well as final
 totals. Known picker rows are disabled, and invalidated selections remain removable.
 `creatorAwardAllocation` matches awards to
@@ -33,7 +33,7 @@ uses the Creator’s continuous paper surface around its existing controls.
 
 
 [ADR-0005](adr/0005-character-creator.md) implements a separate player tool for
-transcribing paper characters at levels 0–20, with optional rolls and a final
+transcribing paper characters at levels 0–10, with optional rolls and a final
 prepared review. Its
 [workflow audit](audits/2026-10-23-character-creator-workflow.md) maps reuse of
 existing creation/advancement, grant, language, inventory and preparation helpers.
@@ -81,11 +81,12 @@ visits omit complete historical receipts, while pending receipts retain recovery
 references and array order remain significant. Queues serialize one process;
 no distributed CAS or public SDK idempotency guarantee is claimed.
 
-See [creator rules and limitations](rules/character-creator.md). Native/operator
-acceptance is pending, including native13/14 marker/default normalization. The
-public tool SDK lacks a shell navigation dirty-state hook; creator-owned Dashboard
-navigation uses confirmation, while shell discard protection remains an external
-CC-04 dependency. Persistent editable drafts and arbitrary effects remain excluded.
+See [creator rules and limitations](rules/character-creator.md). User acceptance
+and the withdrawn extra shell-discard gate are recorded in ADR-0005. Persistent
+editable drafts and arbitrary effects remain excluded. The October 27 corrective
+spell table and casting-source diagnostics have isolated and user acceptance
+evidence. Core 0.22.2 resolves the reported stale Knight casting grant; no native
+source repair or module casting exception is required.
 
 ## Optional HUD sheet settings
 

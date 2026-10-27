@@ -25,18 +25,30 @@ wrong-level/table awards cannot be waived at review. A table roll shows its
 actual total and selects the matching native result range; any required choices
 within that result still need completing.
 
-Languages must fill the source-defined pools. Ordinary Spells follow the Class
-list and tier allowances. Choose each level's new spells in order, with separate
-tier groups; later levels remain locked until earlier choices are filled. Use
-**Spell selection level** to review completed levels. Removing a spell reopens
-the earliest unmet allowance of its tier. Fixed and talent/boon-granted Spells
-are separate and do not spend ordinary choices. Known spells are disabled in
-both ordinary and grant pickers. Earlier grants cannot use a later level's
-ordinary spells to unlock a tier. The same restrictions are checked before creation.
-Selections outside a changed Class/level remain visible for removal.
-The level selector supports 0–20, but the supplied native caster progression
-only defines levels 1–10. A caster above its available source data cannot be
-completed until supported progression data exists; limits are never extrapolated.
+Languages must fill the source-defined pools. The spell progression table shows
+all levels through your selected level, with a column for each spell tier. Each
+cell shows the new choices required at that level, their selected spells and the
+cumulative ordinary total. Fill new choices from top to bottom; later choices
+remain disabled until earlier levels are complete. Completed choices remain
+visible and removable. Removing a spell reopens the earliest unmet allowance of
+its tier. On narrow screens, scroll sideways; the level column stays visible.
+
+“No new spells” means that tier's allowance did not increase at this level;
+“Not unlocked” means its cumulative allowance is still zero. For example, Wizard
+level 6 adds one tier-2 and one tier-3 spell. This follows the core class tables
+(pp. 20–25), not a pool that can be spent on any unlocked tier. Fixed and
+talent/boon-granted spells are additional and use their own choice controls.
+Known spells are disabled in both pickers. Acquisition-level eligibility still
+applies to grants. Selections outside a changed Class/level stay visible for removal.
+
+The selected Class owns progression even when it uses another Class's spell
+list. Knight of St. Ydris uses Witch spells but its own slower table, reaching
+only tier 3. The heading names both Class and list when they differ. A missing or
+mismatched casting grant is reported at Class selection with the affected list;
+refresh sources and compare the Class/talent with Foundry before changing source
+data. Core 0.22.2 fixes stale pack contents that previously caused a false mismatch.
+The Creator does not alter source effects or invent a casting grant.
+Character creation and advancement stop at level 10 (core rules p. 39).
 
 Each level has its own HP card, stacked in one column. Enter the hit-die result or use the die button
 beside the input. **Max** enters that level’s maximum die result; the selected

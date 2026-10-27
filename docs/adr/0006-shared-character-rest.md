@@ -1,7 +1,14 @@
 # ADR-0006: Shared character rest and resource recovery
 
-Status: Completed — user accepted rest; wand operator check remains outstanding
+Status: Completed — user accepted rest, including wand spell-loss reset
 Date: 2026-10-26
+
+## Wand acceptance — October 27
+
+The user verified that completing rest resets wand spell loss. This closes the
+remaining operator check identified below. Broken-wand exclusions retain their
+existing isolated coverage; this report does not claim an exhaustive native
+version/item matrix.
 
 ## Operator closeout — October 26
 

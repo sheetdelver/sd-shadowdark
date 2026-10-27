@@ -155,24 +155,45 @@ try{
         const strength=p.getByRole('row').filter({has:p.getByRole('rowheader',{name:'STR',exact:true})});assert.deepEqual(await strength.getByRole('cell').allTextContents(),['16','3']);
         const submitted=await p.evaluate(()=>window.calls.filter(c=>c.url.endsWith('/prepare')).at(-1).body.draft);assert.equal(submitted.awards.length,2);assert.notEqual(submitted.awards[0].id,submitted.awards[1].id);assert.equal(submitted.fixedChoices['class:Compendium.shadowdark.talents.Item.5bpWuaT0KTNzuzCu'].target,'Club');assert.equal(writes,before);
     });
+    await test('Knight source mismatch appears at Class selection and clears after corrected-source refresh',900,async p=>{
+        const original=adapter.resolveDocumentFor;
+        adapter.resolveDocumentFor=async function(uuid,caller){
+            const doc=await original.call(this,uuid,caller);
+            if(uuid!=='Compendium.shadowdark.talents.Item.XRW3jhpTni15hwFc')return doc;
+            const changed=structuredClone(doc);changed.effects[0].changes[0].value='knight-of-st.-ydris';return changed;
+        };
+        try{
+            await p.getByLabel('Name',{exact:true}).fill('Knight');await p.getByLabel('Level',{exact:true}).selectOption('10');
+            await pick(p,'Class','Knight of St. Ydris');await pick(p,'Ancestry','Goblin');await finishIdentity(p);
+            const field=p.locator('.sd-creator-field').filter({has:p.locator('span',{hasText:/^Class \*$/})});
+            await field.getByRole('alert').filter({hasText:'does not match the Witch spell list'}).waitFor();
+            assert.equal(await p.getByRole('button',{name:'Next',exact:true}).isDisabled(),true);
+            await p.screenshot({path:path.join(out,'knight-source-mismatch.png'),fullPage:true});
+            adapter.resolveDocumentFor=original;
+            await p.getByRole('button',{name:'Refresh sources and review',exact:true}).click();await waitPlan(p);
+            assert.equal(await field.getByRole('alert').count(),0);
+            assert.equal(await p.getByRole('button',{name:'Next',exact:true}).isDisabled(),false);
+        }finally{adapter.resolveDocumentFor=original;}
+    });
     for(const width of [390,900])await test(`wizard ${width}px: progressive tiers, spell grants and language limits without duplicates`,width,async p=>{
         const wizard='Compendium.shadowdark.classes.Item.035nuVkU9q2wtMPs';
-        await p.getByLabel('Name',{exact:true}).fill('Wizard');await p.getByLabel('Level',{exact:true}).selectOption('3');await pick(p,'Class','Wizard');await pick(p,'Ancestry','Dwarf');await finishIdentity(p);await step(p,'Ability scores');for(const stat of ['STR','DEX','CON','INT','WIS','CHA'])await p.getByLabel(stat,{exact:true}).fill('12');await step(p,'Talents and boons');await waitPlan(p);
+        await p.getByLabel('Name',{exact:true}).fill('Wizard');await p.getByLabel('Level',{exact:true}).selectOption('10');await pick(p,'Class','Wizard');await pick(p,'Ancestry','Dwarf');await finishIdentity(p);await step(p,'Ability scores');for(const stat of ['STR','DEX','CON','INT','WIS','CHA'])await p.getByLabel(stat,{exact:true}).fill('12');await step(p,'Talents and boons');await waitPlan(p);
         await p.getByRole('button',{name:'Choose level 1 talent',exact:true}).click();await p.getByRole('button',{name:/^Learn Wizard Spell —/}).click();await waitPlan(p);
         await p.getByRole('button',{name:'Choose granted Spell…',exact:true}).click();
         const dialog=p.getByRole('dialog',{name:'Select Spell for Learn Wizard Spell',exact:true});await dialog.getByRole('button').filter({hasText:' — '}).first().click();await waitPlan(p);
         const grant=await p.evaluate(()=>Object.values(window.calls.filter(c=>c.url.endsWith('/prepare')).at(-1).body.draft.awards[0].choices)[0].spell);
-        await p.getByRole('button',{name:'Choose level 3 talent',exact:true}).click();await p.getByRole('button',{name:/^\+1 on Spellcasting Checks —/}).click();await waitPlan(p);
+        for(const level of [3,5,7,9]){await p.getByRole('button',{name:`Choose level ${level} talent`,exact:true}).click();await p.getByRole('button',{name:/^\+1 on Spellcasting Checks —/}).click();await waitPlan(p);}
         await step(p,'Languages and spells');
-        const level=p.getByLabel('Spell selection level',{exact:true});
-        assert.equal(await level.inputValue(),'1');assert.equal(await level.locator('option[value="2"]').evaluate(option=>option.disabled),true);assert.equal(await level.locator('option[value="3"]').evaluate(option=>option.disabled),true);
+        const table=p.getByRole('table',{name:'New spell choices by level and tier',exact:true});
+        assert.equal(await table.locator('tbody tr').count(),10);
+        assert.equal(await p.getByRole('button',{name:'Choose level 2 tier 1 spell',exact:true}).isDisabled(),true);
+        assert.equal(await p.getByRole('button',{name:'Choose level 9 tier 5 spell',exact:true}).isDisabled(),true);
+        assert.deepEqual(await table.locator('tfoot td').allTextContents(),['4','4','4','2','2']);
         const selected=[grant];
-        for(const [at,tier,count] of [[1,1,3],[2,1,1],[3,2,1]]){
-            assert.equal(await level.inputValue(),String(at));
+        for(const [at,tier,count] of [[1,1,3],[2,1,1],[3,2,1],[4,2,1],[5,3,1],[6,2,1],[6,3,1],[7,4,1],[8,2,1],[8,4,1],[9,3,1],[9,5,1],[10,3,1],[10,5,1]]){
+            await p.getByText(`Next: level ${at} spell choices.`,{exact:true}).waitFor();
             for(let i=0;i<count;i++){
-                assert.equal(await p.getByRole('button',{name:'Choose tier 3 spell',exact:true}).isDisabled(),true);
-                if(at<3)assert.equal(await p.getByRole('button',{name:'Choose tier 2 spell',exact:true}).isDisabled(),true);
-                await p.getByRole('button',{name:`Choose tier ${tier} spell`,exact:true}).click();
+                await p.getByRole('button',{name:`Choose level ${at} tier ${tier} spell`,exact:true}).click();
                 const picker=p.getByRole('dialog',{name:`Select Level ${at} · Tier ${tier} spells`,exact:true});
                 for(const ref of selected){const known=rows.find(r=>r.uuid===ref);if(known.system.tier===tier)assert.equal(await picker.getByRole('button').filter({hasText:known.name+' —'}).isDisabled(),true);}
                 await picker.locator('button:enabled').filter({hasText:' — '}).first().click();await waitPlan(p);
@@ -180,9 +201,11 @@ try{
             }
         }
         await p.screenshot({path:path.join(out,`spell-tiers-${width}.png`),fullPage:true});
-        // Reopening an earlier level shows its choices; removing one reopens its first unmet allowance.
-        await level.selectOption('1');await p.getByRole('button',{name:'Remove Spell',exact:true}).first().click();await waitPlan(p);assert.equal(await level.inputValue(),'2');assert.equal(await level.locator('option[value="3"]').evaluate(option=>option.disabled),true);
-        await p.getByRole('button',{name:'Choose tier 1 spell',exact:true}).click();await p.getByRole('dialog',{name:'Select Level 2 · Tier 1 spells',exact:true}).locator('button:enabled').filter({hasText:' — '}).first().click();await waitPlan(p);
+        await p.getByText('All level spell choices complete.',{exact:true}).waitFor();
+        // Every level remains visible; removal reopens the earliest unmet tier allowance.
+        await table.locator('tbody tr').first().getByRole('button',{name:/^Remove /}).first().click();await waitPlan(p);
+        await p.getByText('Next: level 2 spell choices.',{exact:true}).waitFor();
+        await p.getByRole('button',{name:'Choose level 2 tier 1 spell',exact:true}).click();await p.getByRole('dialog',{name:'Select Level 2 · Tier 1 spells',exact:true}).locator('button:enabled').filter({hasText:' — '}).first().click();await waitPlan(p);
         const grantName=rows.find(r=>r.uuid===grant).name;await p.getByRole('button',{name:grantName,exact:true}).click();
         const grantPicker=p.getByRole('dialog',{name:'Select Spell for Learn Wizard Spell',exact:true});
         const ordinary=await p.evaluate(()=>window.calls.filter(c=>c.url.endsWith('/prepare')).at(-1).body.draft.spells[0].source);
@@ -190,7 +213,7 @@ try{
         await p.screenshot({path:path.join(out,`known-spell-picker-${width}.png`),fullPage:true});await p.keyboard.press('Escape');
         for(let i=0;i<4;i++){await p.getByRole('button',{name:'Add Language',exact:true}).click();await p.getByRole('dialog',{name:'Select Language on your sheet',exact:true}).getByRole('button').filter({hasText:' — '}).first().click();await waitPlan(p);}
         assert.equal(await p.getByRole('button',{name:'Add Language',exact:true}).isDisabled(),true);
-        const draft=await p.evaluate(()=>window.calls.filter(c=>c.url.endsWith('/prepare')).at(-1).body.draft);assert.equal(draft.spells.length,5);assert.ok(draft.spells.every(s=>s.source!==grant&&s.castingClass===wizard));assert.equal(draft.languages.length,4);assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+        const draft=await p.evaluate(()=>window.calls.filter(c=>c.url.endsWith('/prepare')).at(-1).body.draft);assert.equal(draft.spells.length,16);assert.ok(draft.spells.every(s=>s.source!==grant&&s.castingClass===wizard));assert.equal(draft.languages.length,4);assert.equal(await p.getByRole('button',{name:'Next',exact:true}).isDisabled(),false);await p.getByRole('button',{name:'Next',exact:true}).click();await p.getByRole('heading',{name:'5. Hit points',exact:true}).waitFor();assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
     });
     for(const width of [390,1280])await test(`generator ${width}px: connected paper surface`,width,async p=>{
         await p.evaluate(()=>{window.activeTool='generator';window.render();});

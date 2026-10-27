@@ -4,6 +4,45 @@ Date: 2026-10-23
 Status: User accepted implemented Creator; extra draft protection withdrawn; level cap corrected
 Decision: [ADR-0005](../adr/0005-character-creator.md)
 
+## Spell progression follow-up — October 27
+
+The Creator now shows a level-by-tier table with selected spells, new choice
+counts and cumulative totals. Completed levels remain visible; earlier missing
+choices still gate later choices. Alternate progression/list identities are
+labeled separately. Source mismatches are diagnosed at Class selection and
+remain visible beside Spells if a later refresh introduces them.
+
+The reported Knight error was reproduced with the old cached casting effect.
+Production user evidence and an isolated installed v14 pack both have the correct
+`witch` grant. The stale Core cache instead has `knight-of-st.-ydris`. No native
+source repair is required. Core ADR0075 addresses the generic cache freshness
+failure separately; do not hardcode a Knight exception in this module.
+
+Isolated evidence: 37 Creator planner checks, contracts and explicit typing pass.
+Level10 Wizard progression passes at390/900px, including tier totals4/4/4/2/2,
+known-spell exclusion, earlier removal/reselection and forward navigation to HP.
+Knight source-mismatch/updated-source behavior passes mounted checks. Source and
+archive presentation are checked with the existing paper UI; no new visual theme.
+Package and compiled Creator checks pass. Current runtime archive SHA256:
+00d98bb68a46c2ecfce44948beeea5bfe78b6c2dd50b31161b499b600086fe4f.
+Documentation refinements postdate this archive; runtime matches.
+Operator restart refreshed all 16 declared packs; the persisted Knight grant
+now reads `witch`. The user verified the Character Creator on October 27.
+The user also verified wand spell-loss reset after rest, closing the separate
+operator check recorded as untested in the historical October 26 section.
+No module commit, release version bump or native write is performed.
+
+October 27 operator confirmation: the Creator spell-progression table reflects
+the book, is clearer to follow, and works in the user's tested workflow.
+
+Core 0.22.2 is released (user report and current Core checkout); the generic
+compendium freshness correction supplies the correct casting grant. No module
+version or compatibility requirement changes are part of this checkpoint.
+
+End-of-day checkpoint: Creator planner and contract suites pass again against
+Core 0.22.2. Earlier mounted/archive evidence remains applicable to the unchanged
+runtime; subsequent edits only reconcile documentation and operator acceptance.
+
 ## Current disposition — October 26 operator closeout
 
 The user accepts the implemented changes: ration/HP/spell/daily-resource rest,
