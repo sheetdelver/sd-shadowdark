@@ -20,7 +20,7 @@ Character sheets and tools for playing Shadowdark RPG with SheetDelver.
 
 - Character Generator and Shadowdarklings.net JSON import.
 - Step-by-step Character Creator for entering existing characters at levels 0–10.
-- Character advancement stops at level 10.
+- Character creation and advancement are capped at level 10, following the Shadowdark core rules (Level Advancement, p. 39).
 - Ancestry-based random names, ability score inputs and rolls, and class ability guidance.
 - Level-based talent, language and spell choices, with spells organized by tier and already-known spells excluded from selection.
 - Per-level HP inputs, individual and combined rolls, and maximum-roll shortcuts.
