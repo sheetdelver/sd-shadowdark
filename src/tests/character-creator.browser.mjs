@@ -70,7 +70,7 @@ const pick=async(p,title,name)=>{
 const finishIdentity=async p=>{await pick(p,'Background',rows.find(r=>r.type==='Background').name);await p.getByLabel('Alignment',{exact:true}).selectOption('neutral');await waitPlan(p);};
 try{
     await test('required steps cannot be skipped; Level 0 Class is excluded from adventuring choices',900,async p=>{
-        await waitPlan(p);await p.locator('.sd-creator-name').getByRole('alert').filter({hasText:'Enter the character’s name.'}).waitFor();assert.equal(await p.getByRole('button',{name:'Next',exact:true}).isDisabled(),true);assert.equal(await p.getByRole('button',{name:'7. Review and create',exact:true}).isDisabled(),true);
+        await waitPlan(p);assert.deepEqual(await p.getByLabel('Level',{exact:true}).locator('option').allTextContents(),Array.from({length:11},(_,n)=>String(n)));await p.locator('.sd-creator-name').getByRole('alert').filter({hasText:'Enter the character’s name.'}).waitFor();assert.equal(await p.getByRole('button',{name:'Next',exact:true}).isDisabled(),true);assert.equal(await p.getByRole('button',{name:'7. Review and create',exact:true}).isDisabled(),true);
         await p.getByLabel('Current XP',{exact:true}).fill('-1');assert.equal(await p.getByLabel('Current XP',{exact:true}).inputValue(),'0');await p.getByLabel('Current XP',{exact:true}).fill('0');await p.getByLabel('Name',{exact:true}).fill('Novice');await pick(p,'Ancestry','Dwarf');await finishIdentity(p);
         assert.equal(await p.getByRole('button',{name:'Next',exact:true}).isDisabled(),true);
         const field=p.locator('.sd-creator-field').filter({has:p.locator('span',{hasText:/^Class \*$/})});await field.getByRole('button').first().click();

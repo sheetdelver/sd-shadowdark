@@ -7,6 +7,7 @@ import { useShadowdarkLevelUp } from '../hooks/useShadowdarkLevelUp';
 import type { PreparedAction, ActionRequest } from '../../logic/actions';
 import type { ItemControl } from '../../logic/inventory-controls';
 import ModuleDialog from '../components/ModuleDialog';
+import RestModal from '../components/RestModal';
 
 /**
  * ShadowdarkActorContext — client state for one Actor sheet.
@@ -78,6 +79,7 @@ interface ShadowdarkActorState {
     pendingConfirmation: { title: string; message: string; onConfirm: () => void } | null;
     cancelConfirmation: () => void;
     refreshActor: () => Promise<void>;
+    openRest: () => void;
     card: CardTarget | null;
     openCard: (target: CardTarget) => void;
     closeCard: () => void;
@@ -125,13 +127,15 @@ export function ShadowdarkActorProvider({
     onRefresh: () => Promise<void>;
 }) {
     const actorId = String(initialActor?.id ?? initialActor?._id ?? '');
-    const { addNotification, events, worldId, currentUser, isConnected } = useSDK();
+    const { addNotification, events, worldId, currentUser, isConnected, fetchWithAuth } = useSDK();
     const authorityKey = JSON.stringify([actorId, initialActor?.worldContextRevision, worldId, currentUser?.id, currentUser?.role, isConnected]);
     const authority = useRef({ key: authorityKey, generation: 0 });
     if (authority.current.key !== authorityKey) authority.current = { key: authorityKey, generation: authority.current.generation + 1 };
     const [pending, setPending] = useState(0);
+    const [restOpen,setRestOpen] = useState(false);
     const [drafts, setDrafts] = useState<{ actorId: string; values: Record<string, any> }>({ actorId, values: {} });
     const [optimisticDeletedIds, setOptimisticDeletedIds] = useState<Set<string>>(new Set());
+    const controlsInFlight = useRef(new Set<string>());
     const [busyActions, setBusyActions] = useState<Set<string>>(new Set());
     const [card, setCard] = useState<CardTarget | null>(null);
     const [pendingConfirmation, setPendingConfirmation] = useState<ShadowdarkActorState['pendingConfirmation']>(null);
@@ -150,6 +154,7 @@ export function ShadowdarkActorProvider({
         setDrafts({ actorId, values: {} });
         setOptimisticDeletedIds(new Set());
         setCard(null);
+        setRestOpen(false);
         recovery.current = null; setActionRecovery(null);
         setRollDialog(prev => ({ ...prev, open: false, callback: null }));
         const active = timers.current;
@@ -162,6 +167,7 @@ export function ShadowdarkActorProvider({
     useEffect(() => {
         const retire = () => {
             authority.current.generation++;
+            setRestOpen(false);
             for (const timer of Object.values(timers.current)) clearTimeout(timer);
             timers.current = {};
             setPendingConfirmation(null);
@@ -272,20 +278,37 @@ export function ShadowdarkActorProvider({
     // The item's own write goes first and stops the sequence on failure; native
     // side effects on other items follow, and a partial result is reported.
     const runItemControl = useCallback(async (control: ItemControl) => {
+        const owner = actorIdRef.current, generation = authority.current.generation;
         const [own, ...others] = control.writes;
         const key = `control:${own?.itemId}:${control.id}`;
-        if (!own || busyActions.has(key)) return false;
+        const flightKey = `${owner}:${key}`;
+        if (!own || controlsInFlight.current.has(flightKey)) return false;
+        controlsInFlight.current.add(flightKey);
         setBusyActions(prev => new Set(prev).add(key));
         try {
             if (!(await updateItem(own.itemId, own.patch))) return false;
             let failed = 0;
             for (const write of others) if (!(await updateItem(write.itemId, write.patch))) failed++;
             if (failed && mounted.current) addNotification(`${control.label}: done, but ${failed} related item update(s) failed.`, 'error');
+            if (!failed && control.id === 'light' && mounted.current && actorIdRef.current === owner && generation === authority.current.generation) {
+                try {
+                    const response = await fetchWithAuth(`/api/modules/shadowdark/actors/${owner}/light/chat`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json', ...(typeof initialActor?.worldContextRevision === 'number' ? { 'X-SheetDelver-Context-Revision': String(initialActor.worldContextRevision) } : {}) },
+                        body: JSON.stringify({ requestId: requestId(), itemId: own.itemId, active: own.patch['system.light.active'] }),
+                    });
+                    const result = await response.json();
+                    if (!response.ok || !result.posted) throw new Error(result.warning ?? 'The light changed, but its chat card could not be confirmed.');
+                } catch (e) {
+                    if (mounted.current && actorIdRef.current === owner && generation === authority.current.generation)
+                        addNotification((e as Error).message, 'warning');
+                }
+            }
             return failed === 0;
         } finally {
+            controlsInFlight.current.delete(flightKey);
             if (mounted.current) setBusyActions(prev => { const next = new Set(prev); next.delete(key); return next; });
         }
-    }, [busyActions, updateItem, addNotification]);
+    }, [updateItem, addNotification, fetchWithAuth, initialActor?.worldContextRevision]);
 
     const runAction = useCallback(async (action: PreparedAction, body: Record<string, unknown>, onSettled?: (result: ActionResponse | null) => void) => {
         if (busyActions.has(action.id) || !onAction) { onSettled?.(null); return; }
@@ -397,6 +420,7 @@ export function ShadowdarkActorProvider({
         triggerLevelUp, showLevelUpModal, levelUpData, closeLevelUp,
         rollDialog, startAction, triggerRollDialog, closeRollDialog, isActionBusy, runItemControl,
         actionRecovery,
+        openRest: () => { if(pending || busyActions.size || recovery.current || Object.keys(timers.current).length) { addNotification('Wait for pending changes before resting.', 'warning'); return; } setRestOpen(true); },
         pendingConfirmation, cancelConfirmation: () => setPendingConfirmation(null),
         card, openCard: setCard, closeCard: () => setCard(null),
     };
@@ -414,7 +438,8 @@ export function ShadowdarkActorProvider({
                 <button type="button" disabled={pending > 0} className="min-h-11 border-2 border-black px-3" onClick={async () => { await refreshActor(); recovery.current = null; setActionRecovery(null); setBusyActions(new Set()); }}>Review refreshed Actor and close</button>
             </div>}
             </ModuleDialog>
-            {children}
+            <RestModal open={restOpen} onClose={()=>setRestOpen(false)} actor={initialActor} onRefresh={refreshActor} />
+            <div className="contents" inert={restOpen}>{children}</div>
         </ShadowdarkActorContext.Provider>
     );
 }

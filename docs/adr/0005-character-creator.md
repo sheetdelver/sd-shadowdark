@@ -1,7 +1,51 @@
 # ADR-0005: Character Creator for paper-sheet transcription
 
-Status: Accepted — header/UI correction accepted; native creation and remaining functional gates open
+Status: Completed — user accepted Creator; additional draft protection withdrawn
 Date: 2026-10-23
+
+## Operator closeout — October 26
+
+The user accepts the current Creator and its navigation warning. CC-R03's extra
+shell-wide discard hook and draft protection are explicitly withdrawn, not an
+outstanding Core dependency. Persistent drafts/restoration are not requested.
+CC-R04/CC-07 close for the user's tested creation flows and existing isolated
+recovery evidence; this does not claim a new exhaustive native v13/v14 failure
+injection run. Recovery means resolving an uncertain creation response without
+creating a duplicate, not restoring an editable draft.
+
+The user checked the core rulebook's Level Advancement section (p. 39) and
+confirmed level 10 is the cap, correcting the original 0–20 request. Creator now
+uses a shared maximum of 10 for its 0–10 selector and server draft validation.
+Levels 11–20 are outside standard creation, not unfinished standard progression.
+Native 4.0.6 Class data defines character levels 1–10 and spell tiers 1–5; e.g.
+Wizard tier 5 has one known spell at level 9 and two at level 10. More spells can
+be gained after tier 4 unlocks. No higher-level table is extrapolated.
+
+Acquisition-sensitive means the level when a benefit was gained changes its
+result. Shune's supported spell choice uses its saved acquisition level, not the
+character's final level. Required facts still need input; this is not a general
+unfinished Creator feature. Unsupported custom effects remain explicit limits.
+This closeout supersedes older 0–20, paper-override and pending acceptance text
+where it conflicts with the later rules-guided implementation.
+
+### Level-up cap correction
+
+The user also selected enforcement for existing-Actor advancement. One shared
+`MAX_CHARACTER_LEVEL` serves Creator validation/selector, prepared level-up
+eligibility and the shared level-up hook/server routes. Level 9 can advance to
+10; at 10 or above no new advancement or advancement HP roll is allowed. Existing
+above-cap Actor data is preserved. Saved operation review/reconciliation remains
+available before the new-operation guard, including completed level-10 replay.
+
+Pinned native 4.0.6 does not enforce this rulebook cap: `actorFields.mjs` gives
+level.value a minimum but no maximum; `PlayerSheetSD.getData` checks only XP for
+level-up eligibility, and `LevelUpSD` increments the level. Its explicit 1–10
+spell-table bounds do not prevent noncaster advancement. SheetDelver deliberately
+enforces the user-confirmed p. 39 rule instead of copying that omission.
+
+Verification includes Creator boundary validation, mounted selector options,
+9→10 success, 10/20 advancement and HP rejection with no writes, and completed
+level-10 receipt replay. Existing advancement recovery coverage remains intact.
 
 ## Table result and resource shortcuts — October 26
 
@@ -431,11 +475,10 @@ progression. Selection order must not change the final result.
 
 ### Levels beyond available progression and paper exceptions
 
-Native 4.0.6 stores levels above 10, but its Class spell table defines levels
-1–10 only. The requested 0–20 selector is retained. At an unsupported level show
-“No spell allowance is defined for this level; enter the spells on your sheet.”
-Read available native data first; never extrapolate a progression, copy level 10
-as level 20, clamp an unsupported grant tier, or create a hidden allowance effect.
+The October 26 rules correction supersedes the original 0–20 scope. Standard
+Creator input is 0–10, matching the user-verified rulebook cap (p. 39). Native
+spell tables contain those adventuring levels and tiers through 5. A missing row
+within the supported range is unavailable Class data; it is not unlimited spells.
 
 For paper transcription, unknown/exceeded historical award counts, ordinary spell
 allowances, language totals or inventory capacity are review warnings. A user may

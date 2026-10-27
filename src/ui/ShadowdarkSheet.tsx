@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import ErrorBoundary from './components/ErrorBoundary';
 import { shadowdarkTheme } from './themes/shadowdark';
 
-import { Menu, X, Check } from 'lucide-react';
+import { Menu, X, Check, FlameKindling } from 'lucide-react';
 import { useSDK, useSDKComponents } from '@sheet-delver/sdk/react';
 import { ShadowdarkUIProvider, useShadowdarkUI } from './context/ShadowdarkUIContext';
 import { useShadowdarkActor } from './context/ShadowdarkActorContext';
@@ -52,6 +52,7 @@ export default function ShadowdarkSheet(props: ShadowdarkSheetProps) {
         pendingConfirmation,
         cancelConfirmation,
         isSaving,
+        openRest,
     } = useShadowdarkActor();
     
     const { resolveImageUrl, addNotification } = useSDK();
@@ -225,6 +226,7 @@ export default function ShadowdarkSheet(props: ShadowdarkSheetProps) {
                                         >
                                             View Single Page Sheet
                                         </button>
+                                        <button type="button" onClick={openRest} className="print:hidden text-[10px] text-amber-500 hover:text-amber-400 font-bold uppercase tracking-widest mt-1 border border-amber-500/30 px-2 py-0.5 inline-flex items-center gap-1"><FlameKindling size={14} aria-hidden="true" />Rest</button>
                                     </div>
                                 </div>
                                 {/* Level displayed inline on mobile for space or block on desktop */}

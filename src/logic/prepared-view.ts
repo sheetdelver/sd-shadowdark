@@ -1,3 +1,4 @@
+import { MAX_CHARACTER_LEVEL } from './advancement';
 import { prepareActorCore, ABILITY_KEYS, type AbilityKey, type PreparationLookups, type PreparedActorCore, type PreparedItemBasics } from './actor-preparation';
 import { buildRoll, listActions, weaponBase, bonusLabel, type PreparedAction } from './actions';
 import { UNAVAILABLE_RULE_INPUTS, hasLuckToken, luckMode, type RuleInputs } from './world-settings';
@@ -212,7 +213,7 @@ export function prepareShadowdarkView(source: any, lookups: ViewLookups = {}, ru
         slotsUsed: core.slotUsage?.total ?? null,
         slotBreakdown: core.slotUsage ? { gear: core.slotUsage.gear, treasure: core.slotUsage.treasure, gems: core.slotUsage.gems, coins: core.slotUsage.coins } : null,
         xpNextLevel,
-        levelUp: core.kind === 'Player' && (Number(system.level?.xp ?? 0) >= xpNextLevel),
+        levelUp: core.kind === 'Player' && core.level < MAX_CHARACTER_LEVEL && (Number(system.level?.xp ?? 0) >= xpNextLevel),
         identity,
         items: itemViews,
         actions,

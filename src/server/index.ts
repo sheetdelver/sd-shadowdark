@@ -1,3 +1,5 @@
+import { handleLightChat } from './api/light-chat';
+import { handleRest } from './api/rest';
 import { json, error, type ModuleServerRequest, type ModuleServerParams } from '@sheet-delver/sdk/server';
 import { handleImport } from './api/import';
 import { handleCreatorPrepare, handleCreatorCreate, handleCreatorStatus, handleCreatorRoll, handleCreatorHP } from './api/character-creator';
@@ -85,6 +87,10 @@ export const apiRoutes = {
     'actors/[id]/actions': async (req: ModuleServerRequest, { params }: ModuleServerParams) => {
         return handleActorAction(await actorIdFrom(params), req);
     },
+    'actors/[id]/rest/plan': async (req: ModuleServerRequest, { params }: ModuleServerParams) => handleRest(await actorIdFrom(params), req, 'plan'),
+    'actors/[id]/rest/complete': async (req: ModuleServerRequest, { params }: ModuleServerParams) => handleRest(await actorIdFrom(params), req, 'complete'),
+    'actors/[id]/rest/status': async (req: ModuleServerRequest, { params }: ModuleServerParams) => handleRest(await actorIdFrom(params), req, 'status'),
+    'actors/[id]/light/chat': async (req: ModuleServerRequest, { params }: ModuleServerParams) => handleLightChat(await actorIdFrom(params), req),
     'actors/[id]/luck': async (req: ModuleServerRequest, { params }: ModuleServerParams) => {
         return handleLuck(await actorIdFrom(params), req);
     },

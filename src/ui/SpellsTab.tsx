@@ -1,4 +1,5 @@
 'use client';
+import SpellLossControl from './components/SpellLossControl';
 
 import React from 'react';
 
@@ -24,7 +25,7 @@ interface SpellSource { classUuid: string; listUuid: string; name: string; grant
 
 export default function SpellsTab() {
     const { resolveImageUrl, addNotification, fetchWithAuth } = useSDK();
-    const { actor, updateItem, deleteItem, startAction, openCard, isActionBusy, refreshActor, card, rollDialog, pendingConfirmation } = useShadowdarkActor();
+    const { actor, deleteItem, startAction, openCard, isActionBusy, refreshActor, card, rollDialog, pendingConfirmation } = useShadowdarkActor();
     const [manage, setManage] = useState<{ classUuid: string; tier: number } | null>(null);
     const [saving, setSaving] = useState(false);
     const [submission, setSubmission] = useState<any>(null);
@@ -98,12 +99,7 @@ export default function SpellsTab() {
                     title={action.reason ?? undefined}>
                     <Sparkles className="w-4 h-4" aria-hidden="true" /> {isActionBusy(action.id) ? 'Casting…' : 'Cast'}
                 </button>
-                {lostPath && (
-                    <button type="button" onClick={() => updateItem(String(item.id), { 'system.lost': !item.system?.lost })} aria-pressed={item.system?.lost === true}
-                        className={`min-h-11 px-3 border-2 border-black text-xs font-bold uppercase ${item.system?.lost ? 'bg-red-100 text-red-800' : 'bg-white'}`}>
-                        {item.system?.lost ? 'Restore' : 'Mark lost'}
-                    </button>
-                )}
+                {lostPath && <SpellLossControl itemId={String(item.id ?? item._id)} />}
             </li>
         );
     };

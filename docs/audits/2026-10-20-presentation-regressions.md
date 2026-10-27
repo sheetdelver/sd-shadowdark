@@ -1,5 +1,55 @@
 # Shadowdark presentation regression review
 
+## Current disposition — October 26 operator closeout
+
+The user accepts the implemented changes: ration/HP/spell/daily-resource rest,
+spell loss controls, SDK torch cards (including their presentation difference),
+Pulp luck controls and remaining UI/Creator work. Wands during rest are explicitly
+not yet user-tested; isolated evidence remains, with no claim of new native
+v13/v14 coverage. Additional draft protection/restoration is declined; existing
+navigation warning is accepted. CC-R03 is withdrawn. CC-R04/CC-07 are closed for
+accepted user flows with existing isolated recovery evidence, not an exhaustive
+live failure-injection claim. ADR-0003/0004/0005/0006 record the scoped closeout.
+
+The user confirmed the rulebook p. 39 cap of level 10. Creator selector and shared
+validation now accept 0–10; the earlier 0–20 request and missing-level-11–20
+backlog interpretation are superseded. Native spells reach tier 5 and continue
+gaining within levels 1–10. Acquisition-level choices such as Shune are supported
+when their required level is supplied. Deferred work is not a release blocker.
+Earlier pending statements below retain historical evidence only where superseded.
+
+
+## Light feedback and Pulp controls — October26
+
+User selected chat feedback for saved light toggles and matching −/+ Pulp luck
+controls in both sheets. Scope is recorded in ADR0003. The native4.0.6 sheet
+posts a public light-source card, conditionally including remaining minutes;
+previous SheetDelver item controls intentionally omitted chat. The correction
+uses the public server SDK `runtime.chat.card`, not private Core imports or a
+Foundry browser handler. Scene lights and tracker automation remain deferred.
+
+Verification:
+- Existing action-phase suite passes, including two grouped checks for lit/unlit
+  cards, hidden/unavailable remaining time, ownership/state refusal, escaped text,
+  replay and uncertain chat acknowledgement without inventory writes.
+- Four mounted provider/sheet workflows pass: tabbed and paper light on/off plus
+  shared Pulp input/−/+ behavior, failed item write without chat, and uncertain
+  chat without repeated item writes. Packaged CSS is applied;390px paper and1280px
+  tabbed luck screenshots inspected. Initial harness runs missed packaged CSS and
+  the numbered paper gear button's accessible name; corrected harness passes.
+- Explicit module/UI/server typing and package contract/boundary/build pass.
+-11 compiled public-route checks pass, including SDK light-card dispatch/replay
+  and inherited rest/creation/advancement probes.
+
+Runtime archive SHA256:
+`1c5bff7728f66dc7b721b8aa959238065b512f64a8679631062f9259213b8d93`.
+Evidence/docs and the added packaged probe postdate this artifact; runtime source
+is identical. Module version0.9.6 and contract floors remain unchanged. The only
+manifest addition declares native4.0.6 `playerShowLightRemaining` (world Number,
+default2, choices0/1/2); unavailable values omit time. Verification is offline;
+user/native chat delivery and operator acceptance remain open. No Core changes,
+services, live document writes, commit or release.
+
 ## SD-UI24 — Optional HUD sheet settings, October23
 
 Checkpoint authorized October23 after the Core-theme and panel-cache corrections.

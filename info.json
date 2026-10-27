@@ -17,6 +17,26 @@
     },
     "worldSettings": [
         {
+            "key": "shadowdark.playerShowLightRemaining",
+            "scope": "world",
+            "systemVersion": ">=4.0.6 <=4.0.6",
+            "schema": {
+                "type": "number",
+                "enum": [
+                    0,
+                    1,
+                    2
+                ]
+            },
+            "default": {
+                "value": 2,
+                "source": "native Shadowdark 4.0.6 system/src/settings.mjs: playerShowLightRemaining, world Number, default 2",
+                "systemVersion": ">=4.0.6 <=4.0.6"
+            },
+            "affectsPreparation": false,
+            "exposure": "authenticated"
+        },
+        {
             "key": "shadowdark.usePulpMode",
             "scope": "world",
             "systemVersion": ">=4.0.0 <=4.0.6",

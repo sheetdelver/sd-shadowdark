@@ -30,6 +30,11 @@ import {useAutomaticSpellGrants} from '${moduleRoot}/src/ui/hooks/useAutomaticSp
 import React from 'react'; import {createRoot} from 'react-dom/client';
 import {ShadowdarkUIProvider} from '${moduleRoot}/src/ui/context/ShadowdarkUIContext';
 import Gear from '${moduleRoot}/src/ui/components/GearSelectionModal';
+import Sheet from '${moduleRoot}/src/ui/ShadowdarkSheet';
+import PaperSheet from '${moduleRoot}/src/ui/ShadowdarkPaperSheet';
+import {ShadowdarkActorProvider as RestProvider,useShadowdarkActor as useRestActor} from '${moduleRoot}/src/ui/context/ShadowdarkActorContext.tsx';
+import {restPlan} from '${moduleRoot}/src/logic/rest';
+import {UNAVAILABLE_RULE_INPUTS} from '${moduleRoot}/src/logic/world-settings';
 import Spells from '${moduleRoot}/src/ui/SpellsTab';
 import {ItemRow} from '${moduleRoot}/src/ui/InventoryComponents';
 import Generator from '${moduleRoot}/src/ui/tools/Generator';
@@ -52,7 +57,7 @@ const listeners=new Map();const emit=(event,payload)=>listeners.get(event)?.forE
 window.policy=window.initial.policy||{};
 const rope={_id:'rope',uuid:'Compendium.shadowdark.gear.Item.rope',name:'Current Rope',type:'Basic',pack:'shadowdark.gear',system:{cost:{gp:1}}};
 window.sdk={isConnected:true,worldId:'w',currentUser:{id:'p',role:1},foundryUrl:'',
- events:{on:(event,fn)=>{if(!listeners.has(event))listeners.set(event,new Set());listeners.get(event).add(fn);return ()=>listeners.get(event).delete(fn)}},resolveImageUrl:x=>x||'',addNotification:()=>{},navigate:()=>{},
+ events:{on:(event,fn)=>{if(!listeners.has(event))listeners.set(event,new Set());listeners.get(event).add(fn);return ()=>listeners.get(event).delete(fn)}},resolveImageUrl:x=>x||'',addNotification:(message,type)=>{window.notifications??=[];window.notifications.push({message,type})},navigate:()=>{},
  fetchWithAuth:async (url,options={})=>{
   const key=url.split('/').at(-1).split('?')[0];const call={key,signal:options.signal,body:options.body};window.calls.push(call);
   const reference=url.includes('/document/')?decodeURIComponent(url.split('/document/')[1]):url.includes('uuid=')?decodeURIComponent(url.split('uuid=')[1]):null;
@@ -61,6 +66,19 @@ window.sdk={isConnected:true,worldId:'w',currentUser:{id:'p',role:1},foundryUrl:
   const emptyPlan={fixed:[],groups:[],errors:[],rows:[],current:window.initial.current||[],review:'review1',contextRevision:1};
   if(p.hold)return new Promise(resolve=>window.pending.push({call,resolve}));
   if(p.network)throw new TypeError('Connection interrupted');
+  if(window.initial.which==='rest'&&url.includes('/rest/')) {
+    const body=JSON.parse(options.body||'{}');
+    if(key==='status')return Response.json(window.restOperation||{state:'none'});
+    const plan=restPlan(window.initial.actor,body,{},UNAVAILABLE_RULE_INPUTS);
+    if(key==='plan')return Response.json({...plan,review:'rest-reviewed',contextRevision:1});
+    if(key==='complete') {
+      for(const write of plan.writes){let obj=write.itemId?window.initial.actor.items.find(i=>i._id===write.itemId):window.initial.actor;
+        for(const [path,value]of Object.entries(write.patch)){const parts=path.split('.');let owner=obj;for(const part of parts.slice(0,-1))owner=owner[part]??={};owner[parts.at(-1)]=value}}
+      window.restOperation={state:'complete',requestId:body.requestId,applied:plan.writes.map(w=>w.label),pending:[],intent:body,review:body.review};
+      if(window.initial.lostRestAck){window.initial.lostRestAck=false;throw Error('Response lost');}
+      return Response.json(window.restOperation);
+    }
+  }
   return Response.json(p.body??(key==='index'?{nameIndex:{}}:key==='data'?{success:true,data:{isSpellcaster:false,spellsToChoose:{},availableSpells:[],progressionReady:true}}:key==='gear'?[rope]:key==='plan'?emptyPlan:key==='manage'?{success:true}:[]),{status:p.status||200});
  }};
 window.actorContext={actor:window.initial.actor||{id:'a',items:[],derived:{actions:[],items:[],spellcasting:{classes:[]}}},isActionBusy:()=>false,getDraftValue:(_,value)=>value};
@@ -85,7 +103,19 @@ function EffectAdvancement(){const {state,actions}=useLevelUp(effectProps);
  allocated={state.statChoices[index]||{}} onChange={(stat,delta)=>actions.changeStatChoice(index,stat,delta)}/></div>)}
  <button disabled={!actions.isComplete()} onClick={()=>actions.handleConfirm()}>Finish effect advancement</button></>;}
 function ParityPicker(){const [open,setOpen]=React.useState(false);return <><button onClick={()=>setOpen(true)}>Open spell manager</button><SpellPicker isOpen={open} onClose={()=>setOpen(false)} onSave={intent=>window.saved=intent} title="Manage spells" tier={1} classUuid={window.initial.listUuid||"Compendium.shadowdark.classes.Item.wizard"} knownSpells={window.initial.owned||[]} maxSelections={window.initial.limit} actor={window.initial.actor}/></>;}
+function RestSheet(){window.actorContext=useRestActor();return window.initial.paper?<><PaperSheet onToggleView={()=>{}}/><ResourceDetailModal/></>:<Sheet/>;}
+function RestHost(){
+ const prepare=()=>({...window.initial.actor,id:'restactor',worldContextRevision:1,derived:prepareShadowdarkView(window.initial.actor,{},window.initial.pulp?{...UNAVAILABLE_RULE_INPUTS,usePulpMode:{status:'world',value:true}}:UNAVAILABLE_RULE_INPUTS)});
+ const [actor,setActor]=React.useState(prepare);
+ const noop=async()=>{};return <RestProvider actor={actor} onUpdate={noop} onDeleteItem={noop} onCreateItem={noop}
+ onUpdateItem={async(id,patch)=>{if(!window.initial.lightTest)return;window.calls.push({key:'item-write',id,patch});if(window.initial.failItem)throw Error('Controlled item failure');
+ const item=window.initial.actor.items.find(row=>row._id===id);for(const [path,value]of Object.entries(patch)){const parts=path.split('.');let owner=item;for(const key of parts.slice(0,-1))owner=owner[key]??={};owner[parts.at(-1)]=value}setActor(prepare())}}
+ onLuck={async(mode,value)=>{window.luckWrite={mode,value};window.initial.actor.system.luck.remaining=value;setActor(prepare())}}
+ onRoll={noop} onToggleEffect={noop} onDeleteEffect={noop} onCreateEffect={noop} onUpdateEffect={noop}
+ onRefresh={async()=>{window.refreshes=(window.refreshes||0)+1;setActor(prepare())}}><RestSheet/></RestProvider>;}
+
 function Consumer(){switch(window.initial.which){
+case 'rest':return <RestHost/>;
 case 'item-spells': {
  const source=window.initial.actor;
  const derived=prepareShadowdarkView(source,{classDocument:()=>({name:'Wizard',type:'Class',system:{spellcasting:{ability:'int'}}}),
@@ -105,6 +135,7 @@ case 'resource-card': {
  const selected=wand?source.items[0]._id:'spell';
  if(!wand)derived.items.find(item=>item.id==='spell').diagnostics=['Fixture source note'];
  window.actorContext={actor:{...source,derived},card:{kind:'item',itemId:selected},rollDialog:{open:false},isActionBusy:()=>false,startAction:(action,options)=>window.lastAction={action,options},closeCard:()=>{},openCard:()=>{},performRoll:()=>{},
+ updateItem:async(id,patch)=>{window.lastItemPatch={id,patch};const item=source.items.find(row=>(row._id??row.id)===id);for(const [key,value] of Object.entries(patch)){const parts=key.split('.');let target=item;for(const key of parts.slice(0,-1))target=target[key]??={};target[parts.at(-1)]=value}window.render();return true},
  runItemControl:control=>{window.lastControl=control;for(const write of control.writes){const item=source.items.find(row=>row._id===write.itemId);for(const [path,value]of Object.entries(write.patch)){const parts=path.split('.');let target=item;for(const key of parts.slice(0,-1))target=target[key]??={};target[parts.at(-1)]=value}}window.render()}};
  window.failWand=broken=>{source.items[0].flags={shadowdark:{sheetDelver:{wand:{lostSpells:['Compendium.shadowdark.spells.Item.ItoZZ0nli29N5d7G'],broken}}}};window.render()};
  return <ResourceDetailModal/>;
@@ -135,7 +166,7 @@ window.render();
     if(baseline)b.onLoad({filter:/SpellSelectionModal\.tsx$/},a=>({loader:'tsx',resolveDir:path.dirname(a.path),contents:execFileSync('git',['show',baseline+':src/ui/components/SpellSelectionModal.tsx'],{cwd:moduleRoot,encoding:'utf8'})}));
     b.onResolve({ filter: /^(?:@sheet-delver\/sdk(?:\/react)?|@shared\/sdk\/react)$/ }, a => ({ path: a.path, namespace: 'stub' }));
     b.onResolve({ filter: /ShadowdarkActorContext$/ }, () => ({ path: 'actor', namespace: 'stub' }));
-    b.onLoad({ filter: /.*/, namespace: 'stub' }, a => ({ loader: 'tsx', resolveDir: moduleRoot, contents: a.path === 'actor' ? 'export const useShadowdarkActor=()=>window.actorContext;' : a.path.endsWith('/react') ? `import PageHeader from '${path.resolve(process.env.SHADOWDARK_CORE||process.cwd())}/src/client/ui/components/PageHeader.tsx';import React from 'react';export const useSDK=()=>window.sdk;export const useSDKComponents=()=>({PageHeader,ConfirmationModal:()=>null,LoadingModal:({message})=><div role="status">{message}</div>});` : `export const logger={info(){},warn(){},error(){},debug(){}};export const processHtmlContent=x=>x;export const getErrorMessage=e=>String(e);` }));
+    b.onLoad({ filter: /.*/, namespace: 'stub' }, a => ({ loader: 'tsx', resolveDir: moduleRoot, contents: a.path === 'actor' ? 'export const useShadowdarkActor=()=>window.actorContext;' : a.path.endsWith('/react') ? `import PageHeader from '${path.resolve(process.env.SHADOWDARK_CORE||process.cwd())}/src/client/ui/components/PageHeader.tsx';import React from 'react';export const useSDK=()=>window.sdk;export const useSDKComponents=()=>({PageHeader,RollDialog:()=>null,ConfirmationModal:()=>null,LoadingModal:({message})=><div role="status">{message}</div>});` : `export const logger={info(){},warn(){},error(){},debug(){}};export const processHtmlContent=x=>x;export const getErrorMessage=e=>String(e);` }));
 } }] });
 const browser = await chromium.launch({ ...(process.env.SHADOWDARK_CHROME ? { executablePath: process.env.SHADOWDARK_CHROME } : {}), headless: true, args: ['--no-sandbox', '--disable-background-networking'] });
 const results = [];
@@ -151,8 +182,9 @@ async function test(name, initial, run) {
     page.on('pageerror', e => errors.push(e.message)); await page.route('**/*', r => r.abort());
     try {
         await page.setContent('<div id="root" class="sdk-module--shadowdark"></div>');
-        if(name.startsWith('SD-UI13') || name.startsWith('SD-UI23')) { await page.addStyleTag({content:hostCss}); await page.addStyleTag({path:path.join(moduleRoot,'assets/presentation.css')}); }
+        if(name.startsWith('SD-UI13') || name.startsWith('SD-UI23') || name.startsWith('REST') || name.startsWith('LIGHT')) { await page.addStyleTag({content:hostCss}); await page.addStyleTag({path:path.join(moduleRoot,'assets/presentation.css')}); }
         if(['resource-card','wand-card'].includes(initial.which)) { await page.setViewportSize({width:initial.width,height:900}); if(process.env.SHADOWDARK_CARD_TAILWIND)await page.addStyleTag({path:process.env.SHADOWDARK_CARD_TAILWIND});await page.addStyleTag({path:path.join(moduleRoot,'assets/presentation.css')}); } await page.evaluate(x => window.initial = x, initial);
+        if(initial.which==='rest'){await page.evaluate(paper=>Object.defineProperty(window,'localStorage',{configurable:true,value:{getItem:()=>paper?'simple':'advanced',setItem(){},removeItem(){}}}),initial.paper);await page.setViewportSize({width:initial.width||1280,height:900});if(process.env.SHADOWDARK_CARD_TAILWIND)await page.addStyleTag({path:process.env.SHADOWDARK_CARD_TAILWIND});}
         await page.addScriptTag({ content: bundled.outputFiles[0].text });
         await run(page); assert.deepEqual(errors, []); results.push({ name, ok: true }); console.log(`✓ ${name}`);
     } catch (e) {
@@ -164,6 +196,67 @@ const text = (p, value) => p.getByText(value, { exact: true }).waitFor({ timeout
 const count = (p, key) => p.evaluate(k => window.calls.filter(c => c.key === k).length, key);
 const settled = p => p.waitForTimeout(100);
 try {
+    const restActor={_id:'restactor',name:'Rest tester',type:'Player',system:{attributes:{hp:{value:1,max:9}},abilities:{},level:{value:1,xp:0},coins:{}},effects:[],items:[
+        {_id:'food',type:'Basic',name:'Rations',_stats:{compendiumSource:'Compendium.shadowdark.gear.Item.GX6OmWQiE7MzTmjX'},system:{quantity:3,stashed:false}},
+        {_id:'spell',type:'Spell',name:'Ordinary spell',system:{lost:true},flags:{shadowdark:{sheetDelver:{spellLoss:{reason:'rest'}}}}},
+        {_id:'penance',type:'Spell',name:'Penance spell',system:{lost:true},flags:{shadowdark:{sheetDelver:{spellLoss:{reason:'penance'}}}}},
+        {_id:'broken',type:'Wand',name:'Broken wand',system:{broken:true,spells:[]}}
+    ]};
+    for(const paper of [false,true])await test(`REST: ${paper?'paper':'tabbed'} shared completion and exclusions`,{which:'rest',paper,width:paper?390:1280,actor:restActor},async p=>{
+        const opener=p.getByRole('button',{name:'Rest',exact:true});await opener.waitFor();
+        if(paper)await p.screenshot({path:path.join(out,'paper-rest-button.png')});
+        await opener.click();
+        const dialog=p.getByRole('dialog',{name:'Rest',exact:true});await dialog.waitFor();
+        await text(p,'Will reset');await text(p,'Will not reset');await text(p,'Penance required');await text(p,'Wand is broken');
+        assert.equal(await p.getByLabel('Consume ration?').isChecked(),true);
+        await p.getByRole('button',{name:'Complete rest — use 1 ration',exact:true}).waitFor();
+        await p.screenshot({path:path.join(out,`rest-${paper?'phone':'desktop'}.png`)});
+        if(paper)await p.getByLabel('Consume ration?').uncheck();
+        const complete=p.getByRole('button',{name:paper?'Complete rest':'Complete rest — use 1 ration',exact:true});await complete.click();
+        await dialog.waitFor({state:'detached'});assert.equal(await p.evaluate(()=>window.initial.actor.system.attributes.hp.value),9);
+        assert.equal(await p.evaluate(()=>window.initial.actor.items[0].system.quantity),paper?3:2);
+        assert.equal(await p.evaluate(()=>window.initial.actor.items[1].system.lost),false);assert.equal(await p.evaluate(()=>window.initial.actor.items[2].system.lost),true);
+        assert.equal(await p.evaluate(()=>window.refreshes),1);assert.equal(await opener.evaluate(el=>el===document.activeElement),true);
+    });
+    await test('REST: uncertain response checks the same operation without another completion', {which:'rest',paper:true,actor:restActor,lostRestAck:true},async p=>{
+        await p.getByRole('button',{name:'Rest',exact:true}).click();await text(p,'Will reset');
+        await p.getByRole('button',{name:'Complete rest — use 1 ration',exact:true}).click();await p.getByRole('alert').waitFor();
+        assert.equal(await count(p,'complete'),1);await p.getByRole('button',{name:'Check rest',exact:true}).click();
+        await p.getByRole('dialog',{name:'Rest',exact:true}).waitFor({state:'detached'});assert.equal(await count(p,'complete'),1);
+        assert.equal(await p.evaluate(()=>window.initial.actor.items[0].system.quantity),2);
+    });
+    await test('REST: world context retires a pending preview', {which:'rest',paper:true,actor:restActor,policy:{plan:{hold:true}}},async p=>{
+        await p.getByRole('button',{name:'Rest',exact:true}).click();await p.waitForFunction(()=>window.pending.length===1);
+        await p.evaluate(()=>window.retire());await p.getByRole('dialog',{name:'Rest',exact:true}).waitFor({state:'detached'});
+        await p.evaluate(()=>window.answer(0,{rations:[],reset:[],excluded:[],errors:[],review:'old',contextRevision:1}));await settled(p);
+        assert.equal(await p.getByRole('dialog',{name:'Rest',exact:true}).count(),0);assert.equal(await count(p,'complete'),0);
+    });
+    const lightActor={_id:'restactor',name:'Light tester',type:'Player',system:{abilities:{str:{value:10}},level:{value:1},attributes:{hp:{value:1,max:9}},luck:{remaining:0}},items:[{_id:'torch',name:'Torch',type:'Basic',system:{quantity:1,slots:{per_slot:1},light:{isSource:true,active:false,hasBeenUsed:false,remainingSecs:125,longevityMins:60}},effects:[]}],effects:[]};
+    for(const paper of [false,true])await test(`LIGHT: ${paper?'paper':'tabbed'} saved light feedback and Pulp controls`,{which:'rest',paper,pulp:true,lightTest:true,width:paper?390:1280,actor:lightActor,policy:{chat:{body:{posted:true}}}},async p=>{
+        if(!paper)await p.getByRole('button',{name:'Abilities',exact:true}).click();
+        const input=p.getByRole('textbox',{name:'Luck tokens'});
+        assert.equal(await input.getAttribute('type'),'text');
+        assert.equal(await p.getByRole('button',{name:'Spend a luck token'}).isDisabled(),true);
+        await p.getByRole('button',{name:'Gain a luck token'}).click();await p.waitForFunction(()=>window.luckWrite?.value===1);
+        await p.getByRole('button',{name:'Spend a luck token'}).click();await p.waitForFunction(()=>window.luckWrite?.value===0);
+        await input.fill('3');await p.waitForFunction(()=>window.luckWrite?.value===3);
+        await p.screenshot({path:path.join(out,`luck-${paper?'paper':'tabbed'}.png`)});
+        if(paper)await p.getByRole('button',{name:/Torch.*Carried/i}).click();
+        else await p.getByRole('button',{name:'Inventory',exact:true}).click();
+        await p.getByRole('button',{name:'Light Torch',exact:true}).click();await p.waitForFunction(()=>window.calls.some(c=>c.key==='chat'));
+        assert.deepEqual(await p.evaluate(()=>window.calls.filter(c=>['item-write','chat'].includes(c.key)).map(c=>c.key)),['item-write','chat']);
+        assert.equal(JSON.parse(await p.evaluate(()=>window.calls.find(c=>c.key==='chat').body)).active,true);
+        await p.getByRole('button',{name:'Extinguish Torch',exact:true}).click();await p.waitForFunction(()=>window.calls.filter(c=>c.key==='chat').length===2);
+        assert.equal(JSON.parse(await p.evaluate(()=>window.calls.filter(c=>c.key==='chat')[1].body)).active,false);
+    });
+    await test('LIGHT: failed inventory write posts no card',{which:'rest',lightTest:true,failItem:true,actor:lightActor},async p=>{
+        await p.getByRole('button',{name:'Inventory',exact:true}).click();await p.getByRole('button',{name:'Light Torch',exact:true}).click();
+        await p.waitForFunction(()=>window.notifications?.length>0);assert.equal(await count(p,'chat'),0);
+    });
+    await test('LIGHT: unavailable chat warns without repeating the saved toggle',{which:'rest',lightTest:true,actor:lightActor,policy:{chat:{network:true}}},async p=>{
+        await p.getByRole('button',{name:'Inventory',exact:true}).click();await p.getByRole('button',{name:'Light Torch',exact:true}).click();
+        await p.waitForFunction(()=>window.notifications?.some(n=>n.type==='warning'));assert.equal(await count(p,'chat'),1);assert.equal(await count(p,'item-write'),1);
+    });
     const monsters = [
         {ref:{kind:'compendium',documentType:'Actor',pack:'shadowdark.monsters',id:'g1'},name:'Goblin',source:'compendium',sourceId:'pack:shadowdark.monsters',sourceLabel:'Core Monsters',level:1,alignment:'chaotic',move:'near'},
         {ref:{kind:'compendium',documentType:'Actor',pack:'world.extra',id:'g2'},name:'Goblin',source:'compendium',sourceId:'pack:world.extra',sourceLabel:'Extra Monsters',level:5,alignment:'lawful',move:'far',moveNote:'fly'},
@@ -621,6 +714,13 @@ try {
             }
             await p.evaluate(()=>{window.initial.actor.items[0].system.duration={type:'instant'};window.render()});
             await focus.waitFor({state:'detached'});await action.click();assert.equal(await p.evaluate(()=>window.lastAction.options.focus),false,'retired focus cannot affect instant casting');
+            await dialog.getByRole('button',{name:'Mark lost',exact:true}).click();
+            await p.waitForFunction(()=>window.initial.actor.items[0].system.lost===true);
+            assert.deepEqual(await p.evaluate(()=>window.lastItemPatch),{id:'spell',patch:{'system.lost':true,'flags.shadowdark.sheetDelver.spellLoss':null}});
+            assert.equal(await action.isDisabled(),true);
+            await dialog.getByRole('button',{name:'Restore',exact:true}).click();
+            await p.waitForFunction(()=>window.initial.actor.items[0].system.lost===false);
+            assert.equal(await action.isEnabled(),true);
             await p.evaluate(()=>{window.initial.actor.items[0].img='https://blocked.invalid/missing.webp';window.render()});
             await p.waitForFunction(()=>document.querySelector('.sd-card-art')?.hidden===true);
             assert.equal(await action.isEnabled(),true);

@@ -1,3 +1,5 @@
+import { REST_LOSS_PATH } from './spell-loss';
+import { SPELL_CLASSES } from './spell-grants';
 import { ownedSpellGrant } from './spell-grants';
 import { spellMishap, type SpellMishap } from './spell-mishaps';
 import { isScroll, scrollSpellUuid, scrollSpent, SCROLL_SPENT_PATH } from './scrolls';
@@ -66,6 +68,7 @@ export interface PreparedAction {
     focusAllowed: boolean;
     /** Table belonging to the selected casting tradition; never a generic Wizard fallback. */
     mishap?: SpellMishap;
+    castingClass?: string;
     diagnostics: string[];
     request: ActionRequest;
 }
@@ -417,6 +420,7 @@ export function prepareSpellAction(core: PreparedActorCore, triggering: any, sou
         : spellcastingAbility(core, spell, true, lookups, owned);
     if (!casting.ability) return unavailable(action, casting.reason ?? 'Unable to determine the casting ability.');
     action.ability = casting.ability;
+    action.castingClass = casting.classUuid;
     action.mishap = spellMishap(casting.classUuid ?? null, tier,
         triggerType !== 'Spell' && !!(core.spellcasting as { itemAbility?: string }).itemAbility, ownedItems);
     if (action.mishap) action.consequences.push({ when: 'critical-failure', description: `A critical failure requires a ${action.mishap.label.toLowerCase()} roll.` });
@@ -604,7 +608,7 @@ export function planConsequences(action: PreparedAction, triggering: any, outcom
     const writes: ConsequenceWrite[] = [];
     if (action.kind === 'spell') {
         if (triggering?.type === 'Spell') {
-            if (outcome?.success === false && !(options.focus && action.focusAllowed)) writes.push({ op: 'update', itemId, updates: { 'system.lost': true }, description: `${action.spell?.name} is lost.` });
+            if (outcome?.success === false && !(options.focus && action.focusAllowed)) writes.push({ op: 'update', itemId, updates: { 'system.lost': true, [REST_LOSS_PATH]: { reason: !outcome.criticalFailure || action.castingClass === SPELL_CLASSES.wizard ? 'rest' : (action.castingClass === SPELL_CLASSES.priest || action.castingClass === SPELL_CLASSES.seer) ? 'penance' : 'unknown', castingClass: action.castingClass ?? null } }, description: `${action.spell?.name} is lost.` });
         } else if (isWand(triggering) && (outcome?.success === false || outcome?.criticalFailure)) {
             // WandSD.setSpellLost writes broken: criticalFailure.
             writes.push({ op: 'update', itemId, updates: wandFailureUpdates(triggering, action.spell?.index ?? 0, outcome.criticalFailure),

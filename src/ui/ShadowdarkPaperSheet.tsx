@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { groupPaperTalents, talentLevelLabel } from './talent-display';
-import { Flame } from 'lucide-react';
+import { Flame, FlameKindling } from 'lucide-react';
 import { LightRemaining } from './components/LightRemaining';
 import { SheetCharacterName } from './components/SheetCharacterName';
 import NotesModal from './components/NotesModal';
@@ -26,7 +26,7 @@ const row = 'w-full text-left flex justify-between items-baseline gap-2 border-b
 const FEATURE_TYPES = ['Talent', 'Boon', 'Class Ability'];
 
 export default function ShadowdarkPaperSheet({ onToggleView }: ShadowdarkPaperSheetProps) {
-    const { actor, updateActor, startAction, openCard, triggerLevelUp, isActionBusy } = useShadowdarkActor();
+    const { actor, updateActor, startAction, openCard, triggerLevelUp, isActionBusy, openRest } = useShadowdarkActor();
     const [notesModalOpen, setNotesModalOpen] = useState(false);
     const derived = actor.derived ?? {};
     const actions: PreparedAction[] = derived.actions ?? [];
@@ -73,10 +73,13 @@ export default function ShadowdarkPaperSheet({ onToggleView }: ShadowdarkPaperSh
                 <div className="flex flex-col md:grid md:grid-cols-12 gap-4 items-start mb-4">
                     <div className="w-full md:col-span-6 xl:col-span-8 flex flex-col items-center gap-2 text-center pt-2">
                         <h1 className="text-[clamp(2rem,5vw,3.75rem)] font-black tracking-tighter uppercase leading-none">ShadowDark</h1>
+                        <div className="flex flex-wrap justify-center items-center gap-2">
                         <button type="button" onClick={onToggleView}
                             className="print:hidden text-xs font-bold uppercase tracking-widest border-2 border-black px-3 py-2 hover:bg-black hover:text-white shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
                             Manage Character Sheet
                         </button>
+                        <button type="button" onClick={openRest} className="print:hidden text-xs font-bold uppercase tracking-widest border-2 border-black px-3 py-2 hover:bg-black hover:text-white shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] inline-flex items-center gap-1"><FlameKindling size={14} aria-hidden="true" />Rest</button>
+                        </div>
                     </div>
                     <div className={`w-full md:col-span-6 xl:col-span-4 ${box} p-2 pt-6 h-24 flex flex-col text-2xl font-bold`}>
                         <span className={tag}>Name</span>

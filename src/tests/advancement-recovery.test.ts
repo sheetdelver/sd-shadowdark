@@ -8,7 +8,7 @@ import { nativePacks } from './core0191/world';
 import { shadowdarkAdapter as adapter } from '../server/ShadowdarkAdapter';
 import { DECLARED_PACKS, ownedCopy } from '../logic/identity';
 import { primLike, worldSnapshot } from './fixtures/native-406';
-import { handleFinalizeLevelUp, handleGetLevelUpData } from '../server/api/level-up';
+import { handleFinalizeLevelUp, handleGetLevelUpData, handleRollHP } from '../server/api/level-up';
 import { reviewToken } from '../server/source-review';
 import { handleActorView } from '../server/api/actor-view';
 import { SdkError } from '@sheet-delver/sdk';
@@ -50,6 +50,23 @@ const checks: any[] = [];
 async function check(name: string, run: () => Promise<void>) { try { await run(); checks.push({ name, pass: true }); } catch (e) { checks.push({ name, pass: false, error: String(e) }); } }
 const unchangedAdvancement = (f: ReturnType<typeof fixture>) => { assert.deepEqual(f.actor.system.level, f.initial.system.level); assert.deepEqual(f.actor.system.attributes.hp, f.initial.system.attributes.hp); };
 const finished = (f: ReturnType<typeof fixture>) => { assert.deepEqual(f.actor.system.level, { value: 3, xp: 15 }); assert.deepEqual(f.actor.system.attributes.hp, { value: 11, max: 11 }); assert.equal(f.actor.items.length, 4); };
+await check('level cap blocks new advancement and HP rolls without writes; level 9 can reach 10', async () => {
+    for (const level of [10,20]) {
+        const f=fixture();f.actor.system.level={value:level,xp:999};f.body.targetLevel=level+1;f.body.baseline=reviewToken(f.actor);
+        const before=structuredClone(f.actor);
+        assert.equal(prepareShadowdarkView(f.actor,{},undefined).levelUp,false);
+        const result=await f.run();assert.equal(result.status,400);assert.match(result.body.error,/maximum character level/);
+        assert.equal(result.body.advancementWrites,'none');
+        assert.equal((await handleGetLevelUpData(f.actor._id,f.request())).status,400);
+        assert.equal((await handleRollHP(f.actor._id,f.request())).status,400);
+        assert.deepEqual(f.events,[]);assert.equal(f.records.size,0);assert.deepEqual(f.actor,before);
+    }
+    const f=fixture(),fighter=rows.find(doc=>doc.type==='Class'&&doc.name==='Fighter');f.actor.system.class=fighter.uuid;f.actor.items=[{...ownedCopy(fighter,fighter.uuid),_id:'class'}];f.body.classUuid=fighter.uuid;f.actor.system.level={value:9,xp:90};f.body.targetLevel=10;f.body.rolledTalents=[];f.body.selectedSpells=[];f.body.baseline=reviewToken(f.actor);
+    assert.equal(prepareShadowdarkView(f.actor,{},undefined).levelUp,true);
+    const result=await f.run();assert.equal(result.body.state,'complete',JSON.stringify(result.body));assert.equal(f.actor.system.level.value,10);
+    assert.equal(prepareShadowdarkView(f.actor,{},undefined).levelUp,false);
+    const count=f.events.length;assert.equal((await f.run()).body.state,'complete');assert.equal(f.events.length,count,'completed level-10 receipt still replays without writes');
+});
 await check('known spell rejection is preflight and keeps all existing copies', async () => {
     const f = fixture(); f.actor.items.push({ ...ownedCopy(spell, spell.uuid), _id: 'knownSpell' });
     f.body.baseline = reviewToken(f.actor);

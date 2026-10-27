@@ -11,7 +11,7 @@ import { statChoiceRule } from '../../logic/stat-choices';
 import { callerOf, requestRules, requestRevision, contextConflict, requireOwnedActor } from '../access';
 import { hitPointRollFormula } from '../../logic/actions';
 import { prepareActorCore } from '../../logic/actor-preparation';
-import { advancementHitPoints, STARTING_GOLD } from '../../logic/advancement';
+import { advancementHitPoints, STARTING_GOLD, MAX_CHARACTER_LEVEL } from '../../logic/advancement';
 import { knownSpellSources, advancementSpellChoices, grantedSpellSources, prepareSpellModel, spellListIdentity } from '../../logic/spell-model';
 import { callerLanguagePlan } from '../languages';
 import { validateLanguageSelections } from '../../logic/languages';
@@ -111,6 +111,7 @@ async function getLevelUpData(actorId: string | undefined, req: ModuleServerRequ
 
         const pending = actor ? await pendingAdvancement(req, actor) : null;
         if (pending) return json({ success: true, data: { advancementOperation: pending, progressionReady: false } });
+        if (actor?.system?.level?.value >= MAX_CHARACTER_LEVEL) return error('validation', 'Level 10 is the maximum character level.');
         const data = await shadowdarkAdapter.getLevelUpData(actor, classId || undefined, patronId || undefined, callerOf(req));
 
         return json({ success: true, data: { ...data, advancementOperation: actor ? await pendingAdvancement(req, actor) : null } });
@@ -134,6 +135,7 @@ export async function handleRollHP(actorId: string | undefined, req: ModuleServe
         const { isReroll: _isReroll, classId } = body;
 
         const actor = actorId && !['new','undefined','null'].includes(actorId) ? await requireOwnedActor(req.runtime, actorId) : null;
+        if (actor?.system?.level?.value >= MAX_CHARACTER_LEVEL) return error('validation', 'Level 10 is the maximum character level.');
         const reference = canonicalUuid(classId || actor?.system?.class);
         if (actor?.system?.level?.value > 0 && classId && reference !== canonicalUuid(actor.system?.class)) return error('validation', 'HP advancement must use the Actor’s exact Class.');
         let hitDie = '1d4'; // native level-zero Generator die, only without a Class
@@ -393,6 +395,11 @@ async function finalizeLevelUp(actorId: string, req: ModuleServerRequest, input?
             noWrites = true; // No saved request exists; all following checks are preflight.
         }
 
+        const targetLevel = body.targetLevel || (actor?.system?.level?.value || 0) + 1;
+        const currentLevel = actor?.system?.level?.value ?? 0;
+        if (!Number.isInteger(targetLevel) || targetLevel !== currentLevel + 1) return reject('validation', 'Advancement must be exactly one level.');
+        if (targetLevel > MAX_CHARACTER_LEVEL) return reject('validation', 'Level 10 is the maximum character level.');
+
         // Server assembly resolves every source by exact identity through the
         // caller; client-supplied document bodies never establish identity.
         const resolveTyped = async (uuid: unknown, type: string) => {
@@ -424,9 +431,6 @@ async function finalizeLevelUp(actorId: string, req: ModuleServerRequest, input?
             extraSpellSelection: { ...(body.extraSpellSelection || { active: false, maxTier: 0, source: '' }), selected: verified.extraSpells }
         };
 
-        const targetLevel = body.targetLevel || (actor?.system?.level?.value || 0) + 1;
-        const currentLevel = actor?.system?.level?.value ?? 0;
-        if (!Number.isInteger(targetLevel) || targetLevel !== currentLevel + 1) return reject('validation', 'Advancement must be exactly one level.');
         if (actor && currentLevel > 0 && canonicalUuid(actor.system?.class) !== canonicalUuid(classObj?.uuid)) return reject('validation', 'Advancement must keep the Actor’s exact Class identity.');
 
         // Assembly: compendium sources are limited to the caller's readable packs.

@@ -1,3 +1,4 @@
+import { MAX_CHARACTER_LEVEL } from './advancement';
 import { ABILITY_KEYS, prepareActorCore, type PreparationLookups } from './actor-preparation';
 import { canonicalUuid } from './identity';
 import { getProperty, setProperty } from './foundry';
@@ -69,8 +70,9 @@ const id = (v: unknown) => typeof v === 'string' && /^[\w-]{1,80}$/.test(v);
 const numberEntry = (v: any) => object(v) && ['base','effective'].includes(v.basis) && (v.value === null || integer(v.value));
 /** Validate bounded identifiers and selections; document bodies/effects are never inputs. */
 export function validateCharacterDraft(v: any): asserts v is CharacterDraft {
+    if (object(v) && !integer(v.level, 0, MAX_CHARACTER_LEVEL)) throw new Error('Choose a character level from 0 to 10.');
     const fail = () => { throw new Error('Character entries have an invalid shape. Use finite whole numbers, exact sources and separate award choices.'); };
-    if (!object(v) || v.version !== 1 || typeof v.name !== 'string' || v.name.length > 200 || !integer(v.level,0,20) || !integer(v.xp)
+    if (!object(v) || v.version !== 1 || typeof v.name !== 'string' || v.name.length > 200 || !integer(v.level,0,MAX_CHARACTER_LEVEL) || !integer(v.xp)
         || !['','lawful','neutral','chaotic'].includes(v.alignment) || typeof v.notes !== 'string' || v.notes.length > 10000) fail();
     for (const key of ['classUuid','ancestryUuid','backgroundUuid','deityUuid','patronUuid']) if (v[key] !== '' && !exact(v[key])) fail();
     if (!object(v.abilities) || Object.keys(v.abilities).length !== 6 || ABILITY_KEYS.some(key => !numberEntry(v.abilities[key]))) fail();

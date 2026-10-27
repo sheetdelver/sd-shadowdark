@@ -90,8 +90,8 @@ await check('ability guidance follows selected native casting/check data and exa
     assert.deepEqual(creatorAbilityGuidance(cls,checks,0),[]);
     assert.deepEqual(creatorAbilityGuidance({uuid:'Item.unknown',name:'Fighter'},[],1),[]);
 });
-await check('manual levels 0,1,2,3,10,20 prepare without writes or advancement replay',async()=>{
-    const before=writeCount;for(const level of [0,1,2,3,10,20]){const d=base(level);const p=await ready(d);assert.equal(p.source.system.level.value,level);assert.equal(p.source.system.level.xp,0);assert.equal(p.source.system.attributes.hp.value,0);if(level===0){assert.equal(p.source.system.class,LEVEL_ZERO_CLASS);assert.ok(!p.source.items.some((i:any)=>i._stats?.compendiumSource==='Compendium.shadowdark.talents.Item.5bpWuaT0KTNzuzCu'));}}assert.equal(writeCount,before);
+await check('manual levels 0,1,2,3,10 prepare without writes or advancement replay',async()=>{
+    const before=writeCount;for(const level of [0,1,2,3,10]){const d=base(level);const p=await ready(d);assert.equal(p.source.system.level.value,level);assert.equal(p.source.system.level.xp,0);assert.equal(p.source.system.attributes.hp.value,0);if(level===0){assert.equal(p.source.system.class,LEVEL_ZERO_CLASS);assert.ok(!p.source.items.some((i:any)=>i._stats?.compendiumSource==='Compendium.shadowdark.talents.Item.5bpWuaT0KTNzuzCu'));}}assert.equal(writeCount,before);
 });
 await check('repeated independent stat awards subtract exactly once per native effect',async()=>{
     const d=base();d.abilities.str.value=16;const source='Compendium.shadowdark.talents.Item.6t06nSjj1hd6o5SV';d.awards=[{id:'repeat-a',origin:'recorded',source,level:1,choices:{}},{id:'repeat-b',origin:'recorded',source,level:3,choices:{}}];
@@ -101,9 +101,11 @@ await check('fixed Player source matches full prepared review with injured HP an
     const d=base();const gear=rows.find(r=>r.type==='Weapon'&&r.name==='Club');d.gear=[{id:'weapon',source:gear.uuid,quantity:2,equipped:true,stashed:false}];d.coins={gp:17,sp:4,cp:9};d.notes='<script>plain paper notes</script>';
     const p=await ready(d);assert.equal(p.source.system.attributes.hp.value,0);assert.equal(p.source.items.at(-1).system.quantity,2);assert.deepEqual(p.source.items.at(-1).effects,gear.effects);assert.ok(!p.source.system.notes.includes('<script>'));
 });
-await check('level20 caster without native progression cannot acknowledge missing allowances away',async()=>{
-    const d=base(20,WIZARD),spell=rows.find(r=>r.type==='Spell'&&r.system.tier===5&&r.system.class.includes(WIZARD));d.spells=[{source:spell.uuid,castingClass:WIZARD}];
-    const p=await prepareCreator(req({}),d);assert.equal(p.ready,false);assert.ok(p.errors.some(w=>w.message.includes('no spells-known data')));assert.ok(p.preview.spellModel.sources.every(s=>Object.values(s.limits).every((l:any)=>l.status==='unavailable')));
+await check('levels above the rules cap reject caster and noncaster creation before writes',async()=>{
+    const before=writeCount;
+    for(const cls of [FIGHTER,WIZARD])for(const level of [11,20])
+        await assert.rejects(()=>prepareCreator(req({}),base(level,cls)),/level from 0 to 10/);
+    assert.equal(writeCount,before);
 });
 await check('Priest fixed Turn Undead is actual owned inventory and cannot fill ordinary selections twice',async()=>{
     const d=base(1,'Compendium.shadowdark.classes.Item.oZWzXx1WRLg286zD'),p=await ready(d),ref='Compendium.shadowdark.spells.Item.mByUvcHIVEPWscfH';
@@ -112,7 +114,7 @@ await check('Priest fixed Turn Undead is actual owned inventory and cannot fill 
 await check('Shune uses acquisition level for a noncaster, retaining casting source and no Wizard progression',async()=>{
     const d=base(10),grant='Compendium.shadowdark.talents.Item.mgRrWET5MEaGLVNo';const spell=rows.find(r=>r.type==='Spell'&&r.system.tier===2&&r.system.class.includes(WIZARD));
     d.awards=[{id:'shune',origin:'recorded',source:grant,level:4,choices:{[grant]:{spell:spell.uuid}}}];const p=await prepareCreator(req({}),d),owned=p.source.items.find((i:any)=>i.type==='Spell');assert.ok(p.errors.some(e=>e.message.includes('Class/Patron table')));assert.equal(owned.flags.shadowdark.spellGrant.level,4);assert.equal(owned.flags.shadowdark.spellGrant.classUuid,WIZARD);
-    assert.ok(p.preview.spellModel.sources.every(s=>s.classUuid!==FIGHTER));d.level=20;d.awards[0].level=20;assert.ok((await prepareCreator(req({}),d)).errors.some(e=>e.message.includes('unsupported tier')));
+    assert.ok(p.preview.spellModel.sources.every(s=>s.classUuid!==FIGHTER));d.awards[0].level=9;assert.ok((await prepareCreator(req({}),d)).errors.some(e=>e.message.includes('acquisition level 9')));
     d.awards[0].level=null;assert.ok((await prepareCreator(req({}),d)).errors.some(e=>e.message.includes('acquisition level')));
 });
 await check('native table OR choices retain exact result IDs and independent stat allocations',async()=>{

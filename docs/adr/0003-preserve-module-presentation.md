@@ -1,7 +1,39 @@
 # ADR-0003: Preserve Shadowdark presentation through behavior changes
 
-Status: User review corrections implemented and isolated-verified; target card layout confirmed, remaining functional review open
+Status: Completed — user accepted implemented presentation and controls
 Date: 2026-10-20
+
+## Operator closeout — October 26
+
+The user confirmed the implemented presentation changes, spell loss controls,
+torch feedback and Pulp luck controls work. The SDK torch card differs from
+native Foundry presentation; the user accepts that difference. Earlier pending
+operator-review statements are historical and superseded for this implemented
+scope. Deferred dashboard and native scene/tracker automation remain excluded.
+
+## Light-toggle feedback and Pulp luck controls — October 26
+
+User approved public chat feedback after lighting/extinguishing a source and
+matching Pulp luck controls in both sheets. Native4.0.6
+`PlayerSheetSD._sendToggledLightSourceToChat` supplies the reference: light name,
+on/off state and remaining minutes only when `playerShowLightRemaining > 1`.
+
+The existing inventory/card control saves its patches first. After all succeed,
+it calls the module's owner-checked notification route, which rereads the light
+state and posts through the public SDK `runtime.chat.card`. The actor is the
+speaker; character and item text are escaped. Core owns rendering, authorization
+and delivery. The module declares the native4.0.6 numeric world setting through
+the manifest and omits remaining time when unavailable/hidden. A request receipt
+prevents a repeated or uncertain notification from posting twice. Chat failure
+warns without undoing or repeating the light change. Scene lighting and native
+tracker/timer automation remain outside this selection (DW-04).
+
+This feedback is available for caller-owned characters in either sheet, without
+requiring the native browser's assigned-character condition. No native browser
+handler or second timer runs. Shared `LuckControl` retains the standard-mode
+checkbox and shows a spinner-free numeric-text input with −/+ buttons in both
+Pulp layouts; the tabbed control is the visual reference. Values remain whole,
+nonnegative counts and use the existing context-fenced luck update path.
 
 ## Active inventory light time — October 26
 
@@ -12,7 +44,7 @@ and seconds, show zero honestly, and show unavailable for missing/invalid data.
 Unlit Items have no remaining-time label. The component reflects refreshed Item
 state; it neither starts a browser countdown nor writes timer values. Native
 `LightSourceTrackerSD` remains the timer authority, including world-time pause and
-GM updates. Existing light-control scope is unchanged.
+GM updates. The later light-toggle feedback selection above adds chat only.
 
 The existing row is the visual reference: secondary text beneath its name, no
 new card/control design. Regression renders both actual sheet surfaces for full,

@@ -1,7 +1,14 @@
 # ADR-0004: Optional HUD sheet-view settings panel
 
-Status: Implemented and isolated-verified; operator review pending
+Status: Completed — user accepted the implemented settings pilot
 Date: 2026-10-23
+
+## Operator closeout — October 26
+
+The user confirmed the remaining implemented changes are verified. This closes
+the settings pilot's operator-review gate. Supporting Core publication is complete;
+earlier publication/recheck notes are historical. No new settings feature or
+compatibility requirement is introduced.
 
 ## Scope and decision
 

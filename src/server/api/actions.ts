@@ -1,3 +1,4 @@
+import { recordSpellLoss } from '../spell-loss';
 import { createHash } from 'node:crypto';
 import { json, error, type ModuleServerRequest } from '@sheet-delver/sdk/server';
 import { getErrorMessage, isSdkError, parseRollResult } from '@sheet-delver/sdk';
@@ -118,6 +119,7 @@ async function applyWrites(record: ActionRecord, actorId: string, req: ModuleSer
             else await req.runtime.documents.items.update({ type: 'Actor', id: actorId }, write.itemId, write.updates ?? {});
             applyLocal(actor, write); record.review = review(actor);
             record.statuses[i] = { status: 'applied' }; await save(record);
+            if(write.op==='update') await recordSpellLoss(req,actorId,write.itemId,write.updates??{});
         } catch (e) {
             const refused = isSdkError(e) && ['permission_denied', 'validation', 'not_found'].includes(e.code);
             const prerequisite = i < record.prerequisiteCount;

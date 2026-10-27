@@ -14,7 +14,8 @@ import { isWand, wandRestUpdates } from './wands';
  * - Stash (`_onToggleStashed`): physical items; toggles `stashed`, clears `equipped`.
  * - Light (`_toggleLightSource`): native light sources (`system.light.isSource`);
  *   lighting one puts out any other lit source and marks `hasBeenUsed`. Native
- *   scene light, chat card and the light tracker are not run by SheetDelver.
+ *   scene light and the light tracker are not run by SheetDelver; successful
+ *   controls post feedback through the SDK chat service.
  */
 export interface ItemWrite { itemId: string; patch: Record<string, unknown> }
 export interface ItemControl { id: 'equip' | 'stash' | 'light' | 'restore-wand'; label: string; pressed: boolean; writes: ItemWrite[]; title?: string }
@@ -62,7 +63,7 @@ export function itemControls(items: ItemView[], sourceItems: any[], itemId: stri
         const patch: Record<string, unknown> = { 'system.light.active': !lit };
         if (!lit && item.system?.light?.hasBeenUsed !== true) patch['system.light.hasBeenUsed'] = true;
         controls.push({ id: 'light', label: lit ? `Extinguish ${name}` : `Light ${name}`, pressed: lit, writes: [{ itemId, patch }, ...writes],
-            title: 'Marks the light lit or unlit (other lit sources go out). SheetDelver does not run native scene light, chat or timers.' });
+            title: 'Marks the light lit or unlit (other lit sources go out). Posts a chat card after saving. SheetDelver does not run native scene light or timers.' });
     }
     return controls;
 }

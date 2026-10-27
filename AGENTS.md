@@ -9,8 +9,9 @@ and its [whole-UI audit](docs/audits/2026-10-20-presentation-regressions.md).
 ADR-0001/0002 remain closed for their agreed native behavior scope.
 The Character Creator is [ADR-0005](docs/adr/0005-character-creator.md),
 with its [workflow audit](docs/audits/2026-10-23-character-creator-workflow.md).
-Its manual paper-character transcription implementation has offline evidence;
-native/operator acceptance and the public shell discard hook remain open gates.
+Its accepted implementation and scoped verification are recorded in ADR-0005.
+Follow the latest operator decisions there; historical pending gates do not
+create new requirements. Additional draft protection was explicitly declined.
 Use its CC-01–CC-08 evidence ledger. Preserve the distinction
 between paper totals and native base values, exact independent grant identities,
 and unknown versus proven creation outcomes. Do not extend the level-0/1 writer

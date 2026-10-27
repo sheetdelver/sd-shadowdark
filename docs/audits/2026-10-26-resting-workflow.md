@@ -1,15 +1,36 @@
 # Resting workflow audit
 
 Date: 2026-10-26
-Status: Audit complete; proposed implementation awaiting review
+Status: User accepted rest; wand operator check remains unverified
 Decision: [ADR-0006](../adr/0006-shared-character-rest.md)
 Baseline: module `5fade4e`, version0.9.6; Core0.22.0, SDK3.8/UI3.6.
+
+## Current disposition — October 26 operator closeout
+
+The user accepts the implemented changes: ration/HP/spell/daily-resource rest,
+spell loss controls, SDK torch cards (including their presentation difference),
+Pulp luck controls and remaining UI/Creator work. Wands during rest are explicitly
+not yet user-tested; isolated evidence remains, with no claim of new native
+v13/v14 coverage. Additional draft protection/restoration is declined; existing
+navigation warning is accepted. CC-R03 is withdrawn. CC-R04/CC-07 are closed for
+accepted user flows with existing isolated recovery evidence, not an exhaustive
+live failure-injection claim. ADR-0003/0004/0005/0006 record the scoped closeout.
+
+The user confirmed the rulebook p. 39 cap of level 10. Creator selector and shared
+validation now accept 0–10; the earlier 0–20 request and missing-level-11–20
+backlog interpretation are superseded. Native spells reach tier 5 and continue
+gaining within levels 1–10. Acquisition-level choices such as Shune are supported
+when their required level is supplied. Deferred work is not a release blocker.
+Earlier pending statements below retain historical evidence only where superseded.
+
+
 
 ## Scope and evidence
 
 The user requested a campfire Rest button in both character sheets, one shared
-modal, ration consumption and applicable recovery. This audit is read-only;
-there is no new rest runtime, live Foundry access or Actor mutation. Crawling Kit
+modal, optional ration consumption and applicable recovery. The initial audit
+was read-only; the authorized implementation and local evidence are recorded below.
+No live Foundry access or Actor mutation was performed. Crawling Kit
 expansion and the preceding HP/status fixes were committed first as `5fade4e`.
 The module worktree was clean at that checkpoint. No push/release occurred.
 
@@ -53,7 +74,7 @@ A campfire is optional lighting: the resting text describes combining three
 torches into one eight-hour fire. The requested campfire **icon** does not authorize
 spending torches, adding a light, advancing world time or running encounters.
 
-## Existing implementation and reuse
+## Audit-baseline implementation and reuse
 
 | Area | Current behavior | Reuse / gap |
 | --- | --- | --- |
@@ -102,7 +123,7 @@ separately. Never invent a use counter, clear all effects, infer recovery from a
 item's English name, or interpret every negative effect as temporary damage.
 Unidentified item curses must not be leaked through player-visible warnings.
 
-## Findings and recommended disposition
+## Audit findings and selected disposition
 
 | ID | Finding | Proposed action |
 | --- | --- | --- |
@@ -114,7 +135,7 @@ Unidentified item curses must not be leaked through player-visible warnings.
 | REST-06 | Recovery spans multiple documents | One request identity bound to the consumption choice, ration first only when selected, absolute planned values, per-write readback, no replay of uncertain spending. Existing SDK has no atomic Actor+Item transaction. |
 | REST-07 | Rest outcome has prerequisites outside this utility | User-selected successful-rest completion only. Player/GM resolve interruptions, checks and eligibility independently; no outcome selector, eligibility checklist or failed-rest spending path. Original outcome proposal superseded. |
 
-## Validation plan and carried work
+## Validation scope and carried work
 
 Implementation should add a compact set of behavioral cases to existing suites,
 not a separate test suite per resource: successful completion, checked/no-ration rejection, unchecked/no-ration recovery,
@@ -130,3 +151,100 @@ verified evidence. Its unresolved CC-R03 public shell-discard hook and CC-R04/CC
 native Creator/recovery acceptance remain open; this rest proposal neither closes
 nor reopens prior accepted sheet/advancement gates. Core dashboard status styling
 remains deferred (local DW-22). No version bump or release is selected.
+
+## Implementation evidence
+
+Checkpoint `91bc7c2` committed the preceding light-time correction and this reviewed
+proposal before implementation. The rest runtime is implemented on the same
+module branch; Core, module version0.9.6 and compatibility requirements remain
+unchanged. No push, release, native service startup or live document write.
+
+R1–R4 are implemented. The22 native Class Abilities are fully classified using
+exact source identities;15 daily counters restore their owned limits and7
+Herbalism/Presence abilities clear eligible loss.45 exact native prose-only daily
+benefits/choices appear as manual follow-ups when owned and identified. Broken
+wands, spent scrolls, penance and unknown loss are separate exclusions. Unknown
+spells have explicit recovery eligibility controls; permanent loss is excluded.
+The native source lacks general recoverable-stat-damage history, so affected
+negative/temporary effects remain visible manual follow-ups, not guessed resets.
+
+Both sheets use the same provider-owned modal and optional personal-ration
+checkbox, with separate Will reset / Will not reset lists. Completion refreshes
+the Actor and closes. Context retirement closes the dialog and ignores late
+results. The rest journal binds the original source, choices, owner/world and
+request, records each dispatch before writing, and prevents new spends while an
+operation is unresolved. Exact readback also settles manually completed resets.
+A partial/uncertain operation never claims full success or replays an unknown write.
+
+Spell loss provenance uses native modification stamps recorded after confirmed
+module writes. Missing evidence and later native edits require explicit
+eligibility instead of trusting stale flags. Source is not mutated by preview.
+Manual spell toggles retire old metadata.
+
+Local verification:
+
+- Existing native-alignment suite:64/64, including prior light-time regression.
+- Existing action-phases suite includes8 grouped rest checks: all22 native
+  abilities, mixed recovery/exclusions, optional food and stale/ownership gates,
+  lost acknowledgement without double spending, unknown/independent-edit guards,
+  external spell edits, refused writes/context/additive HP, and loss provenance.
+- Four mounted workflows: actual tabbed and paper triggers, ration checkbox,
+  recovery/exclusion lists, refreshed source and focus return; uncertain response
+  checks without a new completion; world-context retirement during preview.
+  Screenshots inspected at390/1280px with packaged module CSS and Core preflight.
+- Explicit module/UI/server typing and package validation/build pass. The compiled
+  public apiRoutes probe verifies ration consumption, HP restoration and no-write
+  replay; its inherited advancement/creation checks also pass.
+
+Evidence is controlled/offline, not native acceptance. The remaining gate is the
+user's disposable native v13/v14 verification and ADR closeout. Existing Creator
+and shared-shell discard gates are not silently closed by this work.
+
+### Operator-reported initial preview correction
+
+The user reported “Invalid rest choices” on opening Rest and a missing shadow on
+its paper-sheet button. The initial modal request deliberately omits `rationId`
+while discovering stacks, but server parsing rejected it before planning. Preview
+now returns available stacks and a field-level missing-selection error. Completion
+still refuses a checked consumption choice without a selected ration, before writes.
+The paper Rest button now matches Manage Character Sheet's shadow and hover style.
+
+The existing action-phase regression reproduced HTTP400 before this fix and passes
+with HTTP200 afterward, covering both available and absent rations plus zero-write
+completion rejection. The compiled public-route check also sends this exact initial
+payload. The mounted transport stub called the planner directly and had missed this
+route-validation mismatch; these actual-route assertions close that coverage gap.
+All four mounted rest flows, explicit typing, packaging and10 compiled route checks
+pass. The paper button screenshot was inspected. Native/operator recheck is pending.
+
+Corrected runtime archive SHA256:
+`fae49e469d432d8c86dd574749070c44439dc5c0bae0d9d5463abfea39ae62aa`.
+Module0.9.6 built against Core0.22.0 (SDK3.8/UI3.6). This supersedes the initial
+runtime archive `71807370d66f7ab14c4044b9aac49e2376a6c56c94047aa8881bba8386fac2bf`.
+Evidence annotations postdate the corrected package; runtime source is identical.
+
+### Native penance check and owned spell-card control
+
+User reports the corrected modal works and accepts explicit confirmation for
+Priest losses whose cause is unknown. Read-only inspection of native4.0.6 at
+`9677d16b3903b3b640f00d4efd48249142ac8334` confirms the magic Item schema
+(`system/src/models/_fields/itemFields.mjs`, inherited by `SpellSD.mjs`) has only
+`lost`; `PlayerSD.mjs` failed-cast handling and `dice/dice.mjs` reroll handling
+write that boolean without a penance reason. No persistent penance tracking was
+found in the native source. This finding is scoped to that checked version.
+
+Added a shared Mark lost / Restore control to owned Spell card actions and reused
+it in the Spells tab. It clears old loss provenance, targets the exact embedded
+Item and disables while saving. Source-driven card updates disable casting when
+lost and re-enable it after restoration. The existing mounted card checks pass
+at360/768/1024/1440px for instant/focus spells (8/8), including exact loss patches,
+restoration and casting availability; phone screenshot inspected. Explicit module
+UI/server typing passes. These are offline checks; native operator confirmation
+of the new control remains open. The prior archive predates this control.
+
+Updated package validation/build passes with the spell-card control. Archive
+SHA256: `7e58ae8ae5ae88c1d1cea28c713628f4e628ea710f9927836edce2ae190d2991`.
+This is the current runtime artifact; earlier hashes retain their historical scope.
+The initial isolated packaging attempt lacked toolchain dependency resolution;
+linking the disposable staging directory to Core's installed toolchain resolved
+it without application dependency or source changes.

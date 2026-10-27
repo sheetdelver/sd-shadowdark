@@ -1,8 +1,28 @@
 # Character Creator workflow audit
 
 Date: 2026-10-23
-Status: October 26 follow-ups accepted for checkpoint; native acceptance/recovery recheck and shell SDK gate remain open
+Status: User accepted implemented Creator; extra draft protection withdrawn; level cap corrected
 Decision: [ADR-0005](../adr/0005-character-creator.md)
+
+## Current disposition — October 26 operator closeout
+
+The user accepts the implemented changes: ration/HP/spell/daily-resource rest,
+spell loss controls, SDK torch cards (including their presentation difference),
+Pulp luck controls and remaining UI/Creator work. Wands during rest are explicitly
+not yet user-tested; isolated evidence remains, with no claim of new native
+v13/v14 coverage. Additional draft protection/restoration is declined; existing
+navigation warning is accepted. CC-R03 is withdrawn. CC-R04/CC-07 are closed for
+accepted user flows with existing isolated recovery evidence, not an exhaustive
+live failure-injection claim. ADR-0003/0004/0005/0006 record the scoped closeout.
+
+The user confirmed the rulebook p. 39 cap of level 10. Creator selector and shared
+validation now accept 0–10; the earlier 0–20 request and missing-level-11–20
+backlog interpretation are superseded. Native spells reach tier 5 and continue
+gaining within levels 1–10. Acquisition-level choices such as Shune are supported
+when their required level is supplied. Deferred work is not a release blocker.
+Earlier pending statements below retain historical evidence only where superseded.
+
+
 
 ## Crawling Kit and sheet checkpoint — October 26
 
@@ -813,3 +833,21 @@ Checkpoint authorization: after accepting the UI closeout, the user authorized
 local commits of Core and Shadowdark work. This includes the existing Creator
 implementation and records its remaining gates; it is not full native acceptance
 or authorization to push, merge or release.
+
+
+### Level-cap closeout verification
+
+The original 0–20 request was corrected by the user after checking rulebook p.39.
+Shared cap now also covers prepared sheet actions, level-up opening, data and HP
+routes, and finalize preflight. Native 4.0.6 schema/button/finalizer inspection
+found no equivalent maximum guard. Existing source data is preserved and saved
+recovery still works. Current tests include a level-9 Fighter reaching 10, no-write
+rejection at levels 10/20, completed level-10 replay and Creator 11/20 rejection.
+
+
+Final isolated checks pass: Creator contract/native-fixture suite, Creator handler
+suite, advancement/recovery suite, ten mounted Creator/Generator workflows with
+0–10 selector assertion, explicit module/UI/server typing, module validation and
+packaging, and compiled Creator creation/recovery probe. No live world writes or
+new dependencies. The cap correction is automated-verified; user runtime recheck
+of that last correction is not represented as already performed.

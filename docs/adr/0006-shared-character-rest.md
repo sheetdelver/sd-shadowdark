@@ -1,7 +1,16 @@
 # ADR-0006: Shared character rest and resource recovery
 
-Status: Proposed — audit complete; awaiting user review before implementation
+Status: Completed — user accepted rest; wand operator check remains outstanding
 Date: 2026-10-26
+
+## Operator closeout — October 26
+
+The user verified ration handling, HP, spells and daily resources, and accepted
+the rest utility. Spell loss/restore controls also work. Wands have not yet been
+tried by the user: retain that specific operator check as unverified, with existing
+isolated coverage, rather than claiming native wand acceptance. It is not a
+checkpoint blocker. No new v13/v14 test matrix is claimed. Earlier blanket pending
+operator-review text is superseded by this scoped acceptance.
 
 ## Problem and scope
 
@@ -13,7 +22,7 @@ edits, and the native data does not provide one universal reset method.
 The [resting audit](../audits/2026-10-26-resting-workflow.md) records the rules,
 source identities, current utilities and limitations. It is the evidence for
 this proposal. Implementation remains module-owned on the existing authorized
-branch after review; no Core SDK change, new dependency or version bump is needed.
+branch following user approval; no Core SDK change, new dependency or version bump is needed.
 
 ## Selected scope clarification — October 26
 
@@ -31,7 +40,7 @@ This supersedes the unconditional personal-ration gate. No provider selection,
 proof or extra confirmation is required; the utility never edits another Actor's
 inventory. Recovery exclusions remain visible with their individual reasons.
 
-## Proposed user flow
+## Selected user flow
 
 1. Put a **Rest** button with the existing Lucide `FlameKindling` icon beside the
    tabbed sheet's view controls and beside Manage Character Sheet on the paper
@@ -97,7 +106,7 @@ a death state. The campfire icon does not consume torches or create lights.
 | Proven temporary stat damage/effects | Restore only with explicit rest-recovery provenance and original value/effect identity |
 | Unknown/custom/prose-only resources, permanent damage, arbitrary effects | Show manual follow-up; no guessed patch |
 
-**Recommended policy for review:** a completed eight-hour rest renews the
+**Selected recovery policy:** a completed eight-hour rest renews the
 classified daily resources once for that rest. This does not mean every
 `limitedUses` Item recharges, and is not a calendar-day/sunrise tracker. No
 automatic luck token, ammunition, potion, scroll, coin or torch replenishment.
@@ -133,7 +142,10 @@ such as permanent loss and required penance still constrain what can be reset.
   recovery reason alongside `system.lost` for future module-origin failures:
   rest, penance-required, or unresolved restriction. Include exact casting-source
   identity where necessary; existing casting/grant rules remain authoritative.
-- Native/external boolean-only changes and old Items stay unknown. No migration,
+- `server/spell-loss.ts` records a confirmed native modification stamp after a
+  module cast. Rest checks that evidence; a later native edit, missing stamp or
+  missing receipt downgrades the reason to unknown in a read-only planning copy.
+  Native/external boolean-only changes and old Items stay unknown. No migration,
   reverse reconstruction from chat, or permanent change to a Spell template.
   Explicit manual Restore controls must retire obsolete recovery metadata too.
 - Wizard/Diabolical mishap consequences remain separate. A rest must not undo a
@@ -182,27 +194,85 @@ such as permanent loss and required penance still constrain what can be reset.
 - Record disposable native v13/v14 operator results for quantity and mixed
   recoveries. Offline mocks are not native acceptance.
 - Update rules, architecture, terse changelog and handoff only after behavior is
-  implemented; keep this ADR Proposed until reviewed, then track R1–R5 here.
+  implemented; keep native/operator acceptance open until verified by the user.
 
 ## Acceptance checklist
 
-- [ ] R1 supported-source plan, optional personal ration consumption and exact quantities.
-- [ ] R2 reason-aware loss recovery and historical/manual policy.
-- [ ] R3 bounded operation, readback and no duplicate spending.
-- [ ] R4 matching buttons, shared modal, Consume ration? checkbox and separate recovery/exclusion lists in both layouts.
-- [ ] R5 focused source/mounted/package and native acceptance evidence.
+- [x] R1 supported-source plan, optional personal ration consumption and exact quantities.
+- [x] R2 reason-aware loss recovery and historical/manual policy.
+- [x] R3 bounded operation, readback and no duplicate spending.
+- [x] R4 matching buttons, shared modal, Consume ration? checkbox and separate recovery/exclusion lists in both layouts.
+- [x] R5 focused source, mounted UI, typing and packaged-route verification.
+- [x] User acceptance of ration, HP, spells and daily resources.
+- [ ] Wand rest operator check; retained as an unverified follow-up, not a checkpoint blocker.
 
-## Review points and explicit exclusions
+## Implementation and verification
 
-The modal placement and main ration/HP/reset flow implement the user's request.
-Review is specifically needed for the proposed daily-renewal policy, conservative
-handling of historical/unknown spell losses. The successful-rest-only scope is
-already selected by the user, as are optional personal ration consumption and
-separate recovery and exclusion lists. These are product/rules choices, not additional approval requirements
-for ordinary implementation details.
+The October26 user instruction authorized implementation after checkpoint
+`91bc7c2` (light-time fix and reviewed proposal). The new runtime remains
+uncommitted for operator verification; no version/compatibility bump or Core
+runtime change. See the [audit evidence](../audits/2026-10-26-resting-workflow.md#implementation-evidence).
 
-No rest code is included yet. Interrupted/failed rests, CON checks, eligibility
-adjudication, party-wide rest, managing another Actor's supplies, automated
-campfires/encounters/time, food procurement, new magic-item counters, universal
-effect expiration and dashboard status design are outside this proposal.
-Existing Creator native acceptance and public shell-discard gates remain separate.
+- `logic/rest.ts` supplies exact patches and both lists. All22 native Class
+  Abilities are classified:15 daily counters,7 rest-lost abilities. Owned use
+  maxima are preserved. `rest-manual-sources.ts` identifies45 prose-only native
+  daily benefits/choices for visible manual follow-up, not automatic new counters.
+- `server/api/rest.ts` previews, completes and checks actor-scoped durable
+  operations. Optional ration spending precedes recovery; zero quantity remains
+  an Item. Exact final readback can settle independently completed remaining
+  resets. Uncertain writes never replay; changed source requires manual review.
+- New module casts record loss reason and confirmed native source-version evidence.
+  Manual spell loss/restoration clears that reason; external edits invalidate
+  automatic recovery. Historical unknown losses and completed penance use the
+  displayed eligibility controls. Native versionless Items remain explicit.
+- Both sheet buttons share `RestModal` in the Actor provider. It refreshes and
+  closes on success. Changed context retires requests; the modal checks existing
+  operations on reopening. Pending sheet edits prevent opening, and the sheet
+  is inert while the dialog is open.
+- Native data has no general temporary-stat-damage baseline or rest-expiry field.
+  Negative stat/temporary effects are listed for separate handling; arbitrary
+  fields/effects are not guessed or cleared. Custom/unclassified counters likewise
+  remain visible exclusions. Penance sacrifices, broken wands and spent scrolls
+  remain untouched.
+
+### Initial-preview correction
+
+Operator testing exposed an initial preview rejection: the modal requests ration
+stacks before selecting one, but route validation required a ration ID. Preview
+now accepts an omitted selection and returns stacks with a field-level error;
+completion still requires a valid selected ration when consumption is checked.
+Actual-route regressions cover the initial modal payload with and without food,
+and verify missing selection causes no writes. The paper-sheet Rest button also
+uses the Manage Character Sheet button shadow and hover styling. Native/operator
+recheck remains open.
+
+### Native loss tracking and spell-card control
+
+The checked native Shadowdark4.0.6 source defines `system.lost` in
+`system/src/models/_fields/itemFields.mjs`; `PlayerSD.castSpell` writes only this
+boolean after a failed non-focus owned-spell cast. Its reroll handler likewise
+updates only this boolean. There is no persistent spell penance/reason field in
+that schema or those handlers. Chat roll history is not a current eligibility
+record. Preserve explicit eligibility confirmation for losses without valid
+SheetDelver provenance; do not infer penance from the character being a Priest.
+
+Owned spell cards now reuse the Spells tab's Mark lost / Restore control, including
+clearing prior reason metadata on manual changes. The single-page sheet already
+opens these shared cards. Catalog previews, scrolls and wands do not acquire this
+Spell-only control. The existing footer and Spells-tab button are the visual
+references; no new dialog or confirmation is introduced.
+
+## Operator acceptance and explicit exclusions
+
+Verify both sheet buttons, optional personal food (including no personal ration),
+HP recovery, ordinary/penance spell loss, nonbroken/broken wands and changed daily
+use counters on disposable native v13/v14 characters. Confirm the lists match the
+actual changes and that the sheet refreshes after completion. The local checks
+prove controlled behavior, not native/operator acceptance; leave this ADR open
+until the user verifies and closes it.
+
+Interrupted/failed rests, CON checks, eligibility adjudication, party-wide rest,
+managing another Actor's supplies, automated campfires/encounters/time, food
+procurement, new magic-item counters, universal effect expiration and dashboard
+status design are outside this utility. Existing Creator native acceptance and
+public shell-discard gates remain separate.

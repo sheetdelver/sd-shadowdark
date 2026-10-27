@@ -13,8 +13,8 @@ import { useShadowdarkActor } from '../context/ShadowdarkActorContext';
  * through the context-fenced luck route. Spending luck is not automated.
  *
  * Presentation (user decision): no visible label in either mode. Pulp off shows
- * only the tick box; Pulp on shows only a number input, with −/+ spinner buttons
- * where there is space (not in the compact paper sheet box). When the setting is
+ * only the tick box; Pulp on shows a spinner-free input and −/+ buttons in both
+ * layouts. When the setting is
  * unavailable no mode is guessed: an inert placeholder explains why on hover and
  * to assistive technology.
  */
@@ -25,20 +25,21 @@ export function LuckControl({ compact = false }: { compact?: boolean }) {
     if (mode === 'pulp') {
         const remaining = Math.max(0, Number(getDraftValue('system.luck.remaining', actor.system?.luck?.remaining ?? 0)) || 0);
         const set = (value: number, immediate = true) => updateLuck('pulp', Math.max(0, value), { immediate });
-        const step = 'w-9 h-9 flex items-center justify-center border-2 border-black font-bold disabled:opacity-30 touch-manipulation';
+        const step = 'w-9 h-9 shrink-0 flex items-center justify-center border-2 border-black font-bold disabled:opacity-30 touch-manipulation';
         const input = (
-            <input type="number" min={0} step={1} inputMode="numeric" value={remaining} aria-label="Luck tokens"
+            <input type="text" pattern="[0-9]*" inputMode="numeric" value={remaining} aria-label="Luck tokens"
                 className="w-14 h-9 text-center text-xl font-bold border-2 border-black bg-transparent"
                 onChange={event => {
-                    const value = Math.floor(Number(event.target.value));
-                    if (event.target.value !== '' && Number.isFinite(value)) set(value, false);
+                    if (!/^[0-9]+$/.test(event.target.value)) return;
+                    const value = Number(event.target.value);
+                    if (Number.isSafeInteger(value)) set(value, false);
                 }} />
         );
         return (
             <div className={`flex items-center justify-center gap-2 ${compact ? 'flex-1' : 'py-1'}`} role="group" aria-label="Luck tokens">
-                {!compact && <button type="button" className={step} aria-label="Spend a luck token" disabled={remaining <= 0} onClick={() => set(remaining - 1)}>−</button>}
+                <button type="button" className={step} aria-label="Spend a luck token" disabled={remaining <= 0} onClick={() => set(remaining - 1)}>−</button>
                 {input}
-                {!compact && <button type="button" className={step} aria-label="Gain a luck token" onClick={() => set(remaining + 1)}>+</button>}
+                <button type="button" className={step} aria-label="Gain a luck token" onClick={() => set(remaining + 1)}>+</button>
             </div>
         );
     }

@@ -3,6 +3,11 @@
 Historical entries are reconstructed from [published releases](https://github.com/sheetdelver/sd-shadowdark/releases), their tags, and merged changes. Version numbers follow the published tags; the Unreleased section collects notes for the next authorized release.
 
 ## Unreleased
+- Cap character progression at 10
+- Announce light toggles in chat
+- Match Pulp luck controls
+- Add spell-card loss control
+- Add shared rest utility
 - Restore active light time
 - Expand Crawling Kit contents
 - Mark zero-HP sheet names

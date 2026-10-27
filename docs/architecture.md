@@ -1085,3 +1085,61 @@ preflights all components and passes each `ownedCopy` to existing sheet writes
 or Creator draft additions. It stops on failure/context retirement and reports
 partial additions; the public Item writer is not an atomic batch. No name-only
 recognition, existing-kit migration, currency deduction or implicit stack merge.
+
+## Shared rest completion
+
+Both sheet layouts invoke `openRest` in `ShadowdarkActorProvider`; `RestModal`
+reuses `ModuleDialog` and current module controls. Rest is a successful-rest
+utility, not an interruption simulator. Consume ration? defaults checked; when
+unchecked, no personal food is required or written. Preview has separate recovery
+and exclusion lists. Completion refreshes the Actor and closes the modal.
+
+`logic/rest.ts` builds exact source patches from shared HP preparation/reconciliation,
+owned counters and existing wand helpers. Recovery classifications use native
+source identities. Unsupported daily prose/effects, permanent loss, penance and
+broken/spent items remain visible exclusions. Unknown spell losses and completed
+penance have explicit eligibility controls. `server/spell-loss.ts` validates loss
+metadata against a confirmed native modification stamp; native changes or missing
+evidence require manual eligibility instead of automatic recovery.
+
+The caller-bound `actors/[id]/rest/plan`, `/complete` and `/status` routes share
+the Actor lock and durable SDK data store. Source/choice/context-bound previews
+are revalidated before dispatch. Optional ration spending happens first, retaining
+empty Items. Each absolute write is journaled and read back; unknown writes never
+replay, active operations prevent replacement spending, and exact final values
+can settle independently completed resets. This is not an atomic SDK transaction.
+See [ADR-0006](adr/0006-shared-character-rest.md) and the
+[rest audit](audits/2026-10-26-resting-workflow.md) for coverage and acceptance.
+
+Owned spell cards and the Spells tab share `SpellLossControl`, using
+`manualSpellLoss` through the existing Actor update path. Manual changes clear
+casting-loss provenance; native Shadowdark4.0.6 stores only the lost boolean,
+so rest eligibility for native/manual losses remains explicitly confirmed.
+
+Inventory light controls post feedback only after all item patches succeed.
+`server/api/light-chat.ts` validates caller ownership and current light state,
+reads `shadowdark.playerShowLightRemaining` from SDK world context, and posts a
+public SDK ChatCard with Actor speaker. Durable notification receipts prevent
+reposting after uncertain acknowledgements. No scene-light or timer automation
+is invoked. The shared Pulp LuckControl uses a numeric-text input and −/+ buttons
+in both layouts; it retains the existing world-aware luck write route.
+
+
+### October 26 Creator scope and operator closeout
+
+Creator supports levels 0–10 using one shared maximum for the selector and draft
+validation, following the user-verified core rulebook p. 39 cap. Native Class
+spells-known tables supply levels 1–10 and tiers 1–5. The earlier 0–20 request is
+superseded; higher-level progression is not a missing standard feature.
+The existing leave-warning behavior is accepted; additional Core draft protection
+and editable-draft restoration are not required. Creation operation receipts
+still prevent duplicate writes after uncertain responses; they are not drafts.
+User acceptance closes the implemented presentation/settings/Creator/rest scope,
+with wand-rest operator verification specifically unperformed. See the owning
+ADRs for evidence and remaining explicit limitations.
+
+`logic/advancement.ts` owns `MAX_CHARACTER_LEVEL = 10`, shared with Creator.
+Prepared sheet eligibility and the shared level-up hook suppress new advancement
+at the cap. Server data/HP/finalize routes reject above-cap new operations; saved
+operation reconciliation/replay remains accessible. Existing above-cap Actors are
+not clamped. This enforces the rulebook despite native 4.0.6's uncapped XP button.

@@ -8,6 +8,7 @@ import ModuleDialog from './ModuleDialog';
 import { CardBody, CardNotes } from './ResourceCardBody';
 export { CardBody, CardNotes } from './ResourceCardBody';
 import ItemStateControls from './ItemStateControls';
+import SpellLossControl from './SpellLossControl';
 import { itemControls } from '../../logic/inventory-controls';
 import { useShadowdarkActor, type ActionResponse, type CardTarget } from '../context/ShadowdarkActorContext';
 import { useShadowdarkUI } from '../context/ShadowdarkUIContext';
@@ -85,8 +86,9 @@ export default function ResourceDetailModal() {
 
     const ownedItemId = target.kind === 'item' && loaded.state === 'ready' ? target.itemId : null;
     const hasControls = !!ownedItemId && itemControls(actor.derived?.items ?? [], actor.items ?? [], ownedItemId).length > 0;
+    const hasSpellControl = !!ownedItemId && actor.items?.some((item: any) => String(item.id ?? item._id) === ownedItemId && item.type === 'Spell');
     const hasActions = loaded.state === 'ready' && loaded.card.actions.length > 0;
-    const footer = loaded.state === 'ready' && (hasActions || hasControls || loaded.card.diagnostics.length > 0) ? (
+    const footer = loaded.state === 'ready' && (hasActions || hasControls || hasSpellControl || loaded.card.diagnostics.length > 0) ? (
         <div className="space-y-2">
             <CardNotes card={loaded.card} />
             {hasControls && <ItemStateControls itemId={ownedItemId!} />}
@@ -96,7 +98,7 @@ export default function ResourceDetailModal() {
                     Focus check (a failed focus check does not lose the spell)
                 </label>
             )}
-            {hasActions && <div className="flex flex-wrap gap-2">
+            {(hasActions || hasSpellControl) && <div className="flex flex-wrap gap-2">
                 {loaded.card.actions.map(entry => (
                     <button key={entry.id} type="button" data-autofocus={entry.available || undefined}
                         disabled={!entry.available || isActionBusy(entry.id)} title={entry.reason ?? undefined}
@@ -105,6 +107,7 @@ export default function ResourceDetailModal() {
                         {isActionBusy(entry.id) ? 'Working…' : entry.label}
                     </button>
                 ))}
+                {hasSpellControl && <SpellLossControl key={ownedItemId} itemId={ownedItemId!} />}
             </div>}
             {loaded.card.actions.filter(entry => !entry.available && entry.reason).map(entry => (
                 <p key={entry.id} className="text-xs text-red-800" role="note">{entry.label}: {entry.reason}</p>

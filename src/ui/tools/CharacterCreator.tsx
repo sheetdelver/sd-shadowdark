@@ -15,7 +15,7 @@ import { creatorAbilityGuidance } from '../../logic/creator-ability-guidance';
 import { NONREPEATABLE_CREATOR_AWARDS } from '../../logic/creator-awards';
 import ModuleDialog from '../components/ModuleDialog';
 import { GoldRollSection } from '../components/levelup/sections/GoldRollSection';
-import { STARTING_GOLD } from '../../logic/advancement';
+import { STARTING_GOLD, MAX_CHARACTER_LEVEL } from '../../logic/advancement';
 import ModulePageHeader from '../components/ModulePageHeader';
 import { StatPoolSelectionSection } from '../components/levelup/sections/StatPoolSelectionSection';
 import { LEVEL_ZERO_CLASS, emptyCharacterDraft, type CharacterDraft, type CreatorChoices } from '../../logic/character-creation';
@@ -234,7 +234,7 @@ export function CreatorContent() {
             <h2 ref={heading} tabIndex={-1}>{step+1}. {STEPS[step]}</h2>
             <fieldset disabled={locked||!data.ready||!isConnected} className={`sd-creator-fields${step===0?' sd-creator-identity':''}`}>
                 {step===0&&<><div className="sd-creator-field sd-creator-name"><div className="sd-creator-field-heading"><label htmlFor="creator-name">Name *</label>{diceButton('Randomize Name',()=>void rollName(),!draft.ancestryUuid)}</div><input id="creator-name" aria-label="Name" aria-invalid={invalid('name')} aria-describedby="creator-error-name" maxLength={200} required placeholder="Character Name" value={draft.name} onChange={e=>edit(d=>{d.name=e.target.value;})}/>{feedback('name')}</div>
-                    <label>Level<select aria-label="Level" value={draft.level} onChange={e=>{const level=Number(e.target.value);setFieldErrors(previous=>Object.fromEntries(Object.entries(previous).filter(([field])=>!field.startsWith('hp'))));setGains(previous=>Object.fromEntries(Object.entries(previous).filter(([at])=>Number(at)<=level)));edit(d=>{d.level=level;});}}>{Array.from({length:21},(_,n)=><option key={n}>{n}</option>)}</select></label>
+                    <label>Level<select aria-label="Level" value={draft.level} onChange={e=>{const level=Number(e.target.value);setFieldErrors(previous=>Object.fromEntries(Object.entries(previous).filter(([field])=>!field.startsWith('hp'))));setGains(previous=>Object.fromEntries(Object.entries(previous).filter(([at])=>Number(at)<=level)));edit(d=>{d.level=level;});}}>{Array.from({length:MAX_CHARACTER_LEVEL + 1},(_,n)=><option key={n}>{n}</option>)}</select></label>
                     <label>Current XP{numeric('xp','Current XP',draft.xp,n=>edit(d=>{d.xp=n??0;}))}{feedback('xp')}</label>
                     {draft.level>0?identity('classUuid','classes','Class',true):<p>Level 0 uses the native Level 0 Class, without first-level adventuring grants.</p>}
                     {identity('ancestryUuid','ancestries','Ancestry',true)}{identity('backgroundUuid','backgrounds','Background',true)}

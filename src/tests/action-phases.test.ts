@@ -1,3 +1,10 @@
+import { handleLightChat } from '../server/api/light-chat';
+import { recordSpellLoss } from '../server/spell-loss';
+import { handleRest } from '../server/api/rest';
+import { restPlan, DAILY_ABILITIES, REST_ABILITIES } from '../logic/rest';
+import { planConsequences } from '../logic/actions';
+import { requestRules } from '../server/access';
+import { manualSpellLoss } from '../logic/spell-loss';
 /** ADR-0002 operation/receipt regressions. Real module handlers, isolated source state. */
 import assert from 'node:assert/strict';
 import { handleActorAction } from '../server/api/actions';
@@ -277,6 +284,140 @@ await check('SD02-08 concealed/absent Actors return404 without exposing an actio
  t.runtime.documents.get=async(_type:string,_id:string,opts:any)=>opts?.minOwnership==='owner'?null:structuredClone(t.actor); assert.equal((await t.send()).status,403); assert.deepEqual(t.events,before);
  t.runtime.documents.get=async()=>null; assert.equal((await t.send()).status,404); assert.deepEqual(t.events,before);
  t.runtime.documents.get=async()=>{throw new SdkError('permission_denied','Observer lacks owner access')}; assert.equal((await t.send()).status,403); assert.deepEqual(t.events,before);
+});
+
+const restPacks=nativePacks(process.env.SHADOWDARK_NATIVE ?? path.resolve('temp/shadowdark'),['shadowdark.class-abilities','shadowdark.gear','shadowdark.talents']);
+const nativeRation=restPacks['shadowdark.gear'].find((i:any)=>i._id==='GX6OmWQiE7MzTmjX')!;
+const rationItem=()=>({...ownedCopy(nativeRation,'Compendium.shadowdark.gear.Item.GX6OmWQiE7MzTmjX'),_id:'food'});
+const restFixture=(items:any[]=[])=>{
+    const t=fixture(items);t.actor.system.attributes.hp={value:1,max:9};
+    t.runtime.documents.patch=async(_type:string,_id:string,patch:any)=>{
+        t.events.push('actor');for(const [path,value]of Object.entries(patch)){const keys=path.split('.');const leaf=keys.pop()!;let target=t.actor;for(const k of keys)target=target[k]??={};target[leaf]=value;}
+    };
+    const send=async(mode:'plan'|'complete'|'status',body:any={})=>{
+        const response=await handleRest(t.actor._id,{method:'POST',runtime:t.runtime,userSession:{userId:'controlled'},json:async()=>body} as any,mode);
+        return {status:response.status,body:await response.json() as any};
+    };
+    return {...t,rest:send};
+};
+const choice={consumeRation:true,rationId:'food',confirmedSpells:[]};
+await check('REST daily/native coverage and exact-source counters',()=>{
+    const abilities=restPacks['shadowdark.class-abilities'].filter((i:any)=>i.type==='Class Ability');
+    assert.equal(abilities.length,22);assert.equal(DAILY_ABILITIES.size,15);assert.equal(REST_ABILITIES.size,7);
+    for(const native of abilities){
+        const uuid=`Compendium.shadowdark.class-abilities.Item.${native._id}`;
+        assert.equal(DAILY_ABILITIES.has(uuid),native.system.limitedUses);assert.equal(REST_ABILITIES.has(uuid),native.system.loseOnFailure);
+        if(native.system.limitedUses)assert.match(native.system.description,/day/i);
+        const item={...ownedCopy(native,uuid),_id:'ability'};if(item.system.limitedUses){item.system.uses={available:0,max:7};}else item.system.lost=true;
+        const t=restFixture([item]),plan=restPlan(t.actor,{consumeRation:false,confirmedSpells:[]},{},requestRules(t.runtime));
+        const w=plan.writes.find(w=>w.itemId==='ability')!;assert.ok(w);
+        assert.equal(item.system.limitedUses?w.patch['system.uses.available']:w.patch['system.lost'],item.system.limitedUses?7:false);
+    }
+});
+await check('REST mixed success consumes one ration, restores supported resources and preserves exclusions',async()=>{
+    const spell=(id:string,reason?:string)=>({_id:id,type:'Spell',name:id,system:{lost:true},flags:{shadowdark:{sheetDelver:{spellLoss:reason?{reason}:null}}}});
+    const daily={...ownedCopy(restPacks['shadowdark.class-abilities'].find((i:any)=>i._id==='pRO1kFMnFkkcYOgC'),'Compendium.shadowdark.class-abilities.Item.pRO1kFMnFkkcYOgC'),_id:'omen'};daily.system.uses={available:0,max:4};
+    const t=restFixture([rationItem(),spell('ordinary','rest'),spell('penance','penance'),spell('unknown'),daily,
+        {_id:'wand',name:'Broken wand',type:'Wand',system:{broken:true,spells:[{lost:true}]}},
+        {...legacyScrolls[0],_id:'spent',flags:{shadowdark:{sheetDelver:{scrollSpent:true}}}}]);
+    t.actor.items[1]._stats={modifiedTime:1};t.actor.items[2]._stats={modifiedTime:1};
+    for(const item of t.actor.items.slice(1,3))await recordSpellLoss({runtime:t.runtime} as any,t.actor._id,item._id,{'flags.shadowdark.sheetDelver.spellLoss':item.flags.shadowdark.sheetDelver.spellLoss});
+    const plan=await t.rest('plan',choice);assert.equal(plan.status,200);assert.deepEqual(plan.body.reset.map((r:any)=>r.id),['hp','ordinary','omen']);
+    for(const id of ['penance','unknown','wand','spent'])assert.ok(plan.body.excluded.some((r:any)=>r.id===id));
+    const body={...choice,review:plan.body.review,requestId:'rest-mixed-success'};
+    assert.equal((await t.rest('complete',body)).body.state,'complete');
+    assert.equal(t.actor.system.attributes.hp.value,9);assert.equal(t.actor.items[0].system.quantity,2);
+    assert.equal(t.actor.items[1].system.lost,false);assert.equal(t.actor.items[2].system.lost,true);assert.equal(t.actor.items[4].system.uses.available,4);
+    const before=[...t.events];await t.rest('complete',body);assert.deepEqual(t.events,before);assert.equal(t.events[0],'item:food');
+});
+await check('REST no personal food, explicit external food, stale preview and authorization',async()=>{
+    // Exact initial modal request: discover stacks before a ration ID exists.
+    for(const food of [[],[rationItem()]]){
+        const initial=restFixture(food),choices={consumeRation:true,confirmedSpells:[]};
+        const preview=await initial.rest('plan',choices);assert.equal(preview.status,200);
+        assert.equal(preview.body.rations.length,food.length);assert.ok(preview.body.errors.length);
+        const completion=await initial.rest('complete',{...choices,review:preview.body.review,requestId:'rest-missing-selection'});
+        assert.equal(completion.status,400);assert.deepEqual(initial.events,[]);
+    }
+    const t=restFixture();const blocked=await t.rest('plan',choice);assert.ok(blocked.body.errors.length);
+    assert.equal((await t.rest('complete',{...choice,review:blocked.body.review,requestId:'rest-no-food-blocked'})).status,400);assert.deepEqual(t.events,[]);
+    const external={consumeRation:false,confirmedSpells:[]};const p=await t.rest('plan',external);
+    t.actor.system.attributes.hp.value=2;assert.equal((await t.rest('complete',{...external,review:p.body.review,requestId:'rest-stale-blocked'})).status,409);assert.deepEqual(t.events,[]);
+    const fresh=await t.rest('plan',external);assert.equal((await t.rest('complete',{...external,review:fresh.body.review,requestId:'rest-external-food'})).body.state,'complete');assert.deepEqual(t.events,['actor']);
+    t.runtime.documents.get=async()=>null;assert.ok(((await t.rest('status',{})).status??0)>=400);
+});
+await check('REST lost ration acknowledgement reconciles without spending twice',async()=>{
+    const t=restFixture([rationItem()]);const p=await t.rest('plan',choice),body={...choice,review:p.body.review,requestId:'rest-lost-ack'};
+    t.fail('spend-lost');assert.equal((await t.rest('complete',body)).body.state,'partial');assert.equal(t.actor.items[0].system.quantity,2);
+    t.fail('');const status=await t.rest('status',{});assert.equal(status.body.retryable,true);assert.equal(t.actor.system.attributes.hp.value,1);
+    assert.equal((await t.rest('complete',body)).body.state,'complete');assert.equal(t.actor.system.attributes.hp.value,9);assert.equal(t.events.filter(e=>e==='item:food').length,1);
+});
+await check('REST uncertain writes and independent edits never authorize replay or a replacement',async()=>{
+    for(const failure of ['fields','spend-lost']){
+        const t=restFixture([rationItem()]);const p=await t.rest('plan',choice),body={...choice,review:p.body.review,requestId:'rest-uncertain-request'};
+        t.fail(failure);await t.rest('complete',body);t.fail('');t.actor.system.attributes.hp.value=4;
+        await t.rest('status',{});const before=[...t.events];assert.equal((await t.rest('complete',body)).body.retryable,false);assert.deepEqual(t.events,before);
+        assert.equal((await t.rest('complete',{...body,requestId:'rest-replacement-denied'})).status,409);assert.deepEqual(t.events,before);
+        t.actor.items[0].system.quantity=2;t.actor.system.attributes.hp.value=9;
+        assert.equal((await t.rest('status',{})).body.state,'complete','manual exact completion clears the pending receipt without writes');assert.deepEqual(t.events,before);
+    }
+});
+await check('REST external spell edits invalidate old casting provenance',async()=>{
+    const item={_id:'spell',type:'Spell',name:'Native-edited spell',_stats:{modifiedTime:1},system:{lost:true},flags:{shadowdark:{sheetDelver:{spellLoss:{reason:'rest'}}}}};
+    const t=restFixture([item]),intent={consumeRation:false,confirmedSpells:[]};
+    await recordSpellLoss({runtime:t.runtime} as any,t.actor._id,'spell',{'flags.shadowdark.sheetDelver.spellLoss':item.flags.shadowdark.sheetDelver.spellLoss});
+    assert.ok((await t.rest('plan',intent)).body.reset.some((r:any)=>r.id==='spell'));
+    t.actor.items[0]._stats.modifiedTime=2;
+    const plan=await t.rest('plan',intent);assert.ok(!plan.body.reset.some((r:any)=>r.id==='spell'));assert.match(plan.body.excluded.find((r:any)=>r.id==='spell').detail,/unknown/);
+    assert.equal(t.actor.items[0].flags.shadowdark.sheetDelver.spellLoss.reason,'rest','planning does not edit source flags');
+});
+await check('REST known refusal can finish, changed context blocks and additive HP is not doubled',async()=>{
+    const t=restFixture([rationItem()]);const p=await t.rest('plan',choice),body={...choice,review:p.body.review,requestId:'rest-known-refusal'};
+    t.fail('spend-denied');assert.equal((await t.rest('complete',body)).body.retryable,true);assert.equal(t.actor.items[0].system.quantity,3);
+    t.fail('');assert.equal((await t.rest('complete',body)).body.state,'complete');assert.equal(t.actor.items[0].system.quantity,2);
+    const other=restFixture([rationItem()]);const preview=await other.rest('plan',choice);other.retire();
+    assert.equal((await other.rest('complete',{...choice,review:preview.body.review,requestId:'rest-retired-context'})).status,409);assert.deepEqual(other.events,[]);
+    const hp=restFixture();hp.actor.effects=[{_id:'bonus',name:'HP bonus',disabled:false,changes:[{key:'system.attributes.hp.value',mode:2,value:'2'}]}];
+    const plan=restPlan(hp.actor,{consumeRation:false,confirmedSpells:[]},{},requestRules(hp.runtime));
+    assert.equal(plan.writes.find(w=>!w.itemId)?.patch['system.attributes.hp.value'],7);
+});
+await check('REST spell provenance and manual restore preserve penance and unknown losses',()=>{
+    for(const [classUuid,critical,expected]of [[SPELL_CLASSES.wizard,true,'rest'],[SPELL_CLASSES.priest,true,'penance'],[SPELL_CLASSES.seer,true,'penance'],[SPELL_CLASSES.witch,true,'unknown'],[SPELL_CLASSES.priest,false,'rest']] as const){
+        const w=planConsequences({kind:'spell',itemId:'spell',castingClass:classUuid,spell:{name:'Test'}} as any,{type:'Spell'}, {success:false,criticalFailure:critical} as any)[0];
+        assert.equal((w.updates!['flags.shadowdark.sheetDelver.spellLoss'] as any).reason,expected);
+    }
+    assert.equal(manualSpellLoss(false)['flags.shadowdark.sheetDelver.spellLoss'],null);
+    const t=restFixture([{_id:'penance',type:'Spell',name:'Penance',system:{lost:true},flags:{shadowdark:{sheetDelver:{spellLoss:{reason:'penance'}}}}}]);
+    assert.ok(restPlan(t.actor,{consumeRation:false,confirmedSpells:['penance']},{},requestRules(t.runtime)).reset.some(r=>r.id==='penance'));
+    t.actor.items[0].flags.shadowdark.sheetDelver.spellLoss.reason='permanent';
+    const p=restPlan(t.actor,{consumeRation:false,confirmedSpells:['penance']},{},requestRules(t.runtime));assert.ok(p.errors.length);assert.ok(!p.reset.some(r=>r.id==='penance'));
+});
+await check('LIGHT chat uses SDK cards, native visibility, owner state and duplicate suppression', async () => {
+    for (const active of [true, false]) for (const setting of [0, 1, 2, null]) {
+        const t=fixture([{_id:'torch',name:'Torch <one>',type:'Basic',system:{light:{isSource:true,active,remainingSecs:125}}}]);
+        t.actor.name='Prim <one>'; const cards:any[]=[];
+        t.runtime.world.snapshot=()=>({...worldSnapshot(1),settings:{'shadowdark.playerShowLightRemaining':setting===null?{status:'unavailable'}:{status:'world',value:setting}}});
+        t.runtime.chat.card=async(card:any,options:any)=>{cards.push({card,options});};
+        const body={requestId:'light-card-test',itemId:'torch',active};
+        const send=async(extra:any={})=>handleLightChat(t.actor._id,{method:'POST',runtime:t.runtime,userSession:{userId:'controlled'},json:async()=>({...body,...extra})} as any);
+        assert.equal((await send()).status,200);assert.equal(cards.length,1);
+        assert.equal(cards[0].options.rollMode,'publicroll');assert.equal(cards[0].options.speaker.actor,t.actor._id);
+        assert.match(cards[0].card.title,active?/lit$/:/extinguished$/);
+        assert.match(cards[0].card.content,/Prim &lt;one&gt;/);assert.equal(cards[0].card.content.includes('2 min remaining'),setting===2);
+        assert.equal((await send()).status,200);assert.equal(cards.length,1);
+        assert.equal((await send({active:!active})).status,409);assert.equal(cards.length,1);
+        assert.equal((await send({requestId:'light-new-state',active:!active})).status,409);assert.equal(cards.length,1);
+        t.runtime.documents.get=async()=>null;
+        assert.equal((await send()).status,404);assert.equal(cards.length,1);
+        assert.equal(t.events.length,0,'notification never writes inventory');
+    }
+});
+await check('LIGHT uncertain chat acknowledgement does not retry or change inventory', async () => {
+    const t=fixture([{_id:'torch',type:'Basic',system:{light:{isSource:true,active:true}}}]);let calls=0;
+    t.runtime.chat.card=async()=>{calls++;throw Error('Acknowledgement lost')};
+    const send=()=>handleLightChat(t.actor._id,{method:'POST',runtime:t.runtime,userSession:{userId:'controlled'},json:async()=>({requestId:'light-uncertain',itemId:'torch',active:true})} as any);
+    for(let i=0;i<2;i++){const r=await send();assert.equal(r.status,200);assert.equal((await r.json() as any).posted,false);}
+    assert.equal(calls,1);assert.equal(t.events.length,0);
 });
 console.log(JSON.stringify({method:'Actual module operations over controlled source/receipts; not native Foundry acceptance',checks},null,2));
 if(checks.some(row=>!row.passed))process.exitCode=1;

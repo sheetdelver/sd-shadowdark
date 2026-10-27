@@ -9,8 +9,8 @@ import { worldSnapshot } from './fixtures/native-406';
 const cls = rows.find(d => d.name === 'Warlock' && d.type === 'Class');
 const human = sources.get('Compendium.shadowdark.talents.Item.DYWFJu5XeazJYc0P');
 assert.ok(human && cls); assert.equal(human.name,'Ambitious');
-for (const level of [0,1,2,3,10,20]) { const d=emptyCharacterDraft();d.level=level;validateCharacterDraft(d); }
-for (const value of [-1,21,NaN,Infinity,1.5,'1']) { const d=emptyCharacterDraft();(d as any).level=value;assert.throws(()=>validateCharacterDraft(d)); }
+for (const level of [0,1,2,3,10]) { const d=emptyCharacterDraft();d.level=level;validateCharacterDraft(d); }
+for (const value of [-1,11,20,21,NaN,Infinity,1.5,'1']) { const d=emptyCharacterDraft();(d as any).level=value;assert.throws(()=>validateCharacterDraft(d)); }
 assert.equal(creatorLevelRequirements(1,cls,[]).requiredBoons,cls.system.patron.startingBoons);
 assert.equal(creatorLevelRequirements(1,cls,[ownedCopy(human)]).requiredTalents,1);
 assert.equal(creatorLevelRequirements(2,cls,[]).choiceRolls,0);
