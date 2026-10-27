@@ -1144,3 +1144,14 @@ Prepared sheet eligibility and the shared level-up hook suppress new advancement
 at the cap. Server data/HP/finalize routes reject above-cap new operations; saved
 operation reconciliation/replay remains accessible. Existing above-cap Actors are
 not clamped. This enforces the rulebook despite native 4.0.6's uncapped XP button.
+
+
+## Manual Renown and ability state
+
+[ADR-0007](adr/0007-renown-and-ability-card-controls.md) adds shared RenownControl
+on the tabbed Abilities and paper views, writing native `system.renown` through
+the existing actor draft/update path. The selected control floor is −4; there is
+no gameplay maximum or automatic recalculation. AbilityStateControls reuses the
+native prepared `uses`/`lost` state on ability rows and owned resource cards;
+writes go through the existing exact-owned-item update path. Catalog cards do
+not mount these controls. Normal ability actions and rest recovery are unchanged.

@@ -246,3 +246,12 @@
 .sdk-module--shadowdark .sd-creator-spell-scroll-hint { font-size:.75rem; }
 .sdk-module--shadowdark .sd-creator-spell-progression tr > th:first-child { position:sticky; left:0; z-index:1; background:#fff; box-shadow:1px 0 #777; }
 .sdk-module--shadowdark .sd-creator-spell-progression thead tr > th:first-child { background:#000; }
+
+
+/* Native manual counters retain the paper controls in narrow stat columns. */
+.sdk-module--shadowdark .sd-renown-control { display:grid; grid-template-columns:1.75rem minmax(0,3.5rem) 1.75rem; gap:.25rem; align-items:center; justify-content:center; width:100%; min-width:0; }
+.sdk-module--shadowdark .sd-renown-control button { width:1.75rem; height:2.25rem; padding:0; }
+.sdk-module--shadowdark .sd-renown-control input { width:100%; min-width:0; max-width:3.5rem; height:2.25rem; padding:0; }
+.sdk-module--shadowdark .sd-level-renown-grid > div { min-width:0; padding:.5rem; }
+.sdk-module--shadowdark .sd-level-renown-grid > div > div:first-child { margin:-.5rem -.5rem .5rem; }
+.sdk-module--shadowdark .sd-level-renown-grid h3 { font-size:1rem; }

@@ -81,6 +81,14 @@ where it conflicts with the later rules-guided implementation.
 
 ### Level-up cap correction
 
+October 27 sheet follow-up: at level 10 or above, the tabbed Details and paper
+sheet XP blocks display **MAX** instead of editable XP and a next-level target.
+The Abilities XP progress block uses the same display. All consume the existing
+`MAX_CHARACTER_LEVEL`; stored XP is preserved, and lower-level behavior remains.
+This is a presentation follow-up to the existing advancement cap; the user
+approved closeout on October 27.
+
+
 The user also selected enforcement for existing-Actor advancement. One shared
 `MAX_CHARACTER_LEVEL` serves Creator validation/selector, prepared level-up
 eligibility and the shared level-up hook/server routes. Level 9 can advance to

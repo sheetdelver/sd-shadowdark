@@ -4,6 +4,40 @@ Date: 2026-10-23
 Status: User accepted implemented Creator; extra draft protection withdrawn; level cap corrected
 Decision: [ADR-0005](../adr/0005-character-creator.md)
 
+## Renown and ability cards — October 27
+
+Selected follow-up: [ADR-0007](../adr/0007-renown-and-ability-card-controls.md).
+Renown uses signed manual controls under Luck in both views, beside Level on
+the tabbed sheet. The −4 floor is the user's requested bound, not a stated
+Cursed Scroll 6 rule. Saved values are preserved. Existing ability use/loss
+controls are shared between the Abilities list and owned cards.
+
+Verification: explicit module typing passes. Six mounted Renown workflows pass
+at 390/900/1280 pixels across both layouts, including signed input, the −4 floor,
+manual values above 12, persistence callbacks and column fit. Two owned-card
+workflows pass for limited/unlimited Class Abilities: use depletion/restoration,
+zero/max limits and manual lost/restore updates. Screenshots inspected. The
+initial synthetic card harness assumed a Spell target; its optional owned-item
+selection now supports Class Abilities too. User accepted the controls and approved checkpoint on October 27.
+
+## Maximum-level sheet follow-up — October 27
+
+User selected MAX in both sheet XP blocks at level 10. Details, paper XP and
+Abilities progress now use the shared level cap without changing saved XP.
+Explicit module typing and four mounted cases pass: paper/tabbed sheets at
+levels 9 and 10, including Abilities progress and preservation of saved XP.
+Screenshots of the capped layouts were inspected. User approved closeout of
+the latest XP display on October 27.
+
+Renown investigation: native 4.0.6 commit `95d5d6cc` added `system.renown` as an
+integer defaulting to zero and an unconditional editable Details field. Native
+source references are `system/src/models/PlayerSD.mjs` and
+`system/templates/actors/player/details/renown.hbs`; it has no automatic
+calculation or level-10 visibility condition. SheetDelver's preparation schema
+preserved the field before this follow-up, without rendering a Renown block.
+The user subsequently selected sheet controls in ADR-0007; the investigation
+itself did not change native data or add automatic Renown rules.
+
 ## Spell progression follow-up — October 27
 
 The Creator now shows a level-by-tier table with selected spells, new choice

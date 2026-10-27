@@ -3,6 +3,9 @@
 Historical entries are reconstructed from [published releases](https://github.com/sheetdelver/sd-shadowdark/releases), their tags, and merged changes. Version numbers follow the published tags; the Unreleased section collects notes for the next authorized release.
 
 ## Unreleased
+- Add Renown sheet controls
+- Share ability card counters
+- Show MAX at level cap
 - Clarify spell progression choices
 - Diagnose casting-source mismatches
 - Cap character progression at 10

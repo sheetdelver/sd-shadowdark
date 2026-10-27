@@ -1,5 +1,7 @@
 'use client';
 
+import { MAX_CHARACTER_LEVEL } from '../logic/advancement';
+
 import React, { useState } from 'react';
 import { groupPaperTalents, talentLevelLabel } from './talent-display';
 import { Flame, FlameKindling } from 'lucide-react';
@@ -8,6 +10,7 @@ import { SheetCharacterName } from './components/SheetCharacterName';
 import NotesModal from './components/NotesModal';
 import { useShadowdarkActor } from './context/ShadowdarkActorContext';
 import { LuckControl } from './components/LuckControl';
+import { RenownControl } from './components/RenownControl';
 import { bonusLabel, type PreparedAction } from '../logic/actions';
 
 interface ShadowdarkPaperSheetProps {
@@ -29,6 +32,7 @@ export default function ShadowdarkPaperSheet({ onToggleView }: ShadowdarkPaperSh
     const { actor, updateActor, startAction, openCard, triggerLevelUp, isActionBusy, openRest } = useShadowdarkActor();
     const [notesModalOpen, setNotesModalOpen] = useState(false);
     const derived = actor.derived ?? {};
+    const atMaxLevel = Number(actor.derived?.level ?? actor.system?.level?.value ?? 0) >= MAX_CHARACTER_LEVEL;
     const actions: PreparedAction[] = derived.actions ?? [];
     const views: any[] = derived.items ?? [];
     const itemById = (id: string) => (actor.items ?? []).find((item: any) => String(item.id ?? item._id) === id);
@@ -121,6 +125,10 @@ export default function ShadowdarkPaperSheet({ onToggleView }: ShadowdarkPaperSh
                             <span className={tag}>Luck</span>
                             <LuckControl compact />
                         </div>
+                        <div className={`${box} p-1 pt-6 flex flex-col`}>
+                            <span className={tag}>Renown</span>
+                            <RenownControl compact />
+                        </div>
                         <section className={`${box} flex flex-col`} aria-label="Attacks">
                             <span className="bg-black text-white text-xs font-black uppercase px-2 py-0.5 w-fit">Attacks ({attacks.length})</span>
                             <ul className="p-2 max-h-[28rem] overflow-y-auto">
@@ -157,12 +165,12 @@ export default function ShadowdarkPaperSheet({ onToggleView }: ShadowdarkPaperSh
                         <div className={`${box} h-16 flex flex-col`}>
                             <span className={tag}>XP</span>
                             <div className="flex-1 flex items-center justify-center text-xl font-bold pt-4">
-                                <label className="sr-only" htmlFor="sd-paper-xp">Experience points</label>
+                                {atMaxLevel ? <span aria-label="Maximum level reached">MAX</span> : <><label className="sr-only" htmlFor="sd-paper-xp">Experience points</label>
                                 <input id="sd-paper-xp" key={actor.system?.level?.xp} type="number" min={0} defaultValue={actor.system?.level?.xp || 0}
                                     onBlur={(e) => { const xp = Math.max(0, parseInt(e.target.value) || 0); if (xp !== actor.system?.level?.xp) updateActor('system.level.xp', xp, { immediate: true }); }}
                                     className="w-12 text-center bg-transparent outline-none border-b-2 border-black hover:bg-neutral-100 focus:bg-neutral-100 rounded" />
                                 <span className="text-neutral-400 mx-1" aria-hidden="true">/</span>
-                                <span>{derived.xpNextLevel ?? 0}</span>
+                                <span>{derived.xpNextLevel ?? 0}</span></>}
                             </div>
                         </div>
                         {info('Title', actor.details?.title)}

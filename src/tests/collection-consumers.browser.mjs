@@ -107,7 +107,7 @@ function RestSheet(){window.actorContext=useRestActor();return window.initial.pa
 function RestHost(){
  const prepare=()=>({...window.initial.actor,id:'restactor',worldContextRevision:1,derived:prepareShadowdarkView(window.initial.actor,{},window.initial.pulp?{...UNAVAILABLE_RULE_INPUTS,usePulpMode:{status:'world',value:true}}:UNAVAILABLE_RULE_INPUTS)});
  const [actor,setActor]=React.useState(prepare);
- const noop=async()=>{};return <RestProvider actor={actor} onUpdate={noop} onDeleteItem={noop} onCreateItem={noop}
+ const noop=async()=>{};return <RestProvider actor={actor} onUpdate={async(path,value)=>{if(!window.initial.renownTest)return;window.actorWrites??=[];window.actorWrites.push({path,value});window.initial.actor.system.renown=value;setActor(prepare())}} onDeleteItem={noop} onCreateItem={noop}
  onUpdateItem={async(id,patch)=>{if(!window.initial.lightTest)return;window.calls.push({key:'item-write',id,patch});if(window.initial.failItem)throw Error('Controlled item failure');
  const item=window.initial.actor.items.find(row=>row._id===id);for(const [path,value]of Object.entries(patch)){const parts=path.split('.');let owner=item;for(const key of parts.slice(0,-1))owner=owner[key]??={};owner[parts.at(-1)]=value}setActor(prepare())}}
  onLuck={async(mode,value)=>{window.luckWrite={mode,value};window.initial.actor.system.luck.remaining=value;setActor(prepare())}}
@@ -132,8 +132,8 @@ case 'resource-card': {
  const source=window.initial.actor;
  const wand=window.initial.which==='wand-card';
  const derived=prepareShadowdarkView(source,{classDocument:()=>({name:wand?'Priest':'Wizard',type:'Class',system:{spellcasting:{ability:wand?'wis':'int'}}}),spellDocument:ref=>window.initial.spells?.[ref.id]||null,label:ref=>window.initial.spells?.[ref.id]?.name||null});
- const selected=wand?source.items[0]._id:'spell';
- if(!wand)derived.items.find(item=>item.id==='spell').diagnostics=['Fixture source note'];
+ const selected=window.initial.itemId||(wand?source.items[0]._id:'spell');
+ if(!wand&&derived.items.some(item=>item.id==='spell'))derived.items.find(item=>item.id==='spell').diagnostics=['Fixture source note'];
  window.actorContext={actor:{...source,derived},card:{kind:'item',itemId:selected},rollDialog:{open:false},isActionBusy:()=>false,startAction:(action,options)=>window.lastAction={action,options},closeCard:()=>{},openCard:()=>{},performRoll:()=>{},
  updateItem:async(id,patch)=>{window.lastItemPatch={id,patch};const item=source.items.find(row=>(row._id??row.id)===id);for(const [key,value] of Object.entries(patch)){const parts=key.split('.');let target=item;for(const key of parts.slice(0,-1))target=target[key]??={};target[parts.at(-1)]=value}window.render();return true},
  runItemControl:control=>{window.lastControl=control;for(const write of control.writes){const item=source.items.find(row=>row._id===write.itemId);for(const [path,value]of Object.entries(write.patch)){const parts=path.split('.');let target=item;for(const key of parts.slice(0,-1))target=target[key]??={};target[parts.at(-1)]=value}}window.render()}};
@@ -182,7 +182,7 @@ async function test(name, initial, run) {
     page.on('pageerror', e => errors.push(e.message)); await page.route('**/*', r => r.abort());
     try {
         await page.setContent('<div id="root" class="sdk-module--shadowdark"></div>');
-        if(name.startsWith('SD-UI13') || name.startsWith('SD-UI23') || name.startsWith('REST') || name.startsWith('LIGHT')) { await page.addStyleTag({content:hostCss}); await page.addStyleTag({path:path.join(moduleRoot,'assets/presentation.css')}); }
+        if(name.startsWith('SD-UI13') || name.startsWith('SD-UI23') || name.startsWith('REST') || name.startsWith('LIGHT') || name.startsWith('XP:') || name.startsWith('COUNTERS:')) { await page.addStyleTag({content:hostCss}); await page.addStyleTag({path:path.join(moduleRoot,'assets/presentation.css')}); }
         if(['resource-card','wand-card'].includes(initial.which)) { await page.setViewportSize({width:initial.width,height:900}); if(process.env.SHADOWDARK_CARD_TAILWIND)await page.addStyleTag({path:process.env.SHADOWDARK_CARD_TAILWIND});await page.addStyleTag({path:path.join(moduleRoot,'assets/presentation.css')}); } await page.evaluate(x => window.initial = x, initial);
         if(initial.which==='rest'){await page.evaluate(paper=>Object.defineProperty(window,'localStorage',{configurable:true,value:{getItem:()=>paper?'simple':'advanced',setItem(){},removeItem(){}}}),initial.paper);await page.setViewportSize({width:initial.width||1280,height:900});if(process.env.SHADOWDARK_CARD_TAILWIND)await page.addStyleTag({path:process.env.SHADOWDARK_CARD_TAILWIND});}
         await page.addScriptTag({ content: bundled.outputFiles[0].text });
@@ -202,6 +202,43 @@ try {
         {_id:'penance',type:'Spell',name:'Penance spell',system:{lost:true},flags:{shadowdark:{sheetDelver:{spellLoss:{reason:'penance'}}}}},
         {_id:'broken',type:'Wand',name:'Broken wand',system:{broken:true,spells:[]}}
     ]};
+    for(const paper of [false,true])for(const width of [390,900,1280])await test(`COUNTERS: ${paper?'paper':'tabbed'} renown ${width}`,{which:'rest',paper,width,renownTest:true,actor:{...restActor,system:{...restActor.system,renown:-3}}},async p=>{
+        if(!paper)await p.getByRole('button',{name:'Abilities',exact:true}).click();
+        const input=p.getByRole('textbox',{name:'Renown score'});
+        await input.waitFor();assert.equal(await input.inputValue(),'-3');
+        await p.getByRole('button',{name:'Decrease renown'}).click();assert.equal(await input.inputValue(),'-4');
+        assert.equal(await p.getByRole('button',{name:'Decrease renown'}).isDisabled(),true);
+        await input.fill('-5');assert.equal(await input.inputValue(),'-4');
+        await input.fill('-');await input.fill('-2');await input.blur();
+        await p.waitForFunction(()=>window.initial.actor.system.renown===-2);
+        await input.fill('25');await input.blur();await p.waitForFunction(()=>window.initial.actor.system.renown===25);
+        await p.getByRole('button',{name:'Increase renown'}).click();assert.equal(await input.inputValue(),'26');
+        const bounds=await p.getByRole('group',{name:'Renown',exact:true}).evaluate(el=>({width:el.clientWidth,scroll:el.scrollWidth}));
+        assert.ok(bounds.scroll<=bounds.width+1,'renown controls fit their column');
+        await p.screenshot({path:path.join(out,`renown-${paper?'paper':'tabbed'}-${width}.png`)});
+    });
+    for(const limitedUses of [false,true])await test(`COUNTERS: ability card ${limitedUses?'limited':'unlimited'}`,{which:'resource-card',width:900,itemId:'ability',actor:{_id:'a',type:'Player',system:{abilities:{str:{value:10}},level:{value:1}},effects:[],items:[{_id:'ability',type:'Class Ability',name:'Battle Cry',system:{ability:'str',dc:10,limitedUses,uses:{available:1,max:2},lost:false,loseOnFailure:true},effects:[]}]}},async p=>{
+        const dialog=p.getByRole('dialog');await dialog.waitFor();
+        const remove=dialog.getByRole('button',{name:'Remove a use of Battle Cry'});
+        assert.equal(await remove.count(),limitedUses?1:0);
+        if(limitedUses){await remove.click();await p.waitForFunction(()=>window.initial.actor.items[0].system.uses.available===0);assert.equal(await remove.isDisabled(),true);
+            const restore=dialog.getByRole('button',{name:'Restore a use of Battle Cry'});await restore.click();await restore.click();
+            await p.waitForFunction(()=>window.initial.actor.items[0].system.uses.available===2);assert.equal(await restore.isDisabled(),true);
+        }
+        await dialog.getByRole('button',{name:'Mark lost',exact:true}).click();await p.waitForFunction(()=>window.initial.actor.items[0].system.lost===true);
+        await dialog.getByRole('button',{name:'Restore',exact:true}).click();await p.waitForFunction(()=>window.initial.actor.items[0].system.lost===false);
+        await p.screenshot({path:path.join(out,`ability-controls-${limitedUses}.png`)});
+    });
+    for(const paper of [false,true])for(const level of [9,10])await test(`XP: ${paper?'paper':'tabbed'} level ${level}`,{which:'rest',paper,actor:{...restActor,system:{...restActor.system,level:{value:level,xp:12}}}},async p=>{
+        if(level===10){await text(p,'MAX');assert.equal(await p.getByLabel('Experience points',{exact:true}).count(),0);}
+        else {await p.getByLabel('Experience points',{exact:true}).waitFor();assert.equal(await p.getByLabel('Experience points',{exact:true}).isEnabled(),true);}
+        if(!paper){await p.getByRole('button',{name:'Abilities',exact:true}).click();
+            if(level===10){await text(p,'MAX');assert.equal(await p.getByRole('progressbar',{name:'XP progress'}).count(),0);}
+            else await p.getByRole('progressbar',{name:'XP progress'}).waitFor();
+        }
+        assert.equal(await p.evaluate(()=>window.initial.actor.system.level.xp),12,'display must preserve saved XP');
+        await p.screenshot({path:path.join(out,`xp-${paper?'paper':'tabbed'}-${level}.png`)});
+    });
     for(const paper of [false,true])await test(`REST: ${paper?'paper':'tabbed'} shared completion and exclusions`,{which:'rest',paper,width:paper?390:1280,actor:restActor},async p=>{
         const opener=p.getByRole('button',{name:'Rest',exact:true});await opener.waitFor();
         if(paper)await p.screenshot({path:path.join(out,'paper-rest-button.png')});

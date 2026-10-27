@@ -1,5 +1,7 @@
 'use client';
 
+import { MAX_CHARACTER_LEVEL } from '../logic/advancement';
+
 import React, { useState, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useSDK, useSDKComponents } from '@sheet-delver/sdk/react';
@@ -34,6 +36,7 @@ export default function DetailsTab({}: DetailsTabProps) {
     // Exact identities from the prepared view: the host projection shows raw
     // compendium UUIDs as names (SD01-05), which are never mapped back by name.
     const identity = actor.derived?.identity ?? {};
+    const atMaxLevel = Number(actor.derived?.level ?? actor.system?.level?.value ?? 0) >= MAX_CHARACTER_LEVEL;
     const languageEntries: any[] = identity.languages ?? [];
     const languageIds: string[] = languageEntries.map(entry => entry.ref ? formatUuid(entry.ref) : entry.value).filter(Boolean);
     const ownedClass = (actor.items ?? []).find((item: any) => item.type === 'Class');
@@ -179,7 +182,7 @@ export default function DetailsTab({}: DetailsTabProps) {
                             <div className="w-3" />
                         </div>
                         <div className={`p-2 flex items-center justify-center gap-2 font-serif text-lg bg-white min-h-[44px] ${(!actor.system?.level?.value || actor.system.level.value === 0) ? 'opacity-50 grayscale cursor-not-allowed' : ''}`}>
-                            <input
+                            {atMaxLevel ? <span className="font-bold" aria-label="Maximum level reached">MAX</span> : <><input
                                 type="number"
                                 value={getDraftValue('system.level.xp', actor.system?.level?.xp || 0)}
                                 min={0}
@@ -196,7 +199,7 @@ export default function DetailsTab({}: DetailsTabProps) {
                                 className={`w-12 bg-neutral-100 border-b border-black text-center outline-none px-1 disabled:bg-transparent disabled:border-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
                             />
                             <span className="text-neutral-600" aria-hidden="true">/</span>
-                            <span aria-label="Experience needed">{actor.derived?.xpNextLevel ?? '-'}</span>
+                            <span aria-label="Experience needed">{actor.derived?.xpNextLevel ?? '-'}</span></>}
                         </div>
                     </div>
 

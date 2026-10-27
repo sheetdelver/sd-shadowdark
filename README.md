@@ -9,6 +9,8 @@ Character sheets and tools for playing Shadowdark RPG with SheetDelver.
 - Spell, talent, equipment and monster detail cards.
 - Talent acquisition levels, with repeated talents grouped on the paper sheet.
 - Pulp Mode luck counters with −/+ buttons in both sheet views.
+- Manual Renown tracking with signed input and −/+ controls in both sheets.
+- Class ability use counters and lost/restore controls on shared detail cards.
 - Red character names and a skull indicator at zero hit points.
 - Shared rest controls to recover HP and eligible spells, abilities and daily uses, with optional personal ration consumption and separate recovery and exclusion lists.
 
