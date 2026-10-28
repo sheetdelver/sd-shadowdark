@@ -504,6 +504,23 @@ array, including `[]`, is ready; an invalid response, denied read or failed read
 never populates a successful empty cache. Collection retry retries failed shards
 and preserves successful shards. There is no automatic collection failure loop.
 
+`system-index-session.ts` retains this same store for the lifetime of the SDK
+browser event bus, across provider and tool unmounts. It is memory-only and scoped
+to the current world/user/role/connection; no second Foundry cache or polling was
+added. Event subscriptions remain active while tools are closed, so context,
+package, permission and reconnect changes retire cached data before reuse. Module
+disposal releases subscriptions and pending work. Item/RollTable/User signals
+invalidate the index and collections; Actor signals invalidate tool projections
+that include world NPCs or recipient names/access. Routine Setting events do not
+invalidate catalogs; relevant setting changes arrive through world context.
+
+Monster Stats and Treasure consume `useToolCatalog` using the same store's demand,
+request deduplication and error handling. Successful catalogs survive tab changes
+and navigation; explicit Refresh sources invalidates the requested projection.
+Monster detail cards still load on selection, and Treasure status/prepare/deliver
+remain fresh server calls. A completed matching receipt settles assignment even
+when its Actor event retires the catalog during the write.
+
 `useShadowdarkCollections` registers active demand in that same store. Mounts
 before index readiness wait for the current index; a context/caller/role/world/
 connection change reloads each demanded shard after its replacement index is
@@ -1166,3 +1183,104 @@ the existing public actor-update endpoint in one request; current HP and effect
 documents are excluded. The caller view's `canEdit` is an owner-qualified read,
 with server write authorization still authoritative. See ADR-0008 for validation,
 stale-editor behavior and acceptance.
+
+
+## GM treasure authoring
+
+`tools/Treasure` implements ADR-0009's first single-item slice. The caller-bound
+`treasure/catalog`, `draw`, `prepare`, `deliver` and `status` routes require GM
+access. Current declared source tables are rolled through the SDK and Registry;
+missing table outcomes are entered manually. `logic/treasure.ts` shares draft
+validation and native item shapes, preserving template effects with `ownedCopy`.
+Scroll/Wand drafts link exact available Spell UUIDs, without class restrictions.
+No missing official table rows or probability rules are shipped.
+
+Complete drafts and the server-reviewed payload render with the existing
+`CardBody`/`buildDocumentCard` read-only preview. The draft uses the same
+`treasurePayload` builder as preparation; it performs no preview fetch or write.
+The caller-filtered spell catalog includes type and image for this purpose.
+Native template and chosen spell images are preserved. New Basic/Gem/Scroll/Wand
+payloads explicitly include the native 4.0.6 default image when no source artwork
+supplies one, so the card previews the actual saved image. SDK image resolution
+and existing reference-description processing remain the presentation boundary.
+
+Prepare binds review to sources, fields, recipient and world context; delivery
+revalidates them before one SDK embedded Item create. Durable module receipts
+record dispatch before writing and reconcile uncertain outcomes by an exact Item
+marker, never by name. Source notes and draw provenance remain in module storage;
+only the operation marker is added to Item flags. The first slice supports fully
+disclosed items and does not implement secret projection or coin/bundle grants.
+
+
+### Category tabs and world-item library
+
+Treasure tabs preserve independent page-memory drafts. Weapons exposes a native
+base, separately entered features/qualities/personality, and an additive bonus
+built from native predefined weapon attack/damage effects via `createEffect`.
+Other prose remains descriptive. Mundane Items now has the original-content
+recipe described below; the remaining category recipes are not yet complete.
+
+Library-mode completion uses `server/treasure-library.ts`: caller-bound Folder
+and Item operations create/reuse SheetDelver/type Item folders, save a GM-visible
+world Item and optionally copy it to the selected Actor. Persistent operation
+states separate pending, saving, saved, assigning and complete. Unknown writes
+require exact-marker readback; only a step not yet dispatched can resume. Folder
+creation is serialized per world in this process and separately fenced; this is
+not a distributed transaction or uniqueness guarantee. Existing legacy direct
+actor-delivery receipts still reconcile through their original path.
+
+Only successful completion resets the owning tab. Reloaded unfinished operations
+return to that category; other tabs retain drafts during ordinary tab changes.
+Native source tables shown in this slice are restricted to the verified Treasure
+0–3 table. No OSR data, automatic book-table probability rules, boon delivery,
+secret-item projection or general world-item manager is introduced.
+
+
+Unchanged native templates use assignment-only completion. `treasureUnchanged`
+compares editable values and effective recipe additions against the source defaults;
+category, private notes, draw references and copy-time defaults are not edits.
+The server recomputes this before dispatch and requires a recipient. These operations
+skip Folder and world Item creation, while retaining the same assignment fence and
+exact-marker recovery. Modified/new items retain the library save path. Reverting
+edits restores assignment-only behavior. Native `system.cost` GP/SP/CP populate the
+form and source value is shown beside the editable amounts. No rulebook price is
+inferred for an unpriced source.
+
+Magic Items excludes recognized scrolls/wands, including legacy Basic/Weapon
+representations, using the existing shared capability helpers. Their own tab
+supports native templates as well as spell-derived creation, and recognized legacy
+items save under Scrolls/Wands without changing their native document types.
+
+
+### Mundane Items and original tables
+
+`data/mundane-tables.ts` contains SheetDelver Originals revision1: eleven small
+uniform tables, 90 authored rows across forms, workmanship, gems/cuts, jewelry,
+parent-specific details, unique features and suggested per-item values. No book
+or external dataset was imported. `logic/mundane.ts` provides the shared recipe,
+source/result metadata, dependent-detail validation, description assembly and
+integer quantity totals. Value suggestions are editable module content, not native
+price rules. Native templates still supply their own prices, art and effects.
+
+`treasure/original-draw` is GM-only and accepts a known table/version. It uses the
+public SDK roll service with chat disabled, checks the current context after the
+await, and resolves the module-owned row. It does not use Registry or pretend to
+be a compendium. Original metadata records selection/roll origin and edited text;
+it is descriptive provenance, not an authorization or tamper-proof dice receipt.
+Library operation storage retains that provenance privately; generated descriptions
+are escaped and then go through the existing HTML processing path.
+
+The Mundane Items UI reuses Creator input/dice rows in the connected paper layout.
+Luxury, gemstone and jewelry each have form and material/cut fields, an optional
+unique feature and applicable nested detail. Per-part rerolls retain independent
+parts and custom names. Roll object replaces form/material/detail and suggested
+value together only after all draws succeed; it preserves notes and unique features.
+Changing a parent form retains but invalidates an old dependent detail until the
+GM edits, reselects or clears it. Path changes start a new base while preserving
+notes, quantity/space and the optional feature. Tab changes preserve the draft.
+
+Generated gemstones create native Gem items; jewelry/luxury use Basic items.
+Gemstones and jewelry save under Gems & Jewelry; luxury objects under Mundane
+Items. Existing native templates preserve their type and unchanged-source
+assignment behavior. The existing save/assign receipt and completion reset are
+reused. No Actor coin/XP update, Core change, cache or PDF importer is introduced.

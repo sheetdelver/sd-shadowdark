@@ -1,3 +1,4 @@
+import { handleTreasureCatalog, handleTreasureDraw, handleTreasureOriginalDraw, handleTreasurePrepare, handleTreasureDeliver, handleTreasureStatus } from './api/treasure';
 import { handleLightChat } from './api/light-chat';
 import { handleRest } from './api/rest';
 import { json, error, type ModuleServerRequest, type ModuleServerParams } from '@sheet-delver/sdk/server';
@@ -38,6 +39,12 @@ async function effectRoute(run: () => Promise<unknown>) {
 }
 
 export const apiRoutes = {
+    'treasure/catalog': handleTreasureCatalog,
+    'treasure/draw': handleTreasureDraw,
+    'treasure/original-draw': handleTreasureOriginalDraw,
+    'treasure/prepare': handleTreasurePrepare,
+    'treasure/deliver': handleTreasureDeliver,
+    'treasure/status': handleTreasureStatus,
     'characters/creator/prepare': handleCreatorPrepare,
     'characters/creator/create': handleCreatorCreate,
     'characters/creator/status': handleCreatorStatus,

@@ -2,6 +2,8 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useSDK } from '@sheet-delver/sdk/react';
+import { useToolCatalog } from '../context/useSystemIndexStore';
+import { TOOL_BESTIARY } from '../context/system-index-session';
 import ModulePageHeader from '../components/ModulePageHeader';
 import ModuleDialog from '../components/ModuleDialog';
 import ArtworkImage from '../components/ArtworkImage';
@@ -13,41 +15,20 @@ import { alignmentLabel, moveLabel, filterMonsters, EMPTY_MONSTER_FILTERS, type 
 
 /** Read-only native monster catalog; exact references keep same-name rows separate. */
 export default function Bestiary() {
-    const { fetchWithAuth, navigate, isConnected, worldId, currentUser, events } = useSDK();
+    const { fetchWithAuth, navigate, isConnected, worldId, currentUser } = useSDK();
     const scope = JSON.stringify([worldId, currentUser?.id, currentUser?.role, isConnected]);
-    const [refresh, setRefresh] = useState(0);
-    const [entries, setEntries] = useState<Entry[] | null>(null);
-    const [error, setError] = useState<string | null>(null);
+    const resource = useToolCatalog(TOOL_BESTIARY);
+    const entries: Entry[] | null = resource.data;
+    const error = resource.error;
     const [filters, setFilters] = useState<MonsterFilters>({ ...EMPTY_MONSTER_FILTERS });
     const changeFilter = (key: keyof MonsterFilters, value: string) => setFilters(previous => ({ ...previous, [key]: value }));
     const [selected, setSelected] = useState<Entry | null>(null);
     const [card, setCard] = useState<{ state: 'loading' } | { state: 'ready'; card: ResourceCard } | { state: 'error'; message: string } | null>(null);
     const seq = useRef(0);
-    const [loadedScope, setLoadedScope] = useState<string | null>(null);
-
     useEffect(() => {
-        const reload = () => { seq.current++; setSelected(null); setCard(null); setEntries(null); setLoadedScope(null); setRefresh(value => value + 1); };
-        // Optional newer SDK signal: older hosts simply never emit it.
-        const offPackages = events.on('world:packagesChanged' as Parameters<typeof events.on>[0], reload);
-        const offContext = events.on('world:contextChanged', reload);
-        return () => { offPackages(); offContext(); };
-    }, [events]);
-
-    useEffect(() => {
-        seq.current++; setSelected(null); setCard(null); setEntries(null); setLoadedScope(null);
-        if (!isConnected) return;
-        let cancelled = false;
-        const controller = new AbortController();
-        setError(null);
-        fetchWithAuth('/api/modules/shadowdark/bestiary', { signal: controller.signal }).then(async res => {
-            const data = await res.json().catch(() => null);
-            if (cancelled) return;
-            setLoadedScope(scope);
-            if (!res.ok || !data?.success) { setError(data?.error ?? 'Monster Stats is unavailable.'); setEntries([]); return; }
-            setEntries(data.entries.filter((entry: any) => entry.ref));
-        }).catch(() => { if (!cancelled) { setError('Monster Stats is unavailable.'); setEntries([]); } });
-        return () => { cancelled = true; controller.abort(); seq.current++; };
-    }, [fetchWithAuth, isConnected, scope, refresh]);
+        seq.current++; setSelected(null); setCard(null);
+        return () => { seq.current++; };
+    }, [entries, scope]);
 
     const open = (entry: Entry) => {
         const current = ++seq.current;
@@ -61,7 +42,7 @@ export default function Bestiary() {
         }).catch(() => current === seq.current && setCard({ state: 'error', message: 'This creature could not be loaded.' }));
     };
 
-    const currentEntries = useMemo(() => loadedScope === scope ? entries ?? [] : [], [entries, loadedScope, scope]);
+    const currentEntries = useMemo(() => entries ?? [], [entries]);
     const sources = useMemo(() => [...new Map(currentEntries.map(entry => [entry.sourceId, entry.sourceLabel])).entries()]
         .sort((a, b) => a[1].localeCompare(b[1])), [currentEntries]);
     const alignments = useMemo(() => [...new Set(currentEntries.map(entry => entry.alignment).filter((value): value is string => !!value))]
@@ -102,12 +83,13 @@ export default function Bestiary() {
                     </div>
                     <div className="sd-monster-filter-footer">
                         <p aria-live="polite">{currentEntries.length ? `${visible.length} of ${currentEntries.length} monsters` : '0 monsters'}</p>
+                        <button type="button" onClick={resource.refresh}>Refresh sources</button>
                         <button type="button" onClick={() => setFilters({ ...EMPTY_MONSTER_FILTERS })}>Reset filters</button>
                     </div>
                     {invalidRange && <p role="alert">Minimum level must not exceed maximum level.</p>}
                 </section>
                 {error && <p role="alert" className="bg-white border-2 border-black p-3 text-red-800 font-bold">{error}</p>}
-                {entries === null && <p role="status" className="italic">Loading monsters…</p>}
+                {entries === null && !error && <p role="status" className="italic">{isConnected?'Loading monsters…':'Connect to load monsters.'}</p>}
                 <div className="sd-monster-columns" aria-hidden="true"><span>Monster name / source</span><span>Level</span><span>Alignment</span><span>Move</span></div>
                 <ul className="sd-monster-list" aria-label="Monsters">
                     {visible.map(entry => (
@@ -126,7 +108,7 @@ export default function Bestiary() {
                 </ul>
                 {entries && visible.length === 0 && !error && <p className="sd-monster-empty">No monsters match your filters.</p>}
             </div>
-            <ModuleDialog open={loadedScope === scope && !!selected} title={selected?.name ?? ''} subtitle={card?.state === 'ready' ? card.card.subtitle : undefined}
+            <ModuleDialog open={resource.ready && !!selected} title={selected?.name ?? ''} subtitle={card?.state === 'ready' ? card.card.subtitle : undefined}
                 onClose={() => { seq.current++; setSelected(null); setCard(null); }} size="card"
                 footer={card?.state === 'ready' && (card.card.diagnostics.length > 0 || card.card.artworkCredit) ? <CardNotes card={card.card} /> : undefined}>
                 {card?.state === 'loading' && <p role="status" className="italic">Loading…</p>}

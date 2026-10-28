@@ -117,3 +117,59 @@ The first isolated harness lacked dependency resolution; a symlink then correctl
 failed migration confinement. Copying the checkout and exposing the existing
 Core dependencies resolved both harness issues without source changes. No production actors, settings,
 caches or native packs were changed. No application or Foundry service was started.
+
+
+## Tool catalog navigation regression — October 27
+
+User reported loading resources on every Monster Stats/Treasure visit. Both tools
+owned mount-local fetches outside the existing collection store; Treasure repeated
+its full catalog fetch on each category remount. Sheet providers also discarded
+their own store on unmount. Corrected by sharing the existing caller-scoped store
+for the SDK browser-session lifetime and routing both tool projections through it.
+Cached successes survive navigation; source/lifecycle invalidation remains active
+while pages are closed. No polling, persistent browser storage or Core edit.
+
+Focused source lifecycle checks pass, including caller/reconnect/package changes,
+off-page Actor invalidation and no reload for routine Setting events. Mounted
+Monster Stats checks confirm one list request across reopen, then one replacement
+after off-page invalidation. Treasure at390/1000px makes two catalog requests across
+the whole multi-tab/reopen workflow: one initial and one explicit context refresh.
+Receipts and final write validation remain uncached. This is isolated SDK/browser
+evidence; operator acceptance remains separate.
+
+
+Verification also passed the existing28-case provider subset (open/pending shards,
+caller/world/role changes, disconnect/reconnect, failures and retry), explicit
+typing, contract validation and isolated packaging. The packaged UI and styles
+passed the Treasure navigation/request-count workflow at390/1000px. Monster Stats
+phone rendering preserves established styling with an explicit Refresh sources
+control. Archive SHA256:
+`cb38f19615e1adecaaac1f44c563feafc3f89e7f27b9b3943ffc621b471a5246`.
+No release metadata, SDK minimum or Core changes; no live world was modified.
+
+
+### Host-boundary correction
+
+The operator still observed index/bestiary requests on every real navigation.
+Earlier fixtures retained the SDK event bus and therefore did not prove behavior
+across Core's SurfaceHost unmount. Core ADR-0076 corrects the per-page SDK bus owner
+in the persistent authenticated workspace, preserving caller/role/world/session
+separation. Actual Shadowdark catalog hooks composed with actual Core providers now
+show zero additional catalog requests on return and refresh after an off-page
+invalidation. The module-side cache implementation remains; its earlier fixtures
+alone were not operator acceptance. The user subsequently confirmed persistent
+cache across navigation on 2026-10-27, closing this acceptance item. Core ADR-0076
+is Completed; publication remains pending.
+
+## Mundane Items increment — October 28
+
+The selected Mundane Items recipe is implemented for operator review: luxury,
+gemstone and jewelry paths, original editable generation tables, optional unique
+features, value totals and the existing library save/assignment flow. The
+[GM audit](2026-10-27-gm-treasure-generation.md) and
+[ADR-0009](../adr/0009-gm-treasure-and-item-generator.md) contain the current
+scope, source/pricing decisions and evidence. Focused source regressions, explicit
+typing, contract validation, packaging and compiled UI workflows at 390/1000px
+passed. Operator acceptance of the content/prices and native flow remains open.
+Other category recipes and optional user-table importing remain outside this
+increment; this does not close ADR-0009 or authorize release preparation.

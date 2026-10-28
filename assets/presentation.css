@@ -182,6 +182,13 @@
 .sdk-module--shadowdark .sd-creator-score select { grid-column:1/-1; width:100%; border-color:#d4d4d4; font-family:Arial,Helvetica,sans-serif; }
 .sdk-module--shadowdark .sd-creator-score>span { display:block; font-size:.75rem; margin:.5rem 0; color:#525252; }
 .sdk-module--shadowdark .sd-creator-page .sd-creator-roll { background:#4f46e5; border-color:#4f46e5; color:white; font-family:Arial,Helvetica,sans-serif; font-size:.75rem; }
+.sdk-module--shadowdark .sd-mundane-part { margin:1.25rem 0; min-width:0; }
+.sdk-module--shadowdark .sd-mundane-input-row { display:flex; align-items:center; gap:.75rem; }
+.sdk-module--shadowdark .sd-mundane-input-row>input { flex:1; width:0; min-width:0; }
+.sdk-module--shadowdark .sd-mundane-input-row>.sd-creator-dice { flex:none; }
+.sdk-module--shadowdark .sd-mundane-part>select { width:100%; min-width:0; margin-top:.5rem; }
+.sdk-module--shadowdark .sd-mundane-part small { display:block; margin-top:.5rem; color:#525252; }
+.sdk-module--shadowdark .sd-creator-page .sd-mundane-clear { margin:.5rem 0 0; font-size:.75rem; }
 .sdk-module--shadowdark .sd-creator-award { padding:1rem; margin:1rem 0; background:white; border:2px solid #000; overflow-wrap:anywhere; }
 .sdk-module--shadowdark .sd-creator-notice { padding:.75rem 1rem; margin:1rem 0; border:1px solid #d4d4d4; background:white; font-size:.875rem; overflow-wrap:anywhere; }
 .sdk-module--shadowdark .sd-creator [role=alert] { padding:.5rem; border-left:4px solid #dc2626; color:#991b1b; }
@@ -255,3 +262,26 @@
 .sdk-module--shadowdark .sd-level-renown-grid > div { min-width:0; padding:.5rem; }
 .sdk-module--shadowdark .sd-level-renown-grid > div > div:first-child { margin:-.5rem -.5rem .5rem; }
 .sdk-module--shadowdark .sd-level-renown-grid h3 { font-size:1rem; }
+
+/* Treasure authoring reuses Creator's connected paper and field controls. */
+.sdk-module--shadowdark .sd-treasure section + section { margin-top:2rem; }
+.sdk-module--shadowdark .sd-treasure-actions { display:flex; flex-wrap:wrap; gap:.75rem; }
+.sdk-module--shadowdark .sd-treasure-money { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:1rem; }
+.sdk-module--shadowdark .sd-treasure-money label { display:flex; flex-direction:column; align-items:stretch; }
+.sdk-module--shadowdark .sd-treasure-money input { width:100%; }
+.sdk-module--shadowdark .sd-treasure-review { scroll-margin-top:1rem; }
+.sdk-module--shadowdark .sd-treasure-card-preview { margin:1.5rem 0; }
+.sdk-module--shadowdark .sd-treasure-card-preview .sd-resource-card { max-width:36rem; border:2px solid #000; box-shadow:4px 4px 0 #000; }
+.sdk-module--shadowdark .sd-treasure-facts { display:grid; grid-template-columns:7rem minmax(0,1fr); gap:.75rem; margin:1rem 0; overflow-wrap:anywhere; }
+.sdk-module--shadowdark .sd-treasure-facts dt { font-weight:700; }
+.sdk-module--shadowdark .sd-treasure-facts dd { margin:0; }
+@media(max-width:639px) { .sdk-module--shadowdark .sd-treasure .sd-creator-grid { grid-template-columns:1fr; } }
+
+/* Treasure categories reuse the module's paper tabs; each page owns its recipe. */
+.sdk-module--shadowdark .sd-treasure-tabs { margin-bottom:1.5rem; overflow-x:auto; }
+.sdk-module--shadowdark .sd-treasure-tabs ol { display:flex; min-width:max-content; }
+.sdk-module--shadowdark .sd-treasure-tabs li { flex:0 0 auto; }
+.sdk-module--shadowdark .sd-treasure-tabs button { white-space:nowrap; width:auto; }
+.sdk-module--shadowdark .sd-treasure-recipe { margin-top:1.5rem; }
+.sdk-module--shadowdark .sd-treasure-part { margin:1rem 0; padding:1rem; border:1px solid black; }
+.sdk-module--shadowdark .sd-treasure-part textarea { width:100%; min-height:5rem; }

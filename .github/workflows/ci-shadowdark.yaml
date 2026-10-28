@@ -112,6 +112,7 @@ jobs:
           npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/creator-contracts.test.ts"
           npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/character-creator.test.ts"
           npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/character-edit.test.ts"
+          npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/treasure.test.ts"
 
       - name: Explicit module, UI and migration typing
         if: steps.reuse.outputs.reused != 'true'
@@ -148,6 +149,12 @@ jobs:
         run: |
           SHADOWDARK_PLAYWRIGHT_MODULE="$RUNNER_TEMP/shadowdark-browser-tools/node_modules/playwright/index.mjs" \
             npx tsx .module-ci-data/local/modules/shadowdark/src/tests/character-creator.browser.mjs "$RUNNER_TEMP/shadowdark-creator-results"
+
+      - name: Verify GM treasure workflow
+        if: steps.reuse.outputs.reused != 'true'
+        run: |
+          SHADOWDARK_PLAYWRIGHT_MODULE="$RUNNER_TEMP/shadowdark-browser-tools/node_modules/playwright/index.mjs" \
+            npx tsx .module-ci-data/local/modules/shadowdark/src/tests/treasure.browser.mjs "$RUNNER_TEMP/shadowdark-treasure-results"
 
       - name: Verify distributable package
         if: steps.reuse.outputs.reused != 'true' || steps.reuse.outputs.package == 'true'

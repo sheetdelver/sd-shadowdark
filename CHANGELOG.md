@@ -4,6 +4,11 @@ Historical entries are reconstructed from [published releases](https://github.co
 
 ## Unreleased
 
+- Add treasure tabs and library.
+- Generate mundane valuables.
+- Preview item cards with artwork.
+- Reuse tool catalogs across navigation.
+
 - Shared character base editor.
 - Add Renown sheet controls
 - Share ability card counters

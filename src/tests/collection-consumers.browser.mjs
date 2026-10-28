@@ -155,7 +155,7 @@ case 'details':return <Details/>;
 default:return <Spells/>;}}
 function Delayed(){const [ready,setReady]=React.useState(!window.initial.delay);React.useEffect(()=>{const timer=setTimeout(()=>setReady(true),window.initial.delay||0);return ()=>clearTimeout(timer)},[]);return ready&&show?<Consumer/>:null;}
 window.render=()=>root.render(mounted?(window.initial.which==='generator'?<Generator/>:<ShadowdarkUIProvider><Delayed key={show?'open':'closed'}/></ShadowdarkUIProvider>):null);
-window.retire=()=>emit('world:contextChanged',{keys:[],identity:{worldId:'w',contextRevision:2}});window.sourceChanged=()=>{emit('document:changed',{type:'Item',id:'worldSpell',action:'delete'});emit('document:listInvalidated',{type:'Item',reason:'changed'});}; window.consumerUnmount=()=>{show=false;window.render()};window.unmount=()=>{mounted=false;window.render()};
+window.retire=()=>emit('world:contextChanged',{keys:[],identity:{worldId:'w',contextRevision:2}});window.sourceChanged=()=>{emit('document:changed',{type:'Item',id:'worldSpell',action:'delete'});emit('document:listInvalidated',{type:'Item',reason:'changed'});}; window.consumerUnmount=()=>{show=false;window.render()};window.unmount=()=>{mounted=false;window.render()};window.remount=()=>{mounted=true;show=true;window.render()};
 window.change=values=>{window.sdk={...window.sdk,...values};window.render()};
 window.answer=(index,body,status=200)=>window.pending[index].resolve(Response.json(body,{status}));
 window.render();
@@ -172,6 +172,7 @@ const browser = await chromium.launch({ ...(process.env.SHADOWDARK_CHROME ? { ex
 const results = [];
 async function test(name, initial, run) {
     const only=process.argv.find(arg=>arg.startsWith('--only='))?.slice(7);if(only&&!name.startsWith(only))return;
+    if(process.argv.includes('--cache-only')&&!name.startsWith('SD-UI23')&&!name.startsWith('CACHE:'))return;
     if(process.argv.includes('--backgrounds-only')&&!name.startsWith('SD-UI13'))return;
     if(process.argv.includes('--cards-only')&&!name.startsWith('SD-UI10/11'))return;
     if(providerBaseline&&!name.startsWith('SD02-06') )return;
@@ -300,6 +301,17 @@ try {
         {ref:{kind:'world',documentType:'Actor',id:'g3'},name:'Wandering Shade',source:'world',sourceId:'world',sourceLabel:'World Actors',level:null,alignment:null,move:null}
     ];
     const monsterPolicy = {bestiary:{body:{success:true,entries:monsters}}};
+    await test('CACHE: Monster Stats reuses sources across page mounts and invalidates while away', {which:'bestiary',policy:monsterPolicy}, async p=>{
+        await p.getByRole('button',{name:'View Goblin — Core Monsters',exact:true}).waitFor();
+        const count=()=>p.evaluate(()=>window.calls.filter(c=>c.key==='bestiary').length);
+        assert.equal(await count(),1);
+        await p.evaluate(()=>window.unmount());await p.locator('main').waitFor({state:'hidden'});
+        await p.evaluate(()=>window.remount());await p.getByRole('button',{name:'View Goblin — Core Monsters',exact:true}).waitFor();
+        assert.equal(await count(),1);
+        await p.evaluate(()=>window.unmount());await p.locator('main').waitFor({state:'hidden'});
+        await p.evaluate(()=>window.retire());await p.evaluate(()=>window.remount());
+        await p.getByRole('button',{name:'View Goblin — Core Monsters',exact:true}).waitFor();assert.equal(await count(),2);
+    });
     await test('SD-UI23: source/name/level/alignment/move filters and reset', {which:'bestiary',policy:monsterPolicy}, async p=>{
         await p.getByRole('heading',{name:'Monster Stats',exact:true}).waitFor();
         const rows=p.getByRole('list',{name:'Monsters'}).getByRole('button');

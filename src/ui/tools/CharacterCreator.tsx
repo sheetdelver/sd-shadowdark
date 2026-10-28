@@ -28,7 +28,7 @@ import type { CreatorPlan } from '../../logic/character-creation';
 const CREATOR_NOTES_THEME={...shadowdarkTheme.richText,container:"relative group flex flex-col",editor:"prose prose-sm font-serif max-w-none focus:outline-none min-h-[8rem] p-4 text-black"};
 const STEPS=['Identity','Ability scores','Talents and boons','Languages and spells','Hit points','Equipment and money','Review and create'];
 const hpInputs=(d:CharacterDraft)=>JSON.stringify([d.level,d.classUuid,d.ancestryUuid,d.abilities,d.awards,d.fixedChoices,d.ancestryTalents,d.classTalents]);
-const id=()=>typeof crypto.randomUUID==='function'?crypto.randomUUID():Array.from(crypto.getRandomValues(new Uint8Array(16)),n=>n.toString(16).padStart(2,'0')).join('');
+import { newRequestId as id } from '../utils/request-id';
 const label=(row:any)=>`${row.name}${row.system?.source?.title||row.pack?` — ${row.system?.source?.title||row.pack}`:''}`;
 type Operation={requestId:string;state:string;actorId?:string;differences?:string[];message:string};
 export default function CharacterCreator(){return <ShadowdarkUIProvider><CreatorContent /></ShadowdarkUIProvider>;}

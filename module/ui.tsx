@@ -19,6 +19,7 @@ const referenceViewer = {
 };
 // Placement is an optional enhancement: older supported Core hosts keep this in Tools.
 const bestiaryAction = { id: 'bestiary', label: 'Monster Stats', section: 'gm' as const, kind: 'tool' as const, toolId: 'bestiary' };
+const treasureAction = { id: 'treasure', label: 'Treasure & Items', section: 'gm' as const, kind: 'tool' as const, toolId: 'treasure' };
 const settingsTabs = [{ id: 'sheet', label: 'Shadowdark', load: () => import('../src/ui/settings/SheetSettings') }];
 const uiManifest: UIModuleManifest & {
     referenceViews?: Record<'Actor' | 'Item', typeof referenceViewer>;
@@ -33,6 +34,7 @@ const uiManifest: UIModuleManifest & {
     sheet: () => import('../src/ui/ShadowdarkSheet'),
     rollModal: () => import('../src/ui/components/ShadowdarkInitiativeModal'),
     tools: {
+        'treasure': () => import('../src/ui/tools/Treasure'),
         'creator': () => import('../src/ui/tools/CharacterCreator'),
         'generator': () => import('../src/ui/tools/Generator'),
         'importer': () => import('../src/ui/tools/ShadowdarkImportPage'),
@@ -43,6 +45,7 @@ const uiManifest: UIModuleManifest & {
         { id: 'generator', label: 'Character Generator', kind: 'tool', toolId: 'generator' },
         { id: 'importer', label: 'Import From Shadowdarklings.net', kind: 'tool', toolId: 'importer' },
         bestiaryAction,
+        treasureAction,
     ],
     actorPage: () => import('../src/ui/pages/ActorPage')
 };

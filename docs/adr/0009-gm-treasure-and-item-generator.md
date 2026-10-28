@@ -1,6 +1,6 @@
 # ADR-0009: GM treasure and item generator
 
-**Status:** Proposed — audit and plan requested; implementation not selected
+**Status:** Accepted — Mundane Items and card preview accepted; remaining categories in progress
 **Date:** 2026-10-27
 
 ---
@@ -17,23 +17,41 @@ The [rules/native audit](../audits/2026-10-27-gm-treasure-generation.md) records
 sources, table coverage and item schema evidence. The native pack contains only
 part of the needed generation data. No new Core contract is assumed necessary.
 
-## Selected source approach — October 27
+## Selected source approach — revised October 28
 
-The user selected existing available Foundry tables plus manual entry for missing
-sections. **Do not ship missing rulebook tables**, whether as pack documents,
-lookup arrays, embedded result text or equivalent hardcoded generation rules.
-The GM consults their source material outside SheetDelver, rolls externally when
-needed, then enters the resulting name, value or other item details.
+Use available native Foundry data, **original SheetDelver generation tables** for
+missing content, and manual input. The user selected original content after
+reviewing the costs and incomplete coverage of Basic Fantasy, d20 SRD and Open5e.
+External dataset research/import is no longer a prerequisite for Mundane Items.
+The earlier open-OSR direction is retained below as historical/optional research,
+not an implementation gate. No external dataset has been imported.
 
 The publisher's [licensing FAQ](https://www.thearcanelibrary.com/blogs/shadowdark-blog/faq-on-the-shadowdark-rpg-third-party-license)
-distinguishes roll tables and digital tools. See the audit for evidence and
-uncertainties. This source choice replaces the proposed supplementary table
-package; it is not a legal conclusion about digital-tool permissions. Native
-code's MIT license does not establish rights over book tables or transfer native
-project permissions to SheetDelver.
+explicitly permits similar table layouts with original creative content. Author
+our own entries, combinations and weights; do not transcribe, rearrange or make
+row-by-row synonym replacements of the official tables. Label the bundled source
+**SheetDelver Originals**, without suggesting official content or exact book
+probabilities. Generic materials, objects and gemstone names need not be invented
+fantasy words; the authored selection, descriptions and combinations must stand
+on their own. Do not ship the missing official rulebook tables.
 
-Keep this ADR Proposed: the source approach is selected, implementation and
-release scope are not. No external contact is part of this work.
+The FAQ's separate digital-tool permission discussion remains recorded in the
+audit. Original table authorship addresses this content-source decision; it is
+not a blanket conclusion about permission for the application. Native code's MIT
+license likewise does not transfer rights in book content or project permissions.
+No external contact is part of this work.
+
+Store the original tables as small module-owned data files with stable IDs,
+explicit dice/ranges, relevant part roles and necessary follow-ups. Reuse SDK
+rolls and the existing item review/save flow. Values and any adjustments are
+explicit, editable generator choices, not claimed official rules. Keep manual
+entry and native templates available; no PDF ingestion, external API dependency,
+Core change or parallel workflow engine is needed.
+
+The user authorized implementation after checkpointing the editor on October27.
+The first slice is recorded below. The user accepted the Mundane Items/card-preview
+checkpoint on October28 and selected continuing to the next category, Boons.
+Random Treasure is accepted for now; release placement remains undecided.
 
 ## Proposed experience
 
@@ -44,7 +62,7 @@ new pre-header, nested window, card grid design or separate dice system.
 
 1. **Choose generation.** Treasure by level/context; a specific item category;
    or random magic item where an available table supports it. Show which sections
-   can be rolled from Foundry and which require manual results from outside the app.
+   can be rolled from Foundry or SheetDelver Originals and which use manual results.
    Choosing a recipient here may suggest a level but must not silently change
    the loot table. A GM may generate without assigning anything yet.
 2. **Resolve the draft.** Show an ordered result list with the rolls and required
@@ -57,15 +75,245 @@ new pre-header, nested window, card grid design or separate dice system.
    native base template. Separate bonuses, benefits, curses and personality.
    Label each mechanic as supported or descriptive/manual. Show destination and
    disclosure/identification choices. No actors or inventory mutate while rolling.
-4. **Add to character.** Explicit GM-selected actor and item selection. After a
-   confirmed write, show the actual created item(s) and an Open character action.
-   Handle coins and nonphysical rewards explicitly; do not turn every reward
-   into gear, automatically sell items, grant XP or modify equipped state.
+4. **Save, optionally assign.** Save completed items to the world Items directory
+   under SheetDelver/type folders. Save and assign additionally creates a copy for
+   an explicit GM-selected character. Reset the completed category workflow after
+   confirmed success and show a concise saved/assigned outcome. Handle coins and
+   nonphysical rewards explicitly; do not turn every reward into gear, automatically
+   sell items, grant XP or modify equipped state.
 
 The default scope is GM authoring. It does not simulate player crafting costs,
 materials, downtime or success checks; those are not established by these pages.
 Existing actor ownership rules still apply to the selected recipient. GM section
 placement is presentation only: server routes must authorize the caller as GM.
+
+## Accepted category-based redesign — October 27
+
+User review found that the first slice's generic **Result source → Item details
+(Create from) → Review** mechanism does not support the intended workflow.
+Replace that entry flow rather than adding a longer table picker to it. This is
+the accepted design; the final implementation ledger identifies the first
+delivered slice and what remains open.
+
+### Layout and navigation
+
+Keep one shared header and reuse the connected Creator/Generator paper surface
+inside each category page. The user selected **one tab per category**, in the
+order below, superseding the initial single generic form/category selector.
+Reuse the module's existing tab styling; ten tabs must remain navigable on small
+screens without shrinking text or widening the whole page. No nested windows or
+new page chrome.
+
+Each tab owns a dedicated multipart workflow, with category-specific fields,
+ordering and conditional branches. Shared controls, source adapters and save
+services are reusable; a common sequence must not be forced onto unlike recipes.
+Switching tabs preserves each unfinished draft in page memory. This is not a new
+persisted-draft/reload-recovery feature. World/account context changes still retire
+stale drafts. Reset only the completed tab after saving/assignment succeeds;
+other tabs' drafts are unaffected.
+
+| Category | Draft and selection behavior |
+| --- | --- |
+| 1. Random Treasure | Available native Treasure 0–3 or a labeled OSR alternative. Retain the selected table's own context; do not label an OSR table as an official Shadowdark level band. Resolve results into appropriate category drafts. |
+| 2. Mundane Items | Original SheetDelver tables, available native templates and manual entry. Include luxury objects, gems and jewelry, keeping quantity and per-item value separate. |
+| 3. Boons | Nonphysical rewards/benefits. Preview and manual description remain possible without pretending a boon is ordinary gear. Recipient application requires an explicitly supported native shape. |
+| 4. Magic Items / Attributes | Select a complete available magic item or generate an additive property for a compatible draft. Attribute controls are also available from the other relevant categories, including boons where applicable. |
+| 5. Armor | Select a native armor/shield base, then optional material, feature, bonus, benefit or curse. Preserve native base mechanics and show any unresolved conversion. |
+| 6. Potions | Available potion template or supported/manual potion effect and appearance. Do not replace an absent potion table with arbitrary spells. |
+| 7. Scrolls / Wands | Choose subtype, available exact Spell document(s) within implemented native capabilities, then optional attributes. The first slice's single-spell support remains the current limit. |
+| 8. Utility | Miscellaneous useful physical or magical items; distinct from the ordinary equipment/valuables section. Preserve exact native templates where selected. |
+| 9. Weapons | Select a native weapon base, then optional attributes; preserve damage, properties and explicit ammunition quantities. |
+| 10. Personalities | Optional personality details attach to a chosen item; generated text can be drafted independently but is not delivered as unrelated inventory. |
+
+The section names organize the tool in terms familiar from Shadowdark; they do
+not reproduce official table rows or certify equivalent OSR probabilities.
+Category visibility is not a promise of rollable coverage. Where no suitable
+source is verified, offer manual input with a clear explanation.
+
+### Multipart category recipes — full-rulebook review
+
+The ten categories are entry points into different multipart recipes, not ten
+single-table buttons followed by the same generic form. The full V4.9 rulebook,
+printed pp. 269–295, was reread and category layouts on pp. 278–295 visually
+checked after the user identified this omission. The following inventory records
+structure and dependencies, not table rows or probability distributions.
+
+| Category / pages | Parts to expose and preserve |
+| --- | --- |
+| Random Treasure, 269–277 | Context and available source → treasure result → quantity/value and any fixed type, bonus, tier, benefit/curse or virtue/flaw requirements → matching category recipe. A named native item uses its exact template; only specified additions are resolved. Multiple rewards remain distinct. |
+| Mundane Items, 278–279 | Choose luxury item or gemstone/valuable path. Luxury creation has separate feature/material and item-form columns and possible nested form details. Optional unique features apply to luxury objects, gemstones and jewelry. Gemstones have a value reference, not a random gem distribution; do not invent probabilities from its rows. Quantity, material value and unusual size/value adjustments remain explicit. |
+| Boons, 280–281 | Choose Oath, Secret or Blessing. Oaths supply a favor/promise; Secrets combine Detail 1 and Detail 2; Blessings supply a benefit with applicable duration/uses. These are alternative paths, not three required additions to every boon. Utility/XP assessment remains GM judgment; do not award XP automatically. |
+| Magic Items / Attributes, 282–283 | Optional random item type routes to a category; Qualities determines benefit/curse counts; Personality determines virtue/flaw counts or no personality. Resolve those counts through the relevant category/personality tables. The three-part name/idea generator is a separate naming aid, not an item type or mechanical effect. Bonus is a distinct armor/weapon component. |
+| Armor, 284–285 | Armor type/base → bonus → appearance feature → each required armor benefit and curse → any personality/naming additions. A material-plus-reroll result preserves the material while resolving the base type again. The benefit/curse counts come from the originating result, chosen qualities source or manual decision. |
+| Potions, 286–287 | Separate Feature 1, Feature 2 and Feature 3 components → required potion benefits and curses → nested choices such as an affected stat, damage type or potency. Do not collapse the feature columns into one field or silently copy a single die result across them. Mixing Potions has two effect columns and changes existing effects; it remains a distinct deferred operation, not ordinary potion creation. |
+| Scrolls / Wands, 288–289 | Subtype → its own feature table → fixed or selected tier → that tier's spell result and exact native Spell selection. A separate Curses/Benefits selector chooses the family of tables used for those additions; the selected family then supplies each required benefit/curse. Personality is a separate branch. An upstream fixed tier skips tier generation. |
+| Utility, 290–291 | Physical type/form → feature → each required utility benefit and curse → any personality/naming additions. Nested targets/variants remain attached to their originating property. |
+| Weapons, 292–293 | Weapon type/base and any ammunition quantity → weapon bonus → feature → each required weapon benefit and curse → any personality/naming additions. Armor and weapon bonus tables are distinct sources and must not be collapsed into one assumed distribution. |
+| Personalities, 294–295 | Required virtues and flaws → nested detail choices → personality trait from its two-axis table → alignment chosen by the GM unless a result states it. Attach to the selected item; do not change the character's alignment. |
+
+The book says an item can have some or all qualities; do not force every branch
+onto every item. A complete existing template does not require regenerating its
+properties. The chapter's magic-item recipe does not establish mandatory magic
+qualities/personality for every mundane item or boon; applying extra properties
+there is explicit GM authoring, subject to compatibility.
+
+### Next selected tab: Mundane Items — October 28
+
+The user accepted Random Treasure for now and selected Mundane Items as the next
+category to develop, followed by one category at a time. This specification is implemented in the October28 slice recorded below;
+operator acceptance of its content and workflow remains open.
+The source audit rechecked full-book printed278–279 and the open alternative's
+actual coverage; see the supporting audit's October28 entry.
+
+Keep the existing connected paper page, shared header, category tabs and completion
+controls. Inside Mundane Items, offer **Luxury object**, **Gemstone**, and
+**Jewelry** paths. Jewelry is a luxury subtype with its own authoring path; ordinary gear remains available through existing native-item selection,
+not a newly invented book table. A complete native item can still skip generation.
+
+1. **Choose the path and source.** Use an available native item, manual results
+   from the GM's reference, or SheetDelver Originals for a supported part. Do not advertise a roll where the selected source supplies no table.
+2. **Build the object.** Luxury: material/feature, form and any follow-up detail,
+   each independently editable. The book does not provide
+   a general luxury-price formula. Gemstone: identity, value each, optional explicit
+   size/quality adjustment, then quantity. The official gemstone list is a value
+   reference, not a random distribution. Jewelry: form and description, followed
+   by value; original form and value controls remain separate.
+   All three paths offer an independently editable optional **Unique feature**.
+   It contributes to the assembled description; it does not silently change
+   value or mechanics. Any value adjustment remains explicit.
+3. **Review the assembled item.** Show editable final name, description, quantity,
+   value each, calculated total and inventory space. Generated parts must visibly
+   contribute to the result; replacing one part retains unrelated edits. Native
+   icons and mechanics remain when a template is used. Manual gemstones must use
+   native Gem documents rather than generic Basic items. Jewelry and luxury
+   objects use the supported physical item shape and appropriate library folder.
+4. **Save / assign.** Reuse the existing review and receipt flow. An unchanged
+   native item remains assignment-only. New or modified items may be saved and
+   optionally assigned. Reset this path only after confirmed completion.
+
+The original-content slice supplies separately editable object forms,
+materials/workmanship, gemstone identity/appearance, jewelry forms and optional
+unique features shared across all three paths. Author any needed nested details
+alongside their parent results. Quantity and value remain explicit. Start with
+small useful tables; table sizes, probabilities and value suggestions are our own
+design decisions to review with the content, not a copied book distribution.
+Keep original table content separate from native system mechanics and source
+values. An unavailable or unwanted generated part can always be entered manually.
+
+Completion for this slice means the three paths produce native items end to end,
+part replacement and totals behave correctly, and field-local validation plus
+save/assignment/reset work in the existing desktop/mobile paper layout. Extend
+the existing treasure source and mounted suites for representative complete flows;
+do not add separate suites for every input or source row. Random Treasure needs
+only a regression check if shared behavior changes.
+
+### Substep behavior and source coverage
+
+Render each tab's relevant recipe parts as ordered subsections on its own
+connected paper page, with the assembled result visible. Some paths branch or
+combine columns; each tab controls its own progression rather than sharing a
+forced stepper. Each generated part has
+its own result, source, Roll/Reroll when supported, and manual edit. Display required
+counts (benefits, curses, virtues, flaws) and expose unresolved nested choices by
+the affected field. Unused optional parts need not be completed.
+
+Keep these kinds of tables distinct: a selector routes to a category; a count
+result can set several counts together; text columns contribute separate parts;
+a nested result adds child choices; a two-axis table requires both coordinates;
+a value reference does not imply any random roll. In particular, the Qualities
+and Personality rows supply paired counts, not unrelated rolls for each count.
+The proposed UI treats combination columns as separately editable parts; exact
+roll coupling follows verified source instructions, never a blanket rule that
+all columns roll together or all roll independently.
+
+Preserve upstream constraints through the recipe. If a treasure result specifies
+a bonus and one benefit, show those supplied values and resolve the benefit;
+do not reroll qualities to replace that requirement. GM changes are explicit
+manual overrides and retain origin/history without claiming unchanged source
+results. Reducing a count or changing a family marks affected existing parts for
+resolution; it must not silently delete them or grant extra stale effects.
+
+Open-source suitability is assessed **per substep**, not just per category. The
+content inventory must list category/part, official page reference, available
+native UUID or exact open source/version, result kind, dependencies, conversion
+needs and manual fallback. A useful OSR weapon table alone does not provide its
+feature, bonus, benefit, curse and personality tables. Source changes may use a
+different procedure; surface that difference rather than pretending to reproduce
+the official generation probabilities. Do not auto-roll a book-only substep.
+
+Represent a recipe as ordered parts with stable IDs, parent dependencies and
+source provenance. This extends the module's shared draft model; avoid a general
+workflow engine. Resolve/revalidate only affected descendants after an edit. A
+readable partial preview stays available, but saving or assignment requires all
+selected, necessary parts to be resolved or explicitly converted to descriptive
+manual content. Existing single-item review/receipt handling remains reusable.
+
+### Build and edit a result
+
+Each category tab has its own creation flow. Its common completion boundary is
+**Review → Save**, or **Review → Save and assign → Reset this tab**. Source choices are available Foundry tables/templates,
+SheetDelver Originals, and manual input. Separately selected open alternatives remain possible. Filter table choices
+by declared relevance/capability; do not expose unrelated class, mishap or other
+non-item tables. Native naming tables may be offered only for their naming role.
+User-added sources need explicit category assignment, not guessed behavior from
+table names or prose. Do not silently fall back between data sources.
+
+Keep the base item, individual attributes and personality as independently
+editable parts. **Reroll** replaces the selected part; **Add attribute** appends
+another compatible part. Neither may erase unrelated parts. Changing a base or
+source revalidates dependent parts and visibly identifies those needing a choice;
+it must not leave stale mechanics or silently discard independent manual content.
+Any payload-affecting edit retires the final delivery review.
+
+For example: **Weapons → base sword → attribute → optional personality → review**.
+Replacing an attribute retains the sword, quantity and personality. Preserve
+native item/spell artwork; do not substitute a generic treasure icon when source
+art exists. Attributes display whether mechanics are supported or descriptive.
+Repeated numeric/effect properties require an explicit supported stacking policy;
+never assume every generated addition stacks or applies to every category.
+
+Random treasure may produce an editable list of results. Resolve follow-up tables
+into visible parts of that list, preserving source constraints. Bound recursion
+and detect cycles; unavailable/unsupported follow-ups remain manual choices.
+A direct category can still produce a single result without creating a bundle.
+Gems/jewelry review shows name, quantity, value each and calculated total; differently
+valued results stay separate. Inventory space remains explicit. Valuable items do
+not increase Actor currency, award XP or sell themselves. Coin delivery is a
+separate explicit operation, not an Item-value side effect.
+
+### External open-data research — optional, superseded as the next step
+
+The October28 original-content decision above supersedes the following audit/import
+sequence as required work. Retain it only if external content is selected later.
+
+Start the content audit with **Basic Fantasy fourth-edition treasure, gems/jewelry
+and magic-item tables**. Its text/tables use CC BY-SA 4.0; artwork is separately
+restricted. Cairn's CC BY-SA text/relic collection is a supplementary candidate,
+not a verified substitute for every missing table family. Verify the exact source
+release and individual content before import. Boon/personality and other category
+coverage remains unknown until that inventory is complete. See the supporting
+audit for research links and limitations.
+
+Store approved alternative tables as versioned module data with attribution,
+license notices, stable table/result IDs, category roles, dice/ranges, explicit
+quantity/value fields and follow-up references. Retain the license requirements
+for adaptations and record conversion decisions. No runtime website scraping,
+book PDF ingestion, native-pack replacement or silent equivalence to Shadowdark.
+
+Adapt native draws, open-data draws and manual input into a shared structured
+draft. Reuse Core SDK rolls; native documents continue through Registry. Open data
+is local module-owned content, not fake Foundry UUIDs or a second compendium cache.
+Server orchestration validates table identities/results and compatibility; UI
+formats the choices. Extend the existing treasure logic/routes, source pickers,
+rich-text controls and exact-once delivery evidence rather than introducing a
+parallel generator engine. No Core change is selected or currently established
+as necessary.
+
+Mapping an open result into Shadowdark is separate from resolving its roll.
+Never equate another system's spell level with a Shadowdark tier, apply its AC or
+charge rules blindly, or attach effects by matching names. Retain supported native
+mechanics; label other properties for GM adjudication. Review and delivery should
+make the actual payload understandable without exposing implementation internals.
 
 ## Data and rules
 
@@ -79,12 +327,16 @@ For missing table families, provide ordinary result-entry fields: name, quantity
 value/currency, slots, description, and category-specific details such as a bonus
 or selected spell. These are fields for the GM's result, not a reproduction of the
 missing table's rows, ranges, probabilities or named result lists. Do not import
-or scrape the user's PDF, silently modify native packs, or add bundled fallback
-tables. Runtime tables must be available through supported public source/access
-contracts; an absent or inaccessible source falls back to manual entry.
+or scrape the user's PDF or silently modify native packs. An explicitly selected
+open-data package may supply alternative tables under the conditions below; it
+must not recreate the unavailable official distributions. Runtime Foundry tables
+use supported public source/access contracts. Missing sources leave manual entry
+available, never silently switch the selected source.
 
 Track provenance per draft section: Foundry table UUID/result and revision for a
-native draw; manual entry for externally determined results. Source/page notes
+native draw; package/table/version/result identity for an open-table draw; manual
+entry for externally determined results. Preserve the origin of subsequently
+edited values without claiming they remain unmodified draws. Source/page notes
 are optional. Do not invent a roll receipt or require a die result for manual
 input. Switching a section to manual preserves its editable result and clears
 any claim that the edited value is an unchanged native draw.
@@ -118,6 +370,100 @@ Do not claim that every generated daily ability is automatically handled by rest
 Personality may remain description; it must not overwrite the recipient's
 alignment or force automatic opposed checks.
 
+## World-item library and completion — selected tab workflow
+
+Saving a reusable world Item is now selected scope, superseding the earlier
+single actor-owned-item-only delivery boundary and deferral of world-item library
+publishing. The implementation ledger below now records folders, library saving and reset
+for the first delivered workflows; the other recipes remain planned.
+
+Unchanged native templates offer **Assign to character** only, with an unchanged-source
+note and no library/folder creation. Modified and new item workflows offer
+**Save item** and **Save and assign**. Save requires
+no recipient. Save and assign includes an explicit character selector (assignment
+means its inventory, not changing a User document or granting world-item ownership).
+Show the proposed world folder and, when applicable, recipient in the final review.
+The reviewed draft creates a world Item first; assignment then creates an owned
+copy from that exact saved document. The reusable original remains in the library.
+Preserve its source artwork, supported effects and spell links; omit world-folder
+membership and library ownership from the actor-owned copy.
+
+In Foundry's Items directory, create folders on first successful save as needed:
+
+```text
+SheetDelver
+  Armor
+  Weapons
+  Mundane Items
+  Gems & Jewelry
+  Potions
+  Scrolls
+  Wands
+  Utility
+  Boons  (only for results represented by a supported native Item)
+```
+
+All these are Foundry `Folder` documents with document type `Item`, regardless
+of their display label; the parent reference is the native `folder` field. These
+are world documents, not filesystem directories or compendium packs. The Item
+root is separate from the existing combat Actor root even if both are named
+SheetDelver. Folder labels use the project's SheetDelver spelling.
+
+Route by the finished item's category, not the originating tab: random treasure
+that yields armor belongs in Armor. Magic attributes and personalities attach to
+the parent result and do not create standalone Items/folders. Scrolls and Wands
+share a creation tab but use separate output folders. Create only categories
+actually used. Pure currency and narrative rewards must not be forced into an
+invalid Item type to make the folder model fit; retain their explicit separate
+application boundary. No currency write is implied by saving an item.
+
+Find/reuse the root by document type and top-level parent, then the category child
+under that exact root. Module-created folders carry stable role markers. An
+unambiguous existing folder at the intended path can be reused without taking
+ownership, renaming it or deleting its contents. Preserve user folder changes;
+if multiple folders match or a marked folder has conflicting type/parent, report
+the exact conflict rather than choosing arbitrarily. Recheck before creation and
+serialize this module's world-scoped folder creation. Do not claim distributed
+uniqueness from an in-process lock. Unknown create results require exact receipt/
+marker readback rather than blind recreation. Never perform automatic cleanup of
+user folders or previously saved items.
+
+A successful Save resets the active tab to a fresh draft. A successful Save and
+assign resets only after both steps are confirmed. Keep the active tab selected,
+return its viewport/focus to the start and show a compact confirmation naming the
+saved item and recipient, with an Open character action where useful. Do not make
+users hunt for an off-screen completion banner. Other tabs' unfinished work stays
+intact. A failed or unknown step retains the operation and draft; it does not reset
+or allow an accidental duplicate completion. A saved-but-unassigned item remains
+saved, with a clear retry-assignment action. Reset is a UI action, not deletion.
+
+Reuse saved world Items through public document reads and the existing native
+Items directory. A new library-management CRUD page, compendium publishing,
+bulk distribution and editing existing saved originals are not implied here.
+Deliberately saving a new item with an existing name may create a new document;
+name matching must never overwrite an unrelated original. World saves remain
+GM-only by default; folder placement is organization, not proof of permission or
+secret protection. Existing fully-disclosed assignment restrictions remain until
+separate hidden-content support is accepted.
+
+### Verified public contracts and required evidence
+
+Read-only code inspection confirmed `ModuleRequestRuntime.documents` supplies
+`list/get/create` for Folder and Item, and `documents.items.create` supplies Actor
+inventory copies. The mounted module-document adapter exposes Folder and Item
+stores and dispatches these creates through the caller-bound transport. Core's
+combat folder helper demonstrates type/parent-aware reuse, but it is private Core
+code and must not be imported into the module. Use the public SDK; no direct store
+mutation, direct socket or module-owned replacement cache. The module dataStore
+holds workflow receipts, not the authoritative world-item library.
+
+Before shipping, prove a focused save-and-assign path: missing folders created,
+existing folders reused, one world Item saved, one owned copy assigned, correct
+category placement, and only the successful tab reset. Include a saved-world-item/
+failed-assignment recovery case and lost acknowledgement without duplicates. These
+are static contract findings and a test plan, not live native acceptance. No Core
+change is selected or presently shown necessary.
+
 ## Writes, visibility and recovery
 
 A draft contains drawn/manual results, per-section provenance, source revisions and
@@ -126,10 +472,13 @@ sources at commit. Create through public runtime document APIs; no direct socket
 private Core import or second compendium cache.
 
 Use the existing operation/receipt pattern for the delivery boundary. Bind one
-request to the reviewed draft and recipient; retain returned embedded IDs. A
+request to the reviewed draft, output category and optional recipient; retain
+confirmed folder, world Item and embedded Item IDs. Track library save separately
+from assignment so retrying the latter cannot repeat the former. A
 lost acknowledgement requires readback by exact evidence, never an automatic
-replacement grant. A multi-item or coin-plus-item delivery is not an atomic
-transaction; show confirmed and unresolved portions and resume only proven
+replacement grant. Folder creation, world save and actor assignment are separate
+writes, not an atomic transaction. A multi-item or coin-plus-item delivery likewise
+is not atomic; show confirmed and unresolved portions and resume only proven
 unwritten work. Begin with a single-item delivery before adding bundles.
 
 Keep GM draft notes and undisclosed identities/curses private. Verify serialized
@@ -144,14 +493,34 @@ selecting the missing contract. No chat output is part of this ADR.
 | --- | --- | --- |
 | G01 | Inventory available runtime table/template sources; define typed drafts and manual fields for missing sections | Exact source IDs and coverage; no bundled missing tables; drawn/manual provenance survives edits |
 | G02 | One vertical slice: GM tool, native Treasure 0–3 draw or manual result, resolve missing follow-up manually, review, add one exact item | Unauthorized caller rejected; source/manual distinction retained; successful delivery; uncertain response cannot duplicate |
-| G03 | Treasure/valuables result entry, available-table draws, coin and bundle review | Missing higher bands remain usable through manual entry; quantities/values preserved; no automatic XP/sale |
-| G04 | Armor/weapons and scrolls/wands from available or manual results | Source constraints preserved; explicit template/spell links; native item behavior retained; no hardcoded missing distributions |
-| G05 | Potions, utility and personality, then nonphysical rewards | Supported/manual effect distinction; no arbitrary spell substitution; chosen identification mode does not leak hidden data |
-| G06 | Release review | Focused desktop/mobile walkthrough including missing-table flow; compiled archive; user GM acceptance; README distinguishes available draws from manual entry |
+| G03 | Dedicated category tabs and recipe/substep inventory; implement one complete native/manual armor or weapon tab with world save and optional assignment | Relevant substeps and independent rerolls; type-aware folder reuse; one saved Item and optional owned copy; retry without duplicate save; active tab resets only on success; desktop/phone user review |
+| G04 | Audit/license exact open sources, then deliver the gems/jewelry path within Mundane Items and result-list review | Source/version attribution; quantities, per-item and total values correct; reroll preserves unrelated parts; reviewed valuable saved/assigned in its folder without Actor currency changes |
+| G05 | Extend verified sources to mundane/random treasure, armor/weapons, magical attributes, potions, utility, scrolls/wands and personalities; handle boons separately | A complete demonstrated category at a time; source coverage explicit; compatible effects only; native spell/template identities retained; unsupported properties remain manual |
+| G06 | Add selected bundle/coin/nonphysical delivery capabilities and complete release review | Confirmed/unresolved portions visible without duplicates; no automatic sale/XP; installed archive and desktop/mobile user acceptance; README describes shipped coverage only |
 
-Potion mixing, player crafting, world-item library publishing, reusable saved
-recipes and public cards-to-chat are later scope decisions. Do not silently add
+Potion mixing, player crafting, compendium publishing, a dedicated library manager,
+reusable saved generation recipes and public cards-to-chat remain later scope decisions.
+Saving completed world Items under SheetDelver/type folders is now selected above. Do not silently add
 them while implementing the generation flow.
+
+### Deferred: user-supplied table importer (SD-TREASURE-IMPORT)
+
+**Status:** Deferred — reconsider after the complete generator is stable and its
+category workflows have user acceptance. Selected for later investigation on
+October28; not required for implementation or release of the current generator.
+
+Explore optional import of user-supplied tables from PDFs or other formats into
+the relevant category/recipe parts. Original SheetDelver tables remain the
+complete built-in alternative, and manual entry remains available. Imported
+content would be user-supplied local data, not bundled with module releases or
+published as a shared table collection.
+
+Future investigation should establish practical formats/extraction accuracy,
+preview and correction of rows/ranges/follow-ups, category mapping, storage and
+source provenance, and applicable content permissions. User-supplied import is
+not assumed to settle licensing questions. No importer, PDF parser, upload
+service or additional dependency is selected now. Reopen only when the generator
+is stable and the user explicitly selects this follow-up.
 
 ## Proportional validation
 
@@ -161,15 +530,274 @@ reference suite for book tables the application does not implement. One mounted 
 small set of authorization/recovery failures. Reuse current inventory, spell,
 wand and rest tests; add a regression only where generated payload behavior
 requires it. Avoid another exhaustive test matrix without a player-visible
-feature increment. Complete and demonstrate each vertical slice before extending
-more table families.
+feature increment. Add representative cases for paired counts, multi-part
+features, a nested choice and an upstream fixed constraint as those behaviors
+ship; do not enumerate every official result. Complete and demonstrate each
+vertical slice before extending more table families.
 
 ## Review decisions
 
 - [ ] Confirm this tool's first release scope and its placement after/before 1.0.
-- [x] Use available Foundry tables and manual external results for missing sections; ship no missing rulebook tables (user decision, October 27).
+- [x] Use available Foundry tables and manual external results; ship no missing official rulebook tables (initial user decision, October 27).
+- [x] Plan ten category sections with independently editable additions and explicitly labeled open OSR alternatives (user reassessment, October 27).
+- [x] Author original SheetDelver tables instead of requiring external datasets (October28). External imports are no longer a current gate.
+- Deferred: optional user-supplied table import after stabilization; see SD-TREASURE-IMPORT.
+- [x] Use dedicated category tabs with independent workflows, save reusable world Items under SheetDelver/type, optionally assign, then reset the successful tab (user decision, October 27).
+- [ ] Implement and obtain user acceptance of tab workflows and save/assign/reset; the generic first-slice form does not satisfy this gate.
 - [ ] Confirm disclosure behavior for unidentified/cursed generated items after
   the caller-projection capability check.
 
-These are proposal decisions, not permission requests for the already-authorized
-sheet editor. No generator runtime implementation has been started.
+## First working slice — October 27
+
+Checkpoint `a1cd965` contains the accepted sheet editor and this source decision.
+The user then authorized beginning implementation and reassessing the result.
+
+- GM dashboard tool **Treasure & Items** uses the Creator's connected paper,
+  shared Core page header, existing compendium picker and rich-text editor.
+- Caller-readable declared RollTables are selectable. Draws use Core rolls with
+  chat disabled and Registry range/result handling. No table content is bundled.
+  Formula support initially matches Registry's simple `XdY` contract; other
+  formulas and unresolved linked results require manual resolution.
+- A table result is a visible reference, not a claim that its prose was fully
+  interpreted. Explicit currency amounts can populate value; the GM reviews
+  quantity, remaining constraints and follow-ups.
+  Native linked physical items can be selected; table text never silently grants
+  coins, effects or inventory. **Apply to item details** explicitly copies text
+  results into a fresh manual draft, replacing the name/description and clearing
+  previous template/spell identity, effects, quantities and value. It remains
+  available after rerolls; recipient and GM source note are retained. Review
+  and disclosure are reset. Explicit whole-number GP/SP/CP amounts in result
+  text populate Item value, including comma-grouped numbers and mixed currencies.
+  “Each” stays a per-item value; quantity is still entered separately. Ambiguous
+  alternatives, ranges and dice expressions remain manual. No pricing table is
+  bundled or consulted. Manual drafting works with no available tables.
+- Manual Basic treasure, native physical templates and one-spell Scroll/Wand
+  creation are available. Native templates retain their source icon, effects and
+  mechanics; spell-derived Scrolls/Wands use the selected Spell icon (user-selected
+  presentation behavior beyond the native utility’s minimal payload). No generic
+  icon replaces an available source image. New
+  description text remains manual. The exact Crawling Kit stays in the existing
+  inventory bundle workflow. Spell selection uses available native spells with
+  search/tier filtering, independent of recipient class or known spells.
+- Review displays the payload's name, type, recipient, quantity, value, slots,
+  source, linked spell, description and retained effect names. Native payload
+  shapes follow PhysicalItemSD and UtilitySD.createItemFromSpell in 4.0.6.
+- This slice delivers fully disclosed items only, with an explicit disclosure
+  checkbox. Unidentified templates are refused. Private source notes/table
+  provenance stay in caller-bound module receipts, not actor Item flags.
+- One reviewed embedded Item create through the public SDK. No coin, XP, sale,
+  equip or Actor-stat changes. Confirmed outcomes scroll into view and offer
+  Open character / Create another item.
+- Durable caller/world/request receipts fence the create. Same-ID retries never
+  repeat a dispatched write. A lost response is checked by its exact marker on
+  the recipient; an absent/ambiguous match stays unresolved. Status for a specific
+  request never substitutes an older successful delivery. Locks serialize this
+  process; the public SDK supplies no distributed transaction/CAS guarantee.
+- Same-world source refresh preserves manual entries and retires review; account,
+  world and connection changes clear the draft. Replays still require GM and
+  recipient access. Unknown delivery restores from server receipts on revisit.
+
+**Implemented:** G01 and the bounded G02 draft/review/single-item path, including
+manual missing-table follow-ups and native scroll/wand shapes from G04.
+**Not implemented:** coin/bundle delivery, automatic recursive follow-ups,
+procedural bonus/effect authoring, nonphysical rewards, private/unidentified-item
+projection, potion mixing or multi-spell wand authoring. G03–G06 remain open;
+this is not a claim of a complete book generator or release acceptance.
+
+Validation: `treasure.test.ts` uses native 4.0.6 data for table and payload checks,
+GM/access refusal, unchanged Actor money/XP, and duplicate/lost-ack recovery.
+`treasure.browser.mjs` mounts the actual tool with real routes and isolated SDK
+stores at 390/1000 pixels, covering manual/table input, spell picker, source
+refresh, review, disclosure and recovery. No live Foundry writes or native
+operator acceptance are claimed. User review is the next gate.
+
+
+First-slice verification completed on Core0.22.2 / module0.9.6:
+
+- [x] Native-backed source suite and explicit module/UI/migration typing.
+- [x] Source UI and real handler workflow at 390/1000px; screenshots inspected.
+- [x] Isolated module contract validation and archive packaging.
+- [x] The same two browser workflows using the archive's compiled UI and Tailwind
+  stylesheet. The handler/runtime boundary remains an isolated fixture, not a
+  native Foundry or full managed-host acceptance claim.
+- [x] User walkthrough identified repeated-apply/value defects (corrected) and selected the category-based redesign above. This is reassessment, not acceptance of the existing layout as final.
+
+The checkpoint archive SHA256 is
+`e28cabeb9a9e1e2b226b1dff8179f5dc114f3aeef05a04efe30219c97aabe874`.
+No release metadata or Core source changes were made.
+
+The subsequent source-icon, repeated text-result application and explicit value
+corrections have focused source/mounted checks and typing. The archive above
+predates those corrections; it is not their packaged acceptance evidence.
+
+
+## First tab/library slice — October 27 implementation
+
+User approved the direction and iterative refinement. Implemented the first
+bounded native/manual weapon workflow and shared completion path; this does not
+claim that all ten recipes or open OSR content are complete.
+
+- [x] Category navigation uses the existing paper tab styling, with horizontal
+  overflow confined to the tab bar on narrow screens. Draft fields survive tab
+  changes in page memory; no persistent draft feature was added.
+- [x] Weapons: exact native base selection, additional attack/damage bonus from
+  native predefined effect definitions, independent feature, benefits/curses,
+  virtues/flaws, trait and item-alignment entry. Explicit Add/Remove controls
+  govern counts; empty selected entries block review beside that entry. Nested
+  details are entered manually. Bonus is explicitly additive to retained base
+  effects, not a claimed replacement of an existing magic weapon's total bonus.
+- [x] Native template images/damage/effects remain; arbitrary entered properties
+  become sanitized descriptive text, not invented active mechanics. Original
+  descriptions remain independently editable.
+- [x] Save item creates a GM-visible world Item in the type-specific child of the
+  Item-directory SheetDelver root. An Actor-directory root of the same name is
+  distinct. Existing Item folders are reused; only needed categories are created.
+- [x] Save and assign saves first, then creates the Actor-owned copy without the
+  world folder/ownership. Saving and assignment are recorded separately; readback
+  settles lost acknowledgements and explicit resume only sends an undispatched
+  step. Existing direct-delivery receipts remain supported.
+- [x] Confirmed completion resets the owning tab and focuses its start with a
+  visible saved/assigned confirmation. Other tab drafts remain. Unfinished saved
+  operations return to their category on revisit and do not reset prematurely.
+- [x] Random Treasure now offers the verified native Treasure 0–3 source only;
+  irrelevant class/mishap tables are excluded. Existing manual/native templates
+  and one-spell Scroll/Wand authoring use the new library completion path.
+
+Still open: the dedicated multipart recipes for armor, potions, mundane/utility,
+magic attributes and scrolls/wands; standalone boon/personality workflows; sourced
+subtable rolls/automatic dependencies, full count/constraint propagation and
+all open OSR datasets. Armor/Potions currently select native templates; Boons and
+Personalities explicitly explain that their standalone workflow is not ready.
+No missing official table contents/probabilities were introduced. G03 has a
+working manual weapon/library slice, not user acceptance of the entire redesign.
+
+Validation uses the existing `src/tests/treasure.test.ts` and
+`src/tests/treasure.browser.mjs`, extended for this useful increment rather than
+new suites per subtable. Source checks pass for preserved native shapes, generated
+bonus changes, typed folder reuse, save-only, assignment, lost-world-save and
+lost-assignment acknowledgements, plus permission failure after save and authorized
+resume without a duplicate original. Mounted checks at390/1000px pass for repeated
+text application, value replacement, field-local validation, tab retention,
+independent edits, correct folder save, success-only reset and assignment readback.
+Source and packaged screenshots were visually reviewed against the Creator paper
+layout; no page-wide horizontal overflow is present.
+
+Explicit module/UI/migration typing, module contract validation and isolated
+packaging passed on Core0.22.2/module0.9.6. The archive's compiled UI and both
+packaged stylesheets pass those same two mounted workflows with real module
+handlers and isolated document fixtures. SHA256:
+`f472a3eda383c452ee8058423570ed22872964c001b055e0756d3924fd2fdb94`.
+This is not live Foundry/native acceptance. Core and release metadata remain
+unchanged; no services, commits or remote operations were started for this slice.
+
+
+## Source reuse refinement — October 27
+
+The first pass established tabs, a manual weapon recipe and shared save/assignment;
+it did not complete the category-specific tables or multipart selections above.
+The user identified duplicate scroll/wand options and unnecessary library copies.
+
+- [x] Magic Items excludes scroll/wand authoring and recognized native scroll/wand
+  templates, including legacy Basic/Weapon forms. Scrolls / Wands owns those
+  controls and supports selecting existing templates. Random Treasure can still
+  resolve a scroll/wand result.
+- [x] An unchanged native template displays an unchanged-source note and requires
+  a character for assignment. It creates no world Item or folder. Both UI and
+  server use the shared comparison; modifying content offers library saving and
+  reverting the edits restores assignment-only behavior. Source notes and routing
+  do not count as item modifications.
+- [x] Native prices (`system.cost.gp/sp/cp`) are retained in catalog/form/payload,
+  prefilled on selection and shown as a source value alongside editable inputs.
+  Inspection found no catalog price stripping; native-backed and mounted checks
+  cover the existing prefill. Missing source prices are not inferred from a book.
+- [x] Direct assignment retains exact-source provenance and lost-response recovery;
+  successful completion resets the tab with an assignment-specific confirmation.
+
+The existing two treasure suites cover this refinement, including changed/reverted
+content, recipient validation, zero library/folder writes for unchanged assignment,
+legacy categories, native values and lost assignment acknowledgements. Source and
+390/1000px mounted workflows and explicit typing passed. Other category recipes,
+subtables and OSR content remain open; this refinement does not close ADR-0009.
+
+
+Packaged UI/styles verification also passed the same390/1000px mounted workflows;
+source and packaged screenshots retain the Creator paper layout. Contract validation
+and isolated packaging passed. Archive SHA256:
+`efed6a436cec776dbb8a412697916dd87d48b9440fc01329aa658613c53aba00`.
+Handlers use isolated SDK fixtures; this is not native/live acceptance. Versions
+remain unchanged and this refinement is uncommitted.
+
+
+## Mundane Items implementation — October 28
+
+- [x] Luxury, gemstone and jewelry paths, plus existing native-item selection.
+- [x] SheetDelver Originals revision1: eleven tables / 90 authored entries; no
+  external dataset or official table transcription. Original forms/materials,
+  gem identities/cuts, jewelry forms, nested details, shared optional unique
+  features and suggested values have explicit editable results.
+- [x] Choose, roll or manually edit each part. Parent-specific details must be
+  resolved; changing a parent retains and flags stale detail beside its field.
+  Custom names and unrelated parts survive individual rerolls.
+- [x] Roll object assembles the form, workmanship/cut, applicable detail and
+  suggested value together, preserving notes and unique features. Failure/context
+  change leaves the prior draft intact. Manual price entry clears the old price
+  source; feature text never silently changes price or adds mechanics.
+- [x] Native Gem creation, Basic luxury/jewelry creation, assembled descriptions,
+  quantity and value-each/total review, correct folder destination, optional
+  assignment and successful completion reset through existing services.
+- [x] Creator paper layout, square controls and shared indigo dice buttons reused.
+  Source browser checks pass at390/1000px with no page-width overflow, actual dice
+  artwork and inputs/rollers on one row. No new navigation/header design.
+- [ ] Operator acceptance of original table content, suggested prices and the
+  complete Mundane Items flow. Current prices/weights are generator design
+  choices, not an assertion of official Shadowdark economy rules.
+
+October28 checkpoint: the user accepted the current work, including the card
+preview, and authorized committing it before proceeding to the next segment.
+This closes the UI-review gate for this increment. It does not assert a new
+live Foundry save/assignment acceptance run or independently validate every
+original table row/price; those broader claims are not implied by the checkpoint.
+
+Existing treasure source and mounted suites were extended; no new test suite was
+introduced. Source checks cover nested-form replacement, native Gem save/assign,
+shared unique features, quantity totals, jewelry folders, source provenance and
+GM restrictions. Existing Random Treasure, weapons, source reuse and recovery
+regressions pass. Explicit module typing passes. Browser evidence is isolated;
+no live Foundry/native acceptance is claimed. Packaging evidence follows below.
+
+Random Treasure remains accepted for now. Other category recipes remain open;
+ADR-0009 is not closed. SD-TREASURE-IMPORT remains deferred until stabilization.
+
+Pricing refinement during review: the initial shared8–200GP suggestion pool was
+not calibrated by item type. The user clarified that the book is the reference.
+Gemstone suggestions now span40–350GP, close to the book's40–360GP ordinary-gem
+reference range, without assigning copied gem-name/price pairs. Luxury suggestions
+remain8–200GP; jewelry uses15–300GP. The book gives no universal luxury/jewelry
+price formula: those two pools are original suggestions requiring GM judgment,
+not validated official equivalents. All three use distinct editable price draws;
+size/quality changes remain manual and native template costs remain authoritative.
+
+Final verification: focused source regressions, explicit module typing, contract
+validation and isolated packaging passed. The compiled archive UI with both
+packaged stylesheets passed the full mounted workflow at 390/1000px; screenshots
+were inspected for layout, dice artwork and value totals. Archive SHA256:
+`fb0a9d868bfb5f86373e2d9e6f429d8387e1227a377345f499969540ca4776d4`.
+These checks use isolated SDK stores, not a live Foundry installation. Operator
+acceptance remains open; no version or compatibility requirement changed.
+
+### Item card preview refinement
+
+The user requested the intended icon within a card preview. Reuse the established
+resource card's faded artwork, inset black title and paper body; no separate icon
+panel or new card design. Complete drafts preview while editing, and final review
+shows the server-prepared item using the same component. Incomplete drafts keep
+their existing field validation. Source images remain authoritative; new items
+use the native default for their type, explicitly saved in the payload. The
+preview is informational and exposes no owned-item actions or document writes.
+
+Verified with the existing treasure source suite, explicit typing and source/
+compiled-archive browser workflows at 390/1000px. Mounted checks cover native
+template/spell artwork and compare the reviewed gemstone image with the assigned
+Item. Screenshots inspected using local native icon files; no live Foundry
+connection. Contract validation and packaging passed. Artifact SHA256:
+`161a388a186c8fe089488364415194fd35e85121c908f8b3aa12f8e578f509ef`.
