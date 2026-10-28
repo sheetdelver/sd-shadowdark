@@ -198,6 +198,10 @@ export function buildDocumentCard(doc: any, ref: DocumentRef | null, lookups: Vi
         : ['Talent', 'Boon', 'Class Ability', 'NPC Feature'].includes(doc?.type) ? 'feature'
             : isWand(doc) || system.magicItem || ['Scroll', 'Wand', 'Potion'].includes(doc?.type) ? 'magic' : 'item';
     const facts = kind === 'spell' ? spellFacts(doc, lookups) : [];
+    if(doc?.type==='Boon') {
+        if(system.boonType)facts.push({label:'Boon',value:String(system.boonType)});
+        if(system.level!==undefined)facts.push({label:'Level gained',value:String(system.level)});
+    }
     if (doc?.type === 'Weapon' && !isWand(doc)) {
         facts.push({ label: 'Damage', value: [system.damage?.oneHanded && `1H ${system.damage.oneHanded}`, system.damage?.twoHanded && `2H ${system.damage.twoHanded}`].filter(Boolean).join(', ') || 'Damage unavailable' });
     }

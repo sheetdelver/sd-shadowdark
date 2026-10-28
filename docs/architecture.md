@@ -1199,7 +1199,7 @@ Complete drafts and the server-reviewed payload render with the existing
 `CardBody`/`buildDocumentCard` read-only preview. The draft uses the same
 `treasurePayload` builder as preparation; it performs no preview fetch or write.
 The caller-filtered spell catalog includes type and image for this purpose.
-Native template and chosen spell images are preserved. New Basic/Gem/Scroll/Wand
+Native template and chosen spell images are preserved. New Basic/Gem/Scroll/Wand/Boon
 payloads explicitly include the native 4.0.6 default image when no source artwork
 supplies one, so the card previews the actual saved image. SDK image resolution
 and existing reference-description processing remain the presentation boundary.
@@ -1232,8 +1232,9 @@ actor-delivery receipts still reconcile through their original path.
 Only successful completion resets the owning tab. Reloaded unfinished operations
 return to that category; other tabs retain drafts during ordinary tab changes.
 Native source tables shown in this slice are restricted to the verified Treasure
-0–3 table. No OSR data, automatic book-table probability rules, boon delivery,
-secret-item projection or general world-item manager is introduced.
+0–3 table. No OSR data, automatic book-table probability rules, secret-item
+projection or general world-item manager is introduced. Native Boon delivery is
+described in the category section below.
 
 
 Unchanged native templates use assignment-only completion. `treasureUnchanged`
@@ -1284,3 +1285,19 @@ Gemstones and jewelry save under Gems & Jewelry; luxury objects under Mundane
 Items. Existing native templates preserve their type and unchanged-source
 assignment behavior. The existing save/assign receipt and completion reset are
 reused. No Actor coin/XP update, Core change, cache or PDF importer is introduced.
+
+### Boons
+
+The Boons tab uses `logic/boons.ts` for its oath, secret and blessing recipes.
+Four original prompt tables share the existing SDK draw route through the small
+`data/original-tables.ts` registry; generic result identity/validation lives in
+`logic/original-tables.ts`. Existing Mundane IDs and version1 remain unchanged.
+The category keeps separate editable parts, generated/custom name handling and
+atomic multi-part rolls. Textareas reuse the established input/dice row.
+
+`treasurePayload` emits native Boon fields (`description`, `boonType`, `level`)
+with its native icon and no physical-item fields or generated effects. Library
+destination is Boons. Shared save/assign receipts and private source provenance
+are reused; no new transport or lifecycle is introduced. Blessing use limits and
+duration remain descriptive, because native BoonSD has no counters or expiration
+schema. The preview shows subtype and acquisition level using `buildDocumentCard`.

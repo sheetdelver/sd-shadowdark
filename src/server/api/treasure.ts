@@ -7,8 +7,8 @@ import { withActorLock } from '../operation-lock';
 import { documentId, parseUuid } from '../../logic/identity';
 import { continueLibrary, reconcileLibrary, type LibrarySave } from '../treasure-library';
 import { CRAWLING_KIT_UUID, TREASURE_TYPES, treasureFolder, treasureUnchanged, treasureErrors, treasurePayload, type TreasureDraft } from '../../logic/treasure';
-import { MUNDANE_TABLES, MUNDANE_TABLE_VERSION } from '../../data/mundane-tables';
-import { originalSelection } from '../../logic/mundane';
+import { ORIGINAL_TABLES, ORIGINAL_TABLE_VERSION } from '../../data/original-tables';
+import { originalSelection } from '../../logic/original-tables';
 
 const hash = (v: unknown) => createHash('sha256').update(JSON.stringify(v)).digest('hex');
 function gm(req: ModuleServerRequest) { if (!callerOf(req).isGM) throw new SdkError('permission_denied', 'Treasure & Items requires a Gamemaster.'); }
@@ -80,9 +80,9 @@ export const handleTreasureDraw = (req: ModuleServerRequest) => route(req, 'POST
 export const handleTreasureOriginalDraw = (req: ModuleServerRequest) => route(req,'POST',async()=>{
     const body=await req.json<any>(), revision=requestRevision(req.runtime);
     scope(req);
-    if (body?.version!==MUNDANE_TABLE_VERSION || typeof body?.table!=='string' || !Object.hasOwn(MUNDANE_TABLES,body.table))
+    if (body?.version!==ORIGINAL_TABLE_VERSION || typeof body?.table!=='string' || !Object.hasOwn(ORIGINAL_TABLES,body.table))
         throw new SdkError('validation','Choose a current SheetDelver Originals table.');
-    const table=MUNDANE_TABLES[body.table];
+    const table=ORIGINAL_TABLES[body.table];
     const roll=await req.runtime.rolls.roll(`1d${table.rows.length}`,`SheetDelver Originals: ${table.name}`,{displayChat:false});
     current(req,revision);
     const row=Number.isInteger(roll.total)?table.rows[roll.total-1]:undefined;
@@ -170,7 +170,7 @@ export const handleTreasureDeliver = (req: ModuleServerRequest) => route(req,'PO
         if (b.saveToLibrary===true) {
             const d: LibrarySave = {mode:'library',requestId:b.requestId,intent,marker:randomUUID(),name:plan.payload.name,
                 actorId:b.actorId,category:b.draft.category??'random',folderName:plan.folderName!,unchangedSource:plan.unchangedSource,state:'pending',payload:plan.payload,revision:plan.contextRevision!,
-                provenance:{sourceNote:b.draft.sourceNote,templateUuid:b.draft.templateUuid,draw:plan.draw,mundane:b.draft.mundane}};
+                provenance:{sourceNote:b.draft.sourceNote,templateUuid:b.draft.templateUuid,draw:plan.draw,mundane:b.draft.mundane,boon:b.draft.boon}};
             await req.runtime.dataStore.set(key,d);
             await req.runtime.dataStore.set(`treasure-active-${s}`,b.requestId);
             return {operation:await continueLibrary(req,key,d)};

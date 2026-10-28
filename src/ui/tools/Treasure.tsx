@@ -3,7 +3,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import { PackagePlus } from 'lucide-react';
 import { useSDK, useSDKComponents } from '@sheet-delver/sdk/react';
 import MundaneParts, { OriginalDice, OriginalSourceNote } from './MundaneParts';
-import { MUNDANE_TABLE_VERSION } from '../../data/mundane-tables';
+import { ORIGINAL_TABLE_VERSION } from '../../data/original-tables';
+import BoonParts from './BoonParts';
+import { BOON_PARTS, boonKeys, boonName, emptyBoonRecipe, type BoonRecipe, type BoonPartKey } from '../../logic/boons';
 import { emptyMundaneRecipe, mundaneName, mundaneValueTable, mundaneTable, mundaneFollowUp, originalRow, treasureValue, type MundanePath, type MundaneRecipe, type MundanePartKey, type MundanePart } from '../../logic/mundane';
 import { newRequestId } from '../utils/request-id';
 import { useToolCatalog } from '../context/useSystemIndexStore';
@@ -21,7 +23,7 @@ const notesTheme = { ...shadowdarkTheme.richText, container: 'relative group fle
 const defaultTable = 'Compendium.shadowdark.rollable-tables.RollTable.Pi9nnnLeXpTKCSMY';
 type Catalog = { tables: any[]; items: any[]; spells: any[]; actors: { id: string; name: string }[] };
 type Operation = { unchangedSource?: boolean; requestId: string; actorId: string; itemId?: string; worldItemId?: string; mode?: string; category?: string; folderName?: string; name: string; state: string };
-const freshDraft = (category: TreasureCategory): TreasureDraft => ({...emptyTreasureDraft(),category,...(category==='mundane'?{mundane:emptyMundaneRecipe()}:category==='weapons'?{kind:'template',weapon:emptyWeaponRecipe()}:category==='armor'||category==='potions'||category==='magic'?{kind:'template'}:category==='scrolls'?{kind:'Scroll'}:{})});
+const freshDraft = (category: TreasureCategory): TreasureDraft => ({...emptyTreasureDraft(),category,...(category==='boons'?{kind:'Boon',boon:emptyBoonRecipe()}:category==='mundane'?{mundane:emptyMundaneRecipe()}:category==='weapons'?{kind:'template',weapon:emptyWeaponRecipe()}:category==='armor'||category==='potions'||category==='magic'?{kind:'template'}:category==='scrolls'?{kind:'Scroll'}:{})});
 
 /** Category tabs share controls and completion services, not a compulsory stepper. */
 export default function Treasure() {
@@ -40,7 +42,7 @@ function TreasureTabs() {
                 {TREASURE_CATEGORIES.map(([id,label])=><li key={id}><button disabled={locked} aria-current={category===id?'page':undefined}
                     onClick={()=>setCategory(id)}>{label}</button></li>)}
             </ol></nav>
-            {['boons','personality'].includes(category)?<div className="sd-creator-page"><h2>{TREASURE_CATEGORIES.find(([id])=>id===category)?.[1]}</h2>
+            {category==='personality'?<div className="sd-creator-page"><h2>{TREASURE_CATEGORIES.find(([id])=>id===category)?.[1]}</h2>
                 <p>This category’s dedicated workflow is being prepared. Weapon personalities can already be entered in the Weapons tab.</p></div>:
                 <TreasureWorkflow key={category} category={category} initialDraft={drafts.current[category]}
                     remember={d=>{drafts.current[category]=d;}} lock={setLocked} recoverCategory={setCategory}/>}
@@ -114,7 +116,7 @@ function TreasureWorkflow({category,initialDraft,remember,lock,recoverCategory}:
         change({mundane,...(!draft.name||draft.name===generated?{name:mundaneName(mundane)}:{}),...patch});
     };
     async function originalDraw(table: string): Promise<MundanePart> {
-        const result=await api('/original-draw',{table,version:MUNDANE_TABLE_VERSION});
+        const result=await api('/original-draw',{table,version:ORIGINAL_TABLE_VERSION});
         return result.part;
     }
     const rollMundane = (key: MundanePartKey|'value') => run(`mundane.${key}`,async()=>{
@@ -139,6 +141,16 @@ function TreasureWorkflow({category,initialDraft,remember,lock,recoverCategory}:
         const value=await originalDraw(mundaneValueTable(m));
         if(generation!==epoch.current||scopeRef.current!==scope)return;
         editMundane({...m,valueSource:value.source},{gp:String(originalRow(value.source)!.gp),sp:'0',cp:'0'});
+    });
+    const editBoon = (boon:BoonRecipe) => change({boon,...(!draft.name||draft.name===boonName(draft.boon!)?{name:boonName(boon)}:{})});
+    const rollBoon = (key:BoonPartKey|'all') => run(`boon.${key}`,async()=>{
+        let boon={...draft.boon!};const generation=epoch.current;
+        for(const part of key==='all'?boonKeys(boon.path):[key]) {
+            const result=await originalDraw(BOON_PARTS[part].table);
+            if(generation!==epoch.current||scopeRef.current!==scope)return;
+            boon={...boon,[part]:result};
+        }
+        editBoon(boon);
     });
     const localError = (key: string) => errors[key] ? <p role="alert">{errors[key]}</p> : null;
     const requestError = (section: string) => error?.section === section ? <p role="alert">{error.text}</p> : null;
@@ -215,7 +227,7 @@ function TreasureWorkflow({category,initialDraft,remember,lock,recoverCategory}:
                     {operation?.mode==='library'&&['pending','saved'].includes(operation.state)&&<button disabled={busy} onClick={resume}>{operation.unchangedSource?'Continue assignment':operation.state==='saved'?'Assign saved item':'Continue saving'}</button>}
                     {requestId&&!operation&&plan&&<button disabled={busy} onClick={deliver}>Retry same request</button>}
                 </section>}
-                <p>{category==='mundane'?'Create a nonmagical valuable, or use an existing native item.':category==='weapons'?'Build from a native weapon, enter its features and qualities, then save the finished item.':'Assign an existing item, or customize one and save it to your world library.'}</p>
+                <p>{category==='boons'?'Create a non-monetary reward, save it to your library and optionally assign it to a character.':category==='mundane'?'Create a nonmagical valuable, or use an existing native item.':category==='weapons'?'Build from a native weapon, enter its features and qualities, then save the finished item.':'Assign an existing item, or customize one and save it to your world library.'}</p>
                 <fieldset disabled={busy || uncertain || operation?.state === 'complete'} className="sd-creator-fields">
                     {category==='random' && <section aria-label="Result source"><h2>1. Result source</h2>
                         <p>Missing tables? Roll outside the application and enter the item details below.</p>
@@ -232,13 +244,14 @@ function TreasureWorkflow({category,initialDraft,remember,lock,recoverCategory}:
                         </div>}
                         <label>Source note (GM only)<input value={draft.sourceNote} maxLength={500} onChange={e=>change({sourceNote:e.target.value})} placeholder="Optional book or page reference" /></label>{localError('sourceNote')}
                     </section>
-                    }<section aria-label="Item details"><h2>{category==='mundane'?'1. Choose an item':category==='weapons'?'1. Weapon base':'Item details'}</h2>
+                    }<section aria-label="Item details"><h2>{category==='boons'?'1. Choose a boon':category==='mundane'?'1. Choose an item':category==='weapons'?'1. Weapon base':'Item details'}</h2>
+                        {category==='boons'&&draft.boon&&<BoonParts value={draft.boon} change={editBoon} roll={rollBoon} rollAll={()=>rollBoon('all')} errors={errors} rollError={key=>requestError(`boon.${key}`)}/>}
                         {category==='mundane'&&<><label>Item path<select aria-label="Item path" value={draft.kind==='template'?'template':draft.mundane?.path??'luxury'} onChange={e=>{
                             const path=e.target.value;const m=emptyMundaneRecipe(path==='template'?'luxury':path as MundanePath);
                             m.feature=draft.mundane?.feature??{text:''};
                             editMundane(m,{kind:path==='template'?'template':path==='gemstone'?'Gem':'Basic',templateUuid:'',name:'',gp:'0',sp:'0',cp:'0'});
                         }}><option value="luxury">Luxury object</option><option value="gemstone">Gemstone</option><option value="jewelry">Jewelry</option><option value="template">Existing native item</option></select></label>{localError('mundane.path')}{localError('kind')}</>}
-                        {!['mundane','weapons','armor','potions'].includes(category)&&<label>Create from<select aria-label="Create from" value={draft.kind} onChange={e=>{const kind=e.target.value as TreasureDraft['kind'];setDraft({...freshDraft(category),kind,sourceNote:draft.sourceNote,drawId:draft.drawId});setPlan(null);setErrors({});}}>
+                        {!['boons','mundane','weapons','armor','potions'].includes(category)&&<label>Create from<select aria-label="Create from" value={draft.kind} onChange={e=>{const kind=e.target.value as TreasureDraft['kind'];setDraft({...freshDraft(category),kind,sourceNote:draft.sourceNote,drawId:draft.drawId});setPlan(null);setErrors({});}}>
                             {category!=='scrolls'&&<option value="Basic">Manual treasure / basic item</option>}<option value="template">Existing native item</option>{['random','scrolls'].includes(category)&&<><option value="Scroll">Scroll from a spell</option><option value="Wand">Wand from a spell</option></>}
                         </select></label>}
                         {draft.kind==='template' && <><button onClick={()=>setPicker('item')}>{catalog.items.find(i=>i.uuid===draft.templateUuid)?.name || (category==='weapons'?'Choose weapon base':'Choose native item')}</button>{localError('templateUuid')}<p>Retains the template’s mechanics and effects. Added descriptions do not create new effects.</p>
@@ -248,18 +261,19 @@ function TreasureWorkflow({category,initialDraft,remember,lock,recoverCategory}:
                             <p>Choose from available spells, including a result rolled from your book. The recipient’s class does not limit this picker.</p></>}
                         {category==='mundane'&&draft.mundane&&<MundaneParts value={draft.mundane} change={editMundane} roll={rollMundane} rollObject={rollMundaneObject} native={draft.kind==='template'} errors={errors} rollError={key=>requestError(`mundane.${key}`)}/>}
                         <label>Name *<input value={draft.name} maxLength={200} onChange={e=>change({name:e.target.value})} /></label>{localError('name')}
+                        {category==='boons'&&draft.boon&&boonName(draft.boon)&&draft.name!==boonName(draft.boon)&&<button type="button" onClick={()=>change({name:boonName(draft.boon!)})}>Use generated name</button>}
                         {category==='mundane'&&draft.kind!=='template'&&draft.mundane&&mundaneName(draft.mundane)&&draft.name!==mundaneName(draft.mundane)&&<button type="button" onClick={()=>change({name:mundaneName(draft.mundane!)})}>Use generated name</button>}
                         {category==='weapons'&&draft.weapon&&<WeaponParts value={draft.weapon} change={weapon=>change({weapon})} errors={errors}/>}
-                        <div className="sd-creator-grid">{numberField('quantity','Quantity')}{numberField('slots','Slots per group')}{numberField('perSlot','Items per group')}{numberField('freeCarry','Free to carry')}</div>
+                        {category!=='boons'&&<><div className="sd-creator-grid">{numberField('quantity','Quantity')}{numberField('slots','Slots per group')}{numberField('perSlot','Items per group')}{numberField('freeCarry','Free to carry')}</div>
                         <h3>Item value</h3>{template&&<p>Source value: {template.system?.cost?.gp??0} GP · {template.system?.cost?.sp??0} SP · {template.system?.cost?.cp??0} CP. These amounts are filled in when you select the item.</p>}<p>Value per item. Amounts marked “each” apply to one item; enter the quantity separately. This does not add money to the character.</p>
-                        <div className="sd-treasure-money">{numberField('gp','GP')}{numberField('sp','SP')}{numberField('cp','CP')}</div>
+                        <div className="sd-treasure-money">{numberField('gp','GP')}{numberField('sp','SP')}{numberField('cp','CP')}</div></>}
                         {category==='mundane'&&draft.mundane&&<div className="sd-treasure-part">
                             <div className="sd-treasure-actions"><span>Suggested value each</span><OriginalDice label="Roll suggested value" onClick={()=>rollMundane('value')}/></div>
                             {requestError('mundane.value')}<p>Original generator suggestion; it replaces GP, SP and CP. Adjust it for size, quality or your campaign.</p>
                             {draft.mundane.valueSource&&<OriginalSourceNote part={{text:`${draft.gp} GP`,source:draft.mundane.valueSource}}/>}
                             <p><strong>Total value ({draft.quantity||'—'}):</strong> {treasureValue(draft,true)}</p>
                         </div>}
-                        <h3>{category==='mundane'?'Additional notes':'Description'}</h3><p>{category==='mundane'?'The assembled details are included automatically in the item preview. Add any other information here.':'Include manually determined features, benefits or curses here. These details will be visible to the recipient.'}</p>
+                        <h3>{['boons','mundane'].includes(category)?'Additional notes':'Description'}</h3><p>{['boons','mundane'].includes(category)?'The assembled details are included automatically in the item preview. Add any other information here.':'Include manually determined features, benefits or curses here. These details will be visible to the recipient.'}</p>
                         <RichTextEditor key={`${draft.kind}:${draft.templateUuid}:${detailsVersion}`} content={draft.description} onSave={(html:string)=>change({description:html})} theme={notesTheme} editButtonText="Edit description" />{localError('description')}
                         {preview && <TreasureCardPreview payload={preview} />}
                         <label>{unchangedSource?'Assign to character *':'Assign to character (optional)'}<select aria-label={unchangedSource?'Assign to character':'Assign to character (optional)'} value={actorId} onChange={e=>{setActorId(e.target.value);setPlan(null);setErrors({});}}><option value="">{unchangedSource?'Choose character…':'Save to library only'}</option>{catalog.actors.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select></label>{localError('actorId')}
@@ -268,13 +282,13 @@ function TreasureWorkflow({category,initialDraft,remember,lock,recoverCategory}:
                 </fieldset>
                 {plan && !operation && <section ref={reviewRef} aria-label="Review item" className="sd-treasure-review"><h2>{plan.unchangedSource?'Review and assign':'Review and save'}</h2>
                     <TreasureCardPreview payload={plan.payload} /><dl className="sd-treasure-facts">{!plan.unchangedSource&&<><dt>Folder</dt><dd>SheetDelver / {plan.folderName}</dd></>}<dt>Recipient</dt><dd>{plan.actorName||'Library only'}</dd><dt>Type</dt><dd>{plan.payload.type}</dd>
-                        <dt>Quantity</dt><dd>{plan.payload.system.quantity}</dd><dt>Value each</dt><dd>{treasureValue(draft)}</dd>{category==='mundane'&&<><dt>Total value</dt><dd>{treasureValue(draft,true)}</dd></>}
-                        <dt>Slots</dt><dd>{draft.slots} per {draft.perSlot} item(s) · {draft.freeCarry} free to carry</dd>
-                        <dt>Source</dt><dd>{plan.templateName ? `Native template: ${plan.templateName}${plan.unchangedSource?' (unchanged)':' (modified)'}` : draft.mundane ? 'SheetDelver Originals / editable authoring' : 'Manual item details'}{plan.draw && ` · Table reference: ${plan.draw.name} (${plan.draw.total})`}</dd>
+                        {category!=='boons'&&<><dt>Quantity</dt><dd>{plan.payload.system.quantity}</dd><dt>Value each</dt><dd>{treasureValue(draft)}</dd>{category==='mundane'&&<><dt>Total value</dt><dd>{treasureValue(draft,true)}</dd></>}
+                        <dt>Slots</dt><dd>{draft.slots} per {draft.perSlot} item(s) · {draft.freeCarry} free to carry</dd></>}
+                        <dt>Source</dt><dd>{plan.templateName ? `Native template: ${plan.templateName}${plan.unchangedSource?' (unchanged)':' (modified)'}` : draft.mundane||draft.boon ? 'SheetDelver Originals / editable authoring' : 'Manual item details'}{plan.draw && ` · Table reference: ${plan.draw.name} (${plan.draw.total})`}</dd>
                         {plan.spellName && <><dt>Linked spell</dt><dd>{plan.spellName}</dd></>}
                     </dl>
                     {!!plan.payload.effects?.length && <><h3>Item effects</h3><ul>{plan.payload.effects.map((e:any,i:number)=><li key={i}>{e.name || 'Unnamed effect'}{e.disabled?' (disabled)':''}</li>)}</ul></>}
-                    <p>{category==='mundane'?'Generated features describe the item; they do not add magical effects.':'Textual qualities remain manual. Supported weapon bonus effects and original template effects are included.'} {plan.unchangedSource?'This assigns the original item without creating a library duplicate.':'This saves a reusable item; assignment adds a separate inventory copy.'} It does not equip the item or grant XP or coins.</p>
+                    <p>{category==='boons'?'This saves a native Boon under SheetDelver / Boons. Assignment adds it to the character’s boons. Benefits, uses and expiration are managed manually; no effects, XP or coins are applied.':<>{category==='mundane'?'Generated features describe the item; they do not add magical effects.':'Textual qualities remain manual. Supported weapon bonus effects and original template effects are included.'} {plan.unchangedSource?'This assigns the original item without creating a library duplicate.':'This saves a reusable item; assignment adds a separate inventory copy.'} It does not equip the item or grant XP or coins.</>}</p>
                     {actorId&&<label><input type="checkbox" checked={disclosed} disabled={busy||uncertain} onChange={e=>setDisclosed(e.target.checked)} />All item details may be shared with the recipient.</label>}
                     {requestError('delivery')}<div className="sd-creator-footer"><button className="sd-creator-primary" disabled={(!!actorId&&!disclosed)||busy||!!uncertain} onClick={deliver}>{plan.unchangedSource?'Assign to character':actorId?'Save and assign':'Save item'}</button></div>
                 </section>}

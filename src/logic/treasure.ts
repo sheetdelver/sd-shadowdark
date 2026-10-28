@@ -4,6 +4,7 @@ import { ownedCopy } from './identity';
 import { NATIVE_PREDEFINED_EFFECTS } from '../data/native-predefined-effects';
 import { createEffect } from '../utils/Sanitizer';
 import { mundaneErrors, mundaneParts, mundaneDescription, type MundaneRecipe } from './mundane';
+import { boonErrors, boonDescription, type BoonRecipe } from './boons';
 
 export const TREASURE_TYPES = ['Basic', 'Weapon', 'Armor', 'Potion', 'Scroll', 'Wand', 'Gem'];
 // Native Shadowdark 4.0.6 DEFAULTS.ITEM_IMAGES for newly authored item types.
@@ -13,6 +14,7 @@ const NEW_ITEM_IMAGES = {
     Gem: 'icons/commodities/gems/gem-faceted-navette-red.webp',
     Scroll: 'icons/sundries/scrolls/scroll-runed-brown-purple.webp',
     Wand: 'icons/weapons/wands/wand-gem-violet.webp',
+    Boon: 'icons/skills/social/diplomacy-writing-letter.webp',
 };
 export const CRAWLING_KIT_UUID = 'Compendium.shadowdark.gear.Item.fJHwwn6TEfbdr8CM';
 export const TREASURE_CATEGORIES = [
@@ -27,6 +29,7 @@ export interface WeaponRecipe {
 }
 export const emptyWeaponRecipe = (): WeaponRecipe => ({feature:'',bonus:'0',benefits:[],curses:[],virtues:[],flaws:[],trait:'',alignment:''});
 export function treasureFolder(d: TreasureDraft, payload: any): string {
+    if (payload.type === 'Boon') return 'Boons';
     if (isScroll(payload)) return 'Scrolls';
     if (isWand(payload)) return 'Wands';
     if (d.category==='mundane' && d.mundane?.path==='jewelry') return 'Gems & Jewelry';
@@ -37,7 +40,8 @@ export interface TreasureDraft {
     category?: TreasureCategory;
     weapon?: WeaponRecipe;
     mundane?: MundaneRecipe;
-    kind: 'template' | 'Basic' | 'Gem' | 'Scroll' | 'Wand';
+    boon?: BoonRecipe;
+    kind: 'template' | 'Basic' | 'Gem' | 'Scroll' | 'Wand' | 'Boon';
     templateUuid: string; spellUuid: string; name: string; description: string;
     quantity: string; gp: string; sp: string; cp: string;
     slots: string; perSlot: string; freeCarry: string;
@@ -47,7 +51,11 @@ export const emptyTreasureDraft = (): TreasureDraft => ({ kind: 'Basic', templat
     quantity: '1', gp: '0', sp: '0', cp: '0', slots: '1', perSlot: '1', freeCarry: '0', sourceNote: '', drawId: '' });
 export function treasureErrors(d: TreasureDraft): Record<string, string> {
     const errors: Record<string, string> = {};
-    if (!['template','Basic','Gem','Scroll','Wand'].includes(d.kind)) errors.kind = 'Choose an item type.';
+    if (!['template','Basic','Gem','Scroll','Wand','Boon'].includes(d.kind)) errors.kind = 'Choose an item type.';
+    if (d.category==='boons' || d.kind==='Boon') {
+        if(d.category!=='boons'||d.kind!=='Boon')errors.kind='Use the Boons category for a boon.';
+        Object.assign(errors,boonErrors(d.boon!));
+    }
     if (d.category==='mundane' && d.mundane) {
         Object.assign(errors,mundaneErrors(d.mundane,d.kind==='template'));
         if (d.kind!=='template' && d.kind!==(d.mundane.path==='gemstone'?'Gem':'Basic')) errors.kind='Choose the matching mundane item type.';
@@ -68,7 +76,7 @@ export function treasureErrors(d: TreasureDraft): Record<string, string> {
     if (!d.name?.trim() || d.name.length > 200) errors.name = 'Enter an item name (up to 200 characters).';
     if (d.kind === 'template' && !d.templateUuid) errors.templateUuid = 'Choose a native item.';
     if (['Scroll','Wand'].includes(d.kind) && !d.spellUuid) errors.spellUuid = 'Choose the spell for this item.';
-    for (const key of ['quantity','gp','sp','cp','slots','perSlot','freeCarry'] as const) {
+    for (const key of d.kind==='Boon'?[]:['quantity','gp','sp','cp','slots','perSlot','freeCarry'] as const) {
         const min = key === 'quantity' || key === 'perSlot' ? 1 : 0;
         if (!/^\d+$/.test(d[key] ?? '') || !Number.isSafeInteger(Number(d[key])) || Number(d[key]) < min)
             errors[key] = `Enter a whole number of ${min} or more.`;
@@ -109,6 +117,9 @@ export function treasureTemplateAllowed(category: TreasureCategory | undefined, 
  * No table contents, executable prose effects, currency or Actor changes. */
 export function treasurePayload(d: TreasureDraft, template: any, spell: any): any {
     if (Object.keys(treasureErrors(d)).length) throw new Error('Complete the item details.');
+    // Native BoonSD extends BaseItemSD, not PhysicalItemSD: no cost, slots or quantity.
+    if(d.kind==='Boon')return {name:d.name.trim(),type:'Boon',img:NEW_ITEM_IMAGES.Boon,
+        system:{boonType:d.boon!.path,level:Number(d.boon!.level),description:boonDescription(d.boon!)+d.description},effects:[]};
     if (d.kind === 'template' && (!template || !TREASURE_TYPES.includes(template.type) || template.uuid === CRAWLING_KIT_UUID))
         throw new Error('Choose an available single item. Crawling Kits are added through inventory.');
     if (['Scroll','Wand'].includes(d.kind) && spell?.type !== 'Spell') throw new Error('The selected spell is unavailable.');

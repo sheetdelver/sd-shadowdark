@@ -173,3 +173,10 @@ typing, contract validation, packaging and compiled UI workflows at 390/1000px
 passed. Operator acceptance of the content/prices and native flow remains open.
 Other category recipes and optional user-table importing remain outside this
 increment; this does not close ADR-0009 or authorize release preparation.
+
+October28 follow-up: the user accepted the Mundane/card preview checkpoint,
+committed as `2a4e0a0`, and selected continuation. The Boons tab is implemented for
+review with native Oath/Secret/Blessing items, original/manual parts, card preview
+and shared save/assign behavior. The GM audit and ADR-0009 retain its evidence and
+manual-effect boundaries. Other category recipes and release preparation remain
+separate; this does not reopen accepted player-sheet work.

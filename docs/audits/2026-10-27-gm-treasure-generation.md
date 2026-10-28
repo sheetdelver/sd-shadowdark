@@ -1,7 +1,7 @@
 # GM treasure and item generation audit
 
 Date: 2026-10-27
-Status: Tab/library, manual weapon and original Mundane Items slices implemented; Mundane operator acceptance and remaining recipes are open in ADR-0009
+Status: Mundane Items/card and Boons checkpoints accepted; remaining recipes tracked in ADR-0009
 
 ## Sources and scope
 
@@ -390,3 +390,45 @@ October28 operator checkpoint: user accepted the current Mundane Items/card
 preview work and authorized committing the accumulated GM tool/cache changes
 before continuing to the next category. UI review is accepted; no fresh live
 Foundry write evidence is inferred from that acceptance. Next segment: Boons.
+
+## Boons implementation — October 28
+
+Following checkpoint `2a4e0a0`, reread and visually inspected full-book printed
+pp.280–281 (PDF284–285). The paths are Oath, Secret and Blessing; Secrets combine
+two details. Utility determines any GM-assessed XP; this generator does not grant
+XP. Native4.0.6 `system/src/models/items/BoonSD.mjs` extends `_BaseItemSD` with
+`boonType` (oath/secret/blessing) and `level`. `PlayerSheetSD._onCreateBoon` creates
+that shape. Boons are not physical items and have no native duration/use-counter
+fields. No declared pack Boon templates were found in the local native checkout.
+
+Implemented three paths with four original six-row tables, manual entry,
+independent part rolls and atomic whole-boon rolls. These prompts do not copy
+the official entries or distributions. Blessing limitations remain descriptive;
+no effects or rest counters are synthesized. The native Boon payload preserves
+the selected subtype and acquisition level, uses its native icon, and routes to
+SheetDelver / Boons through the shared save/assignment recovery service.
+
+Source tests passed for all three paths, native nonphysical payloads, validation,
+escaped descriptions, no Actor money/XP change and lost-save recovery without
+duplicate creation. Source mounted workflows passed at390/1000px for all paths,
+part rerolls, missing Secret subject correction, navigation retention, preview,
+save-only and assignment/reset. Source screenshots were visually inspected;
+longer prose fields were then expanded to textareas for readability on phones.
+Explicit module typing passed. Final packaged UI verification is recorded below.
+No Core edit or live Foundry connection; native operator acceptance is pending.
+
+Final contract/package checks and compiled-archive workflows passed at390/1000px.
+The textarea refinement exposed an implicit-label issue after entering duration
+text; an explicit label/input association corrected it and the same workflow
+then passed. Packaged screenshots were inspected for all three paths, card
+artwork, readable prose and no page overflow. Source evidence:
+`/tmp/sd-boons-source.log`, `/tmp/sd-boons-types.log`,
+`/tmp/sd-boons-browser/results.json`. Final archive evidence:
+`/tmp/sd-boons-package.log`, `/tmp/sd-boons-archive-browser/results.json`.
+Archive SHA256:
+`f99c46c0876d18c65978521167236c37d428a8ef1bccf6a1cff4da61e63caf12`.
+Browsers exited; no service retained. Version/compatibility remain unchanged.
+
+The user subsequently accepted the Boons increment and authorized committing it
+before continuing to Magic Items / Attributes. UI/content acceptance is recorded;
+no new live Foundry write or native-version test is inferred from that approval.

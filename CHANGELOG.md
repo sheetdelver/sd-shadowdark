@@ -4,6 +4,7 @@ Historical entries are reconstructed from [published releases](https://github.co
 
 ## Unreleased
 
+- Generate and assign boons.
 - Add treasure tabs and library.
 - Generate mundane valuables.
 - Preview item cards with artwork.

@@ -1,9 +1,9 @@
-import { MUNDANE_TABLES, MUNDANE_TABLE_VERSION } from '../data/mundane-tables';
+import { originalRow, type OriginalSource, type OriginalPart } from './original-tables';
+export { originalRow, originalSelection, type OriginalSource } from './original-tables';
 
 export type MundanePath = 'luxury' | 'gemstone' | 'jewelry';
 export type MundanePartKey = 'form' | 'material' | 'detail' | 'feature';
-export interface OriginalSource { table: string; result: string; version: number; total?: number }
-export interface MundanePart { text: string; source?: OriginalSource }
+export type MundanePart = OriginalPart;
 export interface MundaneRecipe {
     path: MundanePath;
     form: MundanePart; material: MundanePart; detail: MundanePart; feature: MundanePart;
@@ -13,17 +13,6 @@ export interface MundaneRecipe {
 export const emptyMundaneRecipe = (path: MundanePath = 'luxury'): MundaneRecipe => ({
     path, form:{text:''}, material:{text:''}, detail:{text:''}, feature:{text:''}, detailFor:'',
 });
-export function originalSelection(table: string, result: string, total?: number): MundanePart {
-    const rows = Object.hasOwn(MUNDANE_TABLES,table) ? MUNDANE_TABLES[table].rows : [];
-    const index = rows.findIndex(row=>row.id===result);
-    if (index < 0 || (total !== undefined && total !== index+1)) throw new Error('Choose an available original result.');
-    return {text:rows[index].text,source:{table,result,version:MUNDANE_TABLE_VERSION,...(total===undefined?{}:{total})}};
-}
-export function originalRow(source?: OriginalSource) {
-    if (!source || source.version !== MUNDANE_TABLE_VERSION || !Object.hasOwn(MUNDANE_TABLES,source.table)) return undefined;
-    const rows = MUNDANE_TABLES[source.table].rows;
-    return rows.find((row,index)=>row.id===source.result && (source.total===undefined || source.total===index+1));
-}
 export function mundaneFollowUp(m: MundaneRecipe): string | undefined {
     const row=originalRow(m.form.source);
     return row?.text===m.form.text ? row.followUp : undefined;

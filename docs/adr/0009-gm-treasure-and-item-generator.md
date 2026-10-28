@@ -1,6 +1,6 @@
 # ADR-0009: GM treasure and item generator
 
-**Status:** Accepted — Mundane Items and card preview accepted; remaining categories in progress
+**Status:** Accepted — Mundane Items, card preview and Boons accepted; remaining categories in progress
 **Date:** 2026-10-27
 
 ---
@@ -801,3 +801,48 @@ template/spell artwork and compare the reviewed gemstone image with the assigned
 Item. Screenshots inspected using local native icon files; no live Foundry
 connection. Contract validation and packaging passed. Artifact SHA256:
 `161a388a186c8fe089488364415194fd35e85121c908f8b3aa12f8e578f509ef`.
+
+## Next segment: Boons — October 28
+
+Checkpoint `2a4e0a0` contains the accepted accumulated tool, cache and Mundane/card
+work. The user authorized proceeding to the next segment; Boons follows Mundane
+Items in the agreed tab order. Full-book pp.280–281 and native4.0.6
+`BoonSD`, `_BaseItemSD`, `PlayerSheetSD._onCreateBoon` and `BOON_TYPES` were
+rechecked before implementation. Native Boon is nonphysical: its system fields
+add `boonType` and acquisition `level` to the base description/source/properties.
+It does not own price, slots, quantity, use counters or expiration fields.
+
+- [x] Oath: one favor/promise; Secret: independent detail and subject combined
+  into one statement; Blessing: benefit plus optional duration/limits text.
+- [x] Four SheetDelver Originals tables, six equally likely rows each. These
+  are independently authored prompts, not the official rows or probabilities.
+  Every field permits manual entry, selection and independent SDK rolling.
+- [x] Roll boon resolves only the selected path; Secrets roll each part
+  separately. Results apply together after success. Notes, manual limits and
+  custom names survive rerolls; switching types retains their separate parts.
+- [x] Reuse the connected paper, Creator dice controls, rich-text editor and
+  resource-card preview. Longer prose uses textareas beside the same dice control.
+  Errors remain adjacent to the affected field. Level gained is editable 0–10.
+- [x] Save native Boon to SheetDelver / Boons; optionally assign an owned copy.
+  The shared receipt flow handles unknown saves/assignment without replay.
+  Preview uses the native Boon icon and shows subtype and acquisition level.
+- [x] No cost/slots/quantity controls or physical fields in the payload. No
+  automatic XP, currency, Actor changes beyond the assigned Item, generated
+  active effects, use tracking or rest resets. Blessing text remains GM-managed.
+- [x] Operator review of the Boons flow and original prompt content. User accepted
+  the increment and authorized checkpoint/commit and continuation on October28.
+
+Only this category is selected. Magic Items / Attributes is the following tab,
+not part of this increment. Optional PDF/table importing remains deferred.
+
+Verification: the existing source suite, explicit typing, module contract and
+packaging passed. Source and final compiled-archive mounted workflows cover all
+three paths at390/1000px; final packaged screenshots were inspected with the
+native icons and expanded prose fields. Archive SHA256:
+`f99c46c0876d18c65978521167236c37d428a8ef1bccf6a1cff4da61e63caf12`.
+No live Foundry acceptance is claimed; the Boons increment remains uncommitted
+for operator review after the preceding checkpoint.
+
+Checkpoint follow-up: the user accepted Boons and selected continuation to Magic
+Items / Attributes. This closes the Boons UI/content review gate; no additional
+live Foundry write or native-version acceptance run is inferred.
