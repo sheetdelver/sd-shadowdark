@@ -4,6 +4,12 @@ Historical entries are reconstructed from [published releases](https://github.co
 
 ## Unreleased
 
+- Complete treasure category builders.
+- Add contextual magical attributes.
+- Author permanent equipment modifiers.
+- Show effects on item cards.
+- Border embedded text editors.
+- Simplify treasure save review.
 - Generate and assign boons.
 - Add treasure tabs and library.
 - Generate mundane valuables.

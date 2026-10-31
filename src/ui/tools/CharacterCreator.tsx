@@ -25,7 +25,7 @@ import { isScroll } from '../../logic/scrolls';
 import { isWand, wandSpells } from '../../logic/wands';
 import type { CreatorPlan } from '../../logic/character-creation';
 
-const CREATOR_NOTES_THEME={...shadowdarkTheme.richText,container:"relative group flex flex-col",editor:"prose prose-sm font-serif max-w-none focus:outline-none min-h-[8rem] p-4 text-black"};
+const CREATOR_NOTES_THEME={...shadowdarkTheme.richText,container:"sd-rich-text-editor relative group flex flex-col",editor:"prose prose-sm font-serif max-w-none focus:outline-none min-h-[8rem] p-4 text-black"};
 const STEPS=['Identity','Ability scores','Talents and boons','Languages and spells','Hit points','Equipment and money','Review and create'];
 const hpInputs=(d:CharacterDraft)=>JSON.stringify([d.level,d.classUuid,d.ancestryUuid,d.abilities,d.awards,d.fixedChoices,d.ancestryTalents,d.classTalents]);
 import { newRequestId as id } from '../utils/request-id';

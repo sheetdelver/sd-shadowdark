@@ -1247,7 +1247,7 @@ edits restores assignment-only behavior. Native `system.cost` GP/SP/CP populate 
 form and source value is shown beside the editable amounts. No rulebook price is
 inferred for an unpriced source.
 
-Magic Items excludes recognized scrolls/wands, including legacy Basic/Weapon
+The retired Magic category excludes recognized scrolls/wands, including legacy Basic/Weapon
 representations, using the existing shared capability helpers. Their own tab
 supports native templates as well as spell-derived creation, and recognized legacy
 items save under Scrolls/Wands without changing their native document types.
@@ -1301,3 +1301,115 @@ destination is Boons. Shared save/assign receipts and private source provenance
 are reused; no new transport or lifecycle is introduced. Blessing use limits and
 duration remain descriptive, because native BoonSD has no counters or expiration
 schema. The preview shows subtype and acquisition level using `buildDocumentCard`.
+
+### Shared attributes and personality
+
+`logic/magic-attributes.ts` owns the two independently enabled sections;
+`ui/tools/MagicAttributes.tsx` is reused inside every implemented builder. Each
+benefit/curse/virtue/flaw is an `OriginalPart` with editable text and optional
+source provenance. Add/remove controls specify the number of results. Disabled
+sections retain their draft data but contribute neither validation nor payload
+text. Empty enabled Attributes do not change native-source equality. An enabled
+Personality requires a trait and GM-chosen alignment.
+
+Armor, Potion, Utility, Weapon, Wand and Scroll bases select their corresponding
+benefit/curse family, including recognized legacy scroll/wand native shapes.
+Otherwise untyped drafts expose a family choice. Virtues/flaws share the Item
+Personality family. Existing results survive a family change and retain their
+source table labels; the new family controls subsequent selections/rerolls.
+Ten original alternative tables contain six equally likely rows each, resolved
+through the existing authenticated GM SDK roll route. Text entry is always
+available. These are original suggestions, not official table distributions.
+
+There is no standalone Magic Items or Personalities tab, random item-type roller
+or three-part naming aid. Retired category IDs remain recognized solely for
+recovering existing saved operations; their exact payloads are not rebuilt.
+Existing weapon recipe fields remain readable for older operations; new UI uses
+the shared sections without duplicate property controls.
+
+Property text is escaped and appended through `treasurePayload`. Physical items
+with additions get native `magicItem`; effects, base mechanics, costs and artwork
+remain intact. Boons only receive descriptive additions. No effect inference or
+automatic resource tracking is added. Source provenance stays in private receipts.
+
+### Armor treasure procedure
+
+`logic/armor-treasure.ts` owns base eligibility, recipe validation, generated
+names and native payload changes. `ui/tools/ArmorParts.tsx` supplies type/bonus/
+feature controls inside Treasure's established workflow. The existing-item path
+bypasses the recipe and preserves exact source data; shared reset/clear actions
+retire the current review and rebuild or clear the selected source draft.
+
+The GM original-draw route also accepts `armor-type`, selecting equally among
+current caller-readable ordinary native gear Armor documents. It returns an exact
+UUID; the UI resolves it in the current catalog and requests refresh if absent.
+This dynamic pool is not a fabricated compendium or a bundled official table.
+Bonus/feature draws use versioned original data. Preparation resolves the exact
+source again and the existing review/receipt boundary protects saving/assignment.
+
+New armor copies the base AC, properties, slots, cost and artwork. Its bonus adds
+to ac.modifier without a duplicate effect. Its baseArmor uses the original value
+or the shared Foundry slug of the original base name, preserving mastery selectors.
+Feature text is escaped and descriptive. Unchanged existing sources still assign
+without creating a library duplicate; generated armor follows the normal Armor
+folder save/assign operation. Document preview cards now include the same AC
+formatting already used by owned armor cards.
+
+### Potion treasure procedure
+
+`logic/potion-treasure.ts` owns build/existing mode and three validated OriginalPart
+features. `ui/tools/PotionParts.tsx` uses the common input/dice rows, individual
+choices and atomic roll-all requests through the existing original-draw route.
+The original table registry includes three feature tables; no new transport,
+cache or native compendium is introduced. Source provenance stays in the existing
+private library receipt.
+
+TreasureDraft adds kind Potion only for a validated Potions build recipe. Its
+payload has native type Potion, native default artwork, magicItem=true, physical
+fields and escaped feature/additive descriptions. It does not infer formulas,
+spell links or effects. Existing templates use the unchanged native copy path.
+The existing potion action recognizes the new native type; feature generation
+adds no consumption/resource behavior. Shared source reset/clear and whole-form
+Clear also apply to Potions, including review invalidation and recipient reset.
+
+
+### Remaining treasure procedures and permanent modifiers
+
+`logic/treasure-procedures.ts` shares validation and exact-source eligibility for
+Utility, Scroll/Wand and weapon recipes. Their distinct UI sequences reuse
+`TreasureProcedureParts`, the original-draw route and the common delivery path.
+New original table IDs extend version1 without changing existing rows. Dynamic
+weapon/spell draws use caller-readable native pools; spell tier is rechecked
+against the exact Spell at preparation. Tier changes retire spell choice/review.
+Weapon/ammunition bases retain native fields; generated names preserve mastery
+baseWeapon identity. Basic ammunition's bonus is descriptive/manual, while a
+Weapon receives the native weapon-specific attack/damage effects.
+
+`logic/treasure-modifiers.ts` allowlists generated native predefined definitions
+for non-expiring equipment AC, ability, slots and initiative grants. UI sends
+IDs/amounts only; payload generation constructs native effects through createEffect.
+Validation runs before review and again against the resolved item type. Modifiers
+participate in source equality and exact review hashing; private receipts retain
+the recipe alongside the frozen payload. No source document or Actor is edited.
+Native equipped/stashed/identification suppression is handled by the existing
+preparation/action path. Armor ac.modifier remains separate from any explicitly
+additional effect. Consumables and Boons cannot receive newly authored permanent
+equipment grants; copied native effects remain intact. Prose is not executed.
+
+
+### Item card effects and embedded editing — October 31
+
+Shared item cards include an Effects section in both sheet views and catalog/
+treasure previews. Owned cards select only canonical prepared effects belonging
+to that exact Item; their status formatter is shared with the Effects tab.
+Document previews use the existing lossless effect reader (v14 changes take
+precedence over legacy changes) and display enabled/disabled state without
+claiming activation on an Actor. Native predefined labels describe known keys;
+unknown keys retain their actual name and operation. Values/formulas are shown
+as text, never evaluated by the card. No effect mechanics or permissions change.
+
+The module rich-text theme supplies a paper border for embedded editors, including
+the Treasure and Creator overrides. Core's editor remains unchanged. Treasure
+review no longer requires a redundant recipient-disclosure checkbox; GM access,
+source visibility, current-review validation, identification restrictions and exact
+save/recovery remain enforced. The review note explains manual written qualities.

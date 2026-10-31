@@ -103,7 +103,7 @@ export const shadowdarkTheme = {
         closeBtn: "text-white hover:text-amber-500 transition-colors"
     },
     richText: {
-        container: 'relative group h-full flex flex-col',
+        container: 'sd-rich-text-editor relative group h-full flex flex-col',
         toolbar: {
             container: 'bg-black border-b-2 border-neutral-800 p-2 flex flex-wrap gap-1 items-center sticky top-0 z-10',
             button: 'p-2 rounded hover:bg-neutral-800 transition-colors text-neutral-400 hover:text-white',

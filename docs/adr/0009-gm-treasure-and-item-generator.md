@@ -1,6 +1,6 @@
 # ADR-0009: GM treasure and item generator
 
-**Status:** Accepted — Mundane Items, card preview and Boons accepted; remaining categories in progress
+**Status:** Implemented — current workflows accepted for checkpoint; final installed release smoke remains
 **Date:** 2026-10-27
 
 ---
@@ -543,9 +543,8 @@ vertical slice before extending more table families.
 - [x] Author original SheetDelver tables instead of requiring external datasets (October28). External imports are no longer a current gate.
 - Deferred: optional user-supplied table import after stabilization; see SD-TREASURE-IMPORT.
 - [x] Use dedicated category tabs with independent workflows, save reusable world Items under SheetDelver/type, optionally assign, then reset the successful tab (user decision, October 27).
-- [ ] Implement and obtain user acceptance of tab workflows and save/assign/reset; the generic first-slice form does not satisfy this gate.
-- [ ] Confirm disclosure behavior for unidentified/cursed generated items after
-  the caller-projection capability check.
+- [x] Implement dedicated tab workflows and save/assign/reset; current work accepted for checkpoint October31. Final installed release smoke remains separate.
+- [x] Retain fully disclosed item delivery and reject unidentified templates; remove the redundant recipient acknowledgement per October31 user review. Hidden-identity authoring is outside this scope.
 
 ## First working slice — October 27
 
@@ -748,8 +747,8 @@ remain unchanged and this refinement is uncommitted.
 - [x] Creator paper layout, square controls and shared indigo dice buttons reused.
   Source browser checks pass at390/1000px with no page-width overflow, actual dice
   artwork and inputs/rollers on one row. No new navigation/header design.
-- [ ] Operator acceptance of original table content, suggested prices and the
-  complete Mundane Items flow. Current prices/weights are generator design
+- [x] Operator acceptance of original table content, suggested prices and the
+  complete Mundane Items flow (October28 checkpoint). Current prices/weights are generator design
   choices, not an assertion of official Shadowdark economy rules.
 
 October28 checkpoint: the user accepted the current work, including the card
@@ -846,3 +845,318 @@ for operator review after the preceding checkpoint.
 Checkpoint follow-up: the user accepted Boons and selected continuation to Magic
 Items / Attributes. This closes the Boons UI/content review gate; no additional
 live Foundry write or native-version acceptance run is inferred.
+
+## Shared Attributes and Personality — October 29
+
+The October28 prototype treated Magic Items / Attributes as a separate tab with
+item-type, count and name suggestions. The user corrected that model: attributes
+are additions to the item being built. This decision supersedes that prototype.
+Boons checkpoint `9e2f094` remains accepted; this revision is uncommitted for review.
+
+Book relationships checked against full Shadowdark RPG printed pp.284–295:
+Armor, Potions, Utility and Weapons have their own benefit/curse tables.
+Scrolls/Wands select among those families. Item Personality on pp.294–295 supplies
+shared virtues/flaws, rather than separate personalities for each physical type.
+Missing official rows are not redistributed. The previously approved original
+alternatives/manual-entry policy still applies; no external dataset is added.
+
+- [x] Remove standalone Magic Items / Attributes and Personalities navigation.
+  Keep their retired category IDs for recovery of existing operations only.
+- [x] Reuse one component within each builder, with independent Attributes and
+  Personality switches. Both begin off. Disabling retains entries for re-enabling
+  but excludes that section from validation and the saved description.
+- [x] Attributes supplies benefits/curses; Personality supplies virtues/flaws,
+  personality trait and GM-chosen alignment. Add/remove individual results; no
+  count suggestion roller or extra count-resolution workflow.
+- [x] Each result supports a nearby die, table selection and manual text entry.
+  A reroll replaces only that result. Source/table and edited status remain visible.
+  A family change preserves existing entries and changes future result choices.
+- [x] Native type/category selects Armor, Potion, Utility or Weapon tables.
+  Scrolls/Wands expose the family selector. General drafts with no specific
+  physical family also allow that choice. Virtues/flaws share Item Personality.
+- [x] Ten original alternative tables, six equally likely rows each: eight
+  type-specific benefit/curse tables and two shared personality tables. These
+  are SheetDelver Originals suggestions, not official distributions or native
+  effects. Manual official results can be entered by the user from their book.
+- [x] Keep native artwork, effects, prices and mechanics. Preview and delivery use
+  the same escaped additive description. Physical items receive magicItem=true;
+  Boons retain their nonphysical schema. Text does not synthesize ActiveEffects.
+- [x] Preserve connected paper, SDK header, existing controls and card preview.
+  No new Core contract, transport, cache or dependency is introduced.
+- [x] Current shared sections accepted for checkpoint October31, including dedicated spell-item properties.
+
+Random item-type generation and three-part naming are removed and deferred until
+explicitly selected again. Optional user-table/PDF importing also remains deferred.
+Dedicated category procedures (such as Armor base/bonus/features) remain separate
+increments; these shared property tables do not mark those workflows complete.
+
+Verification uses the existing treasure source and mounted browser suites, not a
+new suite. Source/typing and source UI checks pass; final archive evidence is in
+the GM audit. No live Foundry writes or operator acceptance are inferred.
+
+## Category-specific procedures: Armor first — October 29
+
+The user identified the missing context in the remaining generic tabs. Shared
+Attributes and Personality are additions; they do not replace each category's
+own creation procedure. Implement and reassess each type individually, beginning
+with Armor. Preserve the existing connected-paper UI and native card/icon reuse.
+
+Armor has two explicit paths:
+
+- **Existing native item:** choose a complete native Armor document. Preserve
+  its price, AC, properties, effects and artwork. Reset to source discards draft
+  modifications and restores that selected source; Clear item removes the
+  selection and its derived fields. Unchanged items remain assign-only.
+- **Build armor:** roll/select an ordinary armor type, roll/select bonus0–3, and
+  roll/select or manually enter a cosmetic feature. The selected type supplies
+  native mechanics/artwork; this produces a customized Armor item, not a Basic
+  item described as armor. Shared additive sections follow this procedure.
+
+Type choices use caller-readable, nonmagical Armor documents in the declared
+native gear source with usable AC fields. This includes supplied mithral variants;
+no missing mithral mechanics or same-name replacement is invented. Type rolls
+choose equally from that available pool. Bonus suggestions use four equally
+likely original alternatives; features use eight original cosmetic alternatives.
+These are explicitly labeled alternatives, not reproductions of the missing book
+rows/distributions. A GM can enter an externally rolled feature and select type/
+bonus manually. Do not silently simulate the book's mithral-reroll procedure.
+
+The bonus adds to native `system.ac.modifier`, including a shield's existing
+modifier. Do not also create an AC ActiveEffect. Preserve source AC base/attribute,
+properties, effects and slots. Preserve an existing baseArmor identifier (e.g.
+mithral chainmail); otherwise use the same Foundry slug helper as native armor
+mastery to retain the base identity when renamed. Positive bonuses set magicItem.
+Prices begin at the base item's value and remain editable, not an inferred magic
+item valuation. The preview displays the same AC formula and icon as the payload.
+
+Individual rolls replace their own part. Changing type refreshes its native
+fields/artwork while retaining bonus, feature and shared additives. Automatic
+names follow type/bonus until edited; custom names are retained. Clear beside Refresh sources
+clears the complete builder and recipient and retires any pending review. Source reset/clear controls are also reused wherever
+an existing native item is selected in the other implemented tabs.
+
+- [x] Armor procedure, native fields, shared additions and preview implemented.
+- [x] Inline validation; existing source and mounted workflow checks extended.
+- [x] Operator review of Armor, including the icon and Clear correction. User
+  accepted this point and selected the next category on October29.
+
+At the Armor checkpoint, the following dedicated category work remained. These
+procedures are now implemented in the subsequent increments below:
+
+| Type | Dedicated procedure |
+| --- | --- |
+| Weapons | Existing item or new type, bonus, feature; native damage/properties/icon |
+| Potions | Existing item or new potion with its three feature parts and potion properties |
+| Scrolls / Wands | Separate features, tier and spell selection; applicable property-family choices |
+| Utility | Existing item or new form and feature; appropriate native shape/icon |
+
+Random Treasure remains accepted for now. Mundane and Boons keep their accepted
+procedures. Missing official prose tables follow the original/manual policy.
+Potion mixing, naming/type navigation aids and user-table importing remain
+separate deferred work. No Core, version, compatibility or release change.
+
+Armor review correction: the type icon must use the public SDK image resolver,
+just like the preview card. Raw Foundry-relative paths resolve against the tool
+page and can break. The Clear action sits beside Refresh sources; source-specific
+Reset to source / Clear item remain separate existing-item controls.
+
+## Potions — October 29
+
+Armor's procedure and icon/Clear correction are user accepted. The next selected
+category is Potions. Full-book pp.286–287 supplies three separate feature columns
+and potion-specific benefit/curse tables; potion mixing is a distinct procedure
+and remains deferred. Native4.0.6 PotionSD extends PhysicalItemSD, includes the
+magic fields and defaults magicItem to true. The native default icon is reused.
+
+- [x] Existing native potion path preserves description, price, icon, effects,
+  formula and other source mechanics. Unchanged sources assign without another
+  library item; Reset to source and Clear item retain their established meaning.
+- [x] Build potion path has three individually required appearance features.
+  Each supports original selection/roll and manual entry. Roll all features
+  replaces just those three parts atomically; name, properties and other fields
+  remain intact. A failed sequence leaves the prior feature set intact.
+- [x] Three new original alternative tables, six equally likely entries each.
+  These are not official rows/distributions. Shared potion benefit/curse tables
+  and the shared personality section remain independently optional. Manually
+  entered property results must include any needed targets, duration and uses.
+- [x] New items use native type Potion, native potion artwork and magicItem=true.
+  The three features and shared additions append escaped description text.
+  No formula, spell association or ActiveEffect is inferred from prose. Such
+  items expose the existing native-aligned potion action; actual authored
+  benefit/curse outcomes remain GM-managed. Existing templates retain theirs.
+- [x] Shared Refresh/Clear, card preview, field validation, library save and
+  optional character assignment. Clear resets recipient/review along with the
+  draft. New potions begin with the existing editable physical-item defaults,
+  not an invented value for their powers.
+- [x] Existing source/typing and mounted desktop/phone checks pass; final archive
+  verification is recorded in the GM audit. No new test suite is introduced.
+- [x] Current Potions implementation included in the accepted October31 checkpoint.
+
+The reference UI remains the accepted Armor/Mundane connected paper, input/dice
+rows, shared rich-text editor and resource card. This does not select mixing,
+crafting costs, potion-effect automation, unidentified-item authoring or the next
+category at that checkpoint. The subsequent user instruction selects the remaining
+categories together, as recorded below. No Core or contract change or version bump.
+
+
+## Remaining procedures and permanent modifiers — October 29
+
+The user selected finishing the remaining categories before reviewing the outcomes,
+and asked for permanent mechanics such as armor +1 or AC +2. This supersedes the
+one-category-at-a-time review gate, not the original/manual-content policy or the
+separation of temporary effects from item authoring. Random Treasure remains
+accepted as-is; Magic Attributes and Personality remain shared sections, not
+standalone duplicate tabs.
+
+- [x] **Scrolls / Wands:** existing native item or a new Scroll/Wand; independent
+  subtype feature, tier, and exact tier-matched Spell. Feature and tier support
+  original alternatives/manual selection. Spell rolls choose equally among
+  caller-readable spells at that tier, not a bundled copy of the book's spell
+  table; the recipient's class does not filter GM authoring. Changing tier clears
+  the old spell and retires review. Empty tiers are explicit and cannot be rolled.
+  A family roll or manual family selection supplies subsequent benefits/curses.
+  New items retain the selected Spell icon and native spell link; existing wands
+  retain all source spells, including multi-spell templates.
+- [x] **Utility:** existing item or new form plus appearance feature. Parts roll
+  independently or atomically together. The six original forms use matching
+  Foundry icons; custom/edited forms use the Basic default, avoiding stale artwork.
+  Existing sources retain their artwork. Native Basic output has treasure=false;
+  actual additions set magicItem. Price remains explicit GM input for new forms.
+- [x] **Weapons:** existing source or ordinary native gear base, including Basic
+  ammunition. Type rolls use caller-readable gear; bonus and feature have separate
+  original tables. Native damage, properties, price, slots and art are retained;
+  baseWeapon identity survives a rename. Weapon bonuses add native attack/damage
+  effects once. Basic ammunition offers quantity entry or 2d6; bonuses are clearly
+  recorded as manual because native selected-ammunition handling consumes the
+  item without applying its effects to the firing weapon. No global attack bonus
+  is granted by merely carrying arrows. Thrown Weapon items remain weapons.
+- [x] Each remaining builder shares Refresh/Clear, source reset/clear, connected
+  paper controls, exact preview/save/assign and successful completion reset.
+  Unchanged existing items assign without another library copy. Ammunition goes
+  under Weapons; Scrolls/Wands have their respective folders; Utility uses Utility.
+- [x] Eight new original tables contain 43 equally likely choices. Missing official
+  prose tables/distributions remain unshipped. Original data and dynamic readable
+  source pools are labeled; manual entry is available for appearance/properties.
+
+### Permanent mechanics
+
+Permanent modifiers are explicit structured choices, not inference from prose or
+item names. This increment permits the supported native predefined definitions
+for additive AC, six ability scores, gear slots and initiative advantage. Numeric
+amounts are nonzero safe integers; initiative advantage uses one grant. Duplicate
+modifier types in one draft are rejected; the amount belongs in one entry. The
+UI states that these additions stack with existing source effects and armor/weapon
+bonuses. The generated native snapshot is unchanged; arbitrary effect keys,
+formulas, durations and modes are not accepted.
+
+Armor's existing bonus continues to update native ac.modifier, never both that
+field and a duplicate effect. An independently selected AC modifier is explicitly
+additional. Weapon bonuses use the two native weapon-specific definitions. Other
+new modifiers are allowed on equipment types Basic, Gem, Armor, Weapon and Wand;
+new grants on Potion, Scroll and Boon are rejected. Original template effects are
+always preserved, including on consumables. Changing to an incompatible template
+keeps any draft modifiers visible for removal rather than leaving a hidden blocker.
+
+Native equipment suppression is preserved: Weapon/Armor effects require equipped,
+identified, unstashed items; Basic/Gem/Wand effects apply while carried, identified
+and unstashed. Modifiers have no expiry and no daily reset. They are attached to
+the created Item; no permanent Actor source edit is made. Preview and final review
+list the exact included effect names. Conditional benefits, spell/potion outcomes,
+blessings, charges, temporary effects and prose consequences remain GM-managed.
+
+### Verification and review
+
+- [x] Extend existing treasure source and mounted browser suites; no new suite or
+  runtime dependency. Exact source re-resolution, GM/pack checks, tier mismatch,
+  malformed modifiers, native preservation, source equality and save/replay covered.
+- [x] Preparation verifies utility AC/stat/initiative changes and their suppression;
+  armor +2 plus an explicit AC +2 applies once each; weapon attack bonus increases
+  by exactly +2. Native effect conformance and weapon fixtures pass.
+- [x] Source desktop/phone workflows exercise tier retirement, actual spell/type
+  rolls, all-feature rolls, manual text retention, modifier editing, ammunition,
+  resolved artwork, previews, saving/assignment and reset. Catalog lifetime remains
+  initial load plus intentional refresh.
+- [x] Contract/package and compiled UI/CSS browser checks at390/1000px; packaged
+  screenshots inspected, artwork loaded, no overflow/errors, catalog reuse intact.
+- [x] Current Potions, Scrolls/Wands, Utility, Weapons and permanent-modifier implementation accepted for checkpoint October31.
+- [ ] Final installed release smoke covering native save/assignment and equipment effects. Offline evidence and checkpoint approval do not establish exhaustive native acceptance.
+
+A broader legacy boundary check reports 55/57 passing. The two failures, C4 failed
+spell loss/focus and RV-03 chat failure after a result, reproduce on committed
+baseline 9e2f094 with the same spellLoss bookkeeping mismatch. No spell-loss or
+chat implementation is changed by this increment. They are a separate existing
+validation limitation, not represented as passing by these checks.
+
+Potion mixing, naming aids, user-table/PDF import, conditional-effect automation
+and extra draft protection keep their existing decisions. No Core change, version
+bump, compatibility change, commit or release is authorized by implementation.
+
+
+### Scroll personality exclusion — October 31
+
+User removed Personality from scroll authoring. New scrolls and recognized native
+scroll templates hide the complete Personality section; selecting a scroll template
+disables any personality additions from the previous draft. Wands retain Personality.
+Existing template description/effects are preserved; this does not rewrite saved
+items or remove their native content. Attributes remain available for both subtypes.
+
+Spell picker follow-up: choices show tier and each referenced casting Class name.
+The catalog resolves only caller-readable Class documents by exact canonical UUID;
+missing/unreadable references say Class unavailable rather than guessing from a
+spell name. Same-name spells remain separate choices with their own native UUIDs.
+The existing picker search includes this class label. This changes presentation,
+not tier pools, class eligibility or the saved Spell identity.
+
+
+### Dedicated spell-item attributes — October 31
+
+The user selected replacing cross-family choices for scrolls/wands with dedicated
+spell-focused tables. The earlier book-inspired family selector was inappropriate
+for our independently authored properties, whose potion entries assume drinking.
+This decision supersedes family selection/rolling in the earlier Scrolls/Wands
+procedure; it does not change the book or claim its tables are reproduced.
+
+Four new SheetDelver Originals tables provide six equally likely results each:
+Wand benefits, Wand curses, Scroll benefits and Scroll curses. They describe casting,
+reading, preparation, handling and consequences of using the actual item. All support
+roll/select/manual entry through the existing controls. The selected subtype fixes
+the family, including native legacy templates; the family dropdown and family-roll
+button are removed. Before selecting an existing spell item, no attributes section
+is shown. Wands retain Personality; scrolls do not.
+
+Previously entered properties and existing template contents remain intact; their
+provenance stays visible. New choices use the correct subtype tables. Conditional
+bonuses, use limits and consequences remain GM-managed prose: no passive equipment
+effect, casting eligibility, spell link, consumption or failure rule is inferred or
+changed. The separate permanent-modifier authoring boundary remains unchanged.
+
+
+### Review clarity and card effects — October 31
+
+The user rejected the recipient-disclosure checkbox: assigning an inventory item
+already exposes its details and the checkbox provides no privacy control. Remove
+the checkbox and its server acknowledgement requirement. This supersedes that
+confirmation gate only; source-note separation, existing unidentified-template
+restriction, GM authorization and current-review validation remain intact. Keep
+the concise note: “Written benefits and curses require manual handling.”
+
+The embedded description editor uses the shared module theme with a visible
+black paper border, including its editing body. Shared item cards now include
+Effects within the card, replacing the separate name-only treasure-preview list.
+Reuse the existing card section typography and spacing; no new card layout.
+Each effect shows its changes and state. Owned sheets use exact Item ownership
+and prepared activation/suppression, matching the Effects tab. Catalog/treasure
+previews label effects enabled/disabled without implying an equipped Actor.
+Known keys use native labels; unknown changes retain their key and operation.
+This is read-only presentation, including formula text, without new automation.
+
+
+### Accepted implementation checkpoint — October 31
+
+The user accepted the current work and authorized committing it after the editor,
+item-effect card and review refinements. All selected category builders and shared
+sections are implemented; the earlier per-increment review notes are historical.
+The remaining release work is explicit scope/version selection, compatibility
+alignment, required CI and a focused final installed smoke. Existing baseline
+spell-loss test failures remain recorded in the GM audit and readiness report.
+Deferrals remain deferred; checkpoint approval does not authorize a release.

@@ -1,7 +1,7 @@
 # Shadowdark 1.0 readiness review
 
 Date: 2026-10-27
-Status: Comparison complete; release preparation not yet selected
+Status: Updated October31 — implementation checkpoint accepted; release preparation not yet selected
 
 ## Baseline and conclusion
 
@@ -29,8 +29,8 @@ is completed. Existing Creator/rest acceptance remains recorded in the
 | --- | --- | --- |
 | Identity and sheets | Both views, titles, background/deity, languages, boons, rich-text notes and effects | Native document authoring remains broader |
 | Creation and progression | Generator, Shadowdarklings importer, Creator and advancement; levels 0–10, native grants and tier table | Custom unsupported effects remain outside the accepted scope |
-| HP and recovery | Current HP editing, ration choice, successful-rest recovery and explicit exclusions | Direct permanent maximum-HP correction is absent |
-| Ability scores and checks | Prepared scores/modifiers, checks and attack modes | Direct base-score correction after creation is absent |
+| HP and recovery | Current HP editing, ration choice, successful-rest recovery and explicit exclusions | Shared base editor implemented and user accepted (ADR-0008) |
+| Ability scores and checks | Prepared scores/modifiers, checks and attack modes | Shared base editor implemented and user accepted (ADR-0008) |
 | Spells and class abilities | Cast/use, limited uses, loss/restoration, modern/legacy consumable handling | Full native damage/target/chat automation remains deferred |
 | Inventory and money | Equipment, stashing, quantities, slots, coins, treasure/gems, crawling-kit contents | Some native item-authoring conveniences are absent |
 | Optional controls | Pulp luck, manual Renown, maximum-level XP display | Renown is manual; no automatic social-event awards or conditional roll bonuses |
@@ -47,8 +47,7 @@ Our `AbilitiesTab.tsx` and `ShadowdarkPaperSheet.tsx` display/roll scores and ed
 current HP, without the equivalent base-score/max-HP edit mode. A shared explicit
 edit action would support corrections and permanent changes. It must distinguish
 saved base values from effect-adjusted totals and preserve existing effects;
-reuse the public update path and existing controls. Until selected, make these
-changes in Foundry.
+reuse the public update path and existing controls. That earlier limitation is resolved by the accepted shared editor.
 
 **R10-02: Deferred for further user discussion.** Share an owned item card to chat. Native
 `PlayerSheetSD._onItemChatClick` calls `shadowdark.chat.showItemCard` using the
@@ -92,7 +91,7 @@ from an older pending paragraph or turn these deferrals into release blockers.
 2. Add concise user-facing limitations to README: manual ammunition and the
    boundaries of damage/scene automation. Keep ADR/development history out of it.
 3. R10-01 is completed and user accepted. R10-02 remains deferred for discussion;
-   the broader GM proposal replacing R10-03 remains proposed in ADR-0009.
+   the broader GM work replacing R10-03 is implemented and accepted for the October31 checkpoint in ADR-0009.
 4. Run required CI and a focused installed-archive smoke check on the final
    release candidate. Reuse accepted workflow evidence; do not add exhaustive
    variable-by-variable tests merely because the major version changes.
@@ -159,7 +158,7 @@ show zero additional catalog requests on return and refresh after an off-page
 invalidation. The module-side cache implementation remains; its earlier fixtures
 alone were not operator acceptance. The user subsequently confirmed persistent
 cache across navigation on 2026-10-27, closing this acceptance item. Core ADR-0076
-is Completed; publication remains pending.
+is Completed; the user subsequently reported the supporting Core release complete.
 
 ## Mundane Items increment — October 28
 
@@ -180,3 +179,66 @@ review with native Oath/Secret/Blessing items, original/manual parts, card previ
 and shared save/assign behavior. The GM audit and ADR-0009 retain its evidence and
 manual-effect boundaries. Other category recipes and release preparation remain
 separate; this does not reopen accepted player-sheet work.
+
+The user accepted Boons; checkpoint `9e2f094` records it. The October29 correction
+replaces the Magic Items prototype with shared, independently optional Attributes
+and Personality sections inside the builders. Type-specific benefit/curse tables
+and shared personality alternatives support roll/select/manual entry. ADR-0009
+and the GM audit own the current scope and evidence. Naming/type aids are deferred.
+Operator review is open. Dedicated category procedures and release preparation
+remain separate; this does not reopen accepted player-sheet work.
+
+October29 Armor follow-up: the user selected per-category procedures after the
+shared additive correction. Armor now has existing-item reset/clear and a native
+base/bonus/feature build flow with icon and AC preview. It awaits operator review.
+Weapons, Potions, Scrolls/Wands and Utility retain distinct remaining procedures
+in ADR-0009; generic/shared controls do not mark these complete. No release or
+compatibility change is selected.
+
+Armor is now user accepted, including the image/whole-form Clear correction.
+Potions is implemented for review with its own three-feature procedure, native
+Potion output, optional shared properties and existing-item handling. Its scope
+and evidence are in ADR-0009 and the GM audit. Potion mixing and remaining
+category procedures are still separate; no release is selected.
+
+
+October29 continuation: user selected completion of the remaining GM treasure
+categories before combined review. Scrolls/Wands, Utility and Weapons now have
+separate procedures; optional supported permanent equipment modifiers are included.
+ADR-0009 and the GM audit own scope, verification and manual boundaries. Potions
+and these new increments await operator acceptance. Two legacy spell-loss boundary
+assertions fail identically on committed baseline9e2f094 (55/57); this validation
+limitation is recorded separately from passing treasure, typing, conformance and
+browser checks. No release/version/compatibility change or new Core work.
+
+
+## Current assessment — October 31 checkpoint
+
+The user accepted checkpointing the completed treasure-category implementation and
+latest UI refinements. Random Treasure, Mundane Items, Boons, Armor, Potions,
+Scrolls/Wands, Utility and Weapons have their selected flows. Shared Attributes
+and Personality replace duplicate tabs; scrolls omit Personality. Supported
+permanent equipment modifiers and shared item-card effect details are included.
+The embedded editor border and simplified save review are accepted. ADR-0009 is
+Implemented; no further selected builder implementation is outstanding.
+
+Relevant source regressions, explicit typing, contract/package and compiled
+390/1000px UI checks pass. The GM audit records exact evidence and distinguishes
+these checks from native acceptance. Current Core checkout is0.22.3; manifest,
+README and CI still have the different historical minimums described above.
+No minimum or release version was changed for this checkpoint.
+
+Before release:
+1. Resolve the two existing boundary-test failures (C4 and RV-03) around spellLoss
+   bookkeeping. They reproduce on baseline9e2f094; they are not introduced by this
+   work, but the required CI suite cannot be considered green with them unresolved.
+2. Select the release scope/version and supported Core baseline, then align the
+   manifest, README and CI pins under release preparation authority.
+3. Run required CI and a focused final installed-archive smoke for native
+   save/assign/reset and equipment effects. Checkpoint approval is not evidence
+   of every native case. Preserve accepted player-workflow evidence.
+4. Finalize concise feature/limitation notes and use the release helper only after
+   separate authorization. No release bump, tag, push or publication is selected.
+
+Optional table/PDF import, naming aids, potion mixing, hidden-identity authoring,
+cards-to-chat and prior native-automation deferrals remain outside this checkpoint.

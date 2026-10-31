@@ -2,8 +2,8 @@ import React from 'react';
 import { MUNDANE_TABLES } from '../../data/mundane-tables';
 import { mundaneFollowUp, mundaneTable, originalRow, originalSelection, type MundaneRecipe, type MundanePart, type MundanePartKey } from '../../logic/mundane';
 
-export function OriginalDice({label,onClick}:{label:string;onClick:()=>void}) {
-    return <button type="button" className="sd-creator-dice" aria-label={label} title={label} onClick={onClick}>
+export function OriginalDice({label,onClick,disabled=false}:{label:string;onClick:()=>void;disabled?:boolean}) {
+    return <button type="button" className="sd-creator-dice" aria-label={label} title={label} disabled={disabled} onClick={onClick}>
         <img src="/icons/dice-d6.svg" alt="" aria-hidden="true"/>
     </button>;
 }

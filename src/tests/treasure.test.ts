@@ -1,12 +1,17 @@
 /** One useful delivery workflow, native payload parity, and bounded failure checks. */
+import { emptyPotionRecipe } from '../logic/potion-treasure';
+import { preparePotionAction } from '../logic/actions';
+import { armorBases, emptyArmorRecipe, armorName } from '../logic/armor-treasure';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { emptyMundaneRecipe, originalSelection, mundaneName, mundaneValueTable, treasureValue } from '../logic/mundane';
 import { MUNDANE_TABLES } from '../data/mundane-tables';
 import { emptyBoonRecipe, boonName } from '../logic/boons';
-import { buildDocumentCard } from '../logic/resource-cards';
+import { buildOwnedItemCard, buildDocumentCard } from '../logic/resource-cards';
+import { emptyMagicRecipe, magicFixedFamily, magicTable, magicErrors, magicDescription } from '../logic/magic-attributes';
 import { nativePacks } from './core0191/world';
 import { DECLARED_PACKS } from '../logic/identity';
+import { prepareShadowdarkView } from '../logic/prepared-view';
 import { worldSnapshot } from './fixtures/native-406';
 import { emptyTreasureDraft, emptyWeaponRecipe, treasureFromTemplate, treasurePayload, treasureErrors, treasureFolder, treasureUnchanged, treasureTemplateAllowed, treasureResultValue } from '../logic/treasure';
 import { shadowdarkAdapter as adapter } from '../server/ShadowdarkAdapter';
@@ -62,8 +67,8 @@ const table='Compendium.shadowdark.rollable-tables.RollTable.Pi9nnnLeXpTKCSMY';
 const draw=await call(handleTreasureDraw,{uuid:table});assert.equal(draw.success,true,JSON.stringify(draw));assert.equal(draw.draw.total,1);assert.ok(draw.draw.results.length);
 const manual={...emptyTreasureDraft(),name:'Externally rolled gem',description:'<p>A result entered by the GM.</p>',gp:'25',drawId:draw.draw.id,sourceNote:'Private source reference'};
 const prep=await call(handleTreasurePrepare,{draft:manual,actorId:'recipient'});assert.ok(prep.plan.review,JSON.stringify(prep));assert.equal(writes,0);
-const body={draft:manual,actorId:'recipient',review:prep.plan.review,disclosed:true,requestId:'delivery-test-0001'};
-assert.equal((await call(handleTreasureDeliver,{...body,disclosed:false})).status,400);assert.equal(writes,0);
+const body={draft:manual,actorId:'recipient',review:prep.plan.review,requestId:'delivery-test-0001'};
+assert.equal((await call(handleTreasureDeliver,{...body,review:'outdated-review'})).reviewChanged,true);assert.equal(writes,0);
 const done=await call(handleTreasureDeliver,body);assert.equal(done.operation.state,'complete');assert.equal(writes,1);
 await call(handleTreasureDeliver,body);assert.equal(writes,1);
 assert.equal(JSON.stringify(actor.items).includes('Private source reference'),false);assert.deepEqual(actor.system,{coins:{gp:5},level:{value:2,xp:3}});
@@ -88,7 +93,7 @@ const wp=treasurePayload(weapon,template,null);
 assert.deepEqual(wp.system.damage,template.system.damage);assert.equal(wp.effects.length,template.effects.length+1);
 assert.deepEqual(wp.effects.at(-1).changes.map((c:any)=>[c.key,c.value]),[['system.roll.attack.bonus.this','2'],['system.roll.attack.damage.this','2']]);
 assert.ok(wp.system.description.includes('Benefit (manual)'));assert.ok(treasureErrors({...weapon,weapon:{...weapon.weapon,benefits:['']}})['benefits.0']);
-const saveBody=async(d:any,id:string,actorId='')=>{const p=await call(handleTreasurePrepare,{draft:d,actorId,saveToLibrary:true});assert.ok(p.plan.review,JSON.stringify(p));return{draft:d,actorId,saveToLibrary:true,review:p.plan.review,requestId:id,disclosed:!!actorId};};
+const saveBody=async(d:any,id:string,actorId='')=>{const p=await call(handleTreasurePrepare,{draft:d,actorId,saveToLibrary:true});assert.ok(p.plan.review,JSON.stringify(p));return{draft:d,actorId,saveToLibrary:true,review:p.plan.review,requestId:id};};
 const firstSave=await saveBody(weapon,'world-save-0001');
 const saved=await call(handleTreasureDeliver,firstSave);assert.equal(saved.operation.state,'complete',JSON.stringify(saved));assert.equal(libraryWrites,1);assert.equal(folderWrites,2);assert.equal(writes,2);
 const root=folders.find(d=>d.type==='Item'&&d.folder===null)!;
@@ -215,3 +220,235 @@ const boonCard=buildDocumentCard(blessingPayload,null);assert.ok(boonCard.facts.
 assert.equal((await call(handleTreasureDeliver,await saveBody(blessing,'boon-blessing-save-0001','recipient'))).operation.state,'complete');
 assert.equal(actor.items.at(-1).system.boonType,'blessing');assert.deepEqual(actor.system,actorBefore);
 console.log('Boons: oath/secret/blessing parts, native nonphysical shape, level validation, escaping, folder/save/assign and lost-ack recovery passed.');
+
+// Shared additives use actual property results, independent switches and native bases.
+const propertyRoll=await call(handleTreasureOriginalDraw,{table:'weapon-benefits',version:1});
+assert.equal(propertyRoll.success,true);
+assert.equal(magicFixedFamily('weapons',template),'weapon');
+assert.equal(magicFixedFamily('random',{type:'Armor'}),'armor');
+assert.equal(magicFixedFamily('potions'),'potion');
+assert.equal(magicFixedFamily('mundane',null,'Gem'),'utility');
+assert.equal(magicFixedFamily('random',legacyWand),'wand');
+assert.equal(magicFixedFamily('scrolls'),undefined);
+assert.equal(magicTable('armor','virtues'),magicTable('weapon','virtues'));
+let magic={...emptyMagicRecipe(),attributesEnabled:true,benefits:[originalSelection('weapon-benefits','mark')],curses:[{text:'Cannot be concealed from its former owner.'}]};
+assert.ok(magicErrors({...magic,benefits:[{text:''}]})['magic.benefits.0']);
+assert.ok(magicErrors({...magic,benefits:[originalSelection('personality-virtues','names')]})['magic.benefits.0']);
+assert.deepEqual(magicErrors({...magic,attributesEnabled:false,benefits:[{text:''}]}),{});
+magic={...magic,personalityEnabled:true,virtues:[originalSelection('personality-virtues','fairness')],flaws:[{text:'Vain <script>.'}],trait:'Speaks in questions.',alignment:'Neutral'};
+assert.deepEqual(magicErrors(magic),{});
+assert.ok(magicErrors({...magic,trait:''})['magic.trait']);
+assert.doesNotMatch(magicDescription({...magic,attributesEnabled:false}),/identifying mark/);
+assert.match(magicDescription({...magic,attributesEnabled:false}),/Speaks in questions/);
+assert.doesNotMatch(magicDescription({...magic,personalityEnabled:false}),/Speaks in questions/);
+assert.match(magicDescription(magic),/&lt;script&gt;/);
+const enchanted={...treasureFromTemplate(template),category:'magic' as const,magic};
+const nativeOriginal=structuredClone(template),enchantedPayload=treasurePayload(enchanted,template,null);
+assert.deepEqual(enchantedPayload.effects,template.effects);assert.equal(enchantedPayload.img,template.img);assert.deepEqual(template,nativeOriginal);
+assert.equal(enchantedPayload.name,template.name);
+assert.equal(enchantedPayload.system.magicItem,true);
+assert.equal(treasureUnchanged(enchanted,template),false);
+assert.equal(treasureUnchanged({...enchanted,magic:{...magic,attributesEnabled:false,personalityEnabled:false}},template),true);
+assert.equal(treasureUnchanged({...enchanted,magic:{...emptyMagicRecipe(),attributesEnabled:true}},template),true);
+const magicBody=await saveBody(enchanted,'magic-attributes-0001','recipient');
+const magicWrites=writes,magicSaves=libraryWrites;
+assert.equal((await call(handleTreasureDeliver,magicBody)).operation.state,'complete');await call(handleTreasureDeliver,magicBody);
+assert.equal(writes,magicWrites+1);assert.equal(libraryWrites,magicSaves+1);assert.deepEqual(actor.items.at(-1).effects,template.effects);
+assert.deepEqual(actor.system,actorBefore);
+const boonWithAttributes=treasurePayload({...blessing,magic},null,null);
+assert.deepEqual(Object.keys(boonWithAttributes.system).sort(),['boonType','description','level']);assert.deepEqual(boonWithAttributes.effects,[]);
+console.log('Shared additives: contextual tables, independent sections, validation, native preservation and exact save/assignment passed.');
+
+// Armor uses native gear types, not invented AC/slots or a second AC effect.
+const bases=armorBases(rows);assert.equal(bases.length,7);
+const plate=bases.find(d=>d._id==='o0261gnDqGC5hQB1')!;
+const shield=bases.find(d=>d._id==='UWp4WkkiaBMSXYPE')!;
+const mithral=bases.find(d=>d._id==='UDyHeJCreIFZ9y2I')!;
+const nativeArmor=rows.find(d=>d.name==='Ophidian Armor')!;
+assert.equal(armorBases([nativeArmor]).length,0);
+const armorRoll=await call(handleTreasureOriginalDraw,{table:'armor-type',version:1});
+assert.equal(armorRoll.armorType.uuid,bases[0].uuid);
+assert.equal((await call(handleTreasureOriginalDraw,{table:'armor-type',version:1},false)).status,403);
+const recipe={...emptyArmorRecipe(),bonus:'2',feature:originalSelection('armor-feature','map')};
+const armorDraft={...treasureFromTemplate(plate),category:'armor' as const,armor:recipe,name:armorName(plate,recipe.bonus)};
+const plateBefore=structuredClone(plate),armorPayload=treasurePayload(armorDraft,plate,null);
+assert.equal(armorPayload.system.ac.base,15);assert.equal(armorPayload.system.ac.attribute,'');assert.equal(armorPayload.system.ac.modifier,2);
+assert.equal(armorPayload.system.baseArmor,'plate-mail');assert.equal(armorPayload.system.magicItem,true);
+assert.deepEqual(armorPayload.system.properties,plate.system.properties);assert.deepEqual(armorPayload.system.slots,plate.system.slots);
+assert.deepEqual(armorPayload.effects,plate.effects);assert.equal(armorPayload.img,plate.img);assert.deepEqual(plate,plateBefore);
+assert.equal(buildDocumentCard(armorPayload,null).facts.find(f=>f.label==='AC')?.value,'15 +2');
+assert.equal(armorPayload.system.cost.gp,130);assert.match(armorPayload.system.description,/vanished city/);
+const shieldPayload=treasurePayload({...armorDraft,...treasureFromTemplate(shield),name:armorName(shield,'2')},shield,null);
+assert.equal(shieldPayload.system.ac.modifier,4,'native shield +2 plus the selected +2, without adding a second effect');
+assert.deepEqual(shieldPayload.effects,shield.effects);
+const mithralPayload=treasurePayload({...armorDraft,...treasureFromTemplate(mithral)},mithral,null);
+assert.equal(mithralPayload.system.baseArmor,'chainmail');assert.equal(mithralPayload.system.slots.slots_used,1);
+const nativeDraft={...treasureFromTemplate(nativeArmor),category:'armor' as const,armor:emptyArmorRecipe('existing')};
+assert.equal(treasureUnchanged(nativeDraft,nativeArmor),true);
+assert.deepEqual(treasurePayload(nativeDraft,nativeArmor,null).effects,nativeArmor.effects);
+assert.deepEqual(treasurePayload(nativeDraft,nativeArmor,null).system.ac,nativeArmor.system.ac);
+assert.throws(()=>treasurePayload({...nativeDraft,armor:recipe},nativeArmor,null),/available armor type/);
+assert.ok(treasureErrors({...armorDraft,armor:{...recipe,bonus:'4'}})['armor.bonus']);
+assert.ok(treasureErrors({...armorDraft,armor:{...recipe,feature:{text:''}}})['armor.feature']);
+const beforeArmorWrites=writes,beforeArmorSaves=libraryWrites;
+const armorBody=await saveBody(armorDraft,'armor-library-0001','recipient');
+assert.equal((await call(handleTreasureDeliver,armorBody)).operation.state,'complete');await call(handleTreasureDeliver,armorBody);
+assert.equal(writes,beforeArmorWrites+1);assert.equal(libraryWrites,beforeArmorSaves+1);
+assert.equal(actor.items.at(-1).system.ac.modifier,2);assert.equal(actor.items.at(-1).img,plate.img);
+assert.deepEqual(actor.system,actorBefore);
+console.log('Armor: native type rolls, AC/shield bonus, mithral fields, native reuse, validation and exact library/assignment passed.');
+
+// New potions have the native consumable type; appearance never creates mechanics.
+const potionRecipe={...emptyPotionRecipe(),first:originalSelection('potion-feature-first','pearl'),second:originalSelection('potion-feature-second','key'),third:{text:'Label <script>.'}};
+const newPotion={...emptyTreasureDraft(),category:'potions' as const,kind:'Potion' as const,name:'Wayfarer’s Draught',potion:potionRecipe,
+ magic:{...emptyMagicRecipe(),attributesEnabled:true,family:'potion' as const,benefits:[originalSelection('potion-benefits','thread')]}};
+const potionPayload=treasurePayload(newPotion,null,null);
+assert.equal(potionPayload.type,'Potion');assert.equal(potionPayload.system.magicItem,true);
+assert.equal(potionPayload.img,'icons/consumables/potions/bottle-corked-red.webp');assert.deepEqual(potionPayload.effects,[]);
+assert.equal(potionPayload.system.formula,undefined);assert.equal(potionPayload.system.spellUuid,undefined);
+assert.match(potionPayload.system.description,/Potion feature 3/);assert.match(potionPayload.system.description,/&lt;script&gt;/);assert.match(potionPayload.system.description,/silver thread/);
+assert.equal(preparePotionAction({kind:'Player'} as any,{...potionPayload,_id:'made-potion'}).kind,'potion');
+assert.ok(treasureErrors({...newPotion,potion:{...potionRecipe,second:{text:''}}})['potion.second']);
+assert.ok(treasureErrors({...newPotion,potion:{...potionRecipe,first:originalSelection('armor-feature','map')}})['potion.first']);
+assert.ok(treasureErrors({...newPotion,category:'random'})['potion.mode']);
+const potionBefore=writes,potionSaves=libraryWrites;
+const potionBody=await saveBody(newPotion,'potion-library-0001','recipient');
+assert.equal((await call(handleTreasureDeliver,potionBody)).operation.state,'complete');await call(handleTreasureDeliver,potionBody);
+assert.equal(writes,potionBefore+1);assert.equal(libraryWrites,potionSaves+1);
+assert.equal(actor.items.at(-1).type,'Potion');assert.deepEqual(actor.system,actorBefore);
+const nativePotion=rows.find(d=>d.type==='Potion'&&d.effects.length)??rows.find(d=>d.type==='Potion');assert.ok(nativePotion);
+const reusedPotion={...treasureFromTemplate(nativePotion),category:'potions' as const,potion:emptyPotionRecipe('existing')};
+assert.equal(treasureUnchanged(reusedPotion,nativePotion),true);
+const reusedPayload=treasurePayload(reusedPotion,nativePotion,null);
+assert.equal(reusedPayload.img,nativePotion.img);assert.deepEqual(reusedPayload.effects,nativePotion.effects);
+assert.deepEqual(reusedPayload.system.cost,nativePotion.system.cost);assert.equal(reusedPayload.system.formula,nativePotion.system.formula);
+console.log('Potions: independent features, native consumable payload/icon, manual properties, exact reuse and save/assignment passed.');
+
+// Remaining procedures resolve exact native bases/spells and persistent modifiers.
+const { emptyUtilityRecipe, emptySpellItemRecipe, weaponBases, tierSpells }=await import('../logic/treasure-procedures');
+const { prepareActorCore }=await import('../logic/actor-preparation');
+const { prepareWeaponAttack }=await import('../logic/weapon-rules');
+const { modifierErrors }=await import('../logic/treasure-modifiers');
+const utilityDraft={...emptyTreasureDraft(),category:'utility' as const,name:'Surveyor’s compass',
+ utility:{...emptyUtilityRecipe(),form:originalSelection('utility-form','compass'),feature:originalSelection('utility-feature','seams')},
+ modifiers:[{id:'acBonus' as const,value:'2'},{id:'abilityImprovementStr' as const,value:'2'},{id:'initAdvantage' as const,value:'1'}]};
+const utilityPayload=treasurePayload(utilityDraft,null,null);
+assert.equal(utilityPayload.type,'Basic');assert.equal(utilityPayload.system.treasure,false);assert.equal(utilityPayload.system.magicItem,true);
+assert.equal(utilityPayload.img,'icons/tools/navigation/compass-brass-blue-red.webp');
+assert.equal(utilityPayload.effects.length,3);assert.equal(utilityPayload.effects[0].changes[0].key,'system.attributes.ac.value');
+assert.equal(utilityPayload.effects[0].changes[0].value,'2');assert.equal(utilityPayload.effects[0].transfer,true);
+assert.equal(utilityPayload.effects[0].duration.seconds,null);
+assert.ok(treasureErrors({...utilityDraft,utility:{...utilityDraft.utility,feature:originalSelection('weapon-feature','wax')}})['utility.feature']);
+const editedForm=treasurePayload({...utilityDraft,utility:{...utilityDraft.utility,form:{...utilityDraft.utility.form,text:'Custom form'}}},null,null);
+assert.equal(editedForm.img,'icons/containers/bags/pouch-simple-brown.webp','edited form must not claim a mismatched generated icon');
+const mechanicalActor={_id:'mechanical',type:'Player',system:{abilities:Object.fromEntries(['str','dex','con','int','wis','cha'].map(key=>[key,{value:10}])),attributes:{hp:{value:4,max:4}},level:{value:1}},effects:[],items:[{...utilityPayload,_id:'utility'}]};
+let preparedUtility=prepareActorCore(mechanicalActor);
+assert.equal(preparedUtility.ac,12);assert.equal(preparedUtility.abilities.str.value,12);assert.equal(preparedUtility.initiative.advantage,1);
+for(const system of [{stashed:true},{identification:{identified:false}}]){
+ const inactive=prepareActorCore({...mechanicalActor,items:[{...utilityPayload,system:{...utilityPayload.system,...system},_id:'utility'}]});
+ assert.equal(inactive.ac,10);assert.equal(inactive.abilities.str.value,10);assert.equal(inactive.initiative.advantage,0);
+}
+assert.ok(modifierErrors([{id:'acBonus',value:'0'}],'Basic')['modifiers.0']);
+assert.ok(modifierErrors([{id:'acBonus',value:'2'},{id:'acBonus',value:'1'}],'Basic')['modifiers.1']);
+assert.ok(modifierErrors([{id:'arbitrary.key' as any,value:'2'}],'Basic')['modifiers.0']);
+assert.ok(treasureErrors({...newPotion,modifiers:utilityDraft.modifiers}).modifiers);
+assert.throws(()=>treasurePayload({...reusedPotion,modifiers:utilityDraft.modifiers},nativePotion,null),/permanent modifiers/);
+const utilityWrite=await saveBody(utilityDraft,'utility-built-0001','recipient');const uWrites=writes,uSaves=libraryWrites;
+await call(handleTreasureDeliver,utilityWrite);await call(handleTreasureDeliver,utilityWrite);
+assert.equal(writes,uWrites+1);assert.equal(libraryWrites,uSaves+1);assert.equal(actor.items.at(-1).effects.length,3);assert.deepEqual(actor.system,actorBefore);
+
+const weaponBaseRows=weaponBases(rows);assert.ok(weaponBaseRows.some(i=>i.type==='Weapon'));assert.ok(weaponBaseRows.some(i=>i.system.isAmmunition));
+const weaponBase=weaponBaseRows.find(i=>i.type==='Weapon'&&i.system.damage.oneHanded==='d8')??weaponBaseRows.find(i=>i.type==='Weapon');
+const builtWeapon={...treasureFromTemplate(weaponBase),category:'weapons' as const,name:'Etched weapon',weapon:{...emptyWeaponRecipe(),mode:'build' as const,bonus:'2',featurePart:originalSelection('weapon-feature','script')}};
+const builtWeaponPayload=treasurePayload(builtWeapon,weaponBase,null);
+assert.deepEqual(builtWeaponPayload.system.damage,weaponBase.system.damage);assert.equal(builtWeaponPayload.img,weaponBase.img);assert.ok(builtWeaponPayload.system.baseWeapon);
+assert.equal(builtWeaponPayload.effects.at(-1).changes.length,2);
+const ownedWeapon={...builtWeaponPayload,_id:'weapon',system:{...builtWeaponPayload.system,equipped:true}};
+const plainWeapon={...structuredClone(ownedWeapon),effects:weaponBase.effects};
+const baseAttack=prepareWeaponAttack({...mechanicalActor,items:[plainWeapon]},plainWeapon);
+const boostedAttack=prepareWeaponAttack({...mechanicalActor,items:[ownedWeapon]},ownedWeapon);
+assert.equal(boostedAttack.toHit-baseAttack.toHit,2);assert.match(boostedAttack.damage!,/2/);
+const armored=treasurePayload({...armorDraft,modifiers:[{id:'acBonus',value:'2'}]},plate,null);
+const equippedArmor={...armored,_id:'armor',system:{...armored.system,equipped:true}};
+assert.equal(prepareActorCore({...mechanicalActor,items:[equippedArmor]}).ac,19,'native plate 15 + armor bonus2 + separately selected effect2, each once');
+assert.equal(prepareActorCore({...mechanicalActor,items:[{...equippedArmor,system:{...equippedArmor.system,equipped:false}}]}).ac,10);
+const ammo=weaponBaseRows.find(i=>i.type==='Basic'&&i.system.isAmmunition);const ammoDraft={...treasureFromTemplate(ammo),category:'weapons' as const,weapon:builtWeapon.weapon,quantity:'7'};
+const ammoPayload=treasurePayload(ammoDraft,ammo,null);assert.equal(ammoPayload.system.quantity,7);assert.deepEqual(ammoPayload.effects,ammo.effects);assert.match(ammoPayload.system.description,/Ammunition bonus \(manual\)/);
+assert.equal(treasureFolder(ammoDraft,ammoPayload),'Weapons');
+assert.ok(treasureErrors({...builtWeapon,weapon:{...builtWeapon.weapon,featurePart:{text:''}}})['weapon.feature']);
+const weaponDraw=await call(handleTreasureOriginalDraw,{version:1,table:'weapon-type'});assert.equal(weaponDraw.weaponType.uuid,weaponBaseRows[0].uuid);
+const savedRoll=runtime.rolls.roll;runtime.rolls.roll=async()=>({total:7});
+const ammoDraw=await call(handleTreasureOriginalDraw,{version:1,table:'ammunition-quantity',uuid:ammo.uuid});assert.equal(ammoDraw.quantity,7);runtime.rolls.roll=savedRoll;
+
+const oneTier=String(spell.system.tier),nativeSpells=tierSpells(rows,oneTier);
+for(const kind of ['Scroll','Wand'] as const){
+ const draft={...emptyTreasureDraft(),category:'scrolls' as const,kind,name:`Built ${kind}`,spellUuid:spell.uuid,
+  spellItem:{...emptySpellItemRecipe(),tier:oneTier,feature:originalSelection(`${kind.toLowerCase()}-feature`,kind==='Scroll'?'ribbon':'chime')}};
+ const payload=treasurePayload(draft,null,spell);assert.equal(payload.img,spell.img);assert.equal(payload.system.magicItem,true);
+ if(kind==='Scroll')assert.equal(payload.system.spellUuid,spell.uuid);else assert.deepEqual(payload.system.spells,[{uuid:spell.uuid,lost:false}]);
+ assert.match(payload.system.description,new RegExp(`${kind} feature`));
+ const mismatch=await call(handleTreasurePrepare,{draft:{...draft,spellItem:{...draft.spellItem,tier:oneTier==='1'?'2':'1'}},saveToLibrary:true});
+ assert.match(mismatch.plan.errors.spellUuid,/selected tier/);
+ assert.ok(treasureErrors({...draft,spellItem:{...draft.spellItem,feature:originalSelection('utility-feature','seams')}})['spellItem.feature']);
+ const body=await saveBody(draft,`built-${kind}-0001`,'recipient');const beforeSpellWrite:number=writes;await call(handleTreasureDeliver,body);await call(handleTreasureDeliver,body);assert.equal(writes,beforeSpellWrite+1);
+}
+const spellDraw=await call(handleTreasureOriginalDraw,{version:1,table:'tier-spell',tier:oneTier});assert.equal(spellDraw.spell.uuid,nativeSpells[0].uuid);
+assert.equal((await call(handleTreasureOriginalDraw,{version:1,table:'tier-spell',tier:'6'})).status,400);
+allowed=false;const beforeDenied=writes;assert.ok((await call(handleTreasureOriginalDraw,{version:1,table:'tier-spell',tier:oneTier})).status>=400);assert.equal(writes,beforeDenied);allowed=true;
+console.log('Remaining procedures: tier-bound scroll/wand links, utility forms/artwork, native weapons/ammunition, permanent effect application/suppression, exact save/replay and source access passed.');
+
+// Spell choices expose exact native class labels, not guessed spell-name matches.
+const labeledCatalog=await call(handleTreasureCatalog,{},true,'GET');
+const nativeLights=rows.filter(d=>d.type==='Spell'&&d.name==='Light');
+assert.ok(nativeLights.length>=2);
+for(const nativeSpell of nativeLights){
+ const expected=nativeSpell.system.class.map((uuid:string)=>byUuid.get(uuid)?.name??'Class unavailable');
+ assert.deepEqual(labeledCatalog.spells.find((s:any)=>s.uuid===nativeSpell.uuid).classes,expected);
+}
+assert.ok(labeledCatalog.spells.some((s:any)=>s.name==='Light'&&s.classes.includes('Wizard')));
+assert.ok(labeledCatalog.spells.some((s:any)=>s.name==='Light'&&s.classes.includes('Priest')));
+console.log('Treasure spell picker: exact casting-class labels distinguish native same-name spells.');
+
+// Spell-item properties use their own contextual original alternatives.
+assert.equal(magicFixedFamily('scrolls',null,'Scroll'),'scroll');
+assert.equal(magicFixedFamily('scrolls',null,'Wand'),'wand');
+for(const kind of ['Scroll','Wand'] as const){
+ const family=kind==='Scroll'?'scroll':'wand';
+ const rolled=await call(handleTreasureOriginalDraw,{table:`${family}-benefits`,version:1});
+ assert.equal(rolled.part.source.table,`${family}-benefits`);
+ const magic:ReturnType<typeof emptyMagicRecipe>={...emptyMagicRecipe(),family:kind==='Scroll'?'scroll':'wand',attributesEnabled:true,benefits:[rolled.part],curses:[originalSelection(`${family}-curses`,kind==='Scroll'?'stain':'ink')]};
+ assert.deepEqual(magicErrors(magic),{});
+ const draft={...emptyTreasureDraft(),kind,name:`${kind} of Light`,spellUuid:spell.uuid,magic};
+ const made=treasurePayload(draft,null,spell);
+ assert.match(made.system.description,/casting|cast/);
+ assert.deepEqual(made.effects,[],'conditional properties remain descriptive, not passive effects');
+ if(kind==='Scroll')assert.equal(made.system.spellUuid,spell.uuid);else assert.deepEqual(made.system.spells,[{uuid:spell.uuid,lost:false}]);
+}
+console.log('Spell-item tables: dedicated Wand/Scroll families, valid rolls/manual properties and native casting links retained.');
+
+
+// Cards expose changes for the exact owned Item, with canonical v14 precedence
+// and current suppression; preview cards never imply an active Actor effect.
+const cardItem:any={_id:'card-armor',type:'Armor',name:'Test armor',system:{equipped:true,ac:{base:12},quantity:1},effects:[
+    {_id:'shared-id',name:'Protection',changes:[{key:'system.attributes.ac.value',mode:2,value:99}],system:{changes:[{key:'system.attributes.ac.value',type:'add',value:2}]}},
+    {_id:'disabled',name:'Dormant strength',disabled:true,changes:[{key:'system.abilities.str.value',mode:2,value:1}]},
+    {_id:'local',name:'Local effect',transfer:false,changes:[]},
+    {_id:'situational',name:'Situational effect',flags:{shadowdark:{situational:true}},changes:[{key:'system.custom.extension',mode:5,value:'@abilities.cha.mod'}]},
+]};
+const cardActor:any={_id:'card-owner',type:'Player',system:{},effects:[{_id:'shared-id',name:'Actor-only effect',changes:[]}],items:[cardItem,{_id:'other-item',type:'Basic',name:'Other item',effects:[{_id:'shared-id',name:'Other item effect',changes:[]}]}]};
+const ownCard=()=>buildOwnedItemCard(prepareShadowdarkView(cardActor),cardItem)!;
+const entries=ownCard().sections.find(s=>s.title==='Effects')!.entries;
+assert.deepEqual(entries.map(e=>e.title),['Protection','Dormant strength','Local effect','Situational effect']);
+assert.deepEqual(entries[0].facts,[{label:'Status',value:'Active'},{label:'AC Bonus',value:'Add 2'}]);
+assert.equal(entries[1].facts![0].value,'Disabled');assert.equal(entries[2].facts![0].value,'Not transferred');
+assert.equal(entries[3].facts![0].value,'Active (situational)');
+assert.deepEqual(entries[3].facts![1],{label:'system.custom.extension',value:'Set to @abilities.cha.mod'});
+cardItem.system.equipped=false;
+assert.equal(ownCard().sections[0].entries[0].facts![0].value,'Suppressed (unequipped)');
+cardItem.system.stashed=true;
+assert.equal(ownCard().sections[0].entries[0].facts![0].value,'Suppressed (stashed)');
+const previewEffects=buildDocumentCard(cardItem,null).sections[0].entries;
+assert.equal(previewEffects[0].facts![0].value,'Enabled');assert.equal(previewEffects[0].facts![1].value,'Add 2');
+assert.equal(previewEffects[1].facts![0].value,'Disabled');
+assert.deepEqual(buildDocumentCard({...cardItem,effects:[]},null).sections,[]);
+console.log('Item cards: exact-owner effects, readable changes, v14 precedence, suppression and preview state verified.');

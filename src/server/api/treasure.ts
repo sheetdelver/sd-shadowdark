@@ -1,10 +1,13 @@
+import { weaponBases, tierSpells, spellTier } from '../../logic/treasure-procedures';
+import { modifierErrors } from '../../logic/treasure-modifiers';
+import { armorBases } from '../../logic/armor-treasure';
 import { createHash, randomUUID } from 'node:crypto';
 import { json, error, type ModuleServerRequest } from '@sheet-delver/sdk/server';
 import { SdkError, getErrorMessage, isSdkError, processHtmlContent } from '@sheet-delver/sdk';
 import { callerOf, canReadPack, contextConflict, requestRevision, requireOwnedActor } from '../access';
 import { shadowdarkAdapter as adapter } from '../ShadowdarkAdapter';
 import { withActorLock } from '../operation-lock';
-import { documentId, parseUuid } from '../../logic/identity';
+import { documentId, parseUuid, canonicalUuid } from '../../logic/identity';
 import { continueLibrary, reconcileLibrary, type LibrarySave } from '../treasure-library';
 import { CRAWLING_KIT_UUID, TREASURE_TYPES, treasureFolder, treasureUnchanged, treasureErrors, treasurePayload, type TreasureDraft } from '../../logic/treasure';
 import { ORIGINAL_TABLES, ORIGINAL_TABLE_VERSION } from '../../data/original-tables';
@@ -43,18 +46,21 @@ async function exact(req: ModuleServerRequest, uuid: string, type?: string) {
     return { ...doc, uuid };
 }
 export const handleTreasureCatalog = (req: ModuleServerRequest) => route(req, 'GET', async () => {
-    const [tables, gear, magic, spells, actors] = await Promise.all([
+    const [tables, gear, magic, spells, actors, classes] = await Promise.all([
         collection(req,'tables'), collection(req,'gear'), collection(req,'magic-items'), collection(req,'spells'),
         req.runtime.documents.list('Actor', { filter: { type: 'Player' } }, { minOwnership: 'owner' }),
+        collection(req,'classes'),
     ]);
     const label = (d: any) => req.runtime.access?.packs().find(p => p.id === d.pack)?.label ?? d.pack ?? '';
     const options = (docs: any[]) => docs.filter(d => {
         const ref = parseUuid(d.uuid);
         return ref?.kind === 'compendium' && canReadPack(callerOf(req),ref.pack);
     }).map(d => ({ ...d, source: label(d) }));
+    const classNames=new Map(options(classes).filter(d=>d.type==='Class').map(d=>[canonicalUuid(d.uuid),d.name]));
     return { tables: options(tables).filter(d=>d.uuid==='Compendium.shadowdark.rollable-tables.RollTable.Pi9nnnLeXpTKCSMY').map(d => ({ uuid: d.uuid, name: d.name, source: d.source, formula: d.formula })),
         items: options([...gear,...magic].filter(d => TREASURE_TYPES.includes(d.type) && d.uuid !== CRAWLING_KIT_UUID)),
-        spells: options(spells).map(d => ({ uuid: d.uuid, name: d.name, type: d.type, img: d.img, source: d.source, tier: d.system?.tier })),
+        spells: options(spells).map(d => ({ uuid: d.uuid, name: d.name, type: d.type, img: d.img, source: d.source, tier: d.system?.tier,
+            classes: (Array.isArray(d.system?.class)?d.system.class:[]).map((ref:unknown)=>classNames.get(canonicalUuid(ref))??'Class unavailable') })),
         actors: actors.rows.filter((a: any) => a.type === 'Player').map((a: any) => ({ id: documentId(a), name: a.name })) };
 });
 
@@ -80,6 +86,33 @@ export const handleTreasureDraw = (req: ModuleServerRequest) => route(req, 'POST
 export const handleTreasureOriginalDraw = (req: ModuleServerRequest) => route(req,'POST',async()=>{
     const body=await req.json<any>(), revision=requestRevision(req.runtime);
     scope(req);
+    if(body?.version===ORIGINAL_TABLE_VERSION&&body?.table==='tier-spell'){
+        if(!/^[1-5]$/.test(body.tier))throw new SdkError('validation','Choose a spell tier first.');
+        const spells=tierSpells(await collection(req,'spells'),body.tier).filter(d=>{const ref=parseUuid(d.uuid);return ref?.kind==='compendium'&&canReadPack(callerOf(req),ref.pack);});
+        if(!spells.length)throw new SdkError('not_found','No readable spells are available at this tier.');
+        const rolled=await req.runtime.rolls.roll(`1d${spells.length}`,'Spell: available sources at selected tier',{displayChat:false});
+        current(req,revision);const spell=Number.isInteger(rolled.total)?spells[rolled.total-1]:undefined;
+        if(!spell)throw new SdkError('validation','The roll did not produce an available spell.');
+        return {spell:{uuid:spell.uuid,total:rolled.total}};
+    }
+    if(body?.version===ORIGINAL_TABLE_VERSION&&body?.table==='ammunition-quantity'){
+        const item=await exact(req,body.uuid);
+        if(!weaponBases([item]).length||item.type!=='Basic'||!item.system.isAmmunition)throw new SdkError('validation','Choose native ammunition first.');
+        const rolled=await req.runtime.rolls.roll('2d6','Ammunition quantity',{displayChat:false});
+        current(req,revision);
+        if(!Number.isInteger(rolled.total)||rolled.total<2||rolled.total>12)throw new SdkError('validation','Invalid ammunition quantity.');
+        return {quantity:rolled.total};
+    }
+    if(body?.version===ORIGINAL_TABLE_VERSION&&['armor-type','weapon-type'].includes(body?.table)){
+        const weapon=body.table==='weapon-type';
+        const bases=(weapon?weaponBases:armorBases)(await collection(req,'gear')).filter(d=>{const ref=parseUuid(d.uuid);return ref?.kind==='compendium'&&canReadPack(callerOf(req),ref.pack);});
+        if(!bases.length)throw new SdkError('not_found','No readable base types are available.');
+        const roll=await req.runtime.rolls.roll(`1d${bases.length}`,`${weapon?'Weapon':'Armor'} type: available native gear`,{displayChat:false});
+        current(req,revision);
+        const base=Number.isInteger(roll.total)?bases[roll.total-1]:undefined;
+        if(!base)throw new SdkError('validation','The roll did not produce an available base type.');
+        return {[weapon?'weaponType':'armorType']:{uuid:base.uuid,total:roll.total}};
+    }
     if (body?.version!==ORIGINAL_TABLE_VERSION || typeof body?.table!=='string' || !Object.hasOwn(ORIGINAL_TABLES,body.table))
         throw new SdkError('validation','Choose a current SheetDelver Originals table.');
     const table=ORIGINAL_TABLES[body.table];
@@ -97,6 +130,9 @@ async function prepare(req: ModuleServerRequest, draft: TreasureDraft, actorId: 
     const revision = requestRevision(req.runtime);
     const template = draft.kind === 'template' ? await exact(req, draft.templateUuid) : null;
     const spell = ['Scroll','Wand'].includes(draft.kind) ? await exact(req, draft.spellUuid, 'Spell') : null;
+    if(draft.spellItem&&spellTier(spell)!==Number(draft.spellItem.tier))return {errors:{spellUuid:'Choose a spell from the selected tier.'}};
+    const modifiers=modifierErrors(draft.modifiers,template?.type??draft.kind);
+    if(Object.keys(modifiers).length)return {errors:modifiers};
     const actor = actorId ? await requireOwnedActor(req.runtime, actorId) : null;
     const unchangedSource = treasureUnchanged(draft,template);
     if (!actor && unchangedSource) return { errors: {actorId:'Choose a character to receive this unchanged item.'} };
@@ -164,13 +200,12 @@ export const handleTreasureDeliver = (req: ModuleServerRequest) => route(req,'PO
         const active = await req.runtime.dataStore.get<string>(`treasure-active-${s}`);
         const old = active ? await req.runtime.dataStore.get<Delivery>(`treasure-delivery-${s}-${active}`) : null;
         if (active && (!old || old.state !== 'complete')) throw new SdkError('conflict','Check the previous delivery before adding another item.');
-        if (b.actorId && b.disclosed !== true) throw new SdkError('validation','Confirm that these item details may be shared with the recipient.');
         const plan = await prepare(req,b.draft,b.actorId,b.saveToLibrary===true);
         if (!plan.review || plan.review !== b.review) return { reviewChanged: true, plan };
         if (b.saveToLibrary===true) {
             const d: LibrarySave = {mode:'library',requestId:b.requestId,intent,marker:randomUUID(),name:plan.payload.name,
                 actorId:b.actorId,category:b.draft.category??'random',folderName:plan.folderName!,unchangedSource:plan.unchangedSource,state:'pending',payload:plan.payload,revision:plan.contextRevision!,
-                provenance:{sourceNote:b.draft.sourceNote,templateUuid:b.draft.templateUuid,draw:plan.draw,mundane:b.draft.mundane,boon:b.draft.boon}};
+                provenance:{sourceNote:b.draft.sourceNote,templateUuid:b.draft.templateUuid,draw:plan.draw,mundane:b.draft.mundane,boon:b.draft.boon,armor:b.draft.armor,potion:b.draft.potion,utility:b.draft.utility,spellItem:b.draft.spellItem,weapon:b.draft.weapon,modifiers:b.draft.modifiers,magic:b.draft.magic}};
             await req.runtime.dataStore.set(key,d);
             await req.runtime.dataStore.set(`treasure-active-${s}`,b.requestId);
             return {operation:await continueLibrary(req,key,d)};

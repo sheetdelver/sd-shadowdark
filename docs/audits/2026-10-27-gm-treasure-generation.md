@@ -1,7 +1,7 @@
 # GM treasure and item generation audit
 
 Date: 2026-10-27
-Status: Mundane Items/card and Boons checkpoints accepted; remaining recipes tracked in ADR-0009
+Status: Mundane Items/card and Boons accepted; Magic Items / Attributes implemented for review
 
 ## Sources and scope
 
@@ -432,3 +432,322 @@ Browsers exited; no service retained. Version/compatibility remain unchanged.
 The user subsequently accepted the Boons increment and authorized committing it
 before continuing to Magic Items / Attributes. UI/content acceptance is recorded;
 no new live Foundry write or native-version test is inferred from that approval.
+
+## Magic Items / Attributes — October 28 (superseded prototype)
+
+User accepted Boons; checkpoint `9e2f094` precedes this increment. Re-read full-book
+printed pp.282–283 (PDF286–287), including the type/quality/personality separation
+and three-part naming aid. Native4.0.6 `_PhysicalItemSD` has a magicItem flag;
+native Boons remain nonphysical. No property prose is interpreted into effects.
+
+Implemented six labeled original suggestion tables, shared attribute authoring,
+type navigation that preserves existing drafts, explicit name application and
+retained-extra resolution when counts shrink. Complete native items still support
+direct assignment without library duplication. New properties preserve original
+mechanics/artwork/effects and append escaped descriptions; manual category-specific
+property results remain explicit pending their respective tab increments.
+
+Existing source tests cover count requirements and reductions, independent naming,
+source preservation, unchanged-source detection, native Boon shape, and save/
+assignment without replay or Actor money/XP changes. Mounted390/1000px tests cover
+type navigation/draft retention, missing result correction, count reduction,
+personality prerequisites, explicit name application, preview and successful
+assignment/reset. These tests passed before the final bounded count suggestions
+and required-label refinement; final package evidence follows below.
+
+Final source regressions and explicit typing passed after those refinements.
+Contract validation and packaging passed. Final compiled-archive mounted
+workflows passed at390/1000px; screenshots were inspected for the shared controls,
+native icon, card descriptions and no page overflow. Native icons were read from
+the local installation; test writes use isolated SDK stores only. Existing
+catalog request counts remain one initial load and one explicit context refresh.
+Evidence: `/tmp/sd-magic-source.log`, `/tmp/sd-magic-types.log`,
+`/tmp/sd-magic-browser/results.json`, `/tmp/sd-magic-package.log`,
+`/tmp/sd-magic-archive-browser/results.json`. Archive SHA256:
+`97fcafa8759ff73ba948ef219db66813bae99d3919231e6a81940993954d06ab`.
+No service retained, Core edit, version/compatibility change or new Git commit
+after the Boons checkpoint. Operator review of this increment remains open.
+
+## Shared additive sections — October 29
+
+User correction supersedes the separate type/count/name prototype. Re-read full
+book pp.284–295 and visually inspected the Item Personality page. Benefit/curse
+families are type-specific; virtues/flaws are shared. ADR-0009 records the current
+procedure and deferred naming/type aids. The official missing rows remain absent.
+
+One shared component now supplies independently optional Attributes and Personality
+inside the existing builders. Ten original alternative tables have 60 rows total;
+individual results support roll/select/manual editing. Native/legacy item types
+select the applicable family; scrolls/wands choose one. Changes to a family or
+switch preserve draft text. Disabled sections are omitted from validation/output.
+Old category identities remain recoverable without replaying saved writes.
+
+The existing source suite checks family routing (including legacy wands), valid
+property provenance, independent switches, missing required input, escaped prose,
+native effect/artwork preservation, native Boon shape and exact save/assignment.
+The existing mounted workflows exercise both sections, single-result rerolls,
+manual curses, selected flaws, scroll/wand family changes, draft retention,
+preview/assignment/reset and unchanged catalog request counts at390/1000px.
+Source and typing passed; desktop/phone rendered layouts were inspected. All
+writes use isolated SDK fixtures; native/operator acceptance remains open.
+
+Final evidence: source regressions and explicit typing passed after the correction;
+contract validation and packaging passed. The compiled archive and its stylesheets
+passed the full mounted workflows at390/1000px, including Scrolls/Wands changing
+families before rerolling. Packaged desktop/phone screenshots were inspected:
+inline dice remain beside text fields, source tables are identified, and the page
+has no horizontal overflow. Catalog counts remain unchanged.
+Evidence: `/tmp/sd-additives-source.log`, `/tmp/sd-additives-types.log`,
+`/tmp/sd-additives-browser/results.json`, `/tmp/sd-additives-package.log`,
+`/tmp/sd-additives-archive-browser/results.json`. Archive SHA256:
+`b81d9c0161689bed8fcf6e932a68fb3309c81e66453a6f17e5060665555baa69`.
+No services retained. Core is unchanged on main; no version or compatibility bump.
+The corrected increment is uncommitted for operator review.
+
+## Armor procedure — October 29
+
+The user selected individual category workflows, starting with Armor's missing
+existing/build distinction. Re-read and visually inspected full-book printed284
+(PDF288). The native4.0.6 `ArmorSD` schema, ordinary gear documents, magic armor
+and `ItemImporterSD._buildArmorObj` establish the AC/attribute/modifier and base
+identity fields. Native ordinary shields contribute modifier2; an authored +2
+therefore produces modifier4. Using a second AC effect would double the addition.
+Native mithral entries already supply their slots/properties/baseArmor identity.
+
+Implemented the dedicated Armor procedure from ADR-0009, exact source reset and
+clear, per-part rolls, native artwork and AC preview. Seven ordinary types are
+available in the pinned gear snapshot; the application reads the pool dynamically
+rather than copying that count or their mechanics into code. Armor bonus/feature
+alternatives contain4/8 equally likely original rows. No official table rows were
+bundled and no active effect is inferred from feature prose.
+
+Existing treasure source regressions now cover native gear eligibility, GM type
+rolls, plate/shield AC, mithral preservation, base identity, native effects/icons/
+prices, validation, source immutability and exact library/assignment. Mounted
+workflows at390/1000px cover both paths, reset/clear, per-part roll/select/manual
+input, custom-name retention, icon refresh, delivery and builder reset. Initial
+source/type/browser checks passed; final archive evidence follows below.
+No live Foundry connection, production writes or operator acceptance is inferred.
+
+Final Armor verification: source regressions, explicit typing, module contract
+validation and packaging passed. The compiled archive's complete browser workflow
+passed at390/1000px, including the AC preview, native reset/clear and Armor save/
+assign/reset. Packaged screenshots were inspected for the connected-paper layout,
+inline rollers, full-width feature choices, source notes and actual base artwork.
+No horizontal page overflow or browser errors; catalog request counts unchanged.
+Evidence: `/tmp/sd-armor-source.log`, `/tmp/sd-armor-types.log`,
+`/tmp/sd-armor-browser/results.json`, `/tmp/sd-armor-package.log`,
+`/tmp/sd-armor-archive-browser/results.json`. Archive SHA256:
+`4d39788c4affb2bf26a3db4defa5c3c2e0edab57b069c3459986ce6b3bbbf2ab`.
+No services retained. Core remains unchanged; current work is uncommitted for
+operator review. Other dedicated category procedures remain open in ADR-0009.
+
+### Armor icon and start-over correction
+
+Operator reported a broken Mithral Chainmail icon and requested Clear beside
+Refresh sources. The type thumbnail used a raw relative path instead of the SDK
+image resolver. Earlier browser fixtures used an identity resolver and served
+Foundry assets from the tool origin, masking the defect. The existing browser
+suite now separates the Foundry asset origin and checks the resolved URL and
+loaded image. Before the fix it failed at both390/1000px on that exact URL check.
+The thumbnail now uses useSDK().resolveImageUrl, preserving its original artwork.
+
+Clear is beside Refresh sources and resets the complete Armor draft, recipient,
+preview/review, errors and optional sections without a write or catalog reload.
+It replaces the lower Reset armor button. Existing-item Reset to source and
+Clear item retain their distinct purpose. The same browser workflow checks Clear
+against a filled, reviewed draft before continuing the normal build/save flow.
+
+Correction verified: explicit typing, contract/package checks and the updated
+compiled-archive browser workflow passed at390/1000px. Both packaged screenshots
+were inspected; the type icon loads from the resolved Foundry asset origin and
+Clear sits beside Refresh sources. Clearing a reviewed form removes its values,
+recipient and review without writes or extra catalog requests.
+Evidence: `/tmp/sd-armor-icon-before/results.json` (reproduced failure),
+`/tmp/sd-armor-icon-types.log`, `/tmp/sd-armor-icon-package.log`,
+`/tmp/sd-armor-icon-archive-browser/results.json`. Archive SHA256:
+`19dd4a8470bfd0a0b3eec7f815094a5d5ea6d09023f1ed8b97ac98ebb2537aa1`.
+No live Foundry writes or retained services. Changes remain uncommitted.
+
+## Potions — October 29
+
+User accepted Armor, including the corrected icon and Clear placement, and
+selected continuation. That operator gate is checked in ADR-0009. Potions is the
+next category in the agreed tab sequence. Re-read full-book printed286–287 and
+visually inspected its three feature columns. Reviewed native4.0.6 PotionSD,
+PhysicalItemSD, magic fields/default artwork and the existing potion action.
+
+Implemented separate build/existing paths, three original/manual features,
+per-feature and atomic all-feature rolling, potion property context, native
+Potion output and shared preview/save/assignment/reset. Three new original tables
+contain18 independently authored rows. No official missing rows or distributions
+are copied. Mixing and interpretation of prose into mechanics remain deferred.
+
+Existing treasure source checks cover feature validation/provenance/escaping,
+real Potion payload/icon, empty generated effect/formula data, recognition by the
+existing potion action, native source preservation and exact library/assignment.
+The existing browser workflow covers both paths, source reset/clear, individual
+and combined rolls, manual text retention, potion-specific property rolls,
+resolved native/default images, preview and save/assign/reset at390/1000px.
+Source, explicit typing and initial browser workflows passed; rendered source
+layouts were inspected. Final packaged evidence follows below. All writes use
+isolated SDK fixtures; no native/live acceptance is claimed for this increment.
+
+Final Potions verification: source suite, explicit module/UI typing, contract and
+packaging passed. Source and compiled-archive browser workflows passed at 390 and
+1000px; packaged screenshots were inspected. No horizontal overflow or browser
+errors. Catalog requests remained initial load plus intentional refresh.
+Evidence: `/tmp/sd-potion-source.log`, `/tmp/sd-potion-types.log`,
+`/tmp/sd-potion-browser/results.json`, `/tmp/sd-potion-package.log`,
+`/tmp/sd-potion-archive-browser/results.json`. Archive SHA256:
+`8f92c13dfdb522c65e2e44aff31efe9e8cc60e03d0781b7f77d60a48c2c10857`.
+No live Foundry writes, retained services or Core changes. Potions awaits operator
+review; changes remain uncommitted and release metadata is unchanged.
+
+
+## Remaining category procedures and permanent mechanics — October 29
+
+User selected all remaining categories before a combined review and asked to
+support permanent effects. Full-book printed288–295 was re-extracted, and the
+Scroll/Wand, Utility and Weapons layouts visually inspected. Source references:
+native4.0.6 WeaponSD, BasicSD, PhysicalItemSD, PlayerSD selected-ammunition handling,
+and the module's generated predefined-effect snapshot and existing item suppression.
+The book's structure informs the workflows; no missing table prose or distribution
+is bundled. Eight new original tables supply43 equally likely alternatives.
+
+Implemented separate Scroll/Wand feature+tier+spell selection, Utility form+feature,
+and native Weapon/ammunition type+bonus+feature procedures. Existing-item paths and
+source artwork/price preservation remain. Type/spell draws use current authorized
+native pools. Tier changes clear spell choice; exact preparation rejects a wrong
+or unavailable tier/source. Utility icons follow original forms only while their
+text remains unedited. Basic ammunition exposes quantity entry/2d6 and records its
+bonus as manual: native firing consumes selected ammo but does not apply its
+Item effects to that weapon's roll. No passive global attack bonus is synthesized.
+
+Permanent modifiers use nine allowlisted native definitions (AC, six stats, slots,
+initiative advantage). Tests prove prepared AC/stat/initiative changes, suppression,
+armor field/effect additivity without duplication, and exactly +2 attack from a
++2 Weapon. Unsupported types/keys, duplicates and malformed amounts are rejected;
+source effects remain and no Actor source fields change. New temporary/conditional
+mechanics are not inferred from descriptive properties. This selection supersedes
+the earlier wholly-descriptive limitation only for these explicit controls.
+
+Existing source suite, explicit typing and source browser390/1000px pass. Mounted
+checks include real original/dynamic rolls, tier invalidation, empty tier behavior,
+manual-part retention, Clear/reset, resolved artwork, preview and exact save/assign.
+Native effect conformance passes93/93; weapon/choice fixtures pass. A broader legacy
+boundary suite passes55/57: C4 failed spell/focus and RV-03 chat failure mismatch on
+spellLoss bookkeeping. Both reproduce on an isolated git-archive of committed
+baseline9e2f094; no relevant spell/chat implementation changed. Preserve this
+validation limitation rather than labeling all suites green.
+
+Evidence: `/tmp/sd-remaining-source.log`, `/tmp/sd-remaining-types.log`,
+`/tmp/sd-remaining-browser-final/results.json`, `/tmp/sd-remaining-effects.log`,
+`/tmp/sd-remaining-weapons.log`, `/tmp/sd-remaining-boundaries.log`,
+`/tmp/sd-remaining-boundaries-baseline.log`. Packaged evidence follows below.
+
+Final archive verification passed: contract/package checks and compiled UI/CSS
+workflows at390/1000px. Screenshots of Scroll/Wand, Utility and Weapon builders
+were inspected; native artwork, adjacent rollers, connected paper, card previews
+and modifier lists render correctly with no horizontal page overflow or browser
+errors. Catalog count remains two (initial load plus intentional refresh), including
+remount. Browser exited; no test services retained. Archive SHA256:
+`5bca8a23cbefe52784c68c5cbab0b429adebec9c8e4545e2f9eaf4a69b54483d`.
+Evidence: `/tmp/sd-remaining-package.log`,
+`/tmp/sd-remaining-archive-browser/results.json` and its rendered screenshots.
+Core remains clean/unchanged; no version bump or Git write. Potions and the new
+procedures/modifiers remain ready for operator review, not operator accepted.
+
+
+## Scroll review refinements — October 31
+
+Removed the Personality authoring section for new/recognized native scrolls; wands
+retain it. Selecting a scroll template disables draft personality additions while
+preserving copied source description/effects. Attributes are unchanged.
+
+Spell choices now show tier plus casting Class labels resolved through exact native
+class references and the caller-readable classes collection in the existing cached
+catalog. Missing references display Class unavailable. Same-name native Wizard and
+Priest Light spells remain distinct, searchable by class, and retain their UUIDs.
+No class-based eligibility filter or new cache lifecycle was added.
+
+Existing source suite, explicit typing, contract/package and compiled browser checks
+pass at390/1000px. Picker screenshots inspected; checks verify same-name class labels,
+class-name search, absent scroll Personality and retained wand Personality. Catalog
+request count remains two (initial load plus intentional refresh). Browser exited.
+Evidence: /tmp/sd-scroll-review-source.log, /tmp/sd-scroll-review-types.log,
+/tmp/sd-scroll-review-package.log, /tmp/sd-scroll-review-browser/results.json.
+Archive SHA256: ba1178ade616658175709b67485a7e8ab78bc0c69097f6205cfbeada81703bd4.
+Earlier baseline spell-loss boundary failures remain separately recorded; those
+unrelated suites were not rerun for this UI refinement. No Core/release/Git writes.
+
+
+## Dedicated spell-item attributes — October 31
+
+Replaced cross-family selection/rolling with subtype-specific Wand and Scroll
+benefit/curse tables. Four original alternative tables contain six entries each.
+New and recognized legacy templates select the appropriate family automatically;
+existing draft properties and native template mechanics remain preserved. Roll,
+select and manual editing remain available. Conditional outcomes stay descriptive,
+with no inferred passive effects or casting/resource changes. Scrolls still omit
+Personality. ADR-0009 records the selected correction.
+
+The existing treasure source suite, explicit module typing, contract/package checks
+and compiled-archive browser workflows pass at390/1000px. Regression coverage
+checks family resolution, source provenance, manual edit preservation, absent
+cross-family controls and retained native spell links. Desktop Wand and phone
+Scroll screenshots were inspected against the existing shared Attributes layout;
+no visual redesign or new control pattern was introduced. Browser checks report
+no horizontal page overflow or browser errors. Catalog requests remain two
+(initial load plus intentional refresh). The browser exited without retained services.
+
+Evidence: /tmp/sd-spell-tables-source.log, /tmp/sd-spell-tables-types.log,
+/tmp/sd-spell-tables-package.log, /tmp/sd-spell-tables-browser/results.json.
+Archive SHA256: c04304c27551c2a9bd3560f88cb4dbb28db90d0943157d7ff363a1e334c0260e.
+Core is unchanged. No live Foundry writes, version changes or Git mutations.
+Operator acceptance remains pending; the previously recorded baseline boundary
+failures are unchanged and those unrelated suites were not rerun for these tables.
+
+
+## Editor boundary, item effects and save review — October 31
+
+The shared embedded editor theme now has a black paper border, including the
+Treasure/Creator overrides. Shared item cards show effect names, changes and
+state; the separate treasure name-only list was removed. Owned cards filter by
+exact Item owner and use prepared state shared with the Effects tab. Previews
+show enabled/disabled rather than asserting Actor activation. Legacy and v14
+changes use the existing canonical reader. Native labels are used where known;
+custom keys/formulas remain literal. The redundant recipient checkbox/server
+acknowledgement is removed. Authorization, source-note privacy, identification
+restrictions and current-review validation remain enforced.
+
+Existing treasure source tests and explicit module typing pass. New regression
+cases cover same effect IDs on different owners, v14-over-legacy precedence,
+active/disabled/non-transferred/situational states, unequipped/stashed suppression,
+preview status and absent effects. Delivery without disclosure acknowledgement
+succeeds; an outdated review still performs zero writes.
+
+Contract/package and compiled UI/CSS browser workflows pass at390/1000px, including
+assignment/recovery without the checkbox, computed editor borders and effect
+changes inside the preview card. Desktop editor and phone utility card screenshots
+were inspected against the existing paper UI. No horizontal page overflow or
+browser errors; catalog request count remains two (initial plus intentional refresh).
+The browser exited and no test service is retained. Evidence:
+/tmp/sd-card-effects-source.log, /tmp/sd-card-effects-types.log,
+/tmp/sd-card-effects-package.log, /tmp/sd-card-effects-browser/results.json.
+Archive SHA256: ccd35d2beb389d0a5bd9f0c46143392f0c1b999d2ca49e95dee554acd5a010ce.
+The artifact precedes documentation and whitespace-only cleanup. Core is unchanged;
+no live Foundry connections/writes, Git mutations or version changes occurred.
+Operator review remains pending. Earlier baseline boundary failures remain recorded
+and those unrelated suites were not repeated for this presentation change.
+
+
+## Accepted checkpoint — October 31
+
+After reviewing the shared editor border, item-card effects and simplified review,
+the user accepted checkpointing and committing the current implementation. This
+includes the completed category builders and shared properties documented above.
+ADR-0009 is Implemented; individual earlier “awaiting review” notes are historical.
+Final installed release smoke, compatibility alignment and the two known baseline
+boundary-test failures remain listed in the current readiness report. No release
+metadata or deferred feature scope changes accompany the checkpoint.

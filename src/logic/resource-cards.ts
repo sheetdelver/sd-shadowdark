@@ -4,6 +4,8 @@ import { bonusLabel } from './actions';
 import { formatUuid, parseUuid, type DocumentRef } from './identity';
 import type { ShadowdarkView, ViewLookups } from './prepared-view';
 import { isWand } from './wands';
+import { readEffect, effectStatus, type CanonicalChange, type CanonicalEffect } from './effects';
+import { NATIVE_PREDEFINED_EFFECTS } from '../data/native-predefined-effects';
 
 /**
  * Card view models for the module's resource-detail modal. Every card is built
@@ -110,6 +112,32 @@ function spellFacts(spell: any, lookups: ViewLookups, action?: PreparedAction, c
     return facts;
 }
 
+function armorAcFact(system:any):CardFact {
+    const ac=system.ac??{},base=Number(ac.base??0),modifier=Number(ac.modifier??0);
+    return {label:'AC',value:base?`${base}${ac.attribute?` + ${ABILITY_LABELS[ac.attribute]??ac.attribute}`:''}${modifier?` ${signed(modifier)}`:''}`:signed(modifier)};
+}
+
+/** Describe stored changes without executing formulas or claiming a preview is active. */
+function effectChangeFact(change: CanonicalChange): CardFact {
+    const label = Object.values(NATIVE_PREDEFINED_EFFECTS).find(def => def.key === change.key)?.label ?? change.key;
+    const value = typeof change.value === 'string' ? change.value : JSON.stringify(change.value) ?? '';
+    const operation: Record<string, string> = { add: 'Add', subtract: 'Subtract', multiply: 'Multiply by', override: 'Set to', upgrade: 'Minimum', downgrade: 'Maximum', custom: 'Custom' };
+    return { label, value: `${operation[change.type] ?? change.type} ${value}${change.phase !== 'initial' ? ` (${change.phase})` : ''}` };
+}
+
+function effectSections(effects: Array<Pick<CanonicalEffect, 'name' | 'changes' | 'disabled' | 'transfer' | 'situational' | 'suppressed' | 'suppressionReason' | 'applies'>>, preview = false): CardSection[] {
+    if (!effects.length) return [];
+    return [{ title: 'Effects', entries: effects.map(effect => ({
+        title: effect.name,
+        facts: [
+            { label: 'Status', value: preview
+                ? effect.disabled ? 'Disabled' : !effect.transfer ? 'Not transferred' : effect.situational ? 'Enabled (situational)' : 'Enabled'
+                : effectStatus(effect) },
+            ...effect.changes.map(effectChangeFact),
+        ],
+    })) }];
+}
+
 /** Card for an Item owned by the prepared Actor. */
 export function buildOwnedItemCard(view: ShadowdarkView, item: any, lookups: ViewLookups = {}): ResourceCard | null {
     const itemId = String(item?._id ?? item?.id ?? '');
@@ -166,11 +194,7 @@ export function buildOwnedItemCard(view: ShadowdarkView, item: any, lookups: Vie
                 if (action.attack?.special) facts.push({ label: 'Special', value: action.attack.special });
             }
         }
-        if (item.type === 'Armor') {
-            const ac = system.ac ?? {};
-            const base = Number(ac.base ?? 0), modifier = Number(ac.modifier ?? 0);
-            facts.push({ label: 'AC', value: base ? `${base}${ac.attribute ? ` + ${ABILITY_LABELS[ac.attribute] ?? ac.attribute}` : ''}${modifier ? ` ${signed(modifier)}` : ''}` : signed(modifier) });
-        }
+        if (item.type === 'Armor') facts.push(armorAcFact(system));
         if (itemView.wand || itemView.scroll) {
             for (const spell of itemView.spells ?? []) facts.push({ label: itemView.wand ? `Spell ${spell.index + 1}` : 'Spell',
                 value: `${spell.label ?? (spell.ref ? formatUuid(spell.ref) : 'No linked spell')}${spell.lost ? ' (lost)' : ''}` });
@@ -187,7 +211,7 @@ export function buildOwnedItemCard(view: ShadowdarkView, item: any, lookups: Vie
         // Native sheets show the current description; the alternate identity is GM data.
         description: system.description ?? '', rollData: view.rollData,
         actions: cardActions(actions.filter(action => action.kind !== 'attack' || kind === 'item')),
-        sections: [], diagnostics: [...diagnostics, ...actions.flatMap(action => action.reason ? [action.reason] : [])],
+        sections: effectSections(view.effects.filter(effect => effect.owner.kind === 'item' && effect.owner.itemId === itemId)), diagnostics: [...diagnostics, ...actions.flatMap(action => action.reason ? [action.reason] : [])],
     };
 }
 
@@ -205,12 +229,13 @@ export function buildDocumentCard(doc: any, ref: DocumentRef | null, lookups: Vi
     if (doc?.type === 'Weapon' && !isWand(doc)) {
         facts.push({ label: 'Damage', value: [system.damage?.oneHanded && `1H ${system.damage.oneHanded}`, system.damage?.twoHanded && `2H ${system.damage.twoHanded}`].filter(Boolean).join(', ') || 'Damage unavailable' });
     }
+    if (doc?.type === 'Armor') facts.push(armorAcFact(system));
     const cost = costLabel(system.cost);
     if (cost) facts.push({ label: 'Cost', value: cost });
     return {
         kind, itemId: null, ref, title: doc?.name ?? 'Document', subtitle: isWand(doc) ? 'Wand' : doc?.type ?? '', img: doc?.img, facts,
         states: system.identification?.identified === false ? ['Unidentified'] : [], description: system.description ?? '',
-        actions: [], sections: [], diagnostics: ref ? [] : ['This preview has no exact document identity.'],
+        actions: [], sections: effectSections((Array.isArray(doc?.effects) ? doc.effects : []).map((effect: any) => readEffect(effect, {kind: 'item', itemId: String(doc?._id ?? doc?.id ?? '')}, doc)), true), diagnostics: ref ? [] : ['This preview has no exact document identity.'],
     };
 }
 
