@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import ErrorBoundary from './components/ErrorBoundary';
 import { shadowdarkTheme } from './themes/shadowdark';
 
-import { Menu, X, Check } from 'lucide-react';
+import { Menu, X, Check, FlameKindling, Pencil, ArrowLeftRight } from 'lucide-react';
 import { useSDK, useSDKComponents } from '@sheet-delver/sdk/react';
 import { ShadowdarkUIProvider, useShadowdarkUI } from './context/ShadowdarkUIContext';
 import { useShadowdarkActor } from './context/ShadowdarkActorContext';
@@ -22,7 +22,9 @@ import ResourceDetailModal from './components/ResourceDetailModal';
 
 
 import ShadowdarkPaperSheet from './ShadowdarkPaperSheet';
+import { SheetCharacterName } from './components/SheetCharacterName';
 import { logger } from '@sheet-delver/sdk';
+import { useSheetViewPreference, type SheetViewMode } from './settings/sheet-view-preference';
 
 interface ShadowdarkSheetProps {
     onToggleDiceTray?: () => void;
@@ -50,6 +52,8 @@ export default function ShadowdarkSheet(props: ShadowdarkSheetProps) {
         pendingConfirmation,
         cancelConfirmation,
         isSaving,
+        openRest,
+        openEditCharacter,
     } = useShadowdarkActor();
     
     const { resolveImageUrl, addNotification } = useSDK();
@@ -61,19 +65,13 @@ export default function ShadowdarkSheet(props: ShadowdarkSheetProps) {
     const [menuOpen, setMenuOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 
-    const [viewMode, setViewMode] = useState<'simple' | 'advanced'>(() => {
-        if (typeof window !== 'undefined') {
-            const saved = localStorage.getItem('shadowdark_view_mode') as 'simple' | 'advanced';
-            if (saved === 'simple' || saved === 'advanced') return saved;
-        }
-        return 'simple';
-    });
-
-    const handleToggleView = (mode: 'simple' | 'advanced') => {
-        setViewMode(mode);
-        if (typeof window !== 'undefined') {
-            localStorage.setItem('shadowdark_view_mode', mode);
-        }
+    const preference = useSheetViewPreference();
+    const viewMode = preference.mode;
+    useEffect(() => {
+        if (preference.error) addNotification(preference.error.message, 'error');
+    }, [preference.error, addNotification]);
+    const handleToggleView = (mode: SheetViewMode) => {
+        try { preference.set(mode); } catch { /* Shared error snapshot supplies the notification. */ }
     };
 
     // Session state for active tab and menu
@@ -185,7 +183,7 @@ export default function ShadowdarkSheet(props: ShadowdarkSheetProps) {
     const secondaryTabs = overflowTabs;
 
     return (
-        <div className={`flex flex-col h-full relative pb-0 font-crimson font-inter font-sans ${viewMode === 'simple' ? 'bg-black' : 'bg-neutral-100'} text-black`}>
+        <div className={`flex flex-col min-w-0 relative font-crimson font-inter font-sans ${viewMode === 'simple' ? 'bg-white' : 'bg-neutral-100 pb-6'} text-black`}>
             {/* Loading Overlay */}
             <LoadingModal message="Loading System Data..." visible={loadingSystem} theme={shadowdarkTheme.loadingModal} />
             {systemStatus === 'failed' && (
@@ -214,21 +212,17 @@ export default function ShadowdarkSheet(props: ShadowdarkSheetProps) {
                             />
                             <div className="py-2 flex-1 flex flex-row items-center justify-between md:block">
                                 <div>
-                                    <h1 className="text-2xl md:text-3xl font-serif font-bold leading-none tracking-tight">{actor.name}</h1>
+                                    <h1 className="text-2xl md:text-3xl font-serif font-bold leading-none tracking-tight"><SheetCharacterName hp={actor.derived?.hp?.value} dark>{actor.name}</SheetCharacterName></h1>
                                     <div className="flex flex-col md:flex-row md:items-center gap-x-3 gap-y-1">
                                         <p className="text-xs text-neutral-400 font-sans tracking-widest uppercase mt-1">
                                             {actor.details?.title && <span className="text-amber-500 mr-2">{actor.details.title}</span>}
                                             {actor.details?.ancestry || ''} {actor.details?.class || ''}
                                         </p>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                handleToggleView('simple');
-                                            }}
-                                            className="text-[10px] text-amber-500 hover:text-amber-400 font-bold uppercase tracking-widest mt-1 border border-amber-500/30 px-2 py-0.5 rounded w-fit"
-                                        >
-                                            View Single Page Sheet
-                                        </button>
+                                        <div role="group" aria-label="Character sheet controls" className="flex flex-wrap items-center gap-2">
+                                            {actor.canEdit === true && actor.type === 'Player' && <button type="button" onClick={openEditCharacter} className="print:hidden text-[10px] text-amber-500 hover:text-amber-400 font-bold uppercase tracking-widest mt-1 border border-amber-500/30 px-2 py-0.5 inline-flex items-center gap-1"><Pencil size={14} aria-hidden="true" />Edit</button>}
+                                            <button type="button" onClick={() => handleToggleView('simple')} className="print:hidden text-[10px] text-amber-500 hover:text-amber-400 font-bold uppercase tracking-widest mt-1 border border-amber-500/30 px-2 py-0.5 inline-flex items-center gap-1"><ArrowLeftRight size={14} aria-hidden="true" />Single</button>
+                                            <button type="button" onClick={openRest} className="print:hidden text-[10px] text-amber-500 hover:text-amber-400 font-bold uppercase tracking-widest mt-1 border border-amber-500/30 px-2 py-0.5 inline-flex items-center gap-1"><FlameKindling size={14} aria-hidden="true" />Rest</button>
+                                        </div>
                                     </div>
                                 </div>
                                 {/* Level displayed inline on mobile for space or block on desktop */}
@@ -356,7 +350,7 @@ export default function ShadowdarkSheet(props: ShadowdarkSheetProps) {
                     </div>
 
                     {/* Content Area */}
-                    <div className="flex-1 px-4 max-w-5xl mx-auto w-full">
+                    <div className="flex-1 px-4 mx-auto w-full">
                         {activeTab === 'details' && (
                             <DetailsTab />
                         )

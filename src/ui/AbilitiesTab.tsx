@@ -1,5 +1,7 @@
 'use client';
 
+import { MAX_CHARACTER_LEVEL } from '../logic/advancement';
+
 import React from 'react';
 
 import { useSDK } from '@sheet-delver/sdk/react';
@@ -7,6 +9,8 @@ import { useShadowdarkActor } from './context/ShadowdarkActorContext';
 import type { PreparedAction } from '../logic/actions';
 import { bonusLabel } from '../logic/actions';
 import { LuckControl } from './components/LuckControl';
+import { RenownControl } from './components/RenownControl';
+import AbilityStateControls from './components/AbilityStateControls';
 
 /**
  * Advanced Abilities tab. Every value comes from the prepared view
@@ -22,8 +26,9 @@ const header = (title: string, extra?: React.ReactNode) => (
 
 export default function AbilitiesTab() {
     const { resolveImageUrl } = useSDK();
-    const { actor, updateActor, updateItem, getDraftValue, startAction, openCard, isActionBusy } = useShadowdarkActor();
+    const { actor, updateActor, getDraftValue, startAction, openCard, isActionBusy } = useShadowdarkActor();
     const derived = actor.derived ?? {};
+    const atMaxLevel = Number(actor.derived?.level ?? actor.system?.level?.value ?? 0) >= MAX_CHARACTER_LEVEL;
     const actions: PreparedAction[] = derived.actions ?? [];
     const isNpc = derived.kind === 'NPC';
 
@@ -89,18 +94,21 @@ export default function AbilitiesTab() {
                 </div>
 
                 {!isNpc && actor.system?.level && (
+                    <div className="sd-level-renown-grid grid grid-cols-2 gap-4">
                     <div className={cardStyle}>
                         {header(`Level ${derived.level ?? 0}`, derived.levelUp ? <span className="bg-amber-500 text-black px-2 py-0.5 text-xs font-bold rounded">LEVEL UP!</span> : null)}
                         <div className="py-2">
-                            <div className="flex justify-between text-sm mb-1">
-                                <span className="text-neutral-600">XP Progress</span>
+                            {atMaxLevel ? <div className="text-center font-serif font-bold" aria-label="Maximum level reached">MAX</div> : <><div className="flex justify-between text-sm mb-1">
+                                <span className="text-neutral-600">XP</span>
                                 <span className="font-bold">{actor.system.level.xp ?? 0} / {derived.xpNextLevel}</span>
                             </div>
                             <div className="w-full bg-neutral-200 rounded-full h-2 overflow-hidden" role="progressbar" aria-label="XP progress"
                                 aria-valuemin={0} aria-valuemax={derived.xpNextLevel || 1} aria-valuenow={actor.system.level.xp ?? 0}>
                                 <div className="bg-black h-full" style={{ width: `${derived.xpNextLevel ? Math.min(100, ((actor.system.level.xp ?? 0) / derived.xpNextLevel) * 100) : 100}%` }} />
-                            </div>
+                            </div></>}
                         </div>
+                    </div>
+                    <div className={cardStyle}>{header('Renown')}<RenownControl /></div>
                     </div>
                 )}
 
@@ -134,10 +142,9 @@ export default function AbilitiesTab() {
                         {header('Class Abilities')}
                         <ul className="divide-y divide-neutral-200">
                             {abilityActions.map(action => {
-                                const item = (actor.items ?? []).find((entry: any) => String(entry.id) === action.itemId);
+                                const item = (actor.items ?? []).find((entry: any) => String(entry.id ?? entry._id) === action.itemId);
                                 const view = (derived.items ?? []).find((entry: any) => entry.id === action.itemId);
                                 if (!item || !view) return null;
-                                const uses = view.uses;
                                 return (
                                     <li key={action.id} className="py-2 flex flex-wrap items-center gap-2 text-sm">
                                         <button type="button" onClick={() => openCard({ kind: 'item', itemId: view.id })} className="flex-1 min-w-0 flex items-center gap-2 text-left min-h-11" aria-label={`${item.name} details`}>
@@ -145,19 +152,10 @@ export default function AbilitiesTab() {
                                             <span className={`font-serif font-bold text-lg leading-tight break-words ${view.lost ? 'opacity-60 line-through' : ''}`}>{item.name}</span>
                                             {view.lost && <span className="text-[10px] font-bold uppercase border border-red-700 text-red-800 px-1">Lost</span>}
                                         </button>
-                                        {uses?.limited && (
-                                            <span className="flex items-center gap-1" aria-label={`${uses.available} of ${uses.max} uses`}>
-                                                <button type="button" aria-label={`Remove a use of ${item.name}`} className="w-8 h-8 border border-neutral-300 disabled:opacity-30"
-                                                    disabled={uses.available <= 0} onClick={() => updateItem(view.id, { 'system.uses.available': uses.available - 1 })}>−</button>
-                                                <span className="font-mono font-bold min-w-[4ch] text-center">{uses.available}/{uses.max}</span>
-                                                <button type="button" aria-label={`Restore a use of ${item.name}`} className="w-8 h-8 border border-neutral-300 disabled:opacity-30"
-                                                    disabled={uses.available >= uses.max} onClick={() => updateItem(view.id, { 'system.uses.available': uses.available + 1 })}>+</button>
-                                            </span>
-                                        )}
+                                        <AbilityStateControls itemId={view.id} />
                                         <button type="button" onClick={() => startAction(action)} disabled={!action.available || isActionBusy(action.id)}
                                             title={action.reason ?? undefined} className="min-h-11 px-3 bg-black text-white text-xs font-bold uppercase disabled:opacity-40">Use</button>
-                                        <button type="button" onClick={() => updateItem(view.id, { 'system.lost': !view.lost })}
-                                            className="min-h-11 px-3 border border-black text-xs font-bold uppercase">{view.lost ? 'Restore' : 'Mark lost'}</button>
+
                                         {!action.available && action.reason && <span className="basis-full text-xs text-red-800">{action.reason}</span>}
                                     </li>
                                 );

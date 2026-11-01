@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { effectStatus } from '../logic/effects';
 
 import { useState } from 'react';
 import { useSDK, useSDKComponents } from '@sheet-delver/sdk/react';
@@ -13,13 +14,6 @@ import { useShadowdarkActor } from './context/ShadowdarkActorContext';
  * Actor and Item effects appear once each with their owner, native state and
  * changes. Toggle/edit/delete address the owner-qualified reference.
  */
-const status = (effect: any): string => {
-    if (effect.disabled) return 'Disabled';
-    if (effect.suppressed) return `Suppressed (${effect.suppressionReason})`;
-    if (!effect.applies) return 'Not transferred';
-    return effect.situational ? 'Active (situational)' : 'Active';
-};
-
 export default function EffectsTab() {
     const { resolveImageUrl } = useSDK();
     const { ConfirmationModal } = useSDKComponents();
@@ -45,7 +39,7 @@ export default function EffectsTab() {
                         <img src={resolveImageUrl(effect.img)} className="w-8 h-8 border border-neutral-400 shrink-0" alt="" />
                         <div className="flex-1 min-w-[12rem]">
                             <div className="font-bold break-words">{effect.name}</div>
-                            <div className="text-xs text-neutral-700">{effect.isItemEffect ? `From ${effect.sourceName}` : 'On the character'} · {status(effect)}</div>
+                            <div className="text-xs text-neutral-700">{effect.isItemEffect ? `From ${effect.sourceName}` : 'On the character'} · {effectStatus(effect)}</div>
                             <ul className="mt-1 text-xs font-mono text-neutral-800 space-y-0.5">
                                 {(effect.changes ?? []).map((change: any) => (
                                     <li key={change.index} className="break-all">{change.key} {change.type} {typeof change.value === 'string' ? change.value : JSON.stringify(change.value)}{change.phase !== 'initial' ? ` (${change.phase})` : ''}</li>

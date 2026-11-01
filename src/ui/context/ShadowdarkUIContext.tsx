@@ -1,10 +1,9 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useSyncExternalStore, useMemo, useLayoutEffect } from 'react';
-import { logger } from '@sheet-delver/sdk';
-import { useSDK } from '@sheet-delver/sdk/react';
+import React, { createContext, useContext, useEffect, useCallback, useMemo } from 'react';
 import { canonicalUuid } from '../../logic/identity';
-import { createSystemIndexStore, type SystemIndexStatus, type CollectionState } from './system-index-store';
+import { useSystemIndexStore } from './useSystemIndexStore';
+import { type SystemIndexStatus, type CollectionState } from './system-index-store';
 
 /**
  * ARCHITECTURAL SAFEGUARD:
@@ -42,41 +41,11 @@ interface ShadowdarkUIState {
 const ShadowdarkUIContext = createContext<ShadowdarkUIState | undefined>(undefined);
 
 export function ShadowdarkUIProvider({ children }: { children: React.ReactNode }) {
-    const { fetchWithAuth, isConnected, worldId, currentUser, events } = useSDK();
-    const fetchRef = useRef(fetchWithAuth);
-    useLayoutEffect(() => { fetchRef.current = fetchWithAuth; }, [fetchWithAuth]);
-    const [store] = useState(() => createSystemIndexStore({
-        fetchIndex: signal => fetchRef.current('/api/modules/shadowdark/index', { signal }),
-        fetchCollection: (packId, signal) => fetchRef.current(`/api/modules/shadowdark/fetch-pack/${packId}`, { signal }),
-        onError: (message, error) => error ? logger.error(`[ShadowdarkUIContext] ${message}`, error) : logger.warn(`[ShadowdarkUIContext] ${message}`),
-    }));
-    const userId = currentUser?.id ?? null;
-    const role = currentUser?.role ?? null;
-    const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
+    const {store,snapshot,matchesScope} = useSystemIndexStore();
     // Scope changes are applied before paint. Also mask retired data during the
     // intervening render so consumers cannot copy another caller's cached rows.
-    const { status, systemData, collections, error, collectionStates, generation } = store.matchesScope({ worldId: worldId ?? null, userId, role, connected: isConnected })
+    const { status, systemData, collections, error, collectionStates, generation } = matchesScope
         ? snapshot : { status: 'offline' as const, systemData: null, collections: {}, error: null, collectionStates: {}, generation: snapshot.generation };
-    useLayoutEffect(() => {
-        store.setScope({ worldId: worldId ?? null, userId, role, connected: isConnected });
-        return () => store.release();
-    }, [store, worldId, userId, role, isConnected]);
-    useEffect(() => events.on('world:contextChanged', () => store.invalidate()), [events, store]);
-    useEffect(() => {
-        let active = true, queued = false;
-        const invalidateItems = ({ type }: { type: string }) => {
-            if (type !== 'Item' || queued) return;
-            queued = true;
-            // A host change may publish both detail and directory hints. One
-            // generation retires pending catalog results and preserves search.
-            queueMicrotask(() => { queued = false; if (active) store.invalidate(); });
-        };
-        const offItem = events.on('document:changed', invalidateItems);
-        const offList = events.on('document:listInvalidated', invalidateItems);
-        return () => { active = false; offItem(); offList(); };
-    }, [events, store]);
-
-
     const fetchPack = useCallback((packId: string) => store.fetchCollection(packId), [store]);
     const retrySystem = useCallback(() => store.retry(), [store]);
 

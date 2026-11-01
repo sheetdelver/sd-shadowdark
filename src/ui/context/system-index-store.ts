@@ -202,6 +202,16 @@ export function createSystemIndexStore(options: SystemIndexStoreOptions) {
         /** Unmount or scope teardown: retire all work without publishing. */
         release() { retire(); scopeKey = null; },
         fetchCollection,
+        invalidateCollections(ids: readonly string[]) {
+            const collections = { ...snapshot.collections }, states = { ...snapshot.collectionStates };
+            for (const id of ids) {
+                const request = pending.get(id);
+                if (request) { request.controller.abort(); request.finish(null); pending.delete(id); }
+                delete collections[id]; delete states[id];
+            }
+            publish({ collections, collectionStates: states });
+            for (const id of ids) if (consumers.has(id)) void fetchCollection(id);
+        },
         retryCollection(packId: string) {
             const state = snapshot.collectionStates[packId];
             if (state?.status !== 'failed' && !(state?.status === 'ready' && state.warnings?.length)) return;

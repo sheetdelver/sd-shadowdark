@@ -1,0 +1,916 @@
+{
+  "date": "2026-10-20",
+  "module": "shadowdark",
+  "versionUnchanged": "0.9.6",
+  "branch": "fix/restore-module-presentation",
+  "core": {
+    "version": "0.19.5",
+    "commit": "f195246a"
+  },
+  "archiveSha256": "d50d709e09ce1942a6bb668295b17c7ac05dfa1b7e3cd76f27cf1a5d664be607",
+  "nativeAcceptance": false,
+  "compiledRuntimeUnchanged": {
+    "dist/logic.js": true,
+    "dist/server.js": true,
+    "migrations/4.0.6/definition.json": true,
+    "migrations/4.0.6/shadowdark-effect-keys-4.0-world-packs.check.cjs": true,
+    "migrations/4.0.6/shadowdark-effect-keys-4.0-world-packs.plan.cjs": true,
+    "migrations/4.0.6/shadowdark-effect-keys-4.0-world-packs.verify.cjs": true,
+    "migrations/4.0.6/shadowdark-effect-keys-4.0.check.cjs": true,
+    "migrations/4.0.6/shadowdark-effect-keys-4.0.plan.cjs": true,
+    "migrations/4.0.6/shadowdark-effect-keys-4.0.verify.cjs": true
+  },
+  "sourceChecks": [
+    {
+      "name": "shadowdark-verify-types.mjs",
+      "exit": 0
+    },
+    {
+      "name": "shadowdark-action-phases.test.ts",
+      "exit": 0
+    },
+    {
+      "name": "shadowdark-actor-enricher.test.ts",
+      "exit": 0
+    },
+    {
+      "name": "shadowdark-advancement-recovery.test.ts",
+      "exit": 0
+    },
+    {
+      "name": "shadowdark-boundaries.test.ts",
+      "exit": 0
+    },
+    {
+      "name": "shadowdark-creation-validation.test.ts",
+      "exit": 0
+    },
+    {
+      "name": "shadowdark-effect-conformance.test.ts",
+      "exit": 0
+    },
+    {
+      "name": "shadowdark-importer-mapping.test.ts",
+      "exit": 0
+    },
+    {
+      "name": "shadowdark-languages.test.ts",
+      "exit": 0
+    },
+    {
+      "name": "shadowdark-migration-hooks.test.ts",
+      "exit": 0
+    },
+    {
+      "name": "shadowdark-native-alignment.test.ts",
+      "exit": 0
+    },
+    {
+      "name": "shadowdark-native-parity.test.ts",
+      "exit": 0
+    },
+    {
+      "name": "shadowdark-prepared-actor.test.ts",
+      "exit": 0
+    },
+    {
+      "name": "shadowdark-presentation.test.ts",
+      "exit": 0
+    },
+    {
+      "name": "shadowdark-roll-feedback.test.ts",
+      "exit": 0
+    },
+    {
+      "name": "shadowdark-system-index.test.ts",
+      "exit": 0
+    },
+    {
+      "name": "shadowdark-weapon-rules.test.ts",
+      "exit": 0
+    },
+    {
+      "name": "shadowdark-world-adoption.test.ts",
+      "exit": 0
+    }
+  ],
+  "presentation": {
+    "checks": [
+      "candidate v2 module serves a native-pregen world on real Core 0.19.5 (bootstrap migration check is a no-op)",
+      "player logged in through Core's real login view",
+      "360-dark: paper + 7 tabs, Core roll dialog, cards, HUD, bestiary; no overflow; dialogs keep and return focus",
+      "360-light: paper + 7 tabs, Core roll dialog, cards, HUD, bestiary; no overflow; dialogs keep and return focus",
+      "768-dark: paper + 7 tabs, Core roll dialog, cards, HUD, bestiary; no overflow; dialogs keep and return focus",
+      "768-light: paper + 7 tabs, Core roll dialog, cards, HUD, bestiary; no overflow; dialogs keep and return focus",
+      "1024-dark: paper + 7 tabs, Core roll dialog, cards, HUD, bestiary; no overflow; dialogs keep and return focus",
+      "1024-light: paper + 7 tabs, Core roll dialog, cards, HUD, bestiary; no overflow; dialogs keep and return focus",
+      "1440-dark: paper + 7 tabs, Core roll dialog, cards, HUD, bestiary; no overflow; dialogs keep and return focus",
+      "1440-light: paper + 7 tabs, Core roll dialog, cards, HUD, bestiary; no overflow; dialogs keep and return focus",
+      "complete presentation matrix without uncaught page errors"
+    ],
+    "cases": [
+      {
+        "width": 360,
+        "theme": "dark",
+        "background": "rgb(16, 32, 55)",
+        "coreRollDialog": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "spellCard": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "attackCard": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "nestedCardRoll": true,
+        "tabs": [
+          "Abilities",
+          "Details",
+          "Inventory",
+          "Spells",
+          "Talents",
+          "Effects",
+          "Notes"
+        ],
+        "effectEditor": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "boonEditor": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "languageEditor": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "spellPicker": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "inventoryCard": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "gearPicker": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "chat": true,
+        "monsterCard": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        }
+      },
+      {
+        "width": 360,
+        "theme": "light",
+        "background": "rgb(234, 241, 248)",
+        "coreRollDialog": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "spellCard": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "attackCard": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "nestedCardRoll": true,
+        "tabs": [
+          "Abilities",
+          "Details",
+          "Inventory",
+          "Spells",
+          "Talents",
+          "Effects",
+          "Notes"
+        ],
+        "effectEditor": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "boonEditor": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "languageEditor": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "spellPicker": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "inventoryCard": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "gearPicker": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "chat": true,
+        "monsterCard": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        }
+      },
+      {
+        "width": 768,
+        "theme": "dark",
+        "background": "rgb(16, 32, 55)",
+        "coreRollDialog": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "spellCard": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "attackCard": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "tabs": [
+          "Abilities",
+          "Details",
+          "Inventory",
+          "Spells",
+          "Talents",
+          "Effects",
+          "Notes"
+        ],
+        "effectEditor": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "boonEditor": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "languageEditor": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "spellPicker": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "inventoryCard": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "gearPicker": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "chat": true,
+        "monsterCard": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        }
+      },
+      {
+        "width": 768,
+        "theme": "light",
+        "background": "rgb(234, 241, 248)",
+        "coreRollDialog": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "spellCard": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "attackCard": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "tabs": [
+          "Abilities",
+          "Details",
+          "Inventory",
+          "Spells",
+          "Talents",
+          "Effects",
+          "Notes"
+        ],
+        "effectEditor": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "boonEditor": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "languageEditor": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "spellPicker": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "inventoryCard": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "gearPicker": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "chat": true,
+        "monsterCard": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        }
+      },
+      {
+        "width": 1024,
+        "theme": "dark",
+        "background": "rgb(16, 32, 55)",
+        "coreRollDialog": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "spellCard": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "attackCard": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "tabs": [
+          "Abilities",
+          "Details",
+          "Inventory",
+          "Spells",
+          "Talents",
+          "Effects",
+          "Notes"
+        ],
+        "effectEditor": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "boonEditor": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "languageEditor": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "spellPicker": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "inventoryCard": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "gearPicker": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "chat": true,
+        "monsterCard": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        }
+      },
+      {
+        "width": 1024,
+        "theme": "light",
+        "background": "rgb(234, 241, 248)",
+        "coreRollDialog": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "spellCard": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "attackCard": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "tabs": [
+          "Abilities",
+          "Details",
+          "Inventory",
+          "Spells",
+          "Talents",
+          "Effects",
+          "Notes"
+        ],
+        "effectEditor": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "boonEditor": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "languageEditor": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "spellPicker": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "inventoryCard": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "gearPicker": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "chat": true,
+        "monsterCard": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        }
+      },
+      {
+        "width": 1440,
+        "theme": "dark",
+        "background": "rgb(16, 32, 55)",
+        "coreRollDialog": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "spellCard": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "attackCard": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "nestedCardRoll": true,
+        "tabs": [
+          "Abilities",
+          "Details",
+          "Inventory",
+          "Spells",
+          "Talents",
+          "Effects",
+          "Notes"
+        ],
+        "effectEditor": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "boonEditor": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "languageEditor": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "spellPicker": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "inventoryCard": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "gearPicker": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "chat": true,
+        "monsterCard": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        }
+      },
+      {
+        "width": 1440,
+        "theme": "light",
+        "background": "rgb(234, 241, 248)",
+        "coreRollDialog": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "spellCard": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "attackCard": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "nestedCardRoll": true,
+        "tabs": [
+          "Abilities",
+          "Details",
+          "Inventory",
+          "Spells",
+          "Talents",
+          "Effects",
+          "Notes"
+        ],
+        "effectEditor": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "boonEditor": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "languageEditor": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "spellPicker": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "inventoryCard": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "gearPicker": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        },
+        "chat": true,
+        "monsterCard": {
+          "focusEntered": true,
+          "tabContained": "20/20",
+          "reverseTabContained": "20/20",
+          "controlsUnclipped": true,
+          "escapeCloses": true,
+          "focusReturned": true
+        }
+      }
+    ],
+    "pageErrors": []
+  },
+  "priorFullHost": {
+    "archiveSha256": "07b87fd81d73939f4ec4cc37204fdd5f09654413a762935e3813bca1b52fb8e9",
+    "checks": [
+      "candidate v2 module serves a native-pregen world on real Core 0.19.5 (bootstrap migration check is a no-op)",
+      "player logged in through Core's real login view",
+      "360-dark: paper + 7 tabs, Core roll dialog, cards, HUD, bestiary; no overflow; dialogs keep and return focus",
+      "360-light: paper + 7 tabs, Core roll dialog, cards, HUD, bestiary; no overflow; dialogs keep and return focus",
+      "768-dark: paper + 7 tabs, Core roll dialog, cards, HUD, bestiary; no overflow; dialogs keep and return focus",
+      "768-light: paper + 7 tabs, Core roll dialog, cards, HUD, bestiary; no overflow; dialogs keep and return focus",
+      "1024-dark: paper + 7 tabs, Core roll dialog, cards, HUD, bestiary; no overflow; dialogs keep and return focus",
+      "1024-light: paper + 7 tabs, Core roll dialog, cards, HUD, bestiary; no overflow; dialogs keep and return focus",
+      "1440-dark: paper + 7 tabs, Core roll dialog, cards, HUD, bestiary; no overflow; dialogs keep and return focus",
+      "1440-light: paper + 7 tabs, Core roll dialog, cards, HUD, bestiary; no overflow; dialogs keep and return focus",
+      "RV-10 installed UI: open loaded gear refetches all collections on real context event; search preserved",
+      "RV-10 installed UI: ownership-only change during initial requests rejects held privileged responses; same open picker recovers after override removal",
+      "SD02 installed caller Class denial is explicit and exact view recovers without unrelated Class collection loading",
+      "RV-11 installed UI: generator partial success stays blocked on classes 403 and recovers after a real context change",
+      "SD02 installed world Item permission events retire and restore the loaded spell catalog without losing search",
+      "packaged managed-JS OBSERVER 403 and LIMITED concealment 404 preserve source; OWNER succeeds and source is restored",
+      "ownership-only denial across disconnect retires loaded data; reconnect and override removal recover the mounted generator",
+      "SD02 public generic Actor-create control loses Spell Class arrays; module SDK creation preserves them without caller-side repair",
+      "SD02 installed Generator creation validates language pools before caller-bound SDK write and preserves source fields/effects",
+      "SD02 installed GM curated exact-source import retains Class identity and complete fixed native effects",
+      "SD02 world Class dependencies, normalized labels and compact source review through installed caller view",
+      "SD02 GM/world source warm read cannot leak denied Class labels or enable casting for another caller",
+      "SD02 Actor-embedded Class read uses exact public caller parent/Item identity",
+      "SD02 installed explicit replacement preserves native Spell source and records independent create/delete receipts",
+      "SD02 genuine Core process restart: completed management/action receipts replay without writes; uncertain spend never repeats result",
+      "SD02 public Array sourceFilters context refresh filters catalog and preserves every owned Item",
+      "SD02 1000 additional native inventory rows retain exact source and compact review; restored (361ms)",
+      "SD02 installed OBSERVER read/403 write and LIMITED/NONE concealment404; owner restoration and stale review rejection",
+      "live Pulp Mode changes reach the open paper and tabbed sheets without reload; index refetched 27x, no stuck loading",
+      "no uncaught page errors across all cases"
+    ],
+    "pageErrors": [],
+    "qualification": "Full behavioral run before final tablet-name and generator-grid layout deltas; final archive separately passes the complete presentation matrix."
+  }
+}

@@ -1,0 +1,296 @@
+/* Shadowdark's paper, heavy rules and serif headings. Keep resource-card
+ * compactness while giving management forms the established picker styling.
+ * Declared in module/ui.tsx so local and installed UI use the same stylesheet. */
+.sdk-module--shadowdark .sd-dialog-panel:not(.sd-resource-card) { font-family: var(--font-sans, Arial, sans-serif); }
+.sdk-module--shadowdark .sd-dialog-panel:not(.sd-resource-card) {
+    border-width: 4px; background: #f5f5f5;
+    box-shadow: 8px 8px 0 #000;
+}
+.sdk-module--shadowdark .sd-dialog-title {
+    font-family: Georgia, "Times New Roman", serif; font-weight: 900; text-transform: uppercase; letter-spacing: .06em;
+}
+.sdk-module--shadowdark .sd-dialog-panel:not(.sd-resource-card) .sd-dialog-title { font-size: 1.5rem; }
+.sdk-module--shadowdark .sd-dialog-panel:not(.sd-resource-card) .sd-dialog-header { padding: 1rem 1.5rem; }
+.sdk-module--shadowdark .sd-dialog-panel:not(.sd-resource-card) .sd-dialog-body { padding: 1.5rem; }
+.sdk-module--shadowdark .sd-dialog-panel:not(.sd-resource-card) .sd-dialog-footer {
+    padding: 1rem 1.5rem; border-top: 4px solid #000; background: #e5e5e5;
+}
+.sdk-module--shadowdark .sd-dialog-footer button {
+    min-height: 48px; padding: .6rem 1.5rem; border: 2px solid #000;
+    font-family: Georgia, "Times New Roman", serif; font-size: .875rem; font-weight: 900; text-transform: uppercase; letter-spacing: .08em;
+    box-shadow: 4px 4px 0 #000; cursor: pointer;
+}
+.sdk-module--shadowdark .sd-dialog-footer button:active:not(:disabled) { box-shadow: none; transform: translate(2px, 2px); }
+.sdk-module--shadowdark .sd-dialog-footer button:disabled { opacity: .5; cursor: not-allowed; }
+.sdk-module--shadowdark .sd-dialog-panel button:focus-visible,
+.sdk-module--shadowdark .sd-dialog-panel input:focus-visible,
+.sdk-module--shadowdark .sd-dialog-panel select:focus-visible,
+.sdk-module--shadowdark .sd-dialog-panel textarea:focus-visible {
+    outline: 2px solid #a16207; outline-offset: 3px;
+}
+.sdk-module--shadowdark .sd-dialog-body input:not([type="checkbox"]):not([type="radio"]),
+.sdk-module--shadowdark .sd-dialog-body select,
+.sdk-module--shadowdark .sd-dialog-body textarea {
+    color: #111; background: #fff; border: 2px solid #000; min-height: 44px;
+}
+.sdk-module--shadowdark .sd-dialog-body > label {
+    text-transform: uppercase; font-size: .8rem; font-weight: 900; letter-spacing: .06em;
+}
+.sdk-module--shadowdark .sd-dialog-body > label input {
+    margin-top: .5rem; padding: .75rem; font-size: 1rem; font-family: Georgia, "Times New Roman", serif; font-weight: normal;
+    text-transform: none; letter-spacing: normal; box-shadow: 4px 4px 0 #000;
+}
+.sdk-module--shadowdark .sd-dialog-body section > h3 {
+    margin: 1.25rem 0 .75rem; padding-bottom: .5rem;
+    border-bottom: 2px solid #000; font-weight: 900; text-transform: uppercase;
+    font-family: Georgia, "Times New Roman", serif; font-size: 1rem; letter-spacing: .08em;
+}
+.sdk-module--shadowdark .sd-dialog-body button[aria-expanded] {
+    font-family: Georgia, "Times New Roman", serif; font-weight: bold; text-transform: uppercase; font-size: 1rem;
+    overflow-wrap: anywhere; min-width: 0;
+}
+.sdk-module--shadowdark .sd-dialog-body button[aria-pressed] { font-family: Georgia, "Times New Roman", serif; font-weight: bold; text-transform: uppercase; }
+.sdk-module--shadowdark .sd-dialog-body .sd-choice-action { font-family: Georgia, "Times New Roman", serif; font-weight: bold; font-size: .875rem; text-transform: uppercase; flex-shrink: 0; }
+.sdk-module--shadowdark .sd-choice-note { display: block; font-family: var(--font-sans, Arial, sans-serif); font-size: .75rem; font-weight: normal; text-transform: none; }
+.sdk-module--shadowdark .sd-language-choice:disabled:not([aria-pressed="true"]) { opacity: .4; }
+.sdk-module--shadowdark .sd-form-help, .sdk-module--shadowdark .sd-empty { font-size: .875rem; line-height: 1.5; margin-top: .75rem; color: #525252; }
+.sdk-module--shadowdark .sd-form-notice { margin-top: 1rem; padding: .75rem; border: 2px solid #000; font-size: .875rem; line-height: 1.5; background: #fff; }
+.sdk-module--shadowdark .sd-editor-form label > span:not(.sr-only),
+.sdk-module--shadowdark .sd-editor-form legend,
+.sdk-module--shadowdark .sd-field-label { font-family: var(--font-sans, Arial, sans-serif); font-size: .75rem; font-weight: 900; text-transform: uppercase; letter-spacing: .12em; color: #525252; }
+.sdk-module--shadowdark .sd-editor-form .sd-form-field { padding: .75rem; font-size: 1rem; font-family: Georgia, "Times New Roman", serif; box-shadow: 4px 4px 0 #000; }
+.sdk-module--shadowdark .sd-editor-form select.sd-form-field { font-family: var(--font-sans, Arial, sans-serif); font-weight: 800; font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; }
+.sdk-module--shadowdark .sd-editor-form .sd-form-field.font-mono { font-family: monospace; font-size: .75rem; }
+.sdk-module--shadowdark .sd-editor-form legend { margin-bottom: .5rem; }
+.sdk-module--shadowdark .sd-spell-row { background: #fff; }
+.sdk-module--shadowdark .sd-spell-row[data-selected="true"] { background: #fffbeb; }
+.sdk-module--shadowdark .sd-spell-row[data-removing="true"] { background: #fef2f2; }
+.sdk-module--shadowdark .sd-spell-row img { border: 1px solid #000; background: #000; }
+.sdk-module--shadowdark .sd-spell-row button[aria-pressed="true"] { background: #000; color: #fff; }
+.sdk-module--shadowdark .sd-operation-review {
+    background: #fffbeb; color: #111; border: 2px solid #92400e; padding: 1rem;
+    overflow-wrap: anywhere;
+}
+.sdk-module--shadowdark .sd-operation-review button {
+    display: inline-block; margin: .75rem .75rem 0 0; padding: .6rem 1rem;
+    min-height: 44px; border: 2px solid #000; background: #fff; color: #111;
+    font-weight: bold; text-transform: uppercase; box-shadow: 3px 3px 0 #000;
+}
+@media (max-width: 639px) {
+    .sdk-module--shadowdark .sd-spell-line { flex-wrap: wrap; }
+    .sdk-module--shadowdark .sd-spell-line > button[aria-expanded] { flex-basis: calc(100% - 4rem); }
+    .sdk-module--shadowdark .sd-dialog-panel:not(.sd-resource-card) .sd-dialog-header,
+    .sdk-module--shadowdark .sd-dialog-panel:not(.sd-resource-card) .sd-dialog-body,
+    .sdk-module--shadowdark .sd-dialog-panel:not(.sd-resource-card) .sd-dialog-footer { padding: .85rem; }
+    .sdk-module--shadowdark .sd-dialog-footer button { padding: .6rem .85rem; }
+}
+
+.sdk-module--shadowdark .sd-editor-form input.sd-form-field:not(.font-mono) { font-size: 1.125rem; font-weight: bold; }
+.sdk-module--shadowdark .sd-editor-form .sd-form-field { min-width: 0; max-width: 100%; }
+
+/* Artwork belongs behind the inset title and properties, clipped to the body.
+ * The modal's separate top bar owns Close; its title stays available to AT. */
+.sdk-module--shadowdark .sd-resource-card .sd-dialog-body { padding: 0; }
+.sdk-module--shadowdark .sd-card-content { position: relative; isolation: isolate; overflow: hidden; background: #fff; }
+.sdk-module--shadowdark .sd-card-art { position: absolute; inset: 0 0 auto; width: 100%; height: min(100%, 30rem); z-index: 0; overflow: hidden; pointer-events: none; }
+.sdk-module--shadowdark .sd-resource-card .sd-card-art img { position: absolute; inset: 0; display: block; width: 100%; max-width: none; height: 100%; object-fit: cover; object-position: center 25%; }
+.sdk-module--shadowdark .sd-card-art::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to bottom, #fff 0%, rgba(255,255,255,.2) 18%, rgba(255,255,255,.1) 36%, rgba(255,255,255,.94) 63%, #fff 90%); }
+.sdk-module--shadowdark .sd-card-title { position: relative; z-index: 1; margin: 1rem 1.5rem 0; padding: .6rem .8rem; background: #000; color: #fff; text-align: center; font-family: Georgia, "Times New Roman", serif; font-size: 1.2rem; line-height: 1.25; font-weight: 900; text-transform: uppercase; overflow-wrap: anywhere; }
+.sdk-module--shadowdark .sd-card-copy { position: relative; z-index: 1; padding: 1rem; overflow-wrap: anywhere; }
+.sdk-module--shadowdark .sd-card-art:not([hidden]) ~ .sd-card-copy { padding-top: calc(10rem + 3.5em); }
+.sdk-module--shadowdark .sd-card-facts dt { font-weight: 800; color: #111; }
+.sdk-module--shadowdark .sd-card-facts dd { font-weight: 600; }
+.sdk-module--shadowdark .sd-card-facts--npc { grid-template-columns: max-content minmax(0, 1fr) max-content minmax(0, 1fr); }
+.sdk-module--shadowdark .sd-card-facts--npc .sd-card-fact-wide { display: contents; }
+.sdk-module--shadowdark .sd-card-facts--npc .sd-card-fact-wide dd { grid-column: 2 / -1; }
+.sdk-module--shadowdark .sd-card-notes { overflow-wrap: anywhere; }
+.sdk-module--shadowdark .sd-resource-card .sd-dialog-footer { max-height: 38dvh; overflow-y: auto; flex-shrink: 0; }
+.sdk-module--shadowdark .sd-resource-card .sd-dialog-header { flex-shrink: 0; }
+
+/* Known spells remain readable in the catalog without offering another copy. */
+.sdk-module--shadowdark .sd-spell-row[data-known="true"] { background: #eee; color: #666; }
+
+/* Monster Stats: shared columns, one native monster per accessible row. */
+.sdk-module--shadowdark .sd-monster-filters { background: #f5f5f5; color: #111; border: 2px solid #000; padding: 1rem; }
+.sdk-module--shadowdark .sd-monster-filters label, .sdk-module--shadowdark .sd-monster-filters fieldset { display: block; min-width: 0; margin: 0; }
+.sdk-module--shadowdark .sd-monster-filters label > span, .sdk-module--shadowdark .sd-monster-filters legend { display: block; font-size: .8rem; font-weight: bold; text-transform: uppercase; margin-bottom: .4rem; }
+.sdk-module--shadowdark .sd-monster-filters input, .sdk-module--shadowdark .sd-monster-filters select { width: 100%; min-width: 0; min-height: 44px; padding: .5rem; border: 2px solid #000; border-radius: 0; background: #fff; color: #000; font: inherit; }
+.sdk-module--shadowdark .sd-monster-source { max-width: 28rem; margin-bottom: 1rem !important; }
+.sdk-module--shadowdark .sd-monster-filter-fields { display: grid; grid-template-columns: 2fr 1.5fr 1fr 1fr; gap: 1rem; }
+.sdk-module--shadowdark .sd-monster-level-range { display: flex; align-items: center; gap: .4rem; }
+.sdk-module--shadowdark .sd-monster-filter-footer { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-top: 1rem; }
+.sdk-module--shadowdark .sd-monster-filter-footer button { background: #000; color: #fff; border: 2px solid #000; padding: .5rem .8rem; min-height: 44px; font-weight: bold; }
+.sdk-module--shadowdark .sd-monster-columns, .sdk-module--shadowdark .sd-monster-row { display: grid; grid-template-columns: minmax(0, 2.5fr) minmax(3rem, .5fr) minmax(0, 1fr) minmax(0, 1.5fr); align-items: center; gap: 1rem; padding: .75rem; }
+.sdk-module--shadowdark .sd-monster-columns { background: #000; color: #fff; font-weight: bold; text-transform: uppercase; font-size: .8rem; }
+.sdk-module--shadowdark .sd-monster-list { list-style: none; padding: 0; display: grid; gap: .6rem; }
+.sdk-module--shadowdark .sd-monster-row { width: 100%; text-align: left; background: #fff; color: #000; border: 2px solid #000; box-shadow: 3px 3px 0 #000; cursor: pointer; overflow-wrap: anywhere; }
+.sdk-module--shadowdark .sd-monster-row:hover { background: #f5f5f5; }
+.sdk-module--shadowdark .sd-monster-row:focus-visible { outline: 2px solid #a65f00; outline-offset: 3px; }
+.sdk-module--shadowdark .sd-monster-identity { display: flex; align-items: center; gap: .75rem; min-width: 0; }
+.sdk-module--shadowdark .sd-monster-identity strong { display: block; font-size: 1.05rem; }
+.sdk-module--shadowdark .sd-monster-identity small { display: block; color: #555; font: .8rem sans-serif; }
+.sdk-module--shadowdark .sd-monster-thumbnail { width: 48px; height: 48px; object-fit: cover; flex-shrink: 0; border: 1px solid #000; background: #eee; }
+.sdk-module--shadowdark .sd-monster-mobile-label { display: none; }
+.sdk-module--shadowdark .sd-monster-empty { background: #fff; color: #333; padding: 1rem; border: 2px solid #000; }
+@media (max-width: 700px) {
+  .sdk-module--shadowdark .sd-monster-filter-fields { grid-template-columns: 1fr 1fr; }
+  .sdk-module--shadowdark .sd-monster-columns { display: none; }
+  .sdk-module--shadowdark .sd-monster-row { grid-template-columns: 1fr 1fr 1.5fr; gap: .75rem; }
+  .sdk-module--shadowdark .sd-monster-identity { grid-column: 1 / -1; }
+  .sdk-module--shadowdark .sd-monster-mobile-label { display: block; font-size: .7rem; text-transform: uppercase; font-weight: bold; }
+}
+@media (max-width: 420px) {
+  .sdk-module--shadowdark .sd-monster-filter-fields { grid-template-columns: 1fr; }
+}
+/* Character Creator follows Generator's tool header, centered form and white
+   field panels. Core continues to own the outer world/theme canvas. ADR-0005. */
+.sdk-module--shadowdark .sd-creator { color:#171717; }
+.sdk-module--shadowdark .sd-creator-body { max-width:64rem; margin:0 auto; padding:1.5rem 1rem; }
+.sdk-module--shadowdark .sd-creator-steps { background:#fff; border:2px solid #000; }
+.sdk-module--shadowdark .sd-creator-steps ol { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); list-style:none; padding:0; margin:0; }
+.sdk-module--shadowdark .sd-creator-steps li { min-width:0; }
+.sdk-module--shadowdark .sd-creator-steps button { width:100%; height:100%; min-height:2.75rem; padding:.75rem .5rem; background:white; color:#525252; border:1px solid #e5e5e5; text-transform:uppercase; letter-spacing:.05em; font-size:.7rem; font-weight:700; }
+.sdk-module--shadowdark .sd-creator-steps [aria-current] { background:#000; color:white; border-color:#000; }
+.sdk-module--shadowdark .sd-creator-summary { display:flex; align-items:center; flex-wrap:wrap; gap:.5rem 1.25rem; padding:1rem; margin:1.5rem 0; background:#fff; border:2px solid #000; font-size:.75rem; color:#525252; }
+.sdk-module--shadowdark .sd-creator-summary strong { font-family:Georgia,'Times New Roman',serif; font-size:1.25rem; color:#000; margin-right:auto; }
+.sdk-module--shadowdark .sd-creator-page { min-width:0; background:#fafafa; border:2px solid #000; padding:1.5rem; }
+.sdk-module--shadowdark .sd-creator h2 { font-family:Georgia,'Times New Roman',serif; font-size:1.5rem; font-weight:900; border-bottom:2px solid #000; padding-bottom:.5rem; margin:0 0 1.5rem; }
+.sdk-module--shadowdark .sd-creator h3 { font-family:Georgia,'Times New Roman',serif; font-size:1.125rem; font-weight:800; margin:.75rem 0; }
+.sdk-module--shadowdark .sd-creator-page p { font-size:.875rem; line-height:1.5; margin:.75rem 0; }
+.sdk-module--shadowdark .sd-creator-page :where(button,input,select,textarea) { border:2px solid #000; border-radius:0; min-height:2.75rem; padding:.5rem .75rem; max-width:100%; background:#fff; color:#171717; font-size:.875rem; }
+.sdk-module--shadowdark .sd-creator-page :where(button) { font-family:Georgia,'Times New Roman',serif; font-weight:700; cursor:pointer; }
+.sdk-module--shadowdark .sd-creator-page :where(button:hover:not(:disabled)) { background:#f5f5f5; }
+.sdk-module--shadowdark .sd-creator :is(button,input,select,textarea):focus-visible { outline:2px solid #b45309; outline-offset:3px; }
+.sdk-module--shadowdark .sd-creator button:disabled { opacity:.45; cursor:not-allowed; }
+.sdk-module--shadowdark .sd-creator input[type=checkbox] { min-height:1rem; width:1rem; vertical-align:middle; accent-color:#000; flex:none; }
+.sdk-module--shadowdark .sd-creator label,.sdk-module--shadowdark .sd-creator-field { display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; margin:.75rem 0; font-size:.875rem; }
+.sdk-module--shadowdark .sd-creator label>input:not([type=checkbox]),.sdk-module--shadowdark .sd-creator label>select { flex:1; min-width:5rem; }
+.sdk-module--shadowdark .sd-creator textarea { width:100%; min-height:6rem; }
+.sdk-module--shadowdark .sd-creator label:has(>textarea) { display:block; }
+.sdk-module--shadowdark .sd-creator-fields { min-width:0; border:0; padding:0; }
+.sdk-module--shadowdark .sd-creator-fields:disabled { opacity:.65; }
+.sdk-module--shadowdark .sd-creator-identity { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1.5rem; align-items:start; }
+.sdk-module--shadowdark .sd-creator-identity>label,.sdk-module--shadowdark .sd-creator-identity>.sd-creator-field { display:flex; flex-direction:column; align-items:stretch; margin:0; padding:1.5rem; background:white; border:2px solid #000; box-shadow:0 1px 2px #0000000d; font-family:Georgia,'Times New Roman',serif; font-size:1.25rem; font-weight:900; }
+.sdk-module--shadowdark .sd-creator-identity>.sd-creator-field>span { border-bottom:2px solid #000; padding-bottom:.25rem; }
+.sdk-module--shadowdark .sd-creator-identity :is(input,select),.sdk-module--shadowdark .sd-creator-identity>.sd-creator-field>button { border:0; border-bottom:2px solid #d4d4d4; padding:.5rem 0; font-family:Georgia,'Times New Roman',serif; font-size:1.125rem; font-weight:700; text-align:left; }
+.sdk-module--shadowdark .sd-creator-identity>.sd-creator-name { grid-column:1/-1; }
+.sdk-module--shadowdark .sd-creator-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1.5rem; }
+.sdk-module--shadowdark .sd-creator-score { padding:1.25rem; background:white; border:2px solid #000; }
+.sdk-module--shadowdark .sd-creator-score>.sd-creator-field { display:grid; grid-template-columns:1fr 4.5rem; margin:0 0 .75rem; }
+.sdk-module--shadowdark .sd-creator-score>.sd-creator-field>span { font-family:Georgia,'Times New Roman',serif; font-size:1.25rem; font-weight:900; }
+.sdk-module--shadowdark .sd-creator-score input { width:100%; font-weight:700; font-size:1.25rem; text-align:center; }
+.sdk-module--shadowdark .sd-creator-score select { grid-column:1/-1; width:100%; border-color:#d4d4d4; font-family:Arial,Helvetica,sans-serif; }
+.sdk-module--shadowdark .sd-creator-score>span { display:block; font-size:.75rem; margin:.5rem 0; color:#525252; }
+.sdk-module--shadowdark .sd-creator-page .sd-creator-roll { background:#4f46e5; border-color:#4f46e5; color:white; font-family:Arial,Helvetica,sans-serif; font-size:.75rem; }
+.sdk-module--shadowdark .sd-mundane-part { margin:1.25rem 0; min-width:0; }
+.sdk-module--shadowdark .sd-mundane-input-row { display:flex; align-items:center; gap:.75rem; }
+.sdk-module--shadowdark .sd-mundane-input-row>:is(input,textarea,select) { flex:1; width:0; min-width:0; }
+.sdk-module--shadowdark .sd-mundane-input-row>.sd-creator-dice { flex:none; }
+.sdk-module--shadowdark .sd-mundane-part>select { width:100%; min-width:0; margin-top:.5rem; }
+.sdk-module--shadowdark .sd-mundane-part small { display:block; margin-top:.5rem; color:#525252; }
+.sdk-module--shadowdark .sd-creator-page .sd-mundane-clear { margin:.5rem 0 0; font-size:.75rem; }
+.sdk-module--shadowdark .sd-creator-award { padding:1rem; margin:1rem 0; background:white; border:2px solid #000; overflow-wrap:anywhere; }
+.sdk-module--shadowdark .sd-creator-notice { padding:.75rem 1rem; margin:1rem 0; border:1px solid #d4d4d4; background:white; font-size:.875rem; overflow-wrap:anywhere; }
+.sdk-module--shadowdark .sd-creator [role=alert] { padding:.5rem; border-left:4px solid #dc2626; color:#991b1b; }
+.sdk-module--shadowdark .sd-creator-footer { display:flex; align-items:center; flex-wrap:wrap; gap:.75rem; margin-top:1.5rem; border-top:2px solid #000; padding-top:1rem; }
+.sdk-module--shadowdark .sd-creator-page .sd-creator-primary { background:#000; color:white; text-transform:uppercase; letter-spacing:.05em; }
+.sdk-module--shadowdark .sd-creator-page .sd-creator-refresh { margin-left:auto; border:0; background:none; color:#525252; font-family:Arial,Helvetica,sans-serif; font-size:.75rem; }
+.sdk-module--shadowdark .sd-creator-table { overflow-x:auto; }
+.sdk-module--shadowdark .sd-creator table { width:100%; border-collapse:collapse; text-align:left; background:white; font-size:.875rem; }
+.sdk-module--shadowdark .sd-creator :is(th,td) { padding:.75rem .5rem; border-bottom:1px solid #d4d4d4; }
+.sdk-module--shadowdark .sd-creator th { font-family:Georgia,'Times New Roman',serif; }
+.sdk-module--shadowdark .sd-creator details { margin:1rem 0; }
+.sdk-module--shadowdark .sd-creator summary { cursor:pointer; font-weight:700; padding:.75rem 0; }
+@media(max-width:639px) {
+  .sdk-module--shadowdark .sd-creator-body { padding:1rem .75rem; }
+  .sdk-module--shadowdark .sd-creator-page { padding:1rem; }
+  .sdk-module--shadowdark .sd-creator-steps ol { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .sdk-module--shadowdark .sd-creator-steps li:last-child { grid-column:1/-1; }
+  .sdk-module--shadowdark .sd-creator-identity,.sdk-module--shadowdark .sd-creator-grid { grid-template-columns:minmax(0,1fr); gap:1rem; }
+  .sdk-module--shadowdark .sd-creator-identity>label,.sdk-module--shadowdark .sd-creator-identity>.sd-creator-field { padding:1rem; }
+  .sdk-module--shadowdark .sd-creator-footer .sd-creator-refresh { margin-left:0; }
+}
+
+/* Creator reuses Generator's indigo d6 control and compact score entry. */
+.sdk-module--shadowdark .sd-creator-field-heading,
+.sdk-module--shadowdark .sd-creator-score-heading { display:flex; align-items:center; justify-content:space-between; gap:1rem; border-bottom:2px solid #000; padding-bottom:.25rem; margin-bottom:1rem; }
+.sdk-module--shadowdark .sd-creator-field-heading label,
+.sdk-module--shadowdark .sd-creator-score-heading label { margin:0; font-family:Georgia,'Times New Roman',serif; font-size:1.25rem; font-weight:900; }
+.sdk-module--shadowdark .sd-creator-page .sd-creator-dice { display:inline-flex; align-items:center; justify-content:center; width:2.5rem; min-height:2.5rem; flex:none; padding:.25rem; border:0; border-radius:.5rem; background:#4f46e5; box-shadow:0 4px 6px #0002; }
+.sdk-module--shadowdark .sd-creator-page .sd-creator-dice:hover:not(:disabled) { background:#6366f1; }
+.sdk-module--shadowdark .sd-creator-page .sd-creator-dice:disabled { background:#a3a3a3; cursor:not-allowed; }
+.sdk-module--shadowdark .sd-creator-dice img { width:2rem; height:2rem; filter:brightness(0) invert(1); }
+
+.sdk-module--shadowdark .sd-creator-identity>.sd-creator-field>button.sd-creator-clear { align-self:flex-start; border:0; padding:.25rem 0; margin-top:.5rem; font:400 .875rem Arial,sans-serif; text-decoration:underline; color:#525252; }
+
+/* Tool paper surfaces share spacing; their action footer meets the sheet edges. */
+.sdk-module--shadowdark .sd-tool-sheet { --sd-tool-padding:1.5rem; min-width:0; background:#fafafa; border:2px solid #000; padding:var(--sd-tool-padding); }
+@media (max-width:640px) { .sdk-module--shadowdark .sd-tool-sheet { --sd-tool-padding:1rem; } }
+
+.sdk-module--shadowdark .sd-tool-sheet > .sd-tool-sheet-footer { margin-top:2rem; margin-inline:calc(-1 * var(--sd-tool-padding)); margin-bottom:calc(-1 * var(--sd-tool-padding)); }
+
+/* Shared sheet-only zero-HP name cue; the editable name stays unmodified. */
+.sdk-module--shadowdark .sd-sheet-character-name { display:inline-flex; align-items:center; gap:.35em; min-width:0; }
+.sdk-module--shadowdark .sd-sheet-character-name-zero { color:#b91c1c; }
+.sdk-module--shadowdark .sd-sheet-character-name-zero input { color:inherit; }
+.sdk-module--shadowdark .sd-sheet-character-name-dark { color:#f87171; }
+
+/* Creator progression uses the existing paper review table, with a bounded
+ * horizontal viewport on phones rather than hiding other levels in a selector. */
+.sdk-module--shadowdark .sd-creator-spell-scroll { max-width:100%; border:2px solid #000; }
+.sdk-module--shadowdark table.sd-creator-spell-progression { min-width:740px; table-layout:fixed; }
+.sdk-module--shadowdark .sd-creator-spell-progression caption { text-align:left; padding:.75rem; font-weight:bold; }
+.sdk-module--shadowdark .sd-creator-spell-progression :is(th,td) { vertical-align:top; border:1px solid #d4d4d4; }
+.sdk-module--shadowdark .sd-creator-spell-progression thead { background:#000; color:#fff; }
+.sdk-module--shadowdark .sd-creator-spell-progression th:first-child { width:6rem; }
+.sdk-module--shadowdark .sd-creator-spell-progression small { display:block; margin-top:.35rem; font:400 .75rem/1.4 Arial,sans-serif; }
+.sdk-module--shadowdark .sd-creator-spell-progression [data-current="true"] > th { border-left:4px solid #000; }
+.sdk-module--shadowdark .sd-creator-spell-progression ul { list-style:none; padding:0; margin:.5rem 0 0; }
+.sdk-module--shadowdark .sd-creator-spell-progression li { padding:.5rem 0; border-top:1px dotted #777; overflow-wrap:anywhere; }
+.sdk-module--shadowdark .sd-creator-spell-progression li span { display:block; }
+.sdk-module--shadowdark .sd-creator-spell-progression button { margin-top:.5rem; font-size:.75rem; padding:.4rem; min-height:36px; }
+.sdk-module--shadowdark .sd-creator-spell-progression tfoot { border-top:2px solid #000; }
+.sdk-module--shadowdark .sd-creator-spell-scroll-hint { font-size:.75rem; }
+.sdk-module--shadowdark .sd-creator-spell-progression tr > th:first-child { position:sticky; left:0; z-index:1; background:#fff; box-shadow:1px 0 #777; }
+.sdk-module--shadowdark .sd-creator-spell-progression thead tr > th:first-child { background:#000; }
+
+
+/* Native manual counters retain the paper controls in narrow stat columns. */
+.sdk-module--shadowdark .sd-renown-control { display:grid; grid-template-columns:1.75rem minmax(0,3.5rem) 1.75rem; gap:.25rem; align-items:center; justify-content:center; width:100%; min-width:0; }
+.sdk-module--shadowdark .sd-renown-control button { width:1.75rem; height:2.25rem; padding:0; }
+.sdk-module--shadowdark .sd-renown-control input { width:100%; min-width:0; max-width:3.5rem; height:2.25rem; padding:0; }
+.sdk-module--shadowdark .sd-level-renown-grid > div { min-width:0; padding:.5rem; }
+.sdk-module--shadowdark .sd-level-renown-grid > div > div:first-child { margin:-.5rem -.5rem .5rem; }
+.sdk-module--shadowdark .sd-level-renown-grid h3 { font-size:1rem; }
+
+/* Treasure authoring reuses Creator's connected paper and field controls. */
+.sdk-module--shadowdark .sd-treasure section + section { margin-top:2rem; }
+.sdk-module--shadowdark .sd-treasure-actions { display:flex; flex-wrap:wrap; gap:.75rem; }
+.sdk-module--shadowdark .sd-treasure-money { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:1rem; }
+.sdk-module--shadowdark .sd-treasure-money label { display:flex; flex-direction:column; align-items:stretch; }
+.sdk-module--shadowdark .sd-treasure-money input { width:100%; }
+.sdk-module--shadowdark .sd-treasure-review { scroll-margin-top:1rem; }
+.sdk-module--shadowdark .sd-treasure-card-preview { margin:1.5rem 0; }
+.sdk-module--shadowdark .sd-treasure-card-preview .sd-resource-card { max-width:36rem; border:2px solid #000; box-shadow:4px 4px 0 #000; }
+.sdk-module--shadowdark .sd-treasure-facts { display:grid; grid-template-columns:7rem minmax(0,1fr); gap:.75rem; margin:1rem 0; overflow-wrap:anywhere; }
+.sdk-module--shadowdark .sd-treasure-facts dt { font-weight:700; }
+.sdk-module--shadowdark .sd-treasure-facts dd { margin:0; }
+@media(max-width:639px) { .sdk-module--shadowdark .sd-treasure .sd-creator-grid { grid-template-columns:1fr; } }
+
+/* Treasure categories reuse the module's paper tabs; each page owns its recipe. */
+.sdk-module--shadowdark .sd-treasure-tabs { margin-bottom:1.5rem; overflow-x:auto; }
+.sdk-module--shadowdark .sd-treasure-tabs ol { display:flex; min-width:max-content; }
+.sdk-module--shadowdark .sd-treasure-tabs li { flex:0 0 auto; }
+.sdk-module--shadowdark .sd-treasure-tabs button { white-space:nowrap; width:auto; }
+.sdk-module--shadowdark .sd-treasure-recipe { margin-top:1.5rem; }
+.sdk-module--shadowdark .sd-treasure-part { margin:1rem 0; padding:1rem; border:1px solid black; }
+.sdk-module--shadowdark .sd-treasure-part textarea { width:100%; min-height:5rem; }
+
+.sdk-module--shadowdark .sd-treasure-base-icon { display:block; width:4rem; height:4rem; object-fit:contain; margin:.75rem 0; border:1px solid #000; }
+
+/* Shared embedded editor: keep the paper boundary visible with or without its toolbar. */
+.sdk-module--shadowdark .sd-rich-text-editor {
+    border: 2px solid #000;
+    background: #fff;
+    min-width: 0;
+}

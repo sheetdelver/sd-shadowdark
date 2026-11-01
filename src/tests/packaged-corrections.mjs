@@ -73,6 +73,25 @@ async function run(){
  result=await apiRoutes['actors/[id]/level-up/finalize'](req(input),params('new'));assert.equal(result.status,200);const prepared=await result.json();candidate.items=prepared.items.filter(item=>!['weapon','armor','basic','potion','scroll','gear'].includes(item.type.toLowerCase()));candidate.flags={unknown:{keep:['a','b']}};
  const body={actor:candidate,languageChoices:input.languageChoices,creationPlan:prepared.creationPlan};result=await apiRoutes['characters/create'](req(body));assert.equal(result.status,200,JSON.stringify(await result.json()));assert.deepEqual(created[0],candidate);checks.push('packaged shared plan/final creation preserves complete native source');
  const changed=copy(body);changed.actor.items=changed.actor.items.filter((item,index)=>index!==changed.actor.items.findIndex(i=>i.type==='Spell'));result=await apiRoutes['characters/create'](req(changed));assert.equal(result.status,400);assert.equal(created.length,1);checks.push('packaged final body tampering makes zero additional Actor writes');
+ // Rest uses the compiled routes and the public mock SDK store, with no native transport.
+ actor.system.attributes.hp={value:1,max:9};actor.effects=[];
+ actor.items=[{...owned(byUuid.get('Compendium.shadowdark.gear.Item.GX6OmWQiE7MzTmjX')),_id:'ration'}];
+ runtime.documents.items.update=async(parent,id,patch)=>{writes.push('rest-item');const item=actor.items.find(i=>i._id===id);for(const [key,val]of Object.entries(patch)){const parts=key.split('.');let target=item;for(const part of parts.slice(0,-1))target=target[part]??={};target[parts.at(-1)]=copy(val)};return copy(item)};
+ result=await apiRoutes['actors/[id]/rest/plan']({...req({consumeRation:true,confirmedSpells:[]}),method:'POST'},params(actor._id));
+ assert.equal(result.status,200);const initialRest=await result.json();assert.equal(initialRest.rations.length,1);assert.ok(initialRest.errors.length);
+ const restChoice={consumeRation:true,rationId:'ration',confirmedSpells:[]};
+ result=await apiRoutes['actors/[id]/rest/plan']({...req(restChoice),method:'POST'},params(actor._id));assert.equal(result.status,200);const restPreview=await result.json();
+ const restBody={...restChoice,review:restPreview.review,requestId:'packaged-rest-complete'};
+ result=await apiRoutes['actors/[id]/rest/complete']({...req(restBody),method:'POST'},params(actor._id));assert.equal(result.status,200);assert.equal((await result.json()).state,'complete');
+ assert.equal(actor.system.attributes.hp.value,9);assert.equal(actor.items[0].system.quantity,2);
+ const restWrites=writes.length;result=await apiRoutes['actors/[id]/rest/complete']({...req(restBody),method:'POST'},params(actor._id));assert.equal((await result.json()).state,'complete');assert.equal(writes.length,restWrites);
+ checks.push('packaged rest consumes one ration, restores HP and replays without writes');
+ actor.items=[{_id:'torch',name:'Torch',type:'Basic',system:{light:{isSource:true,active:true,remainingSecs:125}}}];
+ const lightCards=[];runtime.chat.card=async(card,options)=>{lightCards.push({card,options});return {_id:'light-chat'}};
+ const lightRequest={requestId:'packaged-light-feedback',itemId:'torch',active:true};
+ for(let i=0;i<2;i++){result=await apiRoutes['actors/[id]/light/chat']({...req(lightRequest),method:'POST'},params(actor._id));assert.equal(result.status,200);assert.equal((await result.json()).posted,true)}
+ assert.equal(lightCards.length,1);assert.equal(lightCards[0].card.title,'Torch lit');assert.equal(lightCards[0].options.rollMode,'publicroll');
+ checks.push('packaged light feedback uses SDK card once without inventory writes');
  console.log(JSON.stringify({scope:'Final compiled apiRoutes + public SDK/testing in memory; no transports/services/native acceptance',coreVersion:${JSON.stringify(JSON.parse(fs.readFileSync(path.join(core,'package.json'),'utf8')).version)},checks},null,2));
 }
 run().catch(error=>{console.error(error);process.exitCode=1});

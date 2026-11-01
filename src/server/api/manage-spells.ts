@@ -5,6 +5,7 @@ import { shadowdarkAdapter } from '../ShadowdarkAdapter';
 import { callerOf, contextConflict, requestRevision, requestRules, requireOwnedActor } from '../access';
 import { canonicalUuid, documentId, formatUuid, ownedCopy } from '../../logic/identity';
 import { prepareShadowdarkView } from '../../logic/prepared-view';
+import { knownSpellSources, grantedSpellSources } from '../../logic/spell-model';
 import { spellReview } from '../../logic/spell-review';
 import { withActorLock, operationProcess } from '../operation-lock';
 import { reviewToken, reviewMatches } from '../source-review';
@@ -56,13 +57,16 @@ export async function handleManageSpells(actorId: string, req: ModuleServerReque
             const source = view.spellModel.sources.find(row => row.listUuid === body.listUuid);
             if (!source || !Number.isInteger(body.tier) || body.tier < 1 || body.tier > 5) return error('validation', 'The selected native casting list is unavailable.');
             const limit = source.limits[body.tier];
-            if (body.additions.length && limit.status !== 'known') return error('validation', limit.reason);
             const operations = journal?.operations ?? [...body.additions.map(target => ({ kind: 'add' as const, target, status: 'pending' as const })),
                 ...body.removals.map(target => ({ kind: 'remove' as const, target, status: 'pending' as const }))];
             const additions = new Map<string, any>();
+            const knownSources = knownSpellSources(actor.items ?? []);
+            const grantedSources = grantedSpellSources(actor.items ?? []);
             const filters = requestRules(req.runtime).sourceFilters;
             if (!filters || filters.value === null) return error('not_ready', 'Native source filters are unavailable. Refresh before reviewing additions.');
             for (const op of operations.filter(op => op.kind === 'add' && op.status !== 'complete')) {
+                if (grantedSources.has(op.target)) return error('validation', 'This spell is granted automatically and cannot be selected again. Refresh the character to apply its grant.');
+                if (knownSources.has(op.target)) return error('validation', 'This character already knows that spell. Choose a different spell.');
                 const doc = await shadowdarkAdapter.resolveDocumentFor(op.target, callerOf(req));
                 if (!doc || doc.type !== 'Spell' || doc.system?.tier !== body.tier || !(doc.system?.class ?? []).some((uuid: unknown) => canonicalUuid(uuid) === source.listUuid))
                     return error('validation', 'An addition is unavailable or does not match the selected list and tier.');
@@ -74,14 +78,16 @@ export async function handleManageSpells(actorId: string, req: ModuleServerReque
                 const row = owned.find(row => row.itemId === op.target);
                 if (!row || row.innate || row.tier !== body.tier || (!row.classes.includes(source.listUuid) && row.classification !== 'unresolved')) return error('validation', 'A removal must identify an ordinary owned Spell on this list and tier.');
             }
-            const remainingAdds = operations.filter(op => op.kind === 'add' && op.status !== 'complete').length;
+            // Fixed grants are automatic; this route handles ordinary choices only.
+            const remainingOrdinaryAdds = operations.filter(op => op.kind === 'add' && op.status !== 'complete' && !grantedSources.has(op.target)).length;
+            if (remainingOrdinaryAdds && limit.status !== 'known') return error('validation', limit.reason);
             const remainingRemovals = operations.filter(op => op.kind === 'remove' && op.status !== 'complete').length;
-            if (remainingAdds && owned.some(row => row.classification === 'unresolved' && (row.tier === body.tier || row.tier === null)))
+            if (remainingOrdinaryAdds && owned.some(row => row.classification === 'unresolved' && (row.tier === body.tier || row.tier === null)))
                 return error('validation', 'Owned spells have unresolved Class/tier data. They are retained and counted separately; resolve their exact sources before adding to this quota.');
             const known = owned.filter(row => !row.innate && row.tier === body.tier && row.classes.includes(source.listUuid)).length;
             // Existing excess is preserved. Removing excess is allowed; adding to
             // an unknown/exceeded quota is not silently a GM exception.
-            if (remainingAdds && limit.status === 'known' && known + remainingAdds - remainingRemovals > limit.value) return error('validation', `Tier ${body.tier} allows ${limit.value} ordinary spells; existing inventory has ${known}.`);
+            if (remainingOrdinaryAdds && limit.status === 'known' && known + remainingOrdinaryAdds - remainingRemovals > limit.value) return error('validation', `Tier ${body.tier} allows ${limit.value} ordinary spells; existing inventory has ${known}.`);
             const latest = await req.runtime.documents.get('Actor', actorId, { minOwnership: 'owner' });
             if (!latest || digest(spellReview(latest)) !== reviewed) return error('conflict', 'Character changed during preflight; refresh and review.');
             const conflict = contextConflict(req.runtime, revision); if (conflict) return conflict;

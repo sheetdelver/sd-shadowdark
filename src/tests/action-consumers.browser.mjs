@@ -19,7 +19,7 @@ window.sdk={worldId:'controlled',isConnected:true,currentUser:{id:'p',role:1},fo
 const source=primLike();source._id='controlled';source.system.class='Item.class';source.items=[];source.effects=[];
 const classDoc={name:'Wizard',type:'Class',system:{spellcasting:{ability:'int',class:''}}};
 if(window.initial.kind==='ability')source.items=[{_id:'resource',name:'Native-shaped ability',type:'Class Ability',system:{ability:'wis',dc:10,limitedUses:true,uses:{available:1,max:1},loseOnFailure:true},effects:[]}];
-else{source.items=[{_id:'resource',name:'Controlled spell',type:'Spell',system:{tier:1,class:['Item.class'],lost:false},effects:[]}];
+else{source.items=[{_id:'resource',name:'Controlled spell',type:'Spell',system:{tier:1,class:['Item.class'],lost:false,duration:{type:window.initial.duration??'instant'}},effects:[]}];
 if(window.initial.kind==='npc'){source.type='NPC';source.system.spellcasting={ability:'int',bonus:2,attacks:1};source.system.abilities=Object.fromEntries(['str','dex','con','int','wis','cha'].map(k=>[k,{mod:0}]));}
 else source.effects=[{_id:'grant',changes:[{key:'system.spellcasting.classes',mode:2,value:'wizard'}]}];}
 const prepared=()=>({...structuredClone(source),id:source._id,derived:prepareShadowdarkView(source,{classDocument:()=>classDoc,label:()=>classDoc.name})});
@@ -46,6 +46,6 @@ try{
  await test('SD02 context change cancels a mounted roller callback before any request',{kind:'ability'},async p=>{
   await p.getByRole('button',{name:'Open resource'}).click();await p.getByRole('button',{name:'Use Native-shaped ability',exact:true}).click();await p.getByRole('button',{name:'Submit prepared roll'}).waitFor();await p.evaluate(()=>window.retire());await p.getByRole('button',{name:'Submit prepared roll'}).waitFor({state:'hidden'});assert.equal(await p.evaluate(()=>window.bodies.length),0);
  });
- for(const kind of ['npc','player'])await test(`SD02-11 actual ${kind} owned resource card focus policy`,{kind},async p=>{await p.getByRole('button',{name:'Open resource'}).click();await p.getByRole('dialog').waitFor();assert.equal(await p.getByRole('checkbox',{name:/Focus check/}).count(),kind==='player'?1:0);});
+ for(const kind of ['npc','player'])for(const duration of ['focus','instant'])await test(`SD02-11 actual ${kind} ${duration} owned resource card focus policy`,{kind,duration},async p=>{await p.getByRole('button',{name:'Open resource'}).click();await p.getByRole('dialog').waitFor();assert.equal(await p.getByRole('checkbox',{name:/Focus check/}).count(),kind==='player'&&duration==='focus'?1:0);});
 }finally{await browser.close();fs.writeFileSync(path.join(out,'results.json'),JSON.stringify(results,null,2));}
 console.log(`${results.filter(row=>row.passed).length}/${results.length} passed`);if(results.some(row=>!row.passed))process.exitCode=1;

@@ -1,10 +1,16 @@
 'use client';
 
+import { MAX_CHARACTER_LEVEL } from '../logic/advancement';
+
 import React, { useState } from 'react';
-import { Flame } from 'lucide-react';
+import { groupPaperTalents, talentLevelLabel } from './talent-display';
+import { Flame, FlameKindling, Pencil, ArrowLeftRight } from 'lucide-react';
+import { LightRemaining } from './components/LightRemaining';
+import { SheetCharacterName } from './components/SheetCharacterName';
 import NotesModal from './components/NotesModal';
 import { useShadowdarkActor } from './context/ShadowdarkActorContext';
 import { LuckControl } from './components/LuckControl';
+import { RenownControl } from './components/RenownControl';
 import { bonusLabel, type PreparedAction } from '../logic/actions';
 
 interface ShadowdarkPaperSheetProps {
@@ -23,9 +29,10 @@ const row = 'w-full text-left flex justify-between items-baseline gap-2 border-b
 const FEATURE_TYPES = ['Talent', 'Boon', 'Class Ability'];
 
 export default function ShadowdarkPaperSheet({ onToggleView }: ShadowdarkPaperSheetProps) {
-    const { actor, updateActor, startAction, openCard, triggerLevelUp, isActionBusy } = useShadowdarkActor();
+    const { actor, updateActor, startAction, openCard, triggerLevelUp, isActionBusy, openRest, openEditCharacter } = useShadowdarkActor();
     const [notesModalOpen, setNotesModalOpen] = useState(false);
     const derived = actor.derived ?? {};
+    const atMaxLevel = Number(actor.derived?.level ?? actor.system?.level?.value ?? 0) >= MAX_CHARACTER_LEVEL;
     const actions: PreparedAction[] = derived.actions ?? [];
     const views: any[] = derived.items ?? [];
     const itemById = (id: string) => (actor.items ?? []).find((item: any) => String(item.id ?? item._id) === id);
@@ -49,7 +56,7 @@ export default function ShadowdarkPaperSheet({ onToggleView }: ShadowdarkPaperSh
     const attacks = [...(derived.attacks?.melee ?? []).map((a: any) => ({ ...a, _type: 'Melee' })), ...(derived.attacks?.ranged ?? []).map((a: any) => ({ ...a, _type: 'Ranged' }))];
     const spells = views.filter(view => view.type === 'Spell').sort((a, b) => (Number(itemById(a.id)?.system?.tier ?? 0) - Number(itemById(b.id)?.system?.tier ?? 0)) || a.name.localeCompare(b.name));
     const magic = views.filter(view => view.type === 'Scroll' || view.type === 'Wand');
-    const features = views.filter(view => FEATURE_TYPES.includes(view.type));
+    const features = groupPaperTalents(views.filter(view => FEATURE_TYPES.includes(view.type)), actor.items ?? []);
     const gear = views.filter(view => view.physical);
     const freeCarry = gear.filter(view => view.freeCarry > 0 && !view.stashed);
     const ownedClass = (actor.items ?? []).find((item: any) => item.type === 'Class');
@@ -65,22 +72,20 @@ export default function ShadowdarkPaperSheet({ onToggleView }: ShadowdarkPaperSh
     );
 
     return (
-        <div className="relative w-full h-full bg-black p-2 sm:p-4 md:p-8 flex justify-center items-start font-serif text-sm">
-            <div className="bg-white text-black w-full max-w-[1200px] border-[3px] border-black shadow-2xl p-3 sm:p-4 md:p-6 relative flex flex-col gap-4 mb-8">
+        <div className="relative w-full flex flex-col bg-white font-serif text-sm">
+            <div className="bg-white text-black w-full p-3 sm:p-4 md:p-6 relative flex flex-col gap-4">
                 <div className="flex flex-col md:grid md:grid-cols-12 gap-4 items-start mb-4">
-                    <div className="w-full md:col-span-8 flex flex-col items-center gap-2 text-center pt-2">
+                    <div className="w-full md:col-span-6 xl:col-span-8 flex flex-col items-center gap-2 text-center pt-2">
                         <h1 className="text-[clamp(2rem,5vw,3.75rem)] font-black tracking-tighter uppercase leading-none">ShadowDark</h1>
-                        <button type="button" onClick={onToggleView}
-                            className="print:hidden text-xs font-bold uppercase tracking-widest border-2 border-black px-3 py-2 hover:bg-black hover:text-white shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
-                            Manage Character Sheet
-                        </button>
+                        <div role="group" aria-label="Character sheet controls" className="flex flex-wrap justify-center items-center gap-2">
+                        {actor.canEdit === true && actor.type === 'Player' && <button type="button" onClick={openEditCharacter} className="print:hidden text-xs font-bold uppercase tracking-widest border-2 border-black px-3 py-2 hover:bg-black hover:text-white shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] inline-flex items-center gap-1"><Pencil size={14} aria-hidden="true" />Edit</button>}
+                        <button type="button" onClick={onToggleView} className="print:hidden text-xs font-bold uppercase tracking-widest border-2 border-black px-3 py-2 hover:bg-black hover:text-white shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] inline-flex items-center gap-1"><ArrowLeftRight size={14} aria-hidden="true" />Tabbed</button>
+                        <button type="button" onClick={openRest} className="print:hidden text-xs font-bold uppercase tracking-widest border-2 border-black px-3 py-2 hover:bg-black hover:text-white shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] inline-flex items-center gap-1"><FlameKindling size={14} aria-hidden="true" />Rest</button>
+                        </div>
                     </div>
-                    <div className={`w-full md:col-span-4 ${box} p-2 pt-6 h-24 flex flex-col`}>
+                    <div className={`w-full md:col-span-6 xl:col-span-4 ${box} p-2 pt-6 min-h-24 flex flex-col text-2xl font-bold`}>
                         <span className={tag}>Name</span>
-                        <label className="sr-only" htmlFor="sd-paper-name">Name</label>
-                        <input id="sd-paper-name" key={actor.name} type="text" defaultValue={actor.name}
-                            onBlur={(e) => e.target.value !== actor.name && updateActor('name', e.target.value, { immediate: true })}
-                            className="w-full h-full text-2xl font-bold bg-transparent outline-none px-1" />
+                        <SheetCharacterName hp={derived.hp?.value} className="flex-1 w-full break-words">{actor.name}</SheetCharacterName>
                     </div>
                 </div>
 
@@ -114,6 +119,10 @@ export default function ShadowdarkPaperSheet({ onToggleView }: ShadowdarkPaperSh
                         <div className={`${box} p-1 pt-6 flex flex-col`}>
                             <span className={tag}>Luck</span>
                             <LuckControl compact />
+                        </div>
+                        <div className={`${box} p-1 pt-6 flex flex-col`}>
+                            <span className={tag}>Renown</span>
+                            <RenownControl compact />
                         </div>
                         <section className={`${box} flex flex-col`} aria-label="Attacks">
                             <span className="bg-black text-white text-xs font-black uppercase px-2 py-0.5 w-fit">Attacks ({attacks.length})</span>
@@ -151,12 +160,12 @@ export default function ShadowdarkPaperSheet({ onToggleView }: ShadowdarkPaperSh
                         <div className={`${box} h-16 flex flex-col`}>
                             <span className={tag}>XP</span>
                             <div className="flex-1 flex items-center justify-center text-xl font-bold pt-4">
-                                <label className="sr-only" htmlFor="sd-paper-xp">Experience points</label>
+                                {atMaxLevel ? <span aria-label="Maximum level reached">MAX</span> : <><label className="sr-only" htmlFor="sd-paper-xp">Experience points</label>
                                 <input id="sd-paper-xp" key={actor.system?.level?.xp} type="number" min={0} defaultValue={actor.system?.level?.xp || 0}
                                     onBlur={(e) => { const xp = Math.max(0, parseInt(e.target.value) || 0); if (xp !== actor.system?.level?.xp) updateActor('system.level.xp', xp, { immediate: true }); }}
                                     className="w-12 text-center bg-transparent outline-none border-b-2 border-black hover:bg-neutral-100 focus:bg-neutral-100 rounded" />
                                 <span className="text-neutral-400 mx-1" aria-hidden="true">/</span>
-                                <span>{derived.xpNextLevel ?? 0}</span>
+                                <span>{derived.xpNextLevel ?? 0}</span></>}
                             </div>
                         </div>
                         {info('Title', actor.details?.title)}
@@ -197,10 +206,10 @@ export default function ShadowdarkPaperSheet({ onToggleView }: ShadowdarkPaperSh
                         <section className={`${box} flex flex-col min-h-[8rem]`} aria-label="Talents and abilities">
                             <span className={tag}>Talents</span>
                             <ul className="p-3 pt-8">
-                                {features.map(view => (
+                                {features.map(({ view, items }) => (
                                     <li key={view.id}>
                                         <button type="button" className={row} onClick={() => openCard({ kind: 'item', itemId: view.id })}>
-                                            <span className={`text-xs font-bold uppercase break-words ${view.lost ? 'line-through opacity-60' : ''}`}>{view.name}</span>
+                                            <span className={`text-xs font-bold uppercase break-words ${view.lost ? 'line-through opacity-60' : ''}`}>{view.name}{items.length > 1 ? ` (x${items.length})` : ''}{talentLevelLabel(items) && <span className="block text-[10px] font-normal normal-case text-neutral-600">{talentLevelLabel(items)}</span>}</span>
                                             <span className="text-[10px] text-neutral-600 shrink-0">{view.type === 'Talent' ? '' : view.type}{view.uses?.limited ? ` ${view.uses.available}/${view.uses.max}` : ''}</span>
                                         </button>
                                     </li>
@@ -245,7 +254,7 @@ export default function ShadowdarkPaperSheet({ onToggleView }: ShadowdarkPaperSh
                                             <button type="button" className={row} onClick={() => openCard({ kind: 'item', itemId: view.id })}>
                                                 <span className="flex gap-1 min-w-0">
                                                     <span className="w-5 text-xs font-bold shrink-0">{index + 1}.</span>
-                                                    <span className="text-xs font-bold uppercase break-words">{view.name}{view.quantity > 1 ? ` ×${view.quantity}` : ''}</span>
+                                                    <span className="text-xs font-bold uppercase break-words">{view.name}{view.quantity > 1 ? ` ×${view.quantity}` : ''}{view.lightSource && <LightRemaining light={item?.system?.light} />}</span>
                                                 </span>
                                                 <span className="flex items-center gap-1 shrink-0 text-[9px] font-bold uppercase">
                                                     {view.lightSource && item?.system?.light?.active && (

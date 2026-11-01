@@ -10,7 +10,7 @@ import { itemControls } from '../../logic/inventory-controls';
  * on its resource card. Rules and side effects come from `itemControls` (native
  * PlayerSheetSD handlers); writes address the exact embedded Item.
  */
-const LABELS = { equip: ['Equip', 'Unequip'], stash: ['Stash', 'Retrieve'], light: ['Light', 'Put out'] } as const;
+const LABELS = { equip: ['Equip', 'Unequip'], stash: ['Stash', 'Retrieve'], light: ['Light', 'Put out'], 'restore-wand': ['Restore after rest', 'Restore after rest'] } as const;
 
 export default function ItemStateControls({ itemId }: { itemId: string }) {
     const { actor, runItemControl, isActionBusy } = useShadowdarkActor();

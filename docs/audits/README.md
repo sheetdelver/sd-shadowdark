@@ -2,6 +2,7 @@
 
 | Record | Status |
 | --- | --- |
+| [Whole-UI presentation review](2026-10-20-presentation-regressions.md) | Active under ADR-0003; restore theme/layout while preserving corrected native behavior. |
 | [Spellcasting and native parity](2026-10-18-spellcasting-and-native-parity.md) | **Completed October19,2026.** Selected findings, corrective reviews and native A02-01–15 accepted; F01–F06 remain deferred. |
 | [ADR-0002 validation](2026-10-18-adr-0002-validation.md) | Supporting checkpoints, archive identities, offline evidence and final UI-only delta. |
 | [ADR-0002 native acceptance](2026-10-19-adr-0002-native-acceptance.md#v13-completion-and-final-closeout--october-19-2026) | Actual13.351/14.367 acceptance, final recovery-layout qualification and verified cleanup. |

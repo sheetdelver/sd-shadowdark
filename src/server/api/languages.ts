@@ -9,7 +9,9 @@ import { callerLanguagePlan } from '../languages';
 import { canonicalUuid } from '../../logic/identity';
 import { prepareShadowdarkView } from '../../logic/prepared-view';
 import { requestRules } from '../access';
-import { validateLanguageSelections } from '../../logic/languages';
+import { validateLanguageSelections, validateLanguageInventory, languageEditingPlan } from '../../logic/languages';
+import { spellReview } from '../../logic/spell-review';
+import { withActorLock } from '../operation-lock';
 
 export async function resolveLanguageIdentity(uuid: unknown, type: 'Class' | 'Ancestry', req: ModuleServerRequest) {
     if (uuid === undefined || uuid === null || uuid === '') return null;
@@ -23,6 +25,10 @@ export async function handleLanguagePlan(req: ModuleServerRequest) {
     const revision = requestRevision(req.runtime);
     try {
         const body = await req.json<any>();
+        if (body.mode === 'inventory') {
+            const plan = await inventoryPlan(req, body.actorId);
+            return contextConflict(req.runtime, revision) ?? json({ ...plan, contextRevision: revision });
+        }
         const ancestry = await resolveLanguageIdentity(body.ancestryUuid, 'Ancestry', req);
         const classDoc = await resolveLanguageIdentity(body.classUuid, 'Class', req);
         let existing: string[] = [];
@@ -32,6 +38,48 @@ export async function handleLanguagePlan(req: ModuleServerRequest) {
         }
         const plan = await callerLanguagePlan(callerOf(req), ancestry, classDoc, existing);
         return contextConflict(req.runtime, revision) ?? json({ ...plan, contextRevision: revision });
+    } catch (e) { return contextConflict(req.runtime, revision) ?? error(isSdkError(e) ? e.code : 'internal', getErrorMessage(e)); }
+}
+
+async function inventoryPlan(req: ModuleServerRequest, actorId: string) {
+    if (typeof actorId !== 'string' || !actorId) throw new SdkError('validation', 'Choose a character before editing languages.');
+    const actor: any = await requireOwnedActor(req.runtime, actorId);
+    if (actor.type !== 'Player') throw new SdkError('validation', 'Language allowances apply to player characters.');
+    if (!Array.isArray(actor.system?.languages) || actor.system.languages.some((value: unknown) => typeof value !== 'string'))
+        throw new SdkError('validation', 'The character’s stored languages need review before editing.');
+    const source = spellReview(actor);
+    const ancestry = await resolveLanguageIdentity(actor.system?.ancestry, 'Ancestry', req);
+    const classDoc = await resolveLanguageIdentity(actor.system?.class, 'Class', req);
+    if (!ancestry || (actor.system?.level?.value > 0 && !classDoc))
+        throw new SdkError('not_ready', 'The character’s ancestry and class must be available to review language allowances.');
+    const native = await callerLanguagePlan(callerOf(req), ancestry, classDoc, [], 'inventory');
+    const plan = { ...native, ...languageEditingPlan(native, native.rows) };
+    const latest = await requireOwnedActor(req.runtime, actorId);
+    if (spellReview(latest) !== source) throw new SdkError('conflict', 'The character changed. Refresh language choices.');
+    const current = Array.isArray(actor.system?.languages) ? actor.system.languages : [];
+    return { ...plan, current, review: createHash('sha256').update(JSON.stringify([source, { ...plan,
+        rows: [...plan.rows].sort((a, b) => a.uuid!.localeCompare(b.uuid!)),
+        groups: plan.groups.map(group => ({ ...group, options: [...group.options].sort() })) }])).digest('hex') };
+}
+
+/** One reviewed primary-document patch. No retries or invented language grants. */
+export async function handleManageLanguages(req: ModuleServerRequest) {
+    const revision = requestRevision(req.runtime);
+    try {
+        const body = await req.json<any>();
+        const world = req.runtime.world?.snapshot().identity;
+        const scope = world ? `${world.instanceId}:${world.worldId}:${body.actorId}` : `${shadowdarkAdapter.runtimeGeneration}:${body.actorId}`;
+        return await withActorLock(scope, async () => {
+            const plan = await inventoryPlan(req, body.actorId);
+            const conflict = contextConflict(req.runtime, revision); if (conflict) return conflict;
+            if (body.contextRevision !== revision || body.review !== plan.review)
+                return error('conflict', 'Language choices changed. Refresh and review them again.');
+            const checked = validateLanguageInventory(plan, plan.current, body.languages);
+            if (!checked.valid) return error('validation', checked.errors.join(' '));
+            if (JSON.stringify(checked.languages) !== JSON.stringify(plan.current))
+                await req.runtime.documents.patch('Actor', body.actorId, { 'system.languages': checked.languages });
+            return json({ success: true });
+        });
     } catch (e) { return contextConflict(req.runtime, revision) ?? error(isSdkError(e) ? e.code : 'internal', getErrorMessage(e)); }
 }
 /** Generator creates through the module's validated native choice workflow. */

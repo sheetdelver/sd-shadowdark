@@ -1,5 +1,118 @@
 # Shadowdark module architecture
 
+## Character Creator
+
+The current rules-guided flow enforces source-defined level award entitlements,
+language pools and ordinary spell counts in the UI and server. Grant spells are
+filtered with existing eligibility helpers and share exact-identity duplicate
+checks with fixed/ordinary spells. `creator-spell-progression.ts` assigns ordinary
+selections to each tier's earliest native level allowances using the existing
+advancement delta helper. The UI exposes all levels and tiers in one progression table, gates subsequent choices, and keeps selected spells visible. The server validates
+intermediate progression and acquisition-level grant eligibility as well as final
+totals. Known picker rows are disabled, and invalidated selections remain removable.
+`creatorAwardAllocation` matches awards to
+Class/Patron entitlements; missing rows never mean unlimited choices. Valuables
+are bounded draft data converted to native Basic/Gem Items, and rich-text notes
+use public SDK sanitization. The review stays procedural with final values. Planner issues carry field/choice
+targets for local validation; bounded numeric editing prevents invalid drafts.
+Verification failures expose the exact owner-readable marked Actor and bounded
+differing field paths without relaxing completion or allowing replay.
+Forward navigation reuses current planner errors; stage tabs cannot bypass required
+entries, and Back remains available. Background/alignment are required at every
+level; Level 0 is excluded from adventuring Class choices by exact identity.
+No general base/total selector or no-op review banner remains. Constant additive
+numeric reconciliation stays internal. HP dice use the existing advantage helper,
+per-level Class dice and first-level CON; constant bonuses prepare once. The HP
+UI keeps one input/roller block per level and calculates the full starting total
+automatically. Relevant rule-input changes invalidate the old total; increasing
+level keeps earlier rolls and adds required entries. Per-level Max uses the native
+hit die and the same HP calculator. Starting gold reuses `GoldRollSection` and
+`advancement.STARTING_GOLD` with staged Add/Cancel behavior. Table dropdowns map
+rolled totals to result ranges while preserving the original total. Generator
+uses the Creator’s continuous paper surface around its existing controls.
+
+
+[ADR-0005](adr/0005-character-creator.md) implements a separate player tool for
+transcribing paper characters at levels 0–10, with optional rolls and a final
+prepared review. Its
+[workflow audit](audits/2026-10-23-character-creator-workflow.md) maps reuse of
+existing creation/advancement, grant, language, inventory and preparation helpers.
+The creator keeps source values distinct from paper totals, does not extrapolate
+native spell progression beyond available rows, and creates the completed Actor
+through one reviewed dispatch with outcome recovery. Existing creation routes
+remain limited to levels0/1 for Generator compatibility. The original creator implementation had no SDK/floor/version change; the
+subsequent shared-header adoption below raises the UI requirement.
+
+Shared header/UI correction was accepted. The October 25 rules-guided Creator
+refinement in ADR-0005 supersedes permissive transcription allowances. `ui/components/ModulePageHeader.tsx`
+supplies content and theme tokens to Core SDK3.8/UI3.6 `PageHeader`. All four
+dashboard tools and ActorPage use it; sheets omit the tool heading. ActorPage
+owns the sole navigation bar outside the centered sheet. ShadowdarkSheet and
+ShadowdarkPaperSheet render character content only. The page uses a 1280px
+maximum container, with no additional width cap inside the tabbed content.
+The sheet meets navigation with no top gap and sizes only to its content.
+Only the transparent page canvas has a viewport minimum; sheet panels do not
+grow to fill unused space. Dock clearance remains outside the sheet background. The paper view has no outer black
+frame or inset canvas; content padding and individual field borders remain.
+Core owns both rows and responsive layout. Creator discard and Importer Back callbacks
+and Generator actions retain their existing handlers. No per-page navigation
+markup or mutable header registry is needed. The UI floor rises3.3→3.6; Core
+application floor and CI/release now align on Core0.22.3 (October31). API floors remain module-api1.7.0/UI3.6.0.
+
+`logic/character-creation.ts` owns bounded draft/wire contracts and numeric
+reconciliation; `logic/creator-awards.ts` supplies shared source requirements and
+exact table groups. The request-local server planner resolves readable sources,
+validates independent choices, prepares final numbers and fingerprints the entire
+intent/source/context. The wizard reuses collection lifecycle, selectors, stat
+allocation and SDK confirmation. Its compendium selector opts into ModuleDialog.
+
+Public routes are `characters/creator/prepare`, `roll`, `hp`, `create` and `status`.
+Prepare/HP never write documents; optional dice use the request roll runtime.
+`creation-operation.ts` persists caller/world-bound bookkeeping before one Actor
+create with all Items. Exact positive primary-source marker evidence can settle
+uncertain receipts without writes; absent/ambiguous/changed evidence cannot.
+Confirmed create/explicit recovery responses navigate directly to the Actor sheet;
+uncertain responses retain recovery without redirecting.
+Generated document IDs, native defaults and canonical legacy/modern effect
+migration are the permitted source-comparison normalizations, including the
+verified v14 permanent-duration replacement for explicitly all-null legacy
+duration fields. Timed/unknown duration data remains significant. Fresh Creator
+visits omit complete historical receipts, while pending receipts retain recovery; nested native
+references and array order remain significant. Queues serialize one process;
+no distributed CAS or public SDK idempotency guarantee is claimed.
+
+See [creator rules and limitations](rules/character-creator.md). User acceptance
+and the withdrawn extra shell-discard gate are recorded in ADR-0005. Persistent
+editable drafts and arbitrary effects remain excluded. The October 27 corrective
+spell table and casting-source diagnostics have isolated and user acceptance
+evidence. Core 0.22.2 resolves the reported stale Knight casting grant; no native
+source repair or module casting exception is required.
+
+## Optional HUD sheet settings
+
+`module/ui.tsx.settingsTabs` optionally exposes the existing Single page/Tabbed
+preference through Core SDK3.7/UI3.5. The module owns semantic `SheetSettings`
+content and behavior; Core owns presentation, controls, modal/tab navigation,
+lifecycle and error handling. The tab is labeled Shadowdark.
+`ui/settings/sheet-view-preference.ts` retains `shadowdark_view_mode`, shared
+across worlds/accounts in this browser/site, and makes the actual sheet and panel
+reactive consumers of the same persisted value. Reset removes only that key;
+failures keep the old mode and present errors. The panel checks its abort signal.
+The original sheet button remains on older Core, so no floor/version/workflow
+change is needed. See [ADR0004](adr/0004-optional-hud-sheet-settings.md) for archive
+verification and pending operator acceptance. Existing native world settings stay
+read-only under their current contracts.
+
+## Existing presentation and rules
+
+`module/ui.tsx` declares `assets/presentation.css` through the public stylesheet
+contract. Scoped management-dialog rules restore the established paper/serif/
+border treatment around `ModuleDialog`; compact cards retain their proportions.
+Picker width and tablet header sizing are presentation-only.
+See [ADR-0003](adr/0003-preserve-module-presentation.md) and the
+[whole-UI review](audits/2026-10-20-presentation-regressions.md). Shared focus,
+overlay suspension, current preparation and persistence remain authoritative.
+
 **Automatic completion correction (October 19):** SD02-N14-01/02 pass offline
 and targeted native v14 checks. The existing caller Actor projection now joins
 the shared Actor queue and refreshes only that caller's owned advancement
@@ -147,9 +260,26 @@ rows. Generator and advancement use it with the shared generation lifecycle and
 accessible choice controls. The module creation route validates assignments before
 public SDK Actor creation; advancement validates before HP/XP/items and checks its
 Actor source/context again. Existing languages survive advancement.
-Details and the ordinary inventory picker impose no creation quota, classify by
-source field only, retain custom/unreadable entries and make unchanged saves a
-no-op. Actor identity exposes current caller-readable language rarity/labels.
+The guided Details picker uses these allowances under the user-selected
+[ADR-0003 policy](adr/0003-preserve-module-presentation.md), superseding its
+previous unrestricted editing. Common/Rare headers include fixed and homogeneous
+restricted grants; mixed pools retain independent counts. `allocateLanguageInventory`
+matches each UUID to one slot. Inventory mode always browses the full authorized
+catalog, even for fixed-only characters. `languageEditingPlan` permits replacement
+of fixed defaults and homogeneous pools within their native Common/Rare totals.
+Mixed/unknown-rarity grants retain explicit allocation rather than guessed quotas.
+Custom, unreadable and excess existing languages survive unless explicitly removed.
+Effects are displayed separately. This differs from native's unrestricted ordinary
+editor; it does not claim native inventory quotas.
+
+`languages/plan` with `mode: inventory` returns the owner-authorized Actor's current
+inventory and a stable review of its exact source/allowances. `languages/manage`
+rechecks owner, context and review under the Actor queue, then validates and sends
+one primary Actor patch. The UI submits exact UUIDs; IDs are not routine labels.
+Unchanged saves are no-ops. Changed context/source retires draft intent; an
+unconfirmed write requires refresh, never automatic replay. External native edits
+are not made atomic with the final patch. Actor identity exposes current
+caller-readable language rarity/labels.
 
 ## Released0.9.5 action and language baseline before ADR-0002
 
@@ -217,6 +347,10 @@ raw items, effects and reference fields stay as Foundry stored them.
 - `logic/roll-keys.ts` ports `_getActiveEffectKeys` for `system.roll.*` selectors
   (ADD, then MULTIPLY, then OVERRIDE). Situational effects are listed as options;
   the roll UI does not select them yet.
+  Reference diagnostics for these selectors use completed Actor roll data, just
+  as action preparation does. A later effect may supply the referenced value
+  (for example, Destined Die). Initial/final application order is unchanged;
+  genuinely missing references still appear on their Effects rows.
 - `logic/identity.ts` parses exact UUIDs. Views carry structured references
   (`{ kind, pack, documentType, id }`) with prepared labels. Core 0.19 keeps
   canonical source strings in Actor responses and adds a separate,
@@ -306,7 +440,8 @@ lease expiry. No automatic claim resolves a lost upstream acknowledgement.
 The Actor provider retains the exact request for explicit recovery. Its dialog
 suspends the resource card and distinguishes pending prerequisites, uncertain
 results and outstanding consequences. Actor/unmount changes retire UI results.
-Player owned-spell actions alone allow focus to exempt loss; NPC cards hide it
+Player owned-spell actions with `system.duration.type === "focus"` alone allow
+focus to exempt loss; NPC cards hide it
 and the server applies NPC loss even to a crafted focus request. Scroll/Wand
 rules remain distinct. Zero disables critical thresholds, missing thresholds
 retain native defaults, and manual totals establish no natural critical.
@@ -369,6 +504,23 @@ array, including `[]`, is ready; an invalid response, denied read or failed read
 never populates a successful empty cache. Collection retry retries failed shards
 and preserves successful shards. There is no automatic collection failure loop.
 
+`system-index-session.ts` retains this same store for the lifetime of the SDK
+browser event bus, across provider and tool unmounts. It is memory-only and scoped
+to the current world/user/role/connection; no second Foundry cache or polling was
+added. Event subscriptions remain active while tools are closed, so context,
+package, permission and reconnect changes retire cached data before reuse. Module
+disposal releases subscriptions and pending work. Item/RollTable/User signals
+invalidate the index and collections; Actor signals invalidate tool projections
+that include world NPCs or recipient names/access. Routine Setting events do not
+invalidate catalogs; relevant setting changes arrive through world context.
+
+Monster Stats and Treasure consume `useToolCatalog` using the same store's demand,
+request deduplication and error handling. Successful catalogs survive tab changes
+and navigation; explicit Refresh sources invalidates the requested projection.
+Monster detail cards still load on selection, and Treasure status/prepare/deliver
+remain fresh server calls. A completed matching receipt settles assignment even
+when its Actor event retires the catalog during the write.
+
 `useShadowdarkCollections` registers active demand in that same store. Mounts
 before index readiness wait for the current index; a context/caller/role/world/
 connection change reloads each demanded shard after its replacement index is
@@ -426,6 +578,15 @@ items. Existing Actors are not repaired.
 
 ## Sheets, cards and bestiary
 
+ADR-0003's illustrated resource cards use the same `CardBody` for owned resources,
+previews and bestiary entries: absolute full-width artwork behind an inset black
+centered title and property/description content, with top/bottom fades. The modal
+bar contains Close; the accessible dialog name remains available without a duplicate
+visible title or subtype. Type is a property. Missing artwork collapses its space.
+`CardNotes` belongs in the divided footer before controls/actions, also on read-only
+cards. The existing responsive shell, scrolling and host-overlay lifecycle remain.
+
+
 Both layouts read the prepared view. Edits are Actor-scoped drafts with
 debounced writes cancelled on Actor change, sequenced responses, optimistic
 rollback with an error, and shared confirmation dialogs. The paper sheet lists
@@ -442,15 +603,29 @@ native sheet handlers: equipping clears stashed and stashing clears equipped;
 equipping a shield switches equipped two-handed Versatile weapons to one hand
 and unequips other two-handed weapons; lighting a source puts out any other lit
 source. Light sources come from `system.light.isSource`, not item names. The
-inventory row uses the same helper. Scene light, light chat cards and the light
-tracker are not run. Cards show
+inventory row uses the same helper. Both sheet inventories display active
+`system.light.remainingSecs` through `LightRemaining`, refreshed from Item updates.
+Missing time is unavailable, not a fabricated full duration. Scene light, light
+chat cards and the light tracker are not run; no independent browser clock is added. Cards show
 the current identified presentation only, never the alternate identification
 fields. Descriptions go through `logic/description.ts` and the SDK sanitizer.
 
-The Bestiary dashboard tool lists world NPCs visible to the caller and, when the
-caller's pack capability allows it, the declared monster pack (the
-`server/access.ts` policy above).
-It is read-only: no spawn, encounter or sharing action.
+The **Monster Stats** dashboard action (stable tool ID/route `bestiary`) declares
+GM Tools placement (Core UI3.4.0+). Older supported hosts retain Tools placement.
+The read-only catalog groups NPC Actors by exact pack reference or world source,
+never by name or inferred creature type. It includes declared `shadowdark.monsters`
+and optional `shadowdark-community-content.monsters`; Core skips an absent pack.
+Public caller pack metadata supplies labels (identical labels include the pack ID).
+Each row shows native level/alignment/move, with move notes and source context;
+missing fields stay unavailable rather than becoming level0 or Near. Name, inclusive
+level range, alignment, movement and source filters combine and reset together.
+Rows activate the shared informational NPC card by mouse or keyboard. The shared
+NPC card no longer manufactures a type from level. Visible card artwork has an
+additional3.5em copy offset into the fade; cards without working art stay compact.
+NPC facts pair Level/Alignment and AC/HP, with other values spanning the row.
+Shared fact labels use weight800 and values600.
+No spawn, encounter, sharing or source-edit action is introduced. Per-pack capability
+checks run after asynchronous work; context changes retire pending lists/cards.
 
 ## Known alignment limits
 
@@ -464,7 +639,7 @@ is outside the supported baseline.
 
 `info.json` declares the module version, API compatibility and world settings.
 CI checkout, the reusable release workflow and its `core_ref` all use the
-Core `v0.19.2` toolchain. CI also runs on `migration.json` and
+Core `v0.20.0` toolchain (publication pending). CI also runs on `migration.json` and
 `migrations/**` changes. Release assets include the package archive, checksum,
 catalog manifest and release history. A module release tag identifies the
 matching manifest version. With the root `migration.json`, packaging compiles
@@ -474,9 +649,9 @@ derives from the packaged catalog.
 
 Repository workflow and verification commands live in [AGENTS.md](../AGENTS.md).
 The shared contracts are described in Core's
-[module authoring guide](https://github.com/sheetdelver/sheetdelver/blob/v0.19.2/docs/MODULE_AUTHORING.md),
-[world context and migrations](https://github.com/sheetdelver/sheetdelver/blob/v0.19.2/docs/MODULE_MIGRATIONS.md)
-and [release process](https://github.com/sheetdelver/sheetdelver/blob/v0.19.2/docs/RELEASING.md).
+[module authoring guide](https://github.com/sheetdelver/sheetdelver/blob/main/docs/MODULE_AUTHORING.md),
+[world context and migrations](https://github.com/sheetdelver/sheetdelver/blob/main/docs/MODULE_MIGRATIONS.md)
+and [release process](https://github.com/sheetdelver/sheetdelver/blob/main/docs/RELEASING.md).
 
 ## Effect-key migration
 
@@ -692,3 +867,549 @@ must be retained for later review. No distributed transaction/CAS is implied.
 The mounted workflow retires old review reads across write attempts, preserves
 known receipts on errors, uses the current review revision and reports completion
 only from the confirmed full-operation response. See [recovery](advancement-recovery.md).
+
+### Optional native monster artwork
+
+`logic/community-artwork.ts` recognizes exact native NPC placeholder paths and
+canonical Actor origins. `server/community-artwork.ts` calls optional public
+`runtime.artwork.resolve`; it never fetches native manifests or maintains an art
+cache. The bestiary reads through the caller runtime and rechecks scope/access
+around optional resolution. Source/prepared Actor values are unchanged. Responses
+carry original fallback and optional credit, rendered through `ArtworkImage` and
+card notes. Original/custom artwork remains usable on older hosts or failure.
+Mounted consumers retire stale cards on package/context changes and keep manual
+search/filter state. See ADR-0003 SD-UI12 and Core ADR-0067; other module catalog
+expansion remains separate.
+
+### Optional Core combat artwork policy
+
+`ShadowdarkAdapter.resolveDisplayArtwork` opts in to Core ADR-0067's generic
+read-only display hook. It shares `monsterPortraitRef` with bestiary artwork: only
+NPCs with exact canonical Actor origins and either verified cowled placeholder
+qualify. The currently displayed image is checked, preserving custom Combatant
+and Token images even when the Actor portrait is a default. Combat manager
+portraits use portrait art; HUD images sourced from a Token/Combatant request token
+art. Actor fallback requests portrait art. Missing capability/provider/origin or
+an aborted request returns null, retaining the original. No source is mutated.
+
+The supplied caller runtime is used; the initialization runtime is not used for
+artwork authority. Older supported hosts simply omit invocation of the optional
+hook. Module version and compatibility declarations remain unchanged. Core owns
+caller authorization, image precedence, deadlines and stale-result retirement.
+Dashboard cards are not automatically covered by this hook. No Shadowdark package
+IDs, default-image paths or rules are added to Core.
+
+The display-artwork policy also consumes optional host-verified
+`context.compendiumSourceUuid`. Core encounter copies intentionally lack native
+origin stamps; the SDK field supplies their exact recorded source after Core
+checks encounter registration and folder agreement. The module does not inspect
+Core-private flags or match monster names. Existing copies require no repair or
+recreation; custom current images still decline replacement.
+
+### Optional compendium reference viewer
+
+Core ADR-0068 owns the optional shared contract. `ShadowdarkAdapter.prepareReferenceView`
+delegates to `server/reference-view.ts`, preparing exact original NPC Actor or Item
+sources with the same `buildNpcCard`/`buildDocumentCard` models as existing cards.
+Player Actors and unsupported origins decline. Core owns source reads, pack type,
+caller access, lifecycle and deadline checks. The module never inspects encounter
+flags, substitutes a current Actor or matches names. Optional artwork uses the
+existing caller-bound artwork reader.
+
+`module/ui.tsx::referenceViews` registers Actor and Item content. The Core combat
+manager consumes Actor views; Item-consuming Core links remain deferred. The
+structural declaration preserves the existing older-host floor. No module version,
+compatibility or workflow Core pin changes are needed for optional adoption.
+
+`ResourceCardBody.tsx` is the shared card body extracted from ResourceDetailModal;
+existing interactive cards retain their default behavior. The reference component
+uses `informational` mode, and `presentReferenceDescription` sanitizes and renders
+inline links/roll controls as text. Card actions are empty; the component mounts
+no Actor/action context. Core provides the sole frame, close button and keyboard
+behavior. Artwork fades, inset black title, paper typography and notes remain.
+The reference is informational original content, not live HP or an encounter sheet.
+
+Maintained `reference-view.test.ts` verifies exact NPC/Item sources, frozen-source
+preservation, actions omitted, aborted work and inert rich text. The installed
+`--artwork-only --reference-views` suite checks real Core public copy creation,
+modified copy HP vs original facts, both typed routes, desktop/mobile rendering,
+focus return, native ownership-setting revoke/restore and existing-copy restart.
+These are isolated production/development tests with controlled upstream data,
+not a new live Foundry acceptance claim.
+
+
+## Selected release compatibility — 2026-10-22
+
+The user requested alignment with the completed Core SDK work. The next module
+release requires Core>=0.20.0, module-api>=1.7.0<2.0.0 and
+ui-extension-api>=3.3.0<4.0.0; roll-engine-api remains>=1.0.0<2.0.0. CI checkout,
+CI_CORE_REF and release validation fingerprint all target v0.20.0. Core must be
+published first. The current Core source checkout's0.19.8 metadata intentionally
+fails the new floor; no bypass or runtime metadata change is introduced here.
+Historical older-host acceptance remains valid only for its tested manifests.
+Native-art installation and per-source reference availability remain optional;
+no artwork replacement occurs when a provider is absent/disabled/unavailable.
+
+
+### Shared page canvas
+
+Generator, importer and bestiary keep transparent outer canvases and opaque paper
+content panels. Core owns world artwork and theme fallback (Core ADR0070); no
+module status fetch or private background hook is used. Shadowdark leaves
+`--sd-module-page-background` unset to follow Core's current player theme when
+world artwork is unavailable. See module ADR0003 / SD-UI13 for rollout and checks.
+
+Core's final ADR0070 design applies the same canvas through SDK SurfaceHost to
+module actor pages and tools. The player layout also hosts dashboard, combat and
+future routes with one image loader and shared viewport-fixed CSS. Modules may
+configure the documented fallback color; no module background hook is needed.
+
+
+### October22 review corrections (ADR0003)
+
+`knownSpellSources` compares canonical owned origins independently of casting
+lists and grant types. Management and advancement validate against it before
+writes; catalog UI disables the matching source without hiding it or deleting
+existing copies. `grantedSpellSources` additionally accepts exact planned talent
+references for first-level preparation. It does not infer grants from class names.
+
+`languageInventorySections` uses `allocateLanguageInventory` to reserve selected
+languages in other categories before reporting each category's capacity. Mixed
+class/ancestry pools are shared, not two independent quotas.
+
+Descriptions use `presentDescription(raw, baseUrl?, rollData?)` everywhere they
+are presented, with `presentReferenceDescription` removing controls from reference
+views. Optional inline labels are display text, never executable markup.
+`derived.rollData` comes from the same effective Actor model used by actions;
+owned cards, inventory, talents and the spell picker pass it explicitly. Catalogs
+have no implicit Actor. Deterministic parenthetical dice counts are bounded to
+0–1000 and use the existing arithmetic parser. Missing references never become
+zero. Rendering never rolls dice or changes source descriptions. Core's SDK
+sanitizer remains the final HTML boundary; source editors retain original markup.
+See ADR0003 for the limits and potential future generic SDK extraction.
+
+Advancement preflight errors may return `advancementWrites: "none"` in their JSON
+body. This module-local field is emitted only while no original operation exists
+and before invoking write orchestration. The mounted form may discard that rejected
+submission and let the player correct choices. It never infers this state from
+an error status or absent response; potentially persisted operations keep recovery.
+
+
+SD-UI16c supersedes SD-UI16b's manual missing-grant addition. `knownSpellSources`
+means actual owned Spell Items; `grantedSpellSources` means exact fixed native
+entitlement. `server/spell-grants.ts` resolves missing fixed Spells as caller-readable
+source copies. `assembleFinalItems` includes them in creation/advancement plans,
+so the original writer/receipts own those writes. Choice-based talent/boon spells
+still use the selected native choice; no choice is invented.
+
+For existing characters, read-only `actors/:id/view` exposes `spellGrants` with
+`missing` and owner-only `canApply`. ActorPage's `useAutomaticSpellGrants` issues
+`POST actors/:id/spells/grants` when needed, and refreshes the actual source. This
+uses no polling and does nothing for complete inventories or observer sheets.
+The route computes grants server-side, serializes with Actor operations, refuses
+unfinished advancement from any caller, rechecks source/context/ownership and
+persists per-Actor/source write-ahead receipts across callers and reloads. Unknown
+create outcomes never authorize a replacement; a visible failure offers retry,
+which reuses that durable fence. The queue is process-local, not distributed CAS.
+No background bootstrap or migration writes are added. Source filters and ordinary
+quotas do not suppress a fixed entitlement; compendium read access still applies.
+
+The picker disables fixed grants even before automatic completion, showing
+“Granted automatically”. Actual saved Items appear in Known spells with casting
+actions; fixed grants do not consume ordinary slots. Ordinary management refuses
+manual fixed-grant additions and duplicate owned origins across every class list.
+
+
+### Talent and boon spell choices (SD-UI16d)
+
+The shared `logic/spell-grants.ts` registry identifies native fixed and choice
+grants by exact source identity. The picker and final writer use the same list,
+tier and independent-choice matcher. Saved bonus Spells carry
+`flags.shadowdark.spellGrant` (grant source, casting Class, acquisition level),
+which the common prepared model uses for quota exemption and casting ability.
+Caller lookups resolve grant Classes through the same readable-document boundary.
+Additional casting permission never borrows another Class's progression table.
+Native source effects remain unchanged. See [SheetDelver spell-grant handling](rules/spell-grants.md)
+for the published-rule boundary, approved Shune rounding and historical limits.
+
+### Effect targets and stat distributions (SD-UI18)
+
+`logic/talent-choices.ts` identifies weapon, armor and pending spell effect
+targets. The creation/advancement UI collects each selection, and the shared
+final assembler validates it against caller-readable catalogs or owned/planned
+Spells before resolving native effects. Fixed spell targets require no picker.
+`logic/stat-choices.ts` supplies distribution limits to UI and server; ordered
+`statChoices` retain independent allocations. Repeated rolled native source
+templates remain independent grants. Final creation and existing-Actor paths
+share validation; receipt/replay handling is unchanged. See
+[talent choice handling](rules/talent-choices.md) for supported rules and limits.
+
+### Legacy scroll sources and spent state (SD-UI20)
+
+`logic/scrolls.ts` is the shared capability/identity policy for modern Scrolls and
+the two exact-origin native Basic scrolls. Caller lookups resolve their explicit
+spell references; preparation publishes linked actions and `ItemView.scroll.spent`.
+The Spells tab consumes prepared item actions instead of filtering only by stored
+Scroll/Wand type. Inventory/cards/list share the spent state.
+
+Historical Gear Add copies lost origins. A bounded compatibility check recognizes
+only complete native name/artwork/description signatures for those two source-less
+Basic magic Items, without manufacturing source metadata. Conflicting origins
+and partial matches are excluded. Gear Add now uses `ownedCopy` to preserve full
+Item data and exact provenance on future additions.
+
+Scroll casting persists a module-owned spent flag through the existing action
+prerequisite/receipt path before attempting the result. It retains the Item and
+server validation blocks new casts. This user-selected departure from native
+deletion is documented in [scroll handling](rules/scrolls.md). Native UI, Potion
+and Wand behavior are unchanged; no Core contract or migration is introduced.
+
+### Spellcasting mishaps (SD-UI21)
+
+`logic/spell-mishaps.ts` maps exact supported casting Class/Talent identities to
+the appropriate native tier table. Prepared actions carry a structured table
+reference, shared by ordinary spell and item casting. `server/spell-mishaps.ts`
+uses caller-readable table data and Core dice/chat after casting consequences.
+The action receipt records dispatch before rolling and retains the result;
+replays never repeat uncertain/complete mishaps. Missing Diabolical tables are
+explicit manual-resolution warnings, never a Wizard substitution. Penance and
+custom traditions are not inferred from names. Table result instructions and
+effects remain manual; see [scroll and wand handling](rules/scrolls.md).
+
+### Legacy wand capability (SD-UI22)
+
+`logic/wands.ts` centralizes wand recognition, linked spell rows, breakage and
+failure/rest patches. `data/legacy-wands.ts` records the three exact native4.0.6
+legacy templates (Blind/Deafen, Unlife, Warding). Caller lookups, preparation,
+actions, cards and item controls consume the shared capability instead of
+assuming stored type `Wand`. Conflicting origins fail recognition; originless
+historical copies need the complete native signature. No source types are changed.
+Legacy schema-safe state lives in `flags.shadowdark.sheetDelver.wand`; modern
+Wands retain native fields. Existing authorized item controls provide explicit
+Restore after rest, clearing loss only for unbroken wands. See the
+[scroll/wand policy](rules/scrolls.md) for casting and native-UI boundaries.
+
+The settings pilot now uses the tab label **Shadowdark** and semantic controls
+without module panel CSS. Core supplies settings typography/colors/widgets and
+retains SDK identity without the module stylesheet scope (Core ADR0072 R72-02).
+The sheet itself keeps its paper styling. This supersedes the initial pilot's
+paper-panel presentation, not its preference storage behavior.
+
+## Gear selection and bundles
+
+`logic/gear-additions.ts` expands the exact native Crawling Kit using its own
+linked source list and component quantities. The shared Gear Selection picker
+preflights all components and passes each `ownedCopy` to existing sheet writes
+or Creator draft additions. It stops on failure/context retirement and reports
+partial additions; the public Item writer is not an atomic batch. No name-only
+recognition, existing-kit migration, currency deduction or implicit stack merge.
+
+## Shared rest completion
+
+Both sheet layouts invoke `openRest` in `ShadowdarkActorProvider`; `RestModal`
+reuses `ModuleDialog` and current module controls. Rest is a successful-rest
+utility, not an interruption simulator. Consume ration? defaults checked; when
+unchecked, no personal food is required or written. Preview has separate recovery
+and exclusion lists. Completion refreshes the Actor and closes the modal.
+
+`logic/rest.ts` builds exact source patches from shared HP preparation/reconciliation,
+owned counters and existing wand helpers. Recovery classifications use native
+source identities. Unsupported daily prose/effects, permanent loss, penance and
+broken/spent items remain visible exclusions. Unknown spell losses and completed
+penance have explicit eligibility controls. `server/spell-loss.ts` validates loss
+metadata against a confirmed native modification stamp; native changes or missing
+evidence require manual eligibility instead of automatic recovery.
+
+The caller-bound `actors/[id]/rest/plan`, `/complete` and `/status` routes share
+the Actor lock and durable SDK data store. Source/choice/context-bound previews
+are revalidated before dispatch. Optional ration spending happens first, retaining
+empty Items. Each absolute write is journaled and read back; unknown writes never
+replay, active operations prevent replacement spending, and exact final values
+can settle independently completed resets. This is not an atomic SDK transaction.
+See [ADR-0006](adr/0006-shared-character-rest.md) and the
+[rest audit](audits/2026-10-26-resting-workflow.md) for coverage and acceptance.
+
+Owned spell cards and the Spells tab share `SpellLossControl`, using
+`manualSpellLoss` through the existing Actor update path. Manual changes clear
+casting-loss provenance; native Shadowdark4.0.6 stores only the lost boolean,
+so rest eligibility for native/manual losses remains explicitly confirmed.
+
+Inventory light controls post feedback only after all item patches succeed.
+`server/api/light-chat.ts` validates caller ownership and current light state,
+reads `shadowdark.playerShowLightRemaining` from SDK world context, and posts a
+public SDK ChatCard with Actor speaker. Durable notification receipts prevent
+reposting after uncertain acknowledgements. No scene-light or timer automation
+is invoked. The shared Pulp LuckControl uses a numeric-text input and −/+ buttons
+in both layouts; it retains the existing world-aware luck write route.
+
+
+### October 26 Creator scope and operator closeout
+
+Creator supports levels 0–10 using one shared maximum for the selector and draft
+validation, following the user-verified core rulebook p. 39 cap. Native Class
+spells-known tables supply levels 1–10 and tiers 1–5. The earlier 0–20 request is
+superseded; higher-level progression is not a missing standard feature.
+The existing leave-warning behavior is accepted; additional Core draft protection
+and editable-draft restoration are not required. Creation operation receipts
+still prevent duplicate writes after uncertain responses; they are not drafts.
+User acceptance closes the implemented presentation/settings/Creator/rest scope,
+with wand-rest operator verification subsequently accepted on October 27. See the owning
+ADRs for evidence and remaining explicit limitations.
+
+`logic/advancement.ts` owns `MAX_CHARACTER_LEVEL = 10`, shared with Creator.
+Prepared sheet eligibility and the shared level-up hook suppress new advancement
+at the cap. Server data/HP/finalize routes reject above-cap new operations; saved
+operation reconciliation/replay remains accessible. Existing above-cap Actors are
+not clamped. This enforces the rulebook despite native 4.0.6's uncapped XP button.
+
+
+## Manual Renown and ability state
+
+[ADR-0007](adr/0007-renown-and-ability-card-controls.md) adds shared RenownControl
+on the tabbed Abilities and paper views, writing native `system.renown` through
+the existing actor draft/update path. The selected control floor is −4; there is
+no gameplay maximum or automatic recalculation. AbilityStateControls reuses the
+native prepared `uses`/`lost` state on ability rows and owned resource cards;
+writes go through the existing exact-owned-item update path. Catalog cards do
+not mount these controls. Normal ability actions and rest recovery are unchanged.
+
+
+## Character base editing
+
+`EditCharacterModal` is mounted once in `ShadowdarkActorProvider` and opened
+from either sheet header. `logic/character-edit.ts` reads preserved source fields
+and produces a sparse name/score/max-HP patch. ActorPage sends that patch through
+the existing public actor-update endpoint in one request; current HP and effect
+documents are excluded. The caller view's `canEdit` is an owner-qualified read,
+with server write authorization still authoritative. See ADR-0008 for validation,
+stale-editor behavior and acceptance.
+
+
+## GM treasure authoring
+
+`tools/Treasure` implements ADR-0009's first single-item slice. The caller-bound
+`treasure/catalog`, `draw`, `prepare`, `deliver` and `status` routes require GM
+access. Current declared source tables are rolled through the SDK and Registry;
+missing table outcomes are entered manually. `logic/treasure.ts` shares draft
+validation and native item shapes, preserving template effects with `ownedCopy`.
+Scroll/Wand drafts link exact available Spell UUIDs, without class restrictions.
+No missing official table rows or probability rules are shipped.
+
+Complete drafts and the server-reviewed payload render with the existing
+`CardBody`/`buildDocumentCard` read-only preview. The draft uses the same
+`treasurePayload` builder as preparation; it performs no preview fetch or write.
+The caller-filtered spell catalog includes type and image for this purpose.
+Native template and chosen spell images are preserved. New Basic/Gem/Scroll/Wand/Boon
+payloads explicitly include the native 4.0.6 default image when no source artwork
+supplies one, so the card previews the actual saved image. SDK image resolution
+and existing reference-description processing remain the presentation boundary.
+
+Prepare binds review to sources, fields, recipient and world context; delivery
+revalidates them before one SDK embedded Item create. Durable module receipts
+record dispatch before writing and reconcile uncertain outcomes by an exact Item
+marker, never by name. Source notes and draw provenance remain in module storage;
+only the operation marker is added to Item flags. The first slice supports fully
+disclosed items and does not implement secret projection or coin/bundle grants.
+
+
+### Category tabs and world-item library
+
+Treasure tabs preserve independent page-memory drafts. Weapons exposes a native
+base, separately entered features/qualities/personality, and an additive bonus
+built from native predefined weapon attack/damage effects via `createEffect`.
+Other prose remains descriptive. Mundane Items now has the original-content
+recipe described below; the remaining category recipes are not yet complete.
+
+Library-mode completion uses `server/treasure-library.ts`: caller-bound Folder
+and Item operations create/reuse SheetDelver/type Item folders, save a GM-visible
+world Item and optionally copy it to the selected Actor. Persistent operation
+states separate pending, saving, saved, assigning and complete. Unknown writes
+require exact-marker readback; only a step not yet dispatched can resume. Folder
+creation is serialized per world in this process and separately fenced; this is
+not a distributed transaction or uniqueness guarantee. Existing legacy direct
+actor-delivery receipts still reconcile through their original path.
+
+Only successful completion resets the owning tab. Reloaded unfinished operations
+return to that category; other tabs retain drafts during ordinary tab changes.
+Native source tables shown in this slice are restricted to the verified Treasure
+0–3 table. No OSR data, automatic book-table probability rules, secret-item
+projection or general world-item manager is introduced. Native Boon delivery is
+described in the category section below.
+
+
+Unchanged native templates use assignment-only completion. `treasureUnchanged`
+compares editable values and effective recipe additions against the source defaults;
+category, private notes, draw references and copy-time defaults are not edits.
+The server recomputes this before dispatch and requires a recipient. These operations
+skip Folder and world Item creation, while retaining the same assignment fence and
+exact-marker recovery. Modified/new items retain the library save path. Reverting
+edits restores assignment-only behavior. Native `system.cost` GP/SP/CP populate the
+form and source value is shown beside the editable amounts. No rulebook price is
+inferred for an unpriced source.
+
+The retired Magic category excludes recognized scrolls/wands, including legacy Basic/Weapon
+representations, using the existing shared capability helpers. Their own tab
+supports native templates as well as spell-derived creation, and recognized legacy
+items save under Scrolls/Wands without changing their native document types.
+
+
+### Mundane Items and original tables
+
+`data/mundane-tables.ts` contains SheetDelver Originals revision1: eleven small
+uniform tables, 90 authored rows across forms, workmanship, gems/cuts, jewelry,
+parent-specific details, unique features and suggested per-item values. No book
+or external dataset was imported. `logic/mundane.ts` provides the shared recipe,
+source/result metadata, dependent-detail validation, description assembly and
+integer quantity totals. Value suggestions are editable module content, not native
+price rules. Native templates still supply their own prices, art and effects.
+
+`treasure/original-draw` is GM-only and accepts a known table/version. It uses the
+public SDK roll service with chat disabled, checks the current context after the
+await, and resolves the module-owned row. It does not use Registry or pretend to
+be a compendium. Original metadata records selection/roll origin and edited text;
+it is descriptive provenance, not an authorization or tamper-proof dice receipt.
+Library operation storage retains that provenance privately; generated descriptions
+are escaped and then go through the existing HTML processing path.
+
+The Mundane Items UI reuses Creator input/dice rows in the connected paper layout.
+Luxury, gemstone and jewelry each have form and material/cut fields, an optional
+unique feature and applicable nested detail. Per-part rerolls retain independent
+parts and custom names. Roll object replaces form/material/detail and suggested
+value together only after all draws succeed; it preserves notes and unique features.
+Changing a parent form retains but invalidates an old dependent detail until the
+GM edits, reselects or clears it. Path changes start a new base while preserving
+notes, quantity/space and the optional feature. Tab changes preserve the draft.
+
+Generated gemstones create native Gem items; jewelry/luxury use Basic items.
+Gemstones and jewelry save under Gems & Jewelry; luxury objects under Mundane
+Items. Existing native templates preserve their type and unchanged-source
+assignment behavior. The existing save/assign receipt and completion reset are
+reused. No Actor coin/XP update, Core change, cache or PDF importer is introduced.
+
+### Boons
+
+The Boons tab uses `logic/boons.ts` for its oath, secret and blessing recipes.
+Four original prompt tables share the existing SDK draw route through the small
+`data/original-tables.ts` registry; generic result identity/validation lives in
+`logic/original-tables.ts`. Existing Mundane IDs and version1 remain unchanged.
+The category keeps separate editable parts, generated/custom name handling and
+atomic multi-part rolls. Textareas reuse the established input/dice row.
+
+`treasurePayload` emits native Boon fields (`description`, `boonType`, `level`)
+with its native icon and no physical-item fields or generated effects. Library
+destination is Boons. Shared save/assign receipts and private source provenance
+are reused; no new transport or lifecycle is introduced. Blessing use limits and
+duration remain descriptive, because native BoonSD has no counters or expiration
+schema. The preview shows subtype and acquisition level using `buildDocumentCard`.
+
+### Shared attributes and personality
+
+`logic/magic-attributes.ts` owns the two independently enabled sections;
+`ui/tools/MagicAttributes.tsx` is reused inside every implemented builder. Each
+benefit/curse/virtue/flaw is an `OriginalPart` with editable text and optional
+source provenance. Add/remove controls specify the number of results. Disabled
+sections retain their draft data but contribute neither validation nor payload
+text. Empty enabled Attributes do not change native-source equality. An enabled
+Personality requires a trait and GM-chosen alignment.
+
+Armor, Potion, Utility, Weapon, Wand and Scroll bases select their corresponding
+benefit/curse family, including recognized legacy scroll/wand native shapes.
+Otherwise untyped drafts expose a family choice. Virtues/flaws share the Item
+Personality family. Existing results survive a family change and retain their
+source table labels; the new family controls subsequent selections/rerolls.
+Ten original alternative tables contain six equally likely rows each, resolved
+through the existing authenticated GM SDK roll route. Text entry is always
+available. These are original suggestions, not official table distributions.
+
+There is no standalone Magic Items or Personalities tab, random item-type roller
+or three-part naming aid. Retired category IDs remain recognized solely for
+recovering existing saved operations; their exact payloads are not rebuilt.
+Existing weapon recipe fields remain readable for older operations; new UI uses
+the shared sections without duplicate property controls.
+
+Property text is escaped and appended through `treasurePayload`. Physical items
+with additions get native `magicItem`; effects, base mechanics, costs and artwork
+remain intact. Boons only receive descriptive additions. No effect inference or
+automatic resource tracking is added. Source provenance stays in private receipts.
+
+### Armor treasure procedure
+
+`logic/armor-treasure.ts` owns base eligibility, recipe validation, generated
+names and native payload changes. `ui/tools/ArmorParts.tsx` supplies type/bonus/
+feature controls inside Treasure's established workflow. The existing-item path
+bypasses the recipe and preserves exact source data; shared reset/clear actions
+retire the current review and rebuild or clear the selected source draft.
+
+The GM original-draw route also accepts `armor-type`, selecting equally among
+current caller-readable ordinary native gear Armor documents. It returns an exact
+UUID; the UI resolves it in the current catalog and requests refresh if absent.
+This dynamic pool is not a fabricated compendium or a bundled official table.
+Bonus/feature draws use versioned original data. Preparation resolves the exact
+source again and the existing review/receipt boundary protects saving/assignment.
+
+New armor copies the base AC, properties, slots, cost and artwork. Its bonus adds
+to ac.modifier without a duplicate effect. Its baseArmor uses the original value
+or the shared Foundry slug of the original base name, preserving mastery selectors.
+Feature text is escaped and descriptive. Unchanged existing sources still assign
+without creating a library duplicate; generated armor follows the normal Armor
+folder save/assign operation. Document preview cards now include the same AC
+formatting already used by owned armor cards.
+
+### Potion treasure procedure
+
+`logic/potion-treasure.ts` owns build/existing mode and three validated OriginalPart
+features. `ui/tools/PotionParts.tsx` uses the common input/dice rows, individual
+choices and atomic roll-all requests through the existing original-draw route.
+The original table registry includes three feature tables; no new transport,
+cache or native compendium is introduced. Source provenance stays in the existing
+private library receipt.
+
+TreasureDraft adds kind Potion only for a validated Potions build recipe. Its
+payload has native type Potion, native default artwork, magicItem=true, physical
+fields and escaped feature/additive descriptions. It does not infer formulas,
+spell links or effects. Existing templates use the unchanged native copy path.
+The existing potion action recognizes the new native type; feature generation
+adds no consumption/resource behavior. Shared source reset/clear and whole-form
+Clear also apply to Potions, including review invalidation and recipient reset.
+
+
+### Remaining treasure procedures and permanent modifiers
+
+`logic/treasure-procedures.ts` shares validation and exact-source eligibility for
+Utility, Scroll/Wand and weapon recipes. Their distinct UI sequences reuse
+`TreasureProcedureParts`, the original-draw route and the common delivery path.
+New original table IDs extend version1 without changing existing rows. Dynamic
+weapon/spell draws use caller-readable native pools; spell tier is rechecked
+against the exact Spell at preparation. Tier changes retire spell choice/review.
+Weapon/ammunition bases retain native fields; generated names preserve mastery
+baseWeapon identity. Basic ammunition's bonus is descriptive/manual, while a
+Weapon receives the native weapon-specific attack/damage effects.
+
+`logic/treasure-modifiers.ts` allowlists generated native predefined definitions
+for non-expiring equipment AC, ability, slots and initiative grants. UI sends
+IDs/amounts only; payload generation constructs native effects through createEffect.
+Validation runs before review and again against the resolved item type. Modifiers
+participate in source equality and exact review hashing; private receipts retain
+the recipe alongside the frozen payload. No source document or Actor is edited.
+Native equipped/stashed/identification suppression is handled by the existing
+preparation/action path. Armor ac.modifier remains separate from any explicitly
+additional effect. Consumables and Boons cannot receive newly authored permanent
+equipment grants; copied native effects remain intact. Prose is not executed.
+
+
+### Item card effects and embedded editing — October 31
+
+Shared item cards include an Effects section in both sheet views and catalog/
+treasure previews. Owned cards select only canonical prepared effects belonging
+to that exact Item; their status formatter is shared with the Effects tab.
+Document previews use the existing lossless effect reader (v14 changes take
+precedence over legacy changes) and display enabled/disabled state without
+claiming activation on an Actor. Native predefined labels describe known keys;
+unknown keys retain their actual name and operation. Values/formulas are shown
+as text, never evaluated by the card. No effect mechanics or permissions change.
+
+The module rich-text theme supplies a paper border for embedded editors, including
+the Treasure and Creator overrides. Core's editor remains unchanged. Treasure
+review no longer requires a redundant recipient-disclosure checkbox; GM access,
+source visibility, current-review validation, identification restrictions and exact
+save/recovery remain enforced. The review note explains manual written qualities.

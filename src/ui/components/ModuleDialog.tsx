@@ -30,7 +30,7 @@ export interface ModuleDialogProps {
      * 34rem) and taller (to 88dvh, then scrolls) when its content needs room.
      * Phones use the full width and content height.
      */
-    size?: 'md' | 'lg' | 'card';
+    size?: 'md' | 'lg' | 'picker' | 'card';
     describedBy?: string;
     closeLabel?: string;
     layer?: number;
@@ -76,26 +76,26 @@ export default function ModuleDialog({ open, title, subtitle, onClose, children,
     if (!open) return null;
     const card = size === 'card';
     const width = card ? 'sm:w-fit sm:min-w-[24rem] sm:max-w-[min(34rem,calc(100vw-2rem))] sm:min-h-[min(24rem,88dvh)]'
-        : size === 'lg' ? 'sm:max-w-3xl' : 'sm:max-w-xl';
+        : size === 'picker' ? 'sm:max-w-5xl' : size === 'lg' ? 'sm:max-w-3xl' : 'sm:max-w-xl';
     return (
         <div className="fixed inset-0 flex items-end sm:items-center justify-center p-0 sm:p-4" style={{ zIndex: suspended ? Math.min(layer, 90) : layer }}
             aria-hidden={suspended || undefined} inert={suspended}>
             <div className="absolute inset-0 bg-black/70 backdrop-blur-[2px]" onClick={() => !suspended && onClose()} />
             <div ref={panel} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={describedBy} tabIndex={-1}
-                className={`relative flex w-full ${width} max-h-[92dvh] sm:max-h-[88dvh] flex-col bg-white text-black border-2 border-black shadow-[8px_8px_0_0_rgba(0,0,0,1)] outline-none`}
+                className={`sd-dialog-panel ${card ? 'sd-resource-card' : ''} relative flex w-full ${width} max-h-[92dvh] sm:max-h-[88dvh] flex-col bg-white text-black border-2 border-black shadow-[8px_8px_0_0_rgba(0,0,0,1)] outline-none`}
                 style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-                <div className={`flex items-start justify-between gap-3 bg-black text-white ${card ? 'pl-3 pr-1 py-1.5' : 'px-4 py-3'}`}>
-                    <div className={`min-w-0 ${card ? 'py-1' : ''}`}>
-                        <h2 id={titleId} className={`font-serif ${card ? 'text-lg' : 'text-xl'} font-bold leading-tight break-words`}>{title}</h2>
-                        {subtitle && <p className={`${card ? 'text-[10px]' : 'text-xs'} uppercase tracking-widest text-neutral-300 mt-0.5`}>{subtitle}</p>}
+                <div className={`sd-dialog-header flex items-start ${card ? 'justify-end' : 'justify-between'} gap-3 bg-black text-white ${card ? 'pl-3 pr-1 py-1.5' : 'px-4 py-3'}`}>
+                    <div className={card ? 'sr-only' : 'min-w-0'}>
+                        <h2 id={titleId} className={`sd-dialog-title font-serif ${card ? 'text-lg' : 'text-xl'} font-bold leading-tight break-words`}>{title}</h2>
+                        {!card && subtitle && <p className={`${card ? 'text-[10px]' : 'text-xs'} uppercase tracking-widest text-neutral-300 mt-0.5`}>{subtitle}</p>}
                     </div>
                     <button type="button" onClick={onClose} aria-label={closeLabel}
-                        className="shrink-0 min-h-11 min-w-11 flex items-center justify-center text-white/70 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-400">
+                        className="bg-transparent border-0 shrink-0 min-h-11 min-w-11 flex items-center justify-center text-white/70 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-400">
                         <X aria-hidden="true" className="w-6 h-6" />
                     </button>
                 </div>
-                <div className={`flex-1 overflow-y-auto overscroll-contain ${card ? 'px-3 py-3' : 'px-4 py-4'}`}>{children}</div>
-                {footer && <div className={`border-t-2 border-black bg-neutral-100 ${card ? 'px-3 py-2' : 'px-4 py-3'}`}>{footer}</div>}
+                <div className={`sd-dialog-body flex-1 overflow-y-auto overscroll-contain ${card ? 'px-3 py-3' : 'px-4 py-4'}`}>{children}</div>
+                {footer && <div className={`sd-dialog-footer border-t-2 border-black bg-neutral-100 ${card ? 'px-3 py-2' : 'px-4 py-3'}`}>{footer}</div>}
             </div>
         </div>
     );
