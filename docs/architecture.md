@@ -57,7 +57,7 @@ frame or inset canvas; content padding and individual field borders remain.
 Core owns both rows and responsive layout. Creator discard and Importer Back callbacks
 and Generator actions retain their existing handlers. No per-page navigation
 markup or mutable header registry is needed. The UI floor rises3.3→3.6; Core
-application floor remains>=0.20.0, and CI/release use Core v0.22.0.
+application floor and CI/release now align on Core0.22.3 (October31). API floors remain module-api1.7.0/UI3.6.0.
 
 `logic/character-creation.ts` owns bounded draft/wire contracts and numeric
 reconciliation; `logic/creator-awards.ts` supplies shared source requirements and

@@ -24,7 +24,7 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     env:
-      CI_CORE_REF: 'v0.22.0'
+      CI_CORE_REF: 'v0.22.3'
       SHEET_DELVER_DATA: ${{ github.workspace }}/sheet-delver-core/.module-ci-data
     defaults:
       run:
@@ -34,7 +34,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           repository: sheetdelver/sheetdelver
-          ref: v0.22.0
+          ref: v0.22.3
           path: sheet-delver-core
           persist-credentials: false
 
@@ -128,7 +128,7 @@ jobs:
         if: steps.reuse.outputs.reused != 'true'
         run: |
           SHADOWDARK_PLAYWRIGHT_MODULE="$RUNNER_TEMP/shadowdark-browser-tools/node_modules/playwright/index.mjs" \
-            node .module-ci-data/local/modules/shadowdark/src/tests/collection-consumers.browser.mjs "$RUNNER_TEMP/shadowdark-collection-results"
+            npx tsx .module-ci-data/local/modules/shadowdark/src/tests/collection-consumers.browser.mjs "$RUNNER_TEMP/shadowdark-collection-results"
 
       - name: Verify action recovery and Actor lifecycle consumers
         if: steps.reuse.outputs.reused != 'true'

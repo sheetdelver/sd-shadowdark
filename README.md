@@ -53,7 +53,7 @@ Character sheets and tools for playing Shadowdark RPG with SheetDelver.
 
 ## Requirements
 
-Use SheetDelver Core **0.22.0 or newer**, providing module-api **1.7.0** and
+Use SheetDelver Core **0.22.3 or newer**, providing module-api **1.7.0** and
 ui-extension-api **3.6.0**. Optional native artwork packages are not required.
 
 Features described here reflect the current module checkout. See the

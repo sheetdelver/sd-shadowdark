@@ -242,3 +242,105 @@ Before release:
 
 Optional table/PDF import, naming aids, potion mixing, hidden-identity authoring,
 cards-to-chat and prior native-automation deferrals remain outside this checkpoint.
+
+
+## Compatibility alignment and failure diagnosis — October31 follow-up
+
+User authorized compatibility alignment in Shadowdark. Manifest minimum
+>=0.20.0 → >=0.22.3; README and CI/release pins0.22.0 →0.22.3, including the CI
+artifact fingerprint. Core's local v0.22.3 tag/release checkout is present and
+matches the user's prior release report. SDK3.8.0 and module-api1.7.0/UI3.6.0/roll
+API1.0.0 contract minima are unchanged. Module release version stays0.9.6.
+This completes baseline alignment; it does not authorize version bump/publication.
+
+Both recorded boundary failures assert the entire old spell patch equals only
+`system.lost: true`. Current consequences additionally write spellLoss reason and
+casting Class for the rest utility. C4 covers failed spell loss versus focus;
+RV-03 covers a chat transport failure and replay without repeated consequences.
+The extra provenance field triggers both exact-object assertions. Existing REST
+regressions explicitly require the provenance for rest/penance/unknown handling.
+This evidence points to stale assertions, not a demonstrated runtime regression.
+Those assertions have not been changed in this compatibility-only follow-up;
+the user asked for the explanation first. Final CI/smoke remains after resolution.
+
+
+Alignment verification: isolated module check passes (contract compatibility,
+source boundaries, root typing, scoped CSS and logic/UI/server dry bundles), log
+/tmp/sd-core-baseline-check.log. The existing presentation suite passes updated
+version/pin/API assertions, then fails its settings-list equality because it omits
+the previously tracked playerShowLightRemaining entry. This is an additional stale
+expectation to reconcile during test cleanup; later assertions have not yet run.
+Log /tmp/sd-core-baseline-presentation.log. No runtime settings changed here.
+No Core modifications, module version bump or new commit accompanies alignment.
+
+
+## Validation cleanup resolved — October31
+
+The user authorized proceeding after the diagnosis. Only tests/harness and
+compatibility documentation changed; application behavior is unchanged.
+
+- Boundary expectations now explicitly require both lost=true and recovery
+  provenance (reason=rest and the exact casting Class). Focus exemption and
+  chat-failure replay assertions remain. Boundary suite passes57/57.
+- Presentation expectations include the existing torch-time world setting and
+  GM-only Treasure tool. Compatibility assertions target Core0.22.3.
+- Native-alignment checks reflect the accepted shared Edit modal and spinner-free
+  Pulp −/+ controls in both views. Suite passes64/64.
+- The action consumer's focus fixture now explicitly declares focus duration;
+  paired instant-duration cases verify its absence. Suite passes8/8.
+- The collection harness loads module Tailwind utilities as installed modules do;
+  host CSS cannot discover ignored module source. This resolves the artificial
+  luck-control overlap. CI invokes this harness with the existing tsx toolchain.
+  Suite passes104/104; the rendered tabbed luck controls were inspected.
+- Packaged Creator and migration checks use the aligned Core minimum.
+
+All23 source suites listed in module CI pass locally, along with49 release-tool
+checks, explicit module/UI typing, module contract/boundary checks and packaging.
+Browser actor lifecycle, corrective consumers and Creator workflows also pass;
+compiled Treasure UI/CSS passes390/1000px. Compiled Creator contracts verify exact
+creation round trips, recovery and source-revocation preflight. Earlier failing
+logs remain historical and are superseded by these reruns.
+
+Evidence: /tmp/sd-final-boundaries.log, /tmp/sd-final-presentation.log,
+/tmp/sd-final-source/*.log, /tmp/sd-final-release-tests.log,
+/tmp/sd-final-types.log, /tmp/sd-final-package.log,
+/tmp/sd-final-actions-rerun/results.json,
+/tmp/sd-final-collections-rerun/results.json,
+/tmp/sd-final-browser/{actor-lifecycle,parity-corrections,character-creator}/results.json,
+/tmp/sd-final-treasure-browser/results.json, /tmp/sd-final-creator-compiled.log.
+Archive SHA256: cfd9a47dbcf19ce228cc3ec4f88ef8e8e1326d10dd7e06089bd31d27a8b19bdd.
+Archive runtime/manifest are current; final test/documentation-only cleanup came
+after packaging. Local toolchain is Core0.22.3/Node24.21.0; hosted CI pins Node22.
+No GitHub workflow was dispatched and no live Foundry service was used.
+
+The two original boundary failures and additional stale assertions/harness defects
+are resolved. Compatibility alignment is complete. Remaining release gates are
+final live installed-Foundry smoke, hosted CI on the proposed commit, release
+version selection and separately authorized publication. No new commit, push,
+version bump or tag is included in this cleanup. All browser processes exited.
+
+
+## Installed native smoke — October31
+
+The user launched local Foundry14.367 world `shadowdark-test` (Shadowdark4.0.6).
+A separate Core0.22.3 workspace/data directory installed the packaged module;
+root production configuration was not used. Through the installed public module
+routes, the authenticated GM loaded the native catalog, prepared/saved/assigned
+a disposable item with price12gp and AC+2, and replayed the same request. Native
+source readback confirmed exact inventory identity, price and ActiveEffect.
+Installed sheet preparation showed AC12; a native stash update changed it toAC10
+and reported suppressed(stashed). Replay made no duplicate.
+
+All disposable Actor/Item/Folder data was removed. Whole-source comparisons
+(excluding transport _stats) confirm original Actor/Item/Folder data unchanged.
+No existing character, item or setting was edited. The isolated Core process
+was stopped; the user's Foundry instance remains running. Evidence:
+/tmp/sd-release-native-smoke/results.json and smoke.log. Archive SHA256:
+6908816efb487c20a6289ed1c9ef526ba935c2a39a1a76668fecef2bd1fb5a80.
+This proves the focused installed API/native persistence smoke; UI rendering was
+covered by the earlier packaged browser suite, not a new live browser session.
+
+Hosted CI remains pending. Workflow inspection shows feature-branch pushes do
+not trigger validation: it runs for main pushes, PRs to main, tags or explicit
+workflow_dispatch. No PR currently exists for this branch. No remote write or
+workflow dispatch has been performed during this check. Version0.9.6 remains.

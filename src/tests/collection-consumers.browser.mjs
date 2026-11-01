@@ -1,12 +1,12 @@
 /** Actual React consumers, controlled SDK boundary; no Core/Foundry service.
  * Run from the pinned Core toolchain: SHADOWDARK_PLAYWRIGHT_MODULE=<playwright import>
- * node data/local/modules/shadowdark/src/tests/collection-consumers.browser.mjs [output-dir]
+ * npx tsx data/local/modules/shadowdark/src/tests/collection-consumers.browser.mjs [output-dir]
  * Browser tooling is development-only. All outgoing browser traffic is blocked.
  */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { build } from 'esbuild';
 import { execFileSync } from 'node:child_process';
 import postcss from 'postcss';
@@ -24,6 +24,10 @@ fs.mkdirSync(out, { recursive: true });
 const coreRoot = path.resolve(process.env.SHADOWDARK_CORE || process.cwd());
 const hostCss = process.env.SHADOWDARK_HOST_CSS ? fs.readFileSync(process.env.SHADOWDARK_HOST_CSS, 'utf8')
     : (await postcss([tailwind({base:coreRoot})]).process(fs.readFileSync(path.join(coreRoot,'src/app/globals.css'),'utf8'), {from:path.join(coreRoot,'src/app/globals.css')})).css;
+
+// Include the same module utilities as an installed archive; host CSS cannot scan ignored module source.
+const {compileModuleTailwind}=await import(pathToFileURL(path.join(coreRoot,'src/scripts/tools/modules/tailwind-compile.ts')).href);
+const moduleCss=process.env.SHADOWDARK_CARD_TAILWIND?fs.readFileSync(process.env.SHADOWDARK_CARD_TAILWIND,'utf8'):await compileModuleTailwind(moduleRoot,'shadowdark');
 
 const bundled = await build({ stdin: { contents: `
 import {useAutomaticSpellGrants} from '${moduleRoot}/src/ui/hooks/useAutomaticSpellGrants';
@@ -183,9 +187,9 @@ async function test(name, initial, run) {
     page.on('pageerror', e => errors.push(e.message)); await page.route('**/*', r => r.abort());
     try {
         await page.setContent('<div id="root" class="sdk-module--shadowdark"></div>');
-        if(name.startsWith('SD-UI13') || name.startsWith('SD-UI23') || name.startsWith('REST') || name.startsWith('LIGHT') || name.startsWith('XP:') || name.startsWith('COUNTERS:')) { await page.addStyleTag({content:hostCss}); await page.addStyleTag({path:path.join(moduleRoot,'assets/presentation.css')}); }
-        if(['resource-card','wand-card'].includes(initial.which)) { await page.setViewportSize({width:initial.width,height:900}); if(process.env.SHADOWDARK_CARD_TAILWIND)await page.addStyleTag({path:process.env.SHADOWDARK_CARD_TAILWIND});await page.addStyleTag({path:path.join(moduleRoot,'assets/presentation.css')}); } await page.evaluate(x => window.initial = x, initial);
-        if(initial.which==='rest'){await page.evaluate(paper=>Object.defineProperty(window,'localStorage',{configurable:true,value:{getItem:()=>paper?'simple':'advanced',setItem(){},removeItem(){}}}),initial.paper);await page.setViewportSize({width:initial.width||1280,height:900});if(process.env.SHADOWDARK_CARD_TAILWIND)await page.addStyleTag({path:process.env.SHADOWDARK_CARD_TAILWIND});}
+        if(name.startsWith('SD-UI13') || name.startsWith('SD-UI23') || name.startsWith('REST') || name.startsWith('LIGHT') || name.startsWith('XP:') || name.startsWith('COUNTERS:')) { await page.addStyleTag({content:hostCss}); await page.addStyleTag({content:moduleCss}); await page.addStyleTag({path:path.join(moduleRoot,'assets/presentation.css')}); }
+        if(['resource-card','wand-card'].includes(initial.which)) { await page.setViewportSize({width:initial.width,height:900}); await page.addStyleTag({content:moduleCss});await page.addStyleTag({path:path.join(moduleRoot,'assets/presentation.css')}); } await page.evaluate(x => window.initial = x, initial);
+        if(initial.which==='rest'){await page.evaluate(paper=>Object.defineProperty(window,'localStorage',{configurable:true,value:{getItem:()=>paper?'simple':'advanced',setItem(){},removeItem(){}}}),initial.paper);await page.setViewportSize({width:initial.width||1280,height:900});await page.addStyleTag({content:moduleCss});}
         await page.addScriptTag({ content: bundled.outputFiles[0].text });
         await run(page); assert.deepEqual(errors, []); results.push({ name, ok: true }); console.log(`✓ ${name}`);
     } catch (e) {

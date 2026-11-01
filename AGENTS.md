@@ -440,13 +440,15 @@ for this release; do not infer further floor changes. Runtime absence of a nativ
 art package still preserves original images.
 
 
-### Coordinated Core release floor — 2026-10-22
+### Coordinated Core release floor — 2026-10-31
 
-The current manifest and validation/release workflow pins target Core v0.20.0,
-SDK3.5.0/module-api1.7.0/UI3.3.0. Publish Core before running those workflows or
-releasing this module. Historical0.19.2/0.19.5 test results below/above remain
-historical; they do not certify the new manifest on the older host. No module
-version bump or release is authorized by compatibility/documentation closeout.
+The user authorized aligning Shadowdark requirements and CI with released Core
+v0.22.3. Manifest minimum >=0.20.0 → >=0.22.3; README and validation/release
+workflow pins0.22.0 →0.22.3. Core0.22.3 includes the accepted compendium freshness
+and persistent SDK-event fixes. It provides SDK3.8.0/module-api1.7.0/UI3.6.0;
+the existing API contract minima are unchanged. Historical older-host evidence
+remains historical. Module version stays0.9.6; release version, commit and
+publication remain separately authorized operations.
 
 
 ### Review regression guardrails — October22
@@ -526,3 +528,12 @@ shadowdark-community-content.monsters. Do not collapse packs or same-name rows;
 use exact identities and caller-filtered pack labels. Core skips absent declared
 packs. Missing native list values are unavailable, not guessed zero/Near. NPC
 cards omit the invented level-as-type subtitle; the actual Level remains a fact.
+
+
+### Browser consumer stylesheet validation — October31
+
+Run collection-consumers.browser.mjs with the existing tsx toolchain. Its isolated
+harness compiles/includes module Tailwind alongside host CSS; the host cannot scan
+ignored module source. Do not treat a host-CSS-only layout as installed-module
+rendering, or bypass pointer interception with forced clicks. Focus fixtures must
+explicitly declare focus duration; ordinary Player spells do not imply focus.

@@ -4,6 +4,11 @@ Historical entries are reconstructed from [published releases](https://github.co
 
 ## Unreleased
 
+- Refresh workflow regression coverage.
+
+- Require Core 0.20.0 → 0.22.3.
+- Align toolchain 0.22.0 → 0.22.3.
+
 - Complete treasure category builders.
 - Add contextual magical attributes.
 - Author permanent equipment modifiers.
@@ -51,7 +56,6 @@ Historical entries are reconstructed from [published releases](https://github.co
 - Adopt Core page headers
 - Require SDK 3.8.0 headers
 - Require UI API 3.3.0 → 3.6.0
-- Target Core 0.22.0 toolchain
 - Restore Creator confirmation actions
 - Align character tool presentation
 - Add manual Character Creator

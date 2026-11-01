@@ -60,6 +60,7 @@ function render(component: any, actor: any) {
 async function sheetNameStatus() {
     await check('UI-zero-hp', 'sheet names show zero HP without changing the editable name or treating unknown HP as zero', () => {
         const actor: any = hostActorProjection(prepare(primLike()));
+        actor.canEdit = true;
         for (const hp of [0, 5, undefined]) {
             actor.derived.hp.value = hp;
             const before = structuredClone(actor);
@@ -71,7 +72,9 @@ async function sheetNameStatus() {
                 assert.equal(html.includes('sd-sheet-character-name-zero'), hp === 0);
             }
             assert.equal(heading.includes('sd-sheet-character-name-dark'), hp === 0);
-            assert.ok(paper.includes(`value="${actor.name}"`), 'editable name never includes status text');
+            assert.ok(paper.includes(actor.name), 'the displayed name remains intact');
+            assert.ok(!paper.includes(`value="${actor.name}"`), 'name editing belongs to the shared modal');
+            assert.match(paper, />Edit<\/button>/, 'the owner can open the shared editor');
             assert.deepEqual(actor, before);
         }
     });
@@ -387,18 +390,18 @@ async function luck() {
         assert.doesNotMatch(html, />\s*Token\s*</, 'no visible label');
         assert.doesNotMatch(html, /Pulp|luck tokens/i);
     });
-    // User decision (October 16): no label in either mode; Pulp off shows only the
-    // tick box; Pulp on shows only a number input, with spinner buttons where there is space.
-    await check('C8', 'Pulp luck replaces the token with an unlabelled number input and spinner', () => {
+    // User refinement: both Pulp views use a spinner-free input and explicit −/+ buttons.
+    await check('C8', 'Pulp luck uses a spinner-free numeric input with explicit step buttons', () => {
         const html = render(() => createElement(LuckControl, {}), at(worldSnapshot(4, { usePulpMode: true })));
         assert.doesNotMatch(html, /type="checkbox"|Token|Pulp|<label/);
-        assert.match(html, /<input[^>]*type="number"[^>]*value="3"|<input[^>]*value="3"[^>]*type="number"/);
+        assert.match(html, /<input[^>]*type="text"[^>]*inputMode="numeric"[^>]*value="3"/);
         assert.match(html, /aria-label="Spend a luck token"/); assert.match(html, /aria-label="Gain a luck token"/);
     });
-    await check('C8', 'compact Pulp luck (paper sheet) is the number input only', () => {
+    await check('C8', 'compact Pulp luck has the same spinner-free input and step buttons', () => {
         const html = render(() => createElement(LuckControl, { compact: true }), at(worldSnapshot(4, { usePulpMode: true })));
-        assert.match(html, /type="number"/);
-        assert.doesNotMatch(html, /<button|type="checkbox"|Token|Pulp|<label/);
+        assert.match(html, /type="text"[^>]*inputMode="numeric"[^>]*value="3"/);
+        assert.doesNotMatch(html, /type="number"|type="checkbox"|Token|Pulp|<label/);
+        assert.match(html, /aria-label="Spend a luck token"/); assert.match(html, /aria-label="Gain a luck token"/);
     });
     await check('G8-A', 'an unavailable setting shows an inert, explained placeholder instead of a guessed control', () => {
         const html = render(() => createElement(LuckControl, {}), at(worldSnapshot(7, {}, { usePulpMode: 'not-ready' })));

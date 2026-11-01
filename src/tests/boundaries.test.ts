@@ -203,7 +203,7 @@ async function actions() {
             const failed = fakeRuntime(wizardActor(), { rolls: [3] });
             const result = await statusOf(await handleActorAction('w1', request(failed.runtime, { requestId: 'req-fail-0001', kind: 'spell', itemId: 'mm' }) as any));
             assert.equal(result.body.outcome.success, false);
-            assert.deepEqual(failed.writes.find(write => write[0] === 'item.update'), ['item.update', { type: 'Actor', id: 'w1' }, 'mm', { 'system.lost': true }]);
+            assert.deepEqual(failed.writes.find(write => write[0] === 'item.update'), ['item.update', { type: 'Actor', id: 'w1' }, 'mm', { 'system.lost': true, 'flags.shadowdark.sheetDelver.spellLoss': { reason: 'rest', castingClass: 'Compendium.shadowdark.classes.Item.wiz' } }]);
             const focusActor = wizardActor(); focusActor.items.find((item: any) => item._id === 'mm').system.duration = { type: 'focus' };
             const focus = fakeRuntime(focusActor, { rolls: [3] });
             await handleActorAction('w1', request(focus.runtime, { requestId: 'req-focus-001', kind: 'spell', itemId: 'mm', focus: true }) as any);
@@ -597,7 +597,7 @@ async function reviewCorrections() {
             const first = await statusOf(await handleActorAction('w1', request(runtime, body) as any));
             assert.equal(first.status, 200); assert.equal(first.body.outcome.success, false);
             assert.ok(first.body.warnings.some((warning: string) => /chat transport down/.test(warning)));
-            assert.deepEqual(writes.filter(write => write[0] === 'item.update').map(write => write[3]), [{ 'system.lost': true }]);
+            assert.deepEqual(writes.filter(write => write[0] === 'item.update').map(write => write[3]), [{ 'system.lost': true, 'flags.shadowdark.sheetDelver.spellLoss': { reason: 'rest', castingClass: 'Compendium.shadowdark.classes.Item.wiz' } }]);
             assert.equal((await statusOf(await handleActorAction('w1', request(runtime, body) as any))).body.replayed, true);
             assert.equal(rolls(), 0); assert.equal(writes.filter(write => write[0] === 'item.update').length, 1);
         });
