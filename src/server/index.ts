@@ -1,5 +1,6 @@
-import { handleTreasureCatalog, handleTreasureDraw, handleTreasureOriginalDraw, handleTreasurePrepare, handleTreasureDeliver, handleTreasureStatus } from './api/treasure';
+import { handleTreasureCatalog, handleTreasureName, handleTreasureDraw, handleTreasureOriginalDraw, handleTreasurePrepare, handleTreasureDeliver, handleTreasureStatus } from './api/treasure';
 import { handleLightChat } from './api/light-chat';
+import { handleItemChat } from './api/item-chat';
 import { handleRest } from './api/rest';
 import { json, error, type ModuleServerRequest, type ModuleServerParams } from '@sheet-delver/sdk/server';
 import { handleImport } from './api/import';
@@ -40,6 +41,7 @@ async function effectRoute(run: () => Promise<unknown>) {
 
 export const apiRoutes = {
     'treasure/catalog': handleTreasureCatalog,
+    'treasure/name': handleTreasureName,
     'treasure/draw': handleTreasureDraw,
     'treasure/original-draw': handleTreasureOriginalDraw,
     'treasure/prepare': handleTreasurePrepare,
@@ -98,6 +100,7 @@ export const apiRoutes = {
     'actors/[id]/rest/complete': async (req: ModuleServerRequest, { params }: ModuleServerParams) => handleRest(await actorIdFrom(params), req, 'complete'),
     'actors/[id]/rest/status': async (req: ModuleServerRequest, { params }: ModuleServerParams) => handleRest(await actorIdFrom(params), req, 'status'),
     'actors/[id]/light/chat': async (req: ModuleServerRequest, { params }: ModuleServerParams) => handleLightChat(await actorIdFrom(params), req),
+    'actors/[id]/items/chat': async (req: ModuleServerRequest, { params }: ModuleServerParams) => handleItemChat(await actorIdFrom(params), req),
     'actors/[id]/luck': async (req: ModuleServerRequest, { params }: ModuleServerParams) => {
         return handleLuck(await actorIdFrom(params), req);
     },

@@ -10,6 +10,7 @@ export { CardBody, CardNotes } from './ResourceCardBody';
 import ItemStateControls from './ItemStateControls';
 import SpellLossControl from './SpellLossControl';
 import AbilityStateControls from './AbilityStateControls';
+import ShareItemControl from './ShareItemControl';
 import { itemControls } from '../../logic/inventory-controls';
 import { useShadowdarkActor, type ActionResponse, type CardTarget } from '../context/ShadowdarkActorContext';
 import { useShadowdarkUI } from '../context/ShadowdarkUIContext';
@@ -90,11 +91,13 @@ export default function ResourceDetailModal() {
     const hasSpellControl = !!ownedItemId && actor.items?.some((item: any) => String(item.id ?? item._id) === ownedItemId && item.type === 'Spell');
     const hasAbilityControl = !!ownedItemId && actor.items?.some((item: any) => String(item.id ?? item._id) === ownedItemId && item.type === 'Class Ability');
     const hasActions = loaded.state === 'ready' && loaded.card.actions.length > 0;
-    const footer = loaded.state === 'ready' && (hasActions || hasControls || hasSpellControl || hasAbilityControl || loaded.card.diagnostics.length > 0) ? (
+    const canShare = !!ownedItemId && actor.canEdit === true;
+    const footer = loaded.state === 'ready' && (canShare || hasActions || hasControls || hasSpellControl || hasAbilityControl || loaded.card.diagnostics.length > 0) ? (
         <div className="space-y-2">
             <CardNotes card={loaded.card} />
             {hasControls && <ItemStateControls itemId={ownedItemId!} />}
             {hasAbilityControl && <AbilityStateControls key={ownedItemId} itemId={ownedItemId!} />}
+            {canShare && <ShareItemControl itemId={ownedItemId!} />}
             {loaded.card.kind === 'spell' && loaded.card.itemId && loaded.card.actions.some(entry => entry.action.focusAllowed) && (
                 <label className="flex items-center gap-2 text-sm min-h-11">
                     <input type="checkbox" className="w-5 h-5" checked={focus} onChange={event => setFocus(event.target.checked)} />

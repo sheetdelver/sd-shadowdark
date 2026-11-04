@@ -1160,3 +1160,20 @@ The remaining release work is explicit scope/version selection, compatibility
 alignment, required CI and a focused final installed smoke. Existing baseline
 spell-loss test failures remain recorded in the GM audit and readiness report.
 Deferrals remain deferred; checkpoint approval does not authorize a release.
+
+### Boon scope correction — November 4
+
+User review identified that item Attributes and Personality do not belong in
+Boons. This supersedes earlier suggestions to expose those shared additions in
+every builder. The Boons tab now keeps only its oath, secret or blessing recipe
+and common naming/description/save controls. Fresh Boon drafts omit the magical
+item recipe. Shared validation refuses enabled item extras on Boon drafts, and
+Boon payloads never append extra attribute/personality text, even from disabled
+legacy draft fields. Existing saved documents are unchanged.
+
+The treasure regression first reproduced the invalid acceptance, then passed
+after the correction. Mounted coverage checks that both sections are absent
+while the existing oath/secret/blessing review, save and assignment flows work.
+
+The user accepted this correction and the explicit Boon effects in
+[ADR-0011](0011-boon-effect-authoring.md) on November4.

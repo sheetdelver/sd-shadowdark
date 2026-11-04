@@ -29,6 +29,17 @@ read-only unless the current user explicitly selects work in those repositories.
 An unavailable host contract is an external dependency to report, not permission
 to edit Core, import private host code or add a direct Foundry transport.
 
+Optional treasure names and owned-card sharing are scoped by
+[ADR-0010](docs/adr/0010-item-naming-and-chat-sharing.md). Preserve suggestion/apply
+separation, caller-bound source resolution, informational chat snapshots and
+duplicate-post receipts. Hidden-identity authoring was declined; imports and
+potion mixing remain deferred.
+
+Explicit Boon effect authoring uses the shared custom-boon fields and validator
+in [ADR-0011](docs/adr/0011-boon-effect-authoring.md). Boons exclude item Attributes
+and Personality; configured native effects are independent from descriptive
+duration/uses. Keep preview, review, library and assignment effects consistent.
+
 Use public `@sheet-delver/sdk` entry points. Core owns source/prepared stores,
 authorization, world/session lifecycle and shared chat, notifications and dice
 presentation. The module owns system rules and its UI. Keep browser UI,

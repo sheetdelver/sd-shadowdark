@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
 import ModuleDialog from './ModuleDialog';
-import { NATIVE_PREDEFINED_EFFECTS, NATIVE_REJECTED_PREDEFINED } from '../../data/native-predefined-effects';
 import { BOON_TYPE_MAP } from '../../data/talent-effects';
-import { createEffect } from '../../utils/Sanitizer';
+import { buildBoonEffects, boonEffectErrors, type BoonEffectRow } from '../../logic/boon-effects';
+import BoonEffectFields from './BoonEffectFields';
 
 /**
  * Custom Boon editor.
@@ -21,14 +20,12 @@ interface CustomBoonModalProps {
     initialData?: any;
 }
 
-interface Row { key: string; type: number; value: string; label: string; icon: string }
-
 export default function CustomBoonModal({ isOpen, onClose, onCreate, onUpdate, initialData }: CustomBoonModalProps) {
     const editing = !!initialData;
     const [name, setName] = useState('');
     const [boonType, setBoonType] = useState('blessing');
     const [level, setLevel] = useState(1);
-    const [rows, setRows] = useState<Row[]>([]);
+    const [rows, setRows] = useState<BoonEffectRow[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
 
@@ -41,14 +38,11 @@ export default function CustomBoonModal({ isOpen, onClose, onCreate, onUpdate, i
     }, [isOpen, initialData]);
 
     if (!isOpen) return null;
-    const selectable = Object.entries(NATIVE_PREDEFINED_EFFECTS)
-        .filter(([key, entry]) => !NATIVE_REJECTED_PREDEFINED[key] && !entry.restriction && !entry.key.includes('REPLACEME') && entry.value !== 'REPLACEME')
-        .sort(([, a], [, b]) => a.label.localeCompare(b.label));
-
     const submit = async (event?: React.FormEvent) => {
         event?.preventDefault();
         if (!name.trim()) { setError('Give the boon a name.'); return; }
-        if (rows.some(row => !row.key.trim())) { setError('Every custom change needs a key.'); return; }
+        const effectError = Object.values(boonEffectErrors(rows))[0];
+        if (!editing && effectError) { setError(effectError); return; }
         setSaving(true); setError(null);
         let ok: boolean;
         if (editing && onUpdate) {
@@ -61,7 +55,7 @@ export default function CustomBoonModal({ isOpen, onClose, onCreate, onUpdate, i
             ok = await onCreate({
                 name, type: 'Boon', img: 'icons/skills/social/diplomacy-writing-letter.webp',
                 system: { boonType, level },
-                effects: rows.map(row => createEffect(row.label, row.icon, [{ key: row.key.trim(), mode: row.type, value: row.value }], { sourceName: name })),
+                effects: buildBoonEffects(rows, name),
             });
         }
         setSaving(false);
@@ -93,33 +87,7 @@ export default function CustomBoonModal({ isOpen, onClose, onCreate, onUpdate, i
                 {editing ? (
                     <p className="text-sm border border-black p-2">This boon has {initialData.effects?.length ?? 0} effect(s). Edit them individually in the Effects tab so their data is preserved.</p>
                 ) : (
-                    <fieldset className="space-y-2">
-                        <legend className="text-xs uppercase tracking-widest font-bold">Effects</legend>
-                        <select className={field} value="" onChange={event => {
-                            const key = event.target.value;
-                            if (key === 'custom') setRows(prev => [...prev, { key: '', type: 2, value: '1', label: 'Custom bonus', icon: 'icons/svg/aura.svg' }]);
-                            else if (NATIVE_PREDEFINED_EFFECTS[key]) {
-                                const entry = NATIVE_PREDEFINED_EFFECTS[key];
-                                setRows(prev => [...prev, { key: entry.key, type: entry.mode, value: String(entry.value), label: entry.label, icon: entry.icon }]);
-                            }
-                        }}>
-                            <option value="">Add an effect…</option>
-                            <option value="custom">Custom change</option>
-                            {selectable.map(([key, entry]) => <option key={key} value={key}>{entry.label}</option>)}
-                        </select>
-                        {rows.map((row, position) => (
-                            <div key={position} className="grid grid-cols-12 gap-2 items-center border border-neutral-300 p-2">
-                                <span className="col-span-12 font-bold text-sm">{row.label}</span>
-                                <input className={`${field} col-span-7 font-mono text-xs`} aria-label={`Change ${position + 1} key`} value={row.key}
-                                    onChange={event => setRows(prev => prev.map((entry, index) => index === position ? { ...entry, key: event.target.value } : entry))} />
-                                <input className={`${field} col-span-3`} aria-label={`Change ${position + 1} value`} value={row.value}
-                                    onChange={event => setRows(prev => prev.map((entry, index) => index === position ? { ...entry, value: event.target.value } : entry))} />
-                                <button type="button" aria-label={`Remove ${row.label}`} className="col-span-2 min-h-11 border-2 border-black flex items-center justify-center"
-                                    onClick={() => setRows(prev => prev.filter((_, index) => index !== position))}><Trash2 size={16} aria-hidden="true" /></button>
-                            </div>
-                        ))}
-                        {rows.length === 0 && <p className="text-xs text-neutral-700 flex items-center gap-1"><Plus size={12} aria-hidden="true" /> A boon may have no mechanical effect.</p>}
-                    </fieldset>
+                    <BoonEffectFields value={rows} onChange={setRows} errors={boonEffectErrors(rows)} />
                 )}
             </form>
         </ModuleDialog>

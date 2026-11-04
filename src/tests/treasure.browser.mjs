@@ -8,7 +8,7 @@ import postcss from 'postcss';
 import tailwind from '@tailwindcss/postcss';
 import { worldSnapshot } from './fixtures/native-406.ts';
 import { shadowdarkAdapter as adapter } from '../server/ShadowdarkAdapter.ts';
-import { handleTreasureCatalog,handleTreasureDraw,handleTreasureOriginalDraw,handleTreasurePrepare,handleTreasureDeliver,handleTreasureStatus } from '../server/api/treasure.ts';
+import { ITEM_NAME_TABLES,handleTreasureName,handleTreasureCatalog,handleTreasureDraw,handleTreasureOriginalDraw,handleTreasurePrepare,handleTreasureDeliver,handleTreasureStatus } from '../server/api/treasure.ts';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..'),core=process.cwd();
 const out=process.argv[2]||'/tmp/sd-treasure-browser';fs.mkdirSync(out,{recursive:true});
 const {chromium}=await import(process.env.SHADOWDARK_PLAYWRIGHT_MODULE||'playwright');
@@ -39,14 +39,15 @@ const ammunition={_id:'arrows',uuid:'Compendium.shadowdark.gear.Item.arrows',pac
 const wizard={_id:'wizard',uuid:'Compendium.shadowdark.classes.Item.wizard',pack:'shadowdark.classes',type:'Class',name:'Wizard',system:{}};
 const priest={_id:'priest',uuid:'Compendium.shadowdark.classes.Item.priest',pack:'shadowdark.classes',type:'Class',name:'Priest',system:{}};
 const priestSpell={...structuredClone(spell),_id:'spell2',uuid:'Compendium.shadowdark.spells.Item.spell2',system:{...spell.system,class:[priest.uuid]}};
-const rows=[table,spell,bag,weapon,armor,shield,potion,ammunition,wizard,priest,priestSpell],sources=new Map(rows.map(d=>[d.uuid,d]));let actor,store,writes,lost,rollCount,library,folders;
+const names=ITEM_NAME_TABLES.map((uuid,i)=>({_id:uuid.split('.').at(-1),uuid,pack:'shadowdark.rollable-tables',name:`Magic Item: Name ${i+1}`,formula:'1d6',results:[{_id:'name-part',range:[1,6],text:['Silver','Lantern','of Dawn'][i]}]}));
+const rows=[table,...names,spell,bag,weapon,armor,shield,potion,ammunition,wizard,priest,priestSpell],sources=new Map(rows.map(d=>[d.uuid,d]));let actor,store,writes,lost,rollCount,library,folders;
 const runtime={world:{snapshot:()=>worldSnapshot(1),assertRevision:()=>{}},access:{canReadPack:()=>true,packs:()=>[]},
  compendium:{findAll:async()=>structuredClone(rows),getById:async(_t,u)=>structuredClone(sources.get(u)??null)},
  dataStore:{get:async k=>structuredClone(store.get(k)??null),set:async(k,v)=>store.set(k,structuredClone(v))},
  documents:{fetchByUuid:async u=>structuredClone(sources.get(u)??null),get:async(type,id)=>structuredClone(type==='Item'?library.find(d=>d._id===id)??null:actor),list:async(type)=>({rows:structuredClone(type==='Item'?library:type==='Folder'?folders:[actor]),total:1}),create:async(type,payload)=>{const target=type==='Folder'?folders:library;const doc={...structuredClone(payload),_id:type+'-'+target.length};target.push(doc);return doc;},items:{create:async(_p,item)=>{writes++;const saved={...structuredClone(item),_id:'created-'+writes};actor.items.push(saved);if(lost)throw Error('Lost acknowledgement');return saved;}}},
  rolls:{roll:async(formula)=>({total:formula==='1d100'?([5,61,90][rollCount++]??90):formula==='2d6'?7:Math.min(2,Number(formula.slice(2)))})}};
 await adapter.initialize({...runtime,logger:console});
-const handlers={'original-draw':handleTreasureOriginalDraw,catalog:handleTreasureCatalog,draw:handleTreasureDraw,prepare:handleTreasurePrepare,deliver:handleTreasureDeliver,status:handleTreasureStatus};
+const handlers={name:handleTreasureName,'original-draw':handleTreasureOriginalDraw,catalog:handleTreasureCatalog,draw:handleTreasureDraw,prepare:handleTreasurePrepare,deliver:handleTreasureDeliver,status:handleTreasureStatus};
 const browser=await chromium.launch({executablePath:process.env.SHADOWDARK_CHROME,headless:true,args:['--no-sandbox','--disable-background-networking']});
 const results=[];
 try{for(const width of [390,1000]){
@@ -69,6 +70,16 @@ try{for(const width of [390,1000]){
  await page.getByRole('button',{name:'Roll table',exact:true}).click();await page.getByText('Treasure 0–3 · Rolled 5',{exact:true}).waitFor();
  await page.getByRole('button',{name:'Use Bag of Holding',exact:true}).click();
  assert.equal(await page.getByLabel('Name *',{exact:true}).inputValue(),'Bag of Holding');
+ await page.getByRole('button',{name:'Suggest item name',exact:true}).click();
+ await page.getByText('Suggested: Silver Lantern of Dawn',{exact:true}).waitFor();
+ assert.equal(await page.getByLabel('Name *',{exact:true}).inputValue(),'Bag of Holding');
+ await page.screenshot({path:path.join(out,'name-suggestion-'+width+'.png'),fullPage:true});
+ await page.getByRole('button',{name:'Dismiss',exact:true}).click();
+ assert.equal(await page.getByLabel('Name *',{exact:true}).inputValue(),'Bag of Holding');
+ await page.getByRole('button',{name:'Suggest item name',exact:true}).click();
+ await page.getByRole('button',{name:'Apply name',exact:true}).click();
+ assert.equal(await page.getByLabel('Name *',{exact:true}).inputValue(),'Silver Lantern of Dawn');
+ assert.equal(writes,0);assert.equal(library.length,0);
  assert.equal(await page.getByLabel('GP',{exact:true}).inputValue(),'150');
  assert.equal(await page.getByRole('region',{name:'Item card preview'}).locator('img').getAttribute('src'),bag.img);
  await page.getByRole('button',{name:'Roll table',exact:true}).click();await page.getByText('Treasure 0–3 · Rolled 61',{exact:true}).waitFor();
@@ -239,6 +250,8 @@ try{for(const width of [390,1000]){
  assert.equal(folders.find(f=>f._id===library.at(-1).folder)?.name,'Gems & Jewelry');
  // Boons have distinct nonphysical paths; keep independent parts across rerolls/navigation.
  await page.getByRole('button',{name:'Boons',exact:true}).click();
+ assert.equal(await page.getByRole('region',{name:'Attributes',exact:true}).count(),0);
+ assert.equal(await page.getByRole('region',{name:'Personality',exact:true}).count(),0);
  assert.equal(await page.getByLabel('GP',{exact:true}).count(),0);assert.equal(await page.getByLabel('Quantity',{exact:true}).count(),0);
  await page.getByRole('button',{name:'Roll boon',exact:true}).click();
  await page.waitForFunction(()=>document.querySelector('#boon-oath')?.value.includes('archivist'));
@@ -277,6 +290,17 @@ try{for(const width of [390,1000]){
  await page.getByRole('button',{name:'Roll boon',exact:true}).click();
  await page.waitForFunction(()=>document.querySelector('#boon-benefit')?.value.startsWith('Homeward thread'));
  assert.equal(await page.getByLabel('Duration and limits',{exact:true}).inputValue(),'Until sunrise; no automatic reset.');
+ await page.getByLabel('Add boon effect',{exact:true}).selectOption('acBonus');
+ await page.getByLabel('Effect 1 name',{exact:true}).fill('Protective blessing');
+ await page.getByLabel('Change 1 value',{exact:true}).fill('2');
+ await page.getByLabel('Effect 1 enabled',{exact:true}).uncheck();
+ await page.getByRole('region',{name:'Item card preview'}).getByText('Protective blessing',{exact:true}).waitFor();
+ assert.match(await page.getByRole('region',{name:'Item card preview'}).innerText(),/Disabled/);
+ await page.getByLabel('Effect 1 enabled',{exact:true}).check();
+ await page.getByLabel('Add boon effect',{exact:true}).selectOption('custom');
+ await page.getByRole('button',{name:'Remove Custom bonus',exact:true}).click();
+ await page.getByRole('button',{name:'Mundane Items',exact:true}).click();await page.getByRole('button',{name:'Boons',exact:true}).click();
+ assert.equal(await page.getByLabel('Change 1 value',{exact:true}).inputValue(),'2');
  await page.getByLabel('Assign to character (optional)',{exact:true}).selectOption('mira');
  await page.getByRole('button',{name:'Review item',exact:true}).click();await page.getByRole('heading',{name:'Review and save'}).waitFor();
  const boonPreview=page.getByRole('region',{name:'Item card preview'});
@@ -286,7 +310,9 @@ try{for(const width of [390,1000]){
  await page.screenshot({path:path.join(out,'boon-blessing-'+width+'.png'),fullPage:true});
  assert.equal(await page.getByLabel('All item details may be shared with the recipient.').count(),0);
  await page.getByRole('button',{name:'Save and assign',exact:true}).click();await page.getByText('Saved Homeward thread',{exact:false}).waitFor();
- assert.equal(actor.items.at(-1).type,'Boon');assert.equal(actor.items.at(-1).system.boonType,'blessing');assert.deepEqual(actor.items.at(-1).effects,[]);
+ assert.equal(actor.items.at(-1).type,'Boon');assert.equal(actor.items.at(-1).system.boonType,'blessing');assert.equal(actor.items.at(-1).effects.length,1);
+ assert.equal(actor.items.at(-1).effects[0].name,'Protective blessing');assert.equal(actor.items.at(-1).effects[0].changes[0].value,'2');assert.equal(actor.items.at(-1).effects[0].disabled,false);
+ assert.equal(await page.getByLabel('Change 1 value',{exact:true}).count(),0,'Successful creation clears effect drafts');
  assert.equal(actor.items.at(-1).system.slots,undefined);assert.equal(actor.items.at(-1).system.cost,undefined);
  // The same additive sections stay inside each builder; no duplicate category/name flow.
  assert.equal(await page.getByRole('button',{name:'Magic Items / Attributes',exact:true}).count(),0);

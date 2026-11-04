@@ -1,7 +1,7 @@
 # Shadowdark 1.0 readiness review
 
 Date: 2026-10-27
-Status: Updated October31 — implementation checkpoint accepted; release preparation not yet selected
+Status: Updated November4 — naming, card sharing and Boon effects implemented and user accepted
 
 ## Baseline and conclusion
 
@@ -37,7 +37,7 @@ is completed. Existing Creator/rest acceptance remains recorded in the
 | Lights | Toggle, remaining-time display and chat message | Native tracker, scene-light and expiry automation remain Foundry-owned |
 | Reference tools | Monster Stats, source filters and independent declared compendiums | Arbitrary undeclared-pack discovery remains deferred |
 
-## Newly identified improvements — not selected for implementation
+## Identified improvements and decisions
 
 **R10-01: Selected and implemented October 27 in [ADR-0008](../adr/0008-character-base-editor.md), with name editing added; user verified the modal and approved closeout on October 27.** Original finding: edit base ability scores and maximum HP. This is the most useful small
 addition before 1.0, but not an existing-flow defect. Native
@@ -49,11 +49,45 @@ edit action would support corrections and permanent changes. It must distinguish
 saved base values from effect-adjusted totals and preserve existing effects;
 reuse the public update path and existing controls. That earlier limitation is resolved by the accepted shared editor.
 
-**R10-02: Deferred for further user discussion.** Share an owned item card to chat. Native
+**R10-02: Completed November4; user verified and accepted.** Share an owned item card to chat. Native
 `PlayerSheetSD._onItemChatClick` calls `shadowdark.chat.showItemCard` using the
-exact item UUID. Our shared detail cards do not expose a general share action.
-This is a convenience feature; existing SDK chat presentation should be checked
-before proposing any Core change.
+exact item UUID. The original review found no general share action in our shared
+detail cards. This convenience is now implemented through existing SDK chat
+presentation without a Core change.
+
+The selected public Share to chat action and optional naming control are now
+implemented using existing SDK services; no Core change was needed. Current
+scope and verification are in [ADR-0010](../adr/0010-item-naming-and-chat-sharing.md).
+The November3 decisions below record the selection that preceded implementation.
+
+November4 Boon follow-up: item Attributes/Personality removed; explicit native
+effect authoring added using shared custom-boon controls. See
+[ADR-0011](../adr/0011-boon-effect-authoring.md). Targeted source, typing and
+phone/desktop browser checks pass. The user confirmed the current work works as
+expected on November4 and authorized its checkpoint commit. ADR-0010 and ADR-0011
+are completed; user acceptance is distinct from automated evidence.
+
+### Optional follow-up decisions — 2026-11-03
+
+- Naming aids: investigate a small optional action beside the existing name
+  field. User requires no interruption or extra mandatory creation steps.
+  Proposed behavior is a suggested name with explicit application; retain manual
+  names and ordinary category-generated names unless the user applies a suggestion.
+- Potion mixing: exploratory only. Recommend a collapsed optional section or
+  separate action within the Potions tab, independent of normal potion creation.
+  Rules/source availability and resulting item/quantity handling need a focused
+  audit before selecting implementation. Do not imply complete mixing automation.
+- Hidden-identity authoring: declined by the user, replacing its deferred status.
+  Do not add it to the release queue. This decision does not remove existing
+  native identification behavior or current disclosure restrictions.
+- Cards to chat: user accepted an action on the existing item card. Reuse shared
+  SDK chat presentation and the existing card action area; sharing must not cast,
+  spend resources or apply effects. Existing light-chat code demonstrates a public
+  runtime chat-card path; content and permissions still need implementation review.
+- Table/PDF import: remains deferred. Uniform Shadowdark layouts are a useful
+  extraction target; verify public RollTable/compendium write capabilities before
+  selecting work. Any missing Core contract is a separate dependency, not authority
+  to bypass the SDK or change Core as part of this module follow-up.
 
 **R10-03: Superseded as a standalone proposal by the broader rules-based GM generator audit and [ADR-0009](../adr/0009-gm-treasure-and-item-generator.md).** Original finding: create a scroll, wand or potion from a spell. Native
 `PlayerSheetSD._createItemFromSpellDialog/_createItemFromSpell` uses
@@ -90,7 +124,7 @@ from an older pending paragraph or turn these deferrals into release blockers.
    freshness correction. No requirements or workflow pins were changed here.
 2. Add concise user-facing limitations to README: manual ammunition and the
    boundaries of damage/scene automation. Keep ADR/development history out of it.
-3. R10-01 is completed and user accepted. R10-02 remains deferred for discussion;
+3. R10-01 and R10-02 are completed and user accepted;
    the broader GM work replacing R10-03 is implemented and accepted for the October31 checkpoint in ADR-0009.
 4. Run required CI and a focused installed-archive smoke check on the final
    release candidate. Reuse accepted workflow evidence; do not add exhaustive
@@ -344,3 +378,25 @@ Hosted CI remains pending. Workflow inspection shows feature-branch pushes do
 not trigger validation: it runs for main pushes, PRs to main, tags or explicit
 workflow_dispatch. No PR currently exists for this branch. No remote write or
 workflow dispatch has been performed during this check. Version0.9.6 remains.
+
+
+## Accepted follow-up checkpoint — November 4
+
+- [x] Optional native-table name suggestions with explicit apply/dismiss.
+- [x] Owned-item Share to chat through the public SDK.
+- [x] Remove item Attributes and Personality from Boons.
+- [x] Shared explicit Boon effect controls, validation, preview and persistence.
+- [x] User confirmed the current implementation works as expected.
+
+Targeted treasure source checks and38/38 action-phase checks pass. Mounted treasure
+flows pass at390/1000px; the expanded card/custom-boon suite passes14/14. Explicit
+module/UI/migration typing and isolated module check/package pass. Naming also
+passed extracted-archive UI/CSS checks before the Boon extension. These are
+automated isolated results, separate from the user's acceptance; no new native
+write or full native acceptance run is claimed.
+
+PR16's hosted Validate Module run41262306466 passed on prior commit82e7a25. This
+supersedes the October31 pending-CI/no-PR note above, but does not establish hosted
+CI for this new checkpoint. The user handles pushing and PR/release operations.
+Module0.9.6 and compatibility requirements remain unchanged. Imports and potion
+mixing stay deferred; hidden-identity authoring remains declined.

@@ -13,7 +13,7 @@ export default function BoonParts({value,change,roll,rollAll,errors,rollError}:{
         <label>Boon type<select aria-label="Boon type" value={value.path} onChange={e=>change({...value,path:e.target.value as BoonPath})}>
             <option value="oath">Oath</option><option value="secret">Secret</option><option value="blessing">Blessing</option>
         </select></label>{error('path')}
-        <p>{value.path==='oath'?'Record a favor or promise owed to the character.':value.path==='secret'?'Combine what is known with whom or what it concerns.':'Record a blessing, including any duration or limits. Its effects are managed by the GM.'}</p>
+        <p>{value.path==='oath'?'Record a favor or promise owed to the character.':value.path==='secret'?'Combine what is known with whom or what it concerns.':'Record a blessing, including any duration or limits. Configure mechanical effects below.'}</p>
         <h3>2. Build the boon</h3>
         <p>SheetDelver Originals are optional generation aids. Choose, roll or enter your own details.</p>
         <button type="button" className="sd-creator-roll" onClick={rollAll}>Roll boon</button>

@@ -5,6 +5,7 @@ import { useSDK, useSDKComponents } from '@sheet-delver/sdk/react';
 import MundaneParts, { OriginalDice, OriginalSourceNote } from './MundaneParts';
 import { ORIGINAL_TABLE_VERSION } from '../../data/original-tables';
 import BoonParts from './BoonParts';
+import BoonEffectFields from '../components/BoonEffectFields';
 import { TreasurePart, PermanentModifiers } from './TreasureProcedureParts';
 import { supportsTreasureModifiers } from '../../logic/treasure-modifiers';
 import { emptyUtilityRecipe, emptySpellItemRecipe, weaponBases, weaponName, tierSpells, type UtilityRecipe } from '../../logic/treasure-procedures';
@@ -31,10 +32,10 @@ import { emptyTreasureDraft, emptyWeaponRecipe, TREASURE_CATEGORIES, treasureErr
 const base = '/api/modules/shadowdark/treasure';
 const notesTheme = { ...shadowdarkTheme.richText, container: 'sd-rich-text-editor relative group flex flex-col', editor: 'prose prose-sm font-serif max-w-none focus:outline-none min-h-[8rem] p-4 text-black' };
 const defaultTable = 'Compendium.shadowdark.rollable-tables.RollTable.Pi9nnnLeXpTKCSMY';
-type Catalog = { tables: any[]; items: any[]; spells: any[]; actors: { id: string; name: string }[] };
+type Catalog = { namingAvailable?: boolean; tables: any[]; items: any[]; spells: any[]; actors: { id: string; name: string }[] };
 type Operation = { unchangedSource?: boolean; requestId: string; actorId: string; itemId?: string; worldItemId?: string; mode?: string; category?: string; folderName?: string; name: string; state: string };
 const freshWeapon=()=>({...emptyWeaponRecipe(),mode:'build' as const,bonus:'',featurePart:{text:''}});
-const freshDraft = (category: TreasureCategory): TreasureDraft => ({...emptyTreasureDraft(),category,magic:emptyMagicRecipe(),...(category==='boons'?{kind:'Boon',boon:emptyBoonRecipe()}:category==='mundane'?{mundane:emptyMundaneRecipe()}:category==='weapons'?{kind:'template',weapon:freshWeapon()}:category==='armor'?{kind:'template',armor:emptyArmorRecipe()}:category==='potions'?{kind:'Potion',potion:emptyPotionRecipe()}:category==='magic'?{kind:'template'}:category==='scrolls'?{kind:'Scroll',spellItem:emptySpellItemRecipe()}:category==='utility'?{utility:emptyUtilityRecipe()}:{})});
+const freshDraft = (category: TreasureCategory): TreasureDraft => ({...emptyTreasureDraft(),category,magic:category==='boons'?undefined:emptyMagicRecipe(),...(category==='boons'?{kind:'Boon',boon:emptyBoonRecipe()}:category==='mundane'?{mundane:emptyMundaneRecipe()}:category==='weapons'?{kind:'template',weapon:freshWeapon()}:category==='armor'?{kind:'template',armor:emptyArmorRecipe()}:category==='potions'?{kind:'Potion',potion:emptyPotionRecipe()}:category==='magic'?{kind:'template'}:category==='scrolls'?{kind:'Scroll',spellItem:emptySpellItemRecipe()}:category==='utility'?{utility:emptyUtilityRecipe()}:{})});
 /** Category tabs share controls and completion services, not a compulsory stepper. */
 export default function Treasure() {
     const sdk=useSDK();
@@ -66,6 +67,7 @@ function TreasureWorkflow({category,initialDraft,remember,lock,recoverCategory}:
     const catalog: Catalog | null = resource.data?.[0] ?? null;
     const [draft,setDraft] = useState(()=>initialDraft??freshDraft(category));
     const [detailsVersion,setDetailsVersion] = useState(0);
+    const [nameSuggestion,setNameSuggestion] = useState('');
     const [actorId,setActorId] = useState('');
     const [table,setTable] = useState('');
     const [draw,setDraw] = useState<any>(null);
@@ -85,6 +87,7 @@ function TreasureWorkflow({category,initialDraft,remember,lock,recoverCategory}:
     const reviewRef = useRef<HTMLElement>(null), outcomeRef = useRef<HTMLElement>(null);
     useEffect(() => { if (operation || requestId) outcomeRef.current?.scrollIntoView({block:'start',behavior:'smooth'}); },[operation,requestId]);
     const ready = catalog !== null && resource.ready && isConnected;
+    useEffect(() => { setNameSuggestion(''); }, [detailsVersion, catalog, ready]);
     const uncertain = !!requestId || (!!operation && operation.state !== 'complete');
     useEffect(()=>{remember(draft);},[draft]);
     useEffect(()=>{lock(busy||uncertain);},[busy,uncertain]);
@@ -296,6 +299,14 @@ function TreasureWorkflow({category,initialDraft,remember,lock,recoverCategory}:
         if (generation !== epoch.current || scopeRef.current !== scope) return;
         setDraw(result.draw); change({drawId:result.draw.id});
     });
+    const suggestName = () => run('name', async () => {
+        const generation = epoch.current;
+        const result = await api('/name', {});
+        if (generation !== epoch.current || scopeRef.current !== scope) return;
+        const name = result.parts.map((part: string) => new DOMParser().parseFromString(part, 'text/html').body.textContent ?? '').join(' ').replace(/\s+/g, ' ').trim();
+        if (!name || name.length > 200) throw new Error('The suggested name is empty or too long. Enter a name manually.');
+        setNameSuggestion(name);
+    });
     const review = () => run('details',async () => {
         const validation = treasureErrors(draft);
         setErrors(validation); if (Object.keys(validation).length) return;
@@ -444,10 +455,17 @@ function TreasureWorkflow({category,initialDraft,remember,lock,recoverCategory}:
                             <button onClick={()=>setPicker('spell')}>{catalog.spells.find(s=>s.uuid===draft.spellUuid)?.name || 'Choose spell'}</button>{localError('spellUuid')}
                             <p>Choose from available spells, including a result rolled from your book. The recipient’s class does not limit this picker.</p></>}
                         {category==='mundane'&&draft.mundane&&<MundaneParts value={draft.mundane} change={editMundane} roll={rollMundane} rollObject={rollMundaneObject} native={draft.kind==='template'} errors={errors} rollError={key=>requestError(`mundane.${key}`)}/>}
-                        <label>Name *<input value={draft.name} maxLength={200} onChange={e=>change({name:e.target.value})} /></label>{localError('name')}
+                        <label htmlFor="treasure-name">Name *</label>
+                        <div className="sd-mundane-input-row"><input id="treasure-name" value={draft.name} maxLength={200} onChange={e=>change({name:e.target.value})} />
+                            <OriginalDice label={catalog.namingAvailable ? 'Suggest item name' : 'Native naming tables unavailable'} disabled={!catalog.namingAvailable} onClick={suggestName}/></div>{localError('name')}{requestError('name')}
+                        {nameSuggestion && <div className="sd-treasure-actions" role="status"><span>Suggested: {nameSuggestion}</span>
+                            <button type="button" onClick={()=>{change({name:nameSuggestion});setNameSuggestion('');}}>Apply name</button>
+                            <button type="button" onClick={()=>setNameSuggestion('')}>Dismiss</button></div>}
                         {category==='boons'&&draft.boon&&boonName(draft.boon)&&draft.name!==boonName(draft.boon)&&<button type="button" onClick={()=>change({name:boonName(draft.boon!)})}>Use generated name</button>}
                         {category==='mundane'&&draft.kind!=='template'&&draft.mundane&&mundaneName(draft.mundane)&&draft.name!==mundaneName(draft.mundane)&&<button type="button" onClick={()=>change({name:mundaneName(draft.mundane!)})}>Use generated name</button>}
-                        {!(category==='scrolls'&&draft.kind==='template'&&!template)&&<MagicAttributes allowPersonality={draft.kind!=='Scroll'&&!isScroll(template)} value={draft.magic??emptyMagicRecipe()} fixedFamily={magicFixedFamily(category,template,draft.kind)} change={magic=>change({magic:{...magic,family:magicFixedFamily(category,template,draft.kind)??magic.family}})}
+                        {category==='boons'&&localError('magic.enabled')}
+                        {category==='boons'&&draft.boon&&<BoonEffectFields value={draft.boon.effects??[]} onChange={effects=>editBoon({...draft.boon!,effects})} errors={errors}/>}
+                        {category!=='boons'&&!(category==='scrolls'&&draft.kind==='template'&&!template)&&<MagicAttributes allowPersonality={draft.kind!=='Scroll'&&!isScroll(template)} value={draft.magic??emptyMagicRecipe()} fixedFamily={magicFixedFamily(category,template,draft.kind)} change={magic=>change({magic:{...magic,family:magicFixedFamily(category,template,draft.kind)??magic.family}})}
                             roll={rollMagic} errors={errors} rollError={key=>requestError(`magic.${key}`)}/>}
                         {(supportsTreasureModifiers(template?.type??draft.kind)||!!draft.modifiers?.length)&&<PermanentModifiers value={draft.modifiers??[]} change={modifiers=>change({modifiers})} errors={errors} type={template?.type??draft.kind}/>}
                         {category!=='boons'&&<><div className="sd-creator-grid">{numberField('quantity','Quantity')}{numberField('slots','Slots per group')}{numberField('perSlot','Items per group')}{numberField('freeCarry','Free to carry')}</div>

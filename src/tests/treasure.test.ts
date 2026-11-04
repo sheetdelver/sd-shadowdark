@@ -7,6 +7,7 @@ import path from 'node:path';
 import { emptyMundaneRecipe, originalSelection, mundaneName, mundaneValueTable, treasureValue } from '../logic/mundane';
 import { MUNDANE_TABLES } from '../data/mundane-tables';
 import { emptyBoonRecipe, boonName } from '../logic/boons';
+import { BOON_EFFECT_PRESETS, buildBoonEffects, boonEffectErrors } from '../logic/boon-effects';
 import { buildOwnedItemCard, buildDocumentCard } from '../logic/resource-cards';
 import { emptyMagicRecipe, magicFixedFamily, magicTable, magicErrors, magicDescription } from '../logic/magic-attributes';
 import { nativePacks } from './core0191/world';
@@ -15,7 +16,7 @@ import { prepareShadowdarkView } from '../logic/prepared-view';
 import { worldSnapshot } from './fixtures/native-406';
 import { emptyTreasureDraft, emptyWeaponRecipe, treasureFromTemplate, treasurePayload, treasureErrors, treasureFolder, treasureUnchanged, treasureTemplateAllowed, treasureResultValue } from '../logic/treasure';
 import { shadowdarkAdapter as adapter } from '../server/ShadowdarkAdapter';
-import { handleTreasureCatalog, handleTreasureDraw, handleTreasureOriginalDraw, handleTreasurePrepare, handleTreasureDeliver, handleTreasureStatus } from '../server/api/treasure';
+import { ITEM_NAME_TABLES, handleTreasureName, handleTreasureCatalog, handleTreasureDraw, handleTreasureOriginalDraw, handleTreasurePrepare, handleTreasureDeliver, handleTreasureStatus } from '../server/api/treasure';
 
 assert.deepEqual(treasureResultValue('Bundle of five scales (5 gp each)'),{gp:'5',sp:'0',cp:'0'});
 assert.deepEqual(treasureResultValue('Jeweled crown (1,000 gp)'),{gp:'1000',sp:'0',cp:'0'});
@@ -61,6 +62,21 @@ assert.ok(treasureErrors({...draft,gp:'1.5'}).gp);
 assert.equal((await call(handleTreasureCatalog,{},false,'GET')).status,403);
 assert.equal((await call(handleTreasureDeliver,{},false)).status,403);
 const catalog=await call(handleTreasureCatalog,{},true,'GET');assert.ok(catalog.items.length>0);assert.ok(catalog.spells.some((s:any)=>s.uuid===spell.uuid));
+assert.equal(catalog.namingAvailable,true);
+const beforeName=structuredClone(actor), beforeNameStore=store.size;
+const name=await call(handleTreasureName);
+assert.equal(name.success,true,JSON.stringify(name));assert.equal(name.parts.length,3);
+// Independent oracle: native macro concatenates one result from each table in order.
+assert.deepEqual(name.parts,ITEM_NAME_TABLES.map(uuid=>{
+ const table=byUuid.get(uuid)!;const row=table.results.find((r:any)=>r.range[0]<=1&&r.range[1]>=1);
+ return row.description||row.text||row.name;
+}));
+assert.deepEqual(actor,beforeName);assert.equal(store.size,beforeNameStore);assert.equal(writes,0);assert.equal(libraryWrites,0);
+assert.equal((await call(handleTreasureName,{},false)).status,403);
+allowed=false;assert.equal((await call(handleTreasureName)).status,403);allowed=true;
+const resolveName=adapter.resolveDocumentFor.bind(adapter);
+adapter.resolveDocumentFor=async(uuid,caller)=>uuid===ITEM_NAME_TABLES[1]?null:resolveName(uuid,caller);
+assert.equal((await call(handleTreasureName)).status,404);adapter.resolveDocumentFor=resolveName;
 assert.equal(catalog.spells.find((s:any)=>s.uuid===spell.uuid).img,spell.img);
 assert.equal(catalog.spells.find((s:any)=>s.uuid===spell.uuid).type,'Spell');
 const table='Compendium.shadowdark.rollable-tables.RollTable.Pi9nnnLeXpTKCSMY';
@@ -221,6 +237,32 @@ assert.equal((await call(handleTreasureDeliver,await saveBody(blessing,'boon-ble
 assert.equal(actor.items.at(-1).system.boonType,'blessing');assert.deepEqual(actor.system,actorBefore);
 console.log('Boons: oath/secret/blessing parts, native nonphysical shape, level validation, escaping, folder/save/assign and lost-ack recovery passed.');
 
+const acBoonDefinition=BOON_EFFECT_PRESETS.find(([id])=>id==='acBonus')![1];
+const boonEffect={key:acBoonDefinition.key,type:acBoonDefinition.mode,value:'2',label:'Protective blessing',icon:acBoonDefinition.icon};
+const effectBoon={...blessing,boon:{...blessing.boon,effects:[boonEffect]}};
+const effectBoonPayload=treasurePayload(effectBoon,null,null);
+assert.equal(effectBoonPayload.effects[0].changes[0].key,'system.attributes.ac.value');
+assert.equal(effectBoonPayload.effects[0].changes[0].value,'2');assert.equal(effectBoonPayload.effects[0].transfer,true);
+assert.equal(effectBoonPayload.effects[0].disabled,false);assert.equal(effectBoonPayload.system.magicItem,undefined);
+assert.ok(buildDocumentCard(effectBoonPayload,null).sections.some(s=>s.entries.some(e=>e.title==='Protective blessing')));
+for(const row of [{...boonEffect,key:'system.REPLACEME'},{...boonEffect,type:99},{...boonEffect,label:''},{...boonEffect,disabled:'yes' as any}]){
+ assert.ok(Object.keys(boonEffectErrors([row])).length);assert.throws(()=>buildBoonEffects([row],'Invalid'));
+ const rejected=await call(handleTreasurePrepare,{draft:{...effectBoon,boon:{...effectBoon.boon,effects:[row]}},saveToLibrary:true});
+ assert.ok(Object.keys(rejected.plan.errors).some(k=>k.startsWith('boon.effects.')));
+}
+const effectBoonBody=await saveBody(effectBoon,'boon-effects-save-0001','recipient');
+const effectSaves=libraryWrites,effectWrites=writes;
+await call(handleTreasureDeliver,effectBoonBody);await call(handleTreasureDeliver,effectBoonBody);
+assert.equal(libraryWrites,effectSaves+1);assert.equal(writes,effectWrites+1);
+assert.deepEqual(library.at(-1).effects,effectBoonPayload.effects);assert.deepEqual(actor.items.at(-1).effects,effectBoonPayload.effects);
+const effectActor={_id:'blessed',type:'Player',system:{abilities:Object.fromEntries(['str','dex','con','int','wis','cha'].map(key=>[key,{value:10}])),attributes:{hp:{value:4,max:4}},level:{value:1}},effects:[],items:[{...effectBoonPayload,_id:'blessing'}]};
+assert.equal(prepareShadowdarkView(effectActor).ac,12,'Boon transfers its configured AC bonus without equipment fields');
+effectActor.items[0].effects[0].disabled=true;
+assert.equal(prepareShadowdarkView(effectActor).ac,10,'Disabled boon effect does not apply');
+const changedBoon=structuredClone(effectBoon);changedBoon.boon.effects[0].value='3';
+assert.equal((await call(handleTreasureDeliver,{...effectBoonBody,requestId:'boon-effects-stale-review',draft:changedBoon})).reviewChanged,true);
+assert.equal(libraryWrites,effectSaves+1);assert.equal(writes,effectWrites+1);
+
 // Shared additives use actual property results, independent switches and native bases.
 const propertyRoll=await call(handleTreasureOriginalDraw,{table:'weapon-benefits',version:1});
 assert.equal(propertyRoll.success,true);
@@ -255,8 +297,14 @@ const magicWrites=writes,magicSaves=libraryWrites;
 assert.equal((await call(handleTreasureDeliver,magicBody)).operation.state,'complete');await call(handleTreasureDeliver,magicBody);
 assert.equal(writes,magicWrites+1);assert.equal(libraryWrites,magicSaves+1);assert.deepEqual(actor.items.at(-1).effects,template.effects);
 assert.deepEqual(actor.system,actorBefore);
-const boonWithAttributes=treasurePayload({...blessing,magic},null,null);
-assert.deepEqual(Object.keys(boonWithAttributes.system).sort(),['boonType','description','level']);assert.deepEqual(boonWithAttributes.effects,[]);
+for (const extra of [magic,{...magic,attributesEnabled:false},{...magic,personalityEnabled:false}]) {
+ const invalid={...blessing,magic:extra};
+ assert.ok(treasureErrors(invalid)['magic.enabled'],'Boons reject item Attributes and Personality');
+ assert.throws(()=>treasurePayload(invalid,null,null));
+ const rejected=await call(handleTreasurePrepare,{draft:invalid,saveToLibrary:true});
+ assert.ok(rejected.plan.errors['magic.enabled']);
+}
+assert.deepEqual(treasurePayload({...blessing,magic:{...magic,attributesEnabled:false,personalityEnabled:false}},null,null),blessingPayload,'Disabled legacy item extras never enter a boon description');
 console.log('Shared additives: contextual tables, independent sections, validation, native preservation and exact save/assignment passed.');
 
 // Armor uses native gear types, not invented AC/slots or a second AC effect.

@@ -1,4 +1,5 @@
 import { handleLightChat } from '../server/api/light-chat';
+import { handleItemChat } from '../server/api/item-chat';
 import { recordSpellLoss } from '../server/spell-loss';
 import { handleRest } from '../server/api/rest';
 import { restPlan, DAILY_ABILITIES, REST_ABILITIES } from '../logic/rest';
@@ -418,6 +419,46 @@ await check('LIGHT uncertain chat acknowledgement does not retry or change inven
     const send=()=>handleLightChat(t.actor._id,{method:'POST',runtime:t.runtime,userSession:{userId:'controlled'},json:async()=>({requestId:'light-uncertain',itemId:'torch',active:true})} as any);
     for(let i=0;i<2;i++){const r=await send();assert.equal(r.status,200);assert.equal((await r.json() as any).posted,false);}
     assert.equal(calls,1);assert.equal(t.events.length,0);
+});
+await check('Item sharing uses current owned content without resources, hidden identity or repeat dispatch', async () => {
+    const t=fixture([potion()]), before=structuredClone(t.actor), cards:any[]=[];
+    t.actor.items[0].system.description='<p>Cloudy liquid.</p><script>bad()</script><button>Drink</button>';
+    const source=structuredClone(t.actor);
+    t.runtime.chat.card=async(card:any,options:any)=>cards.push({card,options});
+    const send=(extra:any={})=>handleItemChat(t.actor._id,{method:'POST',runtime:t.runtime,userSession:{userId:'controlled'},json:async()=>({itemId:'potion',requestId:'share-item-test',...extra})} as any);
+    assert.equal((await send({content:'Forged body',name:'Forged title'})).status,200);assert.equal(cards.length,1);
+    assert.equal(cards[0].card.title,before.items[0].name);assert.match(cards[0].card.content,/Cloudy liquid/);
+    assert.doesNotMatch(cards[0].card.content,/Healing Potion|Known healing effect|<script|<button|First|Second|Forged/);
+    assert.equal(cards[0].options.rollMode,'publicroll');assert.equal(cards[0].options.speaker.actor,t.actor._id);
+    assert.deepEqual(t.actor,source);assert.equal(t.events.length,0);assert.equal(t.rollCalls.length,0);
+    assert.equal((await send()).status,200);assert.equal(cards.length,1);
+    assert.equal((await send({itemId:'other'})).status,409);
+    assert.equal((await send({requestId:'share-new-request',itemId:'missing'})).status,404);
+    t.runtime.documents.get=async(_type:string,_id:string,options:any)=>options?.minOwnership==='owner'?null:source;
+    assert.equal((await send()).status,403);assert.equal(cards.length,1);
+});
+await check('Item sharing includes identified effect facts and does not retry an uncertain post', async () => {
+    const t=fixture([{_id:'gear',name:'Ring <test>',type:'Basic',img:'icons/ring.webp',system:{description:'A ring',quantity:1},effects:[{_id:'effect',name:'Armor bonus',changes:[{key:'system.attributes.ac.bonus',mode:2,value:2}]}]}]);
+    let calls=0;
+    t.runtime.chat.card=async(card:any)=>{calls++;assert.match(card.content,/Ring &lt;test&gt;/);assert.match(card.content,/Armor bonus/);throw Error('Lost acknowledgement');};
+    const send=()=>handleItemChat(t.actor._id,{method:'POST',runtime:t.runtime,userSession:{userId:'controlled'},json:async()=>({itemId:'gear',requestId:'share-uncertain'})} as any);
+    for(let i=0;i<2;i++){const r=await send();assert.equal(r.status,200);assert.equal((await r.json() as any).posted,false);}
+    assert.equal(calls,1);assert.equal(t.events.length,0);
+});
+await check('Item sharing rechecks permission and context after receipt storage', async () => {
+    for(const revoke of ['owner','context','source']){
+        const t=fixture([ability()]);let calls=0;
+        t.runtime.chat.card=async()=>{calls++;};
+        const save=t.runtime.dataStore.set;
+        t.runtime.dataStore.set=async(k:string,v:any)=>{
+            await save(k,v);
+            if(revoke==='owner')t.runtime.documents.get=async(_t:string,_i:string,o:any)=>o?.minOwnership==='owner'?null:t.actor;
+            else if(revoke==='context')t.retire();
+            else t.actor.items[0].name='Changed during sharing';
+        };
+        const response=await handleItemChat(t.actor._id,{method:'POST',runtime:t.runtime,userSession:{userId:'controlled'},json:async()=>({itemId:'ability',requestId:'share-revoked'})} as any);
+        assert.equal(response.status,revoke==='owner'?403:409);assert.equal(calls,0);assert.equal(t.events.length,0);
+    }
 });
 console.log(JSON.stringify({method:'Actual module operations over controlled source/receipts; not native Foundry acceptance',checks},null,2));
 if(checks.some(row=>!row.passed))process.exitCode=1;

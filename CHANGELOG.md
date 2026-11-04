@@ -4,6 +4,11 @@ Historical entries are reconstructed from [published releases](https://github.co
 
 ## Unreleased
 
+- Remove item extras from Boons.
+- Configure boon mechanical effects.
+- Suggest optional item names.
+- Share owned item cards.
+
 - Refresh workflow regression coverage.
 
 - Require Core 0.20.0 → 0.22.3.

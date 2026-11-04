@@ -1,10 +1,11 @@
 import { originalRow, type OriginalPart } from './original-tables';
+import { boonEffectErrors, type BoonEffectRow } from './boon-effects';
 
 export type BoonPath = 'oath'|'secret'|'blessing';
 export type BoonPartKey = 'oath'|'detail'|'subject'|'benefit';
 export interface BoonRecipe {
     path:BoonPath; level:string; oath:OriginalPart; detail:OriginalPart;
-    subject:OriginalPart; benefit:OriginalPart; limits:string;
+    subject:OriginalPart; benefit:OriginalPart; limits:string; effects?:BoonEffectRow[];
 }
 export const BOON_PARTS = {
     oath:{label:'Favor or promise',table:'boon-oath'},
@@ -20,7 +21,7 @@ export function boonName(b:BoonRecipe):string {
 }
 export function boonErrors(b:BoonRecipe):Record<string,string> {
     if(!b || !['oath','secret','blessing'].includes(b.path))return {'boon.path':'Choose a boon type.'};
-    const errors:Record<string,string>={};
+    const errors:Record<string,string>={...boonEffectErrors(b.effects)};
     if(!/^(?:[0-9]|10)$/.test(b.level))errors['boon.level']='Enter a level from 0 to 10.';
     for(const key of Object.keys(BOON_PARTS) as BoonPartKey[]){
         const part=b[key];

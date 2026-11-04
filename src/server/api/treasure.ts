@@ -14,6 +14,9 @@ import { ORIGINAL_TABLES, ORIGINAL_TABLE_VERSION } from '../../data/original-tab
 import { originalSelection } from '../../logic/original-tables';
 
 const hash = (v: unknown) => createHash('sha256').update(JSON.stringify(v)).digest('hex');
+// Native magic-item naming macro's three tables, in its original order.
+export const ITEM_NAME_TABLES = ['8piSI566ZPW7kA87', 'OQWo5AQe0XOcVWjD', 'yC1cHYZvhs05Rm1N']
+    .map(id => `Compendium.shadowdark.rollable-tables.RollTable.${id}`);
 function gm(req: ModuleServerRequest) { if (!callerOf(req).isGM) throw new SdkError('permission_denied', 'Treasure & Items requires a Gamemaster.'); }
 function scope(req: ModuleServerRequest) {
     gm(req);
@@ -57,11 +60,35 @@ export const handleTreasureCatalog = (req: ModuleServerRequest) => route(req, 'G
         return ref?.kind === 'compendium' && canReadPack(callerOf(req),ref.pack);
     }).map(d => ({ ...d, source: label(d) }));
     const classNames=new Map(options(classes).filter(d=>d.type==='Class').map(d=>[canonicalUuid(d.uuid),d.name]));
-    return { tables: options(tables).filter(d=>d.uuid==='Compendium.shadowdark.rollable-tables.RollTable.Pi9nnnLeXpTKCSMY').map(d => ({ uuid: d.uuid, name: d.name, source: d.source, formula: d.formula })),
+    return { namingAvailable: ITEM_NAME_TABLES.every(uuid => options(tables).some(d => d.uuid === uuid)),
+        tables: options(tables).filter(d=>d.uuid==='Compendium.shadowdark.rollable-tables.RollTable.Pi9nnnLeXpTKCSMY').map(d => ({ uuid: d.uuid, name: d.name, source: d.source, formula: d.formula })),
         items: options([...gear,...magic].filter(d => TREASURE_TYPES.includes(d.type) && d.uuid !== CRAWLING_KIT_UUID)),
         spells: options(spells).map(d => ({ uuid: d.uuid, name: d.name, type: d.type, img: d.img, source: d.source, tier: d.system?.tier,
             classes: (Array.isArray(d.system?.class)?d.system.class:[]).map((ref:unknown)=>classNames.get(canonicalUuid(ref))??'Class unavailable') })),
         actors: actors.rows.filter((a: any) => a.type === 'Player').map((a: any) => ({ id: documentId(a), name: a.name })) };
+});
+
+/** Suggest only. Never renames an item, writes documents or posts to chat. */
+export const handleTreasureName = (req: ModuleServerRequest) => route(req, 'POST', async () => {
+    const revision = requestRevision(req.runtime);
+    const tables = await Promise.all(ITEM_NAME_TABLES.map(uuid => exact(req, uuid)));
+    if (tables.some(t => !Array.isArray(t.results) || !/^\d{1,2}d\d{1,5}$/.test(t.formula ?? '')))
+        throw new SdkError('validation', 'The native naming tables are unavailable. Enter a name manually.');
+    const parts: string[] = [];
+    for (const table of tables) {
+        current(req, revision);
+        const roll = await req.runtime.rolls.roll(table.formula, table.name, { displayChat: false });
+        const draw = await adapter.drawTable(table.uuid, callerOf(req), roll.total);
+        if (draw?.results?.length !== 1 || draw.unresolved?.length)
+            throw new SdkError('validation', 'A naming table result could not be resolved. Enter a name manually.');
+        const result: any = draw.results[0];
+        const text = result.description || result.text || result.name;
+        if (typeof text !== 'string' || !text.trim()) throw new SdkError('validation', 'A naming table returned an empty result.');
+        parts.push(String(processHtmlContent(text)));
+    }
+    const fresh = await Promise.all(ITEM_NAME_TABLES.map(uuid => exact(req, uuid)));
+    if (hash(fresh) !== hash(tables)) throw new SdkError('conflict', 'The naming tables changed. Roll again.');
+    return { parts };
 });
 
 export const handleTreasureDraw = (req: ModuleServerRequest) => route(req, 'POST', async () => {

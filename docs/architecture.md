@@ -1,5 +1,21 @@
 # Shadowdark module architecture
 
+## Optional item naming and sharing
+
+[ADR-0010](adr/0010-item-naming-and-chat-sharing.md) adds `treasure/name` and
+`actors/[id]/items/chat` through the public module routes. Naming draws the three
+exact native name tables with the existing caller-bound resolver and SDK rolls;
+the UI applies the suggestion only on explicit Apply name. Catalog availability,
+source revalidation and existing tool lifecycle govern the control.
+
+Owned-item sharing reuses caller lookups, prepared card models and sanitized
+informational descriptions. It posts a public SDK chat card with character
+speaker attribution, excluding actions, diagnostics and alternate identities.
+Unidentified items omit mechanics/effect summaries. Owner/source/context checks
+precede posting; a durable request receipt prevents duplicate retry dispatch.
+The shared card footer handles feedback and retires stale callbacks. No inventory
+writes, independent chat UI, Core change or compatibility bump is involved.
+
 ## Character Creator
 
 The current rules-guided flow enforces source-defined level award entitlements,
@@ -1296,16 +1312,30 @@ The category keeps separate editable parts, generated/custom name handling and
 atomic multi-part rolls. Textareas reuse the established input/dice row.
 
 `treasurePayload` emits native Boon fields (`description`, `boonType`, `level`)
-with its native icon and no physical-item fields or generated effects. Library
+with its native icon and no physical-item fields. Library
 destination is Boons. Shared save/assign receipts and private source provenance
 are reused; no new transport or lifecycle is introduced. Blessing use limits and
 duration remain descriptive, because native BoonSD has no counters or expiration
 schema. The preview shows subtype and acquisition level using `buildDocumentCard`.
+Boons do not offer item Attributes or Personality. Validation rejects enabled
+item extras on Boon drafts, and their payload never appends that material;
+disabled legacy extra fields cannot affect the preview or saved description.
+
+[ADR-0011](adr/0011-boon-effect-authoring.md) adds explicit optional effects to
+the Boon recipe. `BoonEffectFields` and `logic/boon-effects.ts` are shared with
+the existing custom-boon form: native presets without unresolved choices or
+item restrictions, and explicit custom changes. Name, key, operation, value and
+enabled state remain editable. Shared validation runs in draft review and payload
+creation; `createEffect` produces transferring native effects. Preview, world
+save and assignment use the same payload. Effects contribute to review hashes
+and receipts; edits require a fresh review. Descriptive duration/uses do not
+create timers, daily resources or rest resets. Existing-boon editing still
+preserves its effects and uses the Effects tab for individual effect updates.
 
 ### Shared attributes and personality
 
 `logic/magic-attributes.ts` owns the two independently enabled sections;
-`ui/tools/MagicAttributes.tsx` is reused inside every implemented builder. Each
+`ui/tools/MagicAttributes.tsx` is reused inside item builders, excluding Boons. Each
 benefit/curse/virtue/flaw is an `OriginalPart` with editable text and optional
 source provenance. Add/remove controls specify the number of results. Disabled
 sections retain their draft data but contribute neither validation nor payload

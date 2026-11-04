@@ -11,6 +11,7 @@ import { NATIVE_PREDEFINED_EFFECTS } from '../data/native-predefined-effects';
 import { createEffect } from '../utils/Sanitizer';
 import { mundaneErrors, mundaneParts, mundaneDescription, type MundaneRecipe } from './mundane';
 import { boonErrors, boonDescription, type BoonRecipe } from './boons';
+import { buildBoonEffects } from './boon-effects';
 import { magicErrors, magicDescription, magicHasAdditions, type MagicRecipe } from './magic-attributes';
 
 export const TREASURE_TYPES = ['Basic', 'Weapon', 'Armor', 'Potion', 'Scroll', 'Wand', 'Gem'];
@@ -26,7 +27,7 @@ const NEW_ITEM_IMAGES = {
 };
 export const CRAWLING_KIT_UUID = 'Compendium.shadowdark.gear.Item.fJHwwn6TEfbdr8CM';
 // Retain retired category identities for exact in-flight operation recovery.
-// The UI hides magic/personality: their controls now live in every builder.
+// The UI hides magic/personality: their controls live in compatible item builders.
 export const TREASURE_CATEGORIES = [
     ['random','Random Treasure'], ['mundane','Mundane Items'], ['boons','Boons'],
     ['magic','Magic Items / Attributes'], ['armor','Armor'], ['potions','Potions'],
@@ -85,7 +86,11 @@ export function treasureErrors(d: TreasureDraft): Record<string, string> {
         if(d.category!=='armor'||d.kind!=='template')errors['armor.mode']='Use the Armor builder for an armor recipe.';
         Object.assign(errors,armorErrors(d.armor));
     }
-    if(d.magic)Object.assign(errors,magicErrors(d.magic));
+    const isBoon = d.category === 'boons' || d.kind === 'Boon';
+    if (isBoon) {
+        if (d.magic?.attributesEnabled || d.magic?.personalityEnabled)
+            errors['magic.enabled'] = 'Attributes and Personality are not available for boons.';
+    } else if(d.magic)Object.assign(errors,magicErrors(d.magic));
     if (!['template','Basic','Gem','Scroll','Wand','Boon','Potion'].includes(d.kind)) errors.kind = 'Choose an item type.';
     if (d.category==='boons' || d.kind==='Boon') {
         if(d.category!=='boons'||d.kind!=='Boon')errors.kind='Use the Boons category for a boon.';
@@ -162,7 +167,7 @@ export function treasurePayload(d: TreasureDraft, template: any, spell: any): an
     if (Object.keys(treasureErrors(d)).length) throw new Error('Complete the item details.');
     // Native BoonSD extends BaseItemSD, not PhysicalItemSD: no cost, slots or quantity.
     if(d.kind==='Boon')return {name:d.name.trim(),type:'Boon',img:NEW_ITEM_IMAGES.Boon,
-        system:{boonType:d.boon!.path,level:Number(d.boon!.level),description:boonDescription(d.boon!)+d.description+magicDescription(d.magic)},effects:[]};
+        system:{boonType:d.boon!.path,level:Number(d.boon!.level),description:boonDescription(d.boon!)+d.description},effects:buildBoonEffects(d.boon!.effects,d.name.trim())};
     if (d.kind === 'template' && (!template || !TREASURE_TYPES.includes(template.type) || template.uuid === CRAWLING_KIT_UUID))
         throw new Error('Choose an available single item. Crawling Kits are added through inventory.');
     if (['Scroll','Wand'].includes(d.kind) && spell?.type !== 'Spell') throw new Error('The selected spell is unavailable.');
