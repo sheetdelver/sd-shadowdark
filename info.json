@@ -1,6 +1,6 @@
 {
     "id": "shadowdark",
-    "version": "0.9.6",
+    "version": "1.0.0",
     "title": "Shadowdark RPG",
     "manifest": {
         "ui": "module/ui.tsx",
@@ -40,8 +40,14 @@
             "key": "shadowdark.usePulpMode",
             "scope": "world",
             "systemVersion": ">=4.0.0 <=4.0.6",
-            "schema": { "type": "boolean" },
-            "default": { "value": false, "source": "native Shadowdark release-4.0.0 to release-4.0.6 src/settings.mjs: world Boolean usePulpMode, default false", "systemVersion": ">=4.0.0 <=4.0.6" },
+            "schema": {
+                "type": "boolean"
+            },
+            "default": {
+                "value": false,
+                "source": "native Shadowdark release-4.0.0 to release-4.0.6 src/settings.mjs: world Boolean usePulpMode, default false",
+                "systemVersion": ">=4.0.0 <=4.0.6"
+            },
             "affectsPreparation": true,
             "exposure": "authenticated"
         },
@@ -49,8 +55,14 @@
             "key": "shadowdark.autoConsumeAmmunition",
             "scope": "world",
             "systemVersion": ">=4.0.0 <=4.0.6",
-            "schema": { "type": "boolean" },
-            "default": { "value": true, "source": "native Shadowdark release-4.0.0 to release-4.0.6 src/settings.mjs: world Boolean autoConsumeAmmunition, default true", "systemVersion": ">=4.0.0 <=4.0.6" },
+            "schema": {
+                "type": "boolean"
+            },
+            "default": {
+                "value": true,
+                "source": "native Shadowdark release-4.0.0 to release-4.0.6 src/settings.mjs: world Boolean autoConsumeAmmunition, default true",
+                "systemVersion": ">=4.0.0 <=4.0.6"
+            },
             "affectsPreparation": true,
             "exposure": "authenticated"
         },
@@ -58,24 +70,106 @@
             "key": "shadowdark.sourceFilters",
             "scope": "world",
             "systemVersion": ">=4.0.0 <=4.0.6",
-            "schema": { "type": "array" },
-            "default": { "value": [], "source": "native Shadowdark release-4.0.0 through release-4.0.6 system/src/apps/SourceFilterSettings.mjs registerSetting: world Array, default []", "systemVersion": ">=4.0.0 <=4.0.6" },
+            "schema": {
+                "type": "array"
+            },
+            "default": {
+                "value": [],
+                "source": "native Shadowdark release-4.0.0 through release-4.0.6 system/src/apps/SourceFilterSettings.mjs registerSetting: world Array, default []",
+                "systemVersion": ">=4.0.0 <=4.0.6"
+            },
             "affectsPreparation": true,
             "exposure": "authenticated"
         }
     ],
     "combatTracking": {
         "attributes": [
-            { "key": "hp", "label": "HP", "path": "system.attributes.hp", "kind": "resource", "showInRoster": true },
-            { "key": "ac", "label": "AC", "path": "derived.ac", "kind": "number", "showInRoster": true },
-            { "key": "level", "label": "Level", "path": "system.level.value", "kind": "number" },
-            { "key": "str", "label": "STR", "path": "derived.abilities.str.value", "kind": "number", "actorTypes": ["Player"] },
-            { "key": "dex", "label": "DEX", "path": "derived.abilities.dex.value", "kind": "number", "actorTypes": ["Player"] },
-            { "key": "con", "label": "CON", "path": "derived.abilities.con.value", "kind": "number", "actorTypes": ["Player"] },
-            { "key": "int", "label": "INT", "path": "derived.abilities.int.value", "kind": "number", "actorTypes": ["Player"] },
-            { "key": "wis", "label": "WIS", "path": "derived.abilities.wis.value", "kind": "number", "actorTypes": ["Player"] },
-            { "key": "cha", "label": "CHA", "path": "derived.abilities.cha.value", "kind": "number", "actorTypes": ["Player"] },
-            { "key": "notes", "label": "Notes", "path": "system.notes", "kind": "textarea", "contentFormat": "html", "layout": { "columnSpan": 3, "rowSpan": 3, "textRows": 12 } }
+            {
+                "key": "hp",
+                "label": "HP",
+                "path": "system.attributes.hp",
+                "kind": "resource",
+                "showInRoster": true
+            },
+            {
+                "key": "ac",
+                "label": "AC",
+                "path": "derived.ac",
+                "kind": "number",
+                "showInRoster": true
+            },
+            {
+                "key": "level",
+                "label": "Level",
+                "path": "system.level.value",
+                "kind": "number"
+            },
+            {
+                "key": "str",
+                "label": "STR",
+                "path": "derived.abilities.str.value",
+                "kind": "number",
+                "actorTypes": [
+                    "Player"
+                ]
+            },
+            {
+                "key": "dex",
+                "label": "DEX",
+                "path": "derived.abilities.dex.value",
+                "kind": "number",
+                "actorTypes": [
+                    "Player"
+                ]
+            },
+            {
+                "key": "con",
+                "label": "CON",
+                "path": "derived.abilities.con.value",
+                "kind": "number",
+                "actorTypes": [
+                    "Player"
+                ]
+            },
+            {
+                "key": "int",
+                "label": "INT",
+                "path": "derived.abilities.int.value",
+                "kind": "number",
+                "actorTypes": [
+                    "Player"
+                ]
+            },
+            {
+                "key": "wis",
+                "label": "WIS",
+                "path": "derived.abilities.wis.value",
+                "kind": "number",
+                "actorTypes": [
+                    "Player"
+                ]
+            },
+            {
+                "key": "cha",
+                "label": "CHA",
+                "path": "derived.abilities.cha.value",
+                "kind": "number",
+                "actorTypes": [
+                    "Player"
+                ]
+            },
+            {
+                "key": "notes",
+                "label": "Notes",
+                "path": "system.notes",
+                "kind": "textarea",
+                "contentFormat": "html",
+                "layout": {
+                    "columnSpan": 3,
+                    "rowSpan": 3,
+                    "textRows": 12
+                }
+            }
         ]
     },
     "compendiumPacks": {

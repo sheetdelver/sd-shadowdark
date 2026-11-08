@@ -4,107 +4,48 @@ Historical entries are reconstructed from [published releases](https://github.co
 
 ## Unreleased
 
-- Remove item extras from Boons.
+## 1.0.0
+
+- Add manual Character Creator.
+- Enforce level-based character choices.
+- Cap character progression at 10.
+- Clarify tiered spell progression.
+- Prevent duplicate spell selections.
+- Resolve talent and spell grants.
+- Add HP and gold shortcuts.
+- Open newly created characters.
+- Share character base editor.
+- Add successful-rest recovery utility.
+- Restore eligible spells and resources.
+- Add Renown and Pulp controls.
+- Show ability counters and loss.
+- Group talents with acquisition levels.
+- Mark zero-HP character names.
+- Refresh dashboard HP and AC.
+- Expand Crawling Kit contents.
+- Show light timers and chat.
+- Support legacy scrolls and wands.
+- Roll native spellcasting mishaps.
+- Clarify consumable loss and recovery.
+- Add GM treasure category builders.
+- Save and assign reusable items.
+- Generate mundane valuables and boons.
 - Configure boon mechanical effects.
-- Suggest optional item names.
-- Share owned item cards.
-
-- Refresh workflow regression coverage.
-
-- Require Core 0.20.0 → 0.22.3.
-- Align toolchain 0.22.0 → 0.22.3.
-
-- Complete treasure category builders.
-- Add contextual magical attributes.
+- Add contextual attributes and personalities.
 - Author permanent equipment modifiers.
-- Show effects on item cards.
-- Border embedded text editors.
-- Simplify treasure save review.
-- Generate and assign boons.
-- Add treasure tabs and library.
-- Generate mundane valuables.
-- Preview item cards with artwork.
-- Reuse tool catalogs across navigation.
-
-- Shared character base editor.
-- Add Renown sheet controls
-- Share ability card counters
-- Show MAX at level cap
-- Clarify spell progression choices
-- Diagnose casting-source mismatches
-- Cap character progression at 10
-- Announce light toggles in chat
-- Match Pulp luck controls
-- Add spell-card loss control
-- Add shared rest utility
-- Restore active light time
-- Expand Crawling Kit contents
-- Mark zero-HP sheet names
-- Refresh dashboard HP and AC
-- Show talent acquisition levels
-- Group matching paper talents
-- Match rolled talent result ranges
-- Add HP and gold shortcuts
-- Connect character tool panels
-- Select spells progressively by level
-- Disable already-known spell choices
-- Open newly created characters
-- Show class ability guidance
-- Enforce Creator fields and allowances
-- Simplify Creator HP and dice
-- Add Creator treasure and gems
-- Reconcile permanent effect durations
-- Reopen Creator with fresh forms
-- Clarify review and creation recovery
-- Remove duplicate sheet navigation
-- Fit sheets to content
-- Adopt Core page headers
-- Require SDK 3.8.0 headers
-- Require UI API 3.3.0 → 3.6.0
-- Restore Creator confirmation actions
-- Align character tool presentation
-- Add manual Character Creator
-- Review paper totals before creation
-- Recover interrupted character creation
-- Honor native starting boon counts
-- Rename Bestiary: Monster Stats
-- Filter native monster statistics
-- Include optional community monsters
-- Remove invented creature types
-- Improve card text legibility
-- Pair monster card statistics
-- Match Core settings appearance
-- Add optional SDK 3.7.0/UI 3.5.0 settings
-- Group Bestiary with GM tools
-- Recognize legacy spell wands
-- Roll spellcasting mishap tables
-- Clarify wand failure recovery
-- Show legacy spell scrolls
-- Retain spent scroll items
-- Correct effect reference diagnostics
-- Resolve advancement talent choices
-- Validate independent stat grants
-- Prevent duplicate spell choices
-- Apply spell grants automatically
-- Honor talent casting grants
-- Correct Priest starting choices
-- Clarify shared language allowances
-- Render labeled spell formulas
-- Inherit world tool backgrounds
-- Require Core 0.20.0
-- Share informational reference cards
-- Use installed monster artwork
-- Share optional combat artwork
-- Reuse merge validation checks
-- Clarify release workflow titles
-- Reuse validated release artifacts
-- Restore module dialog styling
-- Clarify spell picker labels
-- Allow bounded language customization
-- Limit focus to focus spells
-- Illustrate resource card backgrounds
-- Widen tablet character name
-- Fix narrow generator controls
+- Preview artwork, value and effects.
+- Suggest optional native item names.
+- Share owned cards to chat.
+- Filter native and community monsters.
+- Restore responsive sheet presentation.
+- Share navigation and settings controls.
+- Preserve tool catalogs across navigation.
+- Reuse validated release artifacts.
+- Expand workflow regression coverage.
+- Require Core 0.19.2 → 0.22.3.
+- Require module-api 1.6.0 → 1.7.0.
+- Require UI API 3.2.0 → 3.6.0.
+- Adopt SDK 3.8.0 page headers.
 
 ## 0.9.6
 - Native casting and spell progression
