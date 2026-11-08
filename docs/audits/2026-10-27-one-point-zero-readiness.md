@@ -400,3 +400,14 @@ supersedes the October31 pending-CI/no-PR note above, but does not establish hos
 CI for this new checkpoint. The user handles pushing and PR/release operations.
 Module0.9.6 and compatibility requirements remain unchanged. Imports and potion
 mixing stay deferred; hidden-identity authoring remains declined.
+
+
+## Release CI correction — November 8
+
+PR16 validation at bda154c passed source regressions but failed two styled card
+checks: the workflow invoked action-consumers.browser.mjs with plain Node, which
+could not resolve the Tailwind compiler's extensionless TypeScript dependency.
+The local check had used tsx. CI now uses the existing tsx toolchain for this
+harness, consistent with collection, Creator and treasure browser tests. The
+corrected local invocation passes14/14; no runtime code or assertion changed.
+Hosted validation must pass on the corrected commit before merging/releasing.
