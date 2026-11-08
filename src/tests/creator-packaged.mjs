@@ -12,7 +12,8 @@ assert.ok(fs.statSync(archive).isFile());fs.mkdirSync(out,{recursive:true});
 const names=execFileSync('tar',['-tzf',archive],{encoding:'utf8'}).trim().split('\n');assert.ok(names.every(n=>!path.isAbsolute(n)&&!n.split('/').includes('..')));
 const extracted=path.join(out,'archive');fs.mkdirSync(extracted,{recursive:true});execFileSync('tar',['-xzf',archive,'-C',extracted]);
 const file=suffix=>{const name=names.find(n=>n.endsWith(suffix));assert.ok(name,suffix);return path.join(extracted,name);};
-const info=JSON.parse(fs.readFileSync(file('info.json'),'utf8'));assert.equal(info.version,'0.9.6');assert.equal(info.compatibility.coreVersion,'>=0.22.3');
+const expectedInfo=JSON.parse(fs.readFileSync(path.join(root,'info.json'),'utf8'));
+const info=JSON.parse(fs.readFileSync(file('info.json'),'utf8'));assert.equal(info.version,expectedInfo.version,'archive version matches authoritative module manifest');assert.equal(info.compatibility.coreVersion,'>=0.22.3');
 assert.match(fs.readFileSync(file('assets/presentation.css'),'utf8'),/\.sdk-module--shadowdark \.sd-creator/);
 const probe=path.join(out,'probe.cjs');
 await build({stdin:{resolveDir:core,loader:'ts',contents:`
