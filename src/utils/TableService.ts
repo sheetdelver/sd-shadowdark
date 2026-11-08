@@ -68,7 +68,7 @@ export class TableService {
             }
             // Distribute Stats
             else if ((filter & (ROLL_TABLE_FILTER.DropTwoPointsToDistribute | ROLL_TABLE_FILTER.DistributeTwoStatsAny)) || (filter & ROLL_TABLE_FILTER.DistributeTwoStatsOnlyOnce)) {
-                item = this.createSyntheticDistributeStats();
+                item = this.createSyntheticDistributeStats(false, !!(filter & ROLL_TABLE_FILTER.DistributeTwoStatsOnlyOnce));
                 needsChoice = false;
             }
             // Patron Boons
@@ -171,13 +171,13 @@ export class TableService {
         return TALENT_HANDLERS.find(h => h.matches(item));
     }
 
-    private static createSyntheticDistributeStats(isChoice = false) {
+    private static createSyntheticDistributeStats(isChoice = false, distinct = false) {
         return {
             _id: isChoice ? "synthetic-distribute-stats-choice" : "synthetic-distribute-stats",
-            name: "Distribute to Stats",
+            name: distinct ? "Distribute to Stats (Warlock)" : "Distribute to Stats",
             type: "synthetic",
             img: "icons/sundries/gaming/dice-pair-white-green.webp",
-            text: "Distribute 2 points to any stats."
+            text: distinct ? "Add +1 to two different stats." : "Distribute 2 points to any stats."
         };
     }
 

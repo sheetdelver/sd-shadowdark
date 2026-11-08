@@ -9,21 +9,22 @@ import ShadowdarkImportPage from '../ui/tools/ShadowdarkImportPage';
 import Bestiary from '../ui/tools/Bestiary';
 
 assert.equal(manifest.componentStyles, theme, 'UI manifest must own shared styles');
-// Core v0.19.2 includes the selected lock, ownership-event, SDK error and shared UI corrections.
-assert.equal(manifest.info.compatibility?.coreVersion, '>=0.19.2');
+// Core0.22.3 includes the accepted cache freshness and persistent SDK-event fixes.
+assert.equal(manifest.info.compatibility?.coreVersion, '>=0.22.3');
 const moduleInfo = JSON.parse(fs.readFileSync(new URL('../../info.json', import.meta.url), 'utf8'));
 assert.equal(manifest.info.version, moduleInfo.version, 'published UI uses the authoritative module version');
-assert.match(fs.readFileSync(new URL('../../.github/workflows/ci-shadowdark.yaml', import.meta.url), 'utf8'), /ref: v0\.19\.2\b/);
+assert.match(fs.readFileSync(new URL('../../.github/workflows/ci-shadowdark.yaml', import.meta.url), 'utf8'), /ref: v0\.22\.3\b/);
 const releaseWorkflow = fs.readFileSync(new URL('../../.github/workflows/release-shadowdark.yaml', import.meta.url), 'utf8');
-assert.match(releaseWorkflow, /CI_CORE_REF: 'v0\.19\.2'/);
+assert.match(releaseWorkflow, /CI_CORE_REF: 'v0\.22\.3'/);
 assert.match(releaseWorkflow, /node scripts\/release\.mjs --verify-tag-ci/);
 assert.match(releaseWorkflow, /node scripts\/publish-release\.mjs/);
 assert.doesNotMatch(releaseWorkflow, /npm ci|module:package/, 'publication consumes the validated package');
-assert.equal(manifest.info.compatibility?.apiContracts?.['ui-extension-api'], '>=3.2.0 <4.0.0');
-assert.equal(manifest.info.compatibility?.apiContracts?.['module-api'], '>=1.6.0 <2.0.0');
+assert.equal(manifest.info.compatibility?.apiContracts?.['ui-extension-api'], '>=3.6.0 <4.0.0');
+assert.equal(manifest.info.compatibility?.apiContracts?.['module-api'], '>=1.7.0 <2.0.0');
 assert.equal(manifest.info.compatibility?.apiContracts?.['roll-engine-api'], '>=1.0.0 <2.0.0');
 assert.equal((manifest.info as any).sdkVersion, undefined, 'no invented SDK manifest field');
 assert.deepEqual((manifest.info.worldSettings ?? []).map(row => [row.key, row.scope, row.systemVersion, row.schema.type, row.default?.value, row.affectsPreparation, row.exposure]), [
+    ['shadowdark.playerShowLightRemaining', 'world', '>=4.0.6 <=4.0.6', 'number', 2, false, 'authenticated'],
     ['shadowdark.usePulpMode', 'world', '>=4.0.0 <=4.0.6', 'boolean', false, true, 'authenticated'],
     ['shadowdark.autoConsumeAmmunition', 'world', '>=4.0.0 <=4.0.6', 'boolean', true, true, 'authenticated'],
     ['shadowdark.sourceFilters', 'world', '>=4.0.0 <=4.0.6', 'array', [], true, 'authenticated'],
@@ -31,8 +32,11 @@ assert.deepEqual((manifest.info.worldSettings ?? []).map(row => [row.key, row.sc
 assert.equal(manifest.info.combatTracking?.attributes?.[0]?.path, 'system.attributes.hp');
 assert.equal(manifest.info.combatTracking?.attributes?.[1]?.path, 'derived.ac');
 assert.deepEqual(manifest.dashboardActions?.map(action => [action.id, action.kind]), [
-    ['generator', 'tool'], ['importer', 'tool'], ['bestiary', 'tool'],
+    ['creator', 'tool'], ['generator', 'tool'], ['importer', 'tool'], ['bestiary', 'tool'], ['treasure', 'tool'],
 ]);
+assert.equal(typeof manifest.tools?.creator,'function');
+assert.equal(typeof manifest.tools?.treasure,'function');
+assert.equal(manifest.dashboardActions?.find(action => action.id === 'treasure')?.section, 'gm');
 const bestiaryAction = manifest.dashboardActions?.find(action => action.id === 'bestiary');
 assert.equal(bestiaryAction?.kind === 'tool' ? bestiaryAction.toolId : null, 'bestiary');
 assert.equal(typeof manifest.tools?.bestiary, 'function');
@@ -44,6 +48,7 @@ assert.equal(typeof manifest.tools?.importer, 'function');
 const importerPage = renderToStaticMarkup(
     createElement(MockSDKProvider, null, createElement(ShadowdarkImportPage))
 );
+assert.doesNotMatch(importerPage.match(/<main[^>]*>/)?.[0] ?? '', /bg-neutral-100/, 'importer canvas must expose the host background');
 assert.match(importerPage, /Import Character/);
 assert.match(importerPage, /Shadowdarklings\.net Importer/);
 assert.match(importerPage, /Back to Dashboard/);
@@ -55,9 +60,11 @@ assert.doesNotMatch(importerPage, /fixed top-0|sticky top-\[45px\]|mt-\[45px\]/,
     'importer navigation flows below the Core HUD');
 assert.match(importerPage, /Paste Character JSON/);
 const bestiaryPage = renderToStaticMarkup(createElement(MockSDKProvider, null, createElement(Bestiary)));
-assert.match(bestiaryPage, /Bestiary/);
+assert.doesNotMatch(bestiaryPage.match(/<main[^>]*>/)?.[0] ?? '', /bg-neutral-100/, 'bestiary canvas must expose the host background');
+assert.match(bestiaryPage, /Monster Stats/);
+assert.equal(bestiaryAction?.label, 'Monster Stats');
 assert.match(bestiaryPage, /Back to Dashboard/);
-assert.match(bestiaryPage, /Loading creatures/, 'bestiary shows an explicit loading state before authorized data arrives');
+assert.match(bestiaryPage, /Loading monsters/, 'bestiary shows an explicit loading state before authorized data arrives');
 assert.doesNotMatch(bestiaryPage, /Spawn|Add to encounter/i, 'bestiary is read-only browsing');
 assert.equal('dashboardTools' in manifest, false);
 assert.equal(typeof manifest.componentStyles?.chat?.msgContainer, 'function');

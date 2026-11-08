@@ -177,3 +177,11 @@ export function preferredShape(actor: any): 'v14' | 'legacy' {
     if (shapes.some(shape => shape === 'v14' || shape === 'mixed')) return 'v14';
     return 'legacy';
 }
+
+/** Presentation of the already prepared state; no independent effect evaluation. */
+export function effectStatus(effect: Pick<CanonicalEffect, 'disabled' | 'suppressed' | 'suppressionReason' | 'applies' | 'situational'>): string {
+    if (effect.disabled) return 'Disabled';
+    if (effect.suppressed) return `Suppressed (${effect.suppressionReason})`;
+    if (!effect.applies) return 'Not transferred';
+    return effect.situational ? 'Active (situational)' : 'Active';
+}

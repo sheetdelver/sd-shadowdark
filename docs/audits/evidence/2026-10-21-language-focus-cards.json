@@ -1,0 +1,72 @@
+{
+  "date": "2026-10-21",
+  "scope": "ADR-0003 SD-UI09\u201311",
+  "module": {
+    "version": "0.9.6",
+    "baseCommit": "e7cd3b51e701fab0f269f95a06d52c9e92771f5f",
+    "branch": "fix/restore-module-presentation",
+    "uncommitted": true
+  },
+  "nativeReference": {
+    "version": "4.0.6",
+    "commit": "9677d16b3903b3b640f00d4efd48249142ac8334"
+  },
+  "core": {
+    "version": "0.19.8",
+    "commit": "9ae8442d18445a0472a1be4236c8f6b973e7008b"
+  },
+  "regressions": {
+    "fixedOnlyCatalog": "Failed before; passes after",
+    "instantFocus": "Failed before; passes after"
+  },
+  "verification": {
+    "sourceSuites": 17,
+    "languageCases": 16,
+    "boundaryCases": 54,
+    "explicitTypes": "pass",
+    "moduleCheck": "pass",
+    "package": "pass",
+    "mountedConsumers": 52,
+    "mountedCardCases": 8,
+    "correctiveMountedCases": 16,
+    "initialInstalled": {
+      "widths": [
+        360,
+        768,
+        1024,
+        1440
+      ],
+      "themes": [
+        "dark",
+        "light"
+      ],
+      "checks": 11,
+      "archiveSha256": "f4b24aea3c1b80cb2cdf678fa47346bc49cd04f246ec1597bb5a46b659d68c3d"
+    },
+    "finalInstalled": {
+      "widths": [
+        360,
+        1440
+      ],
+      "themes": [
+        "dark",
+        "light"
+      ],
+      "checks": 7,
+      "pageErrors": []
+    },
+    "infoAndMigrationManifest": "byte-identical to preceding archive"
+  },
+  "archive": {
+    "sha256": "b4d24e7917b6eeae7c161adb43442cbe65de9fcd38aa6a0e396bf2818ebe4d3a",
+    "bytes": 281545
+  },
+  "limitations": [
+    "Isolated controlled-upstream runs; no native Foundry acceptance claimed",
+    "Static native reference artwork serves test browser only; missing core icons exercise image fallback",
+    "User confirmed target card layout; remaining gameplay review separate"
+  ],
+  "taskServices": "stopped",
+  "operatorServices": "untouched",
+  "gitWrites": false
+}

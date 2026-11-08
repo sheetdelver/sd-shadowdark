@@ -143,3 +143,17 @@ October 21 CI follow-up: the presentation suite's historical reusable-workflow
 assertion was updated to the already-adopted module-owned publisher, exact-tag
 validation and unchanged Core0.19.2 toolchain identity. It also rejects packaging
 or dependency installation in publication. No presentation/runtime source changed.
+
+
+## Current baseline — October 31
+
+Core0.22.3 is released (local tag and release checkout verified). The user
+approved aligning the module manifest to >=0.22.3 and README/CI/release pins to
+0.22.3. This includes accepted compendium-cache freshness and SDK-event lifetime
+fixes. The host provides SDK3.8.0; required module-api1.7.0, UI API3.6.0 and roll
+API1.0.0 remain unchanged. Module version remains0.9.6.
+
+The [readiness review](audits/2026-10-27-one-point-zero-readiness.md) tracks two
+existing spell-loss test expectation failures and final release checks. Release
+version selection, final CI/installed smoke, commit and publication remain
+separate. Use the release helper only after validation and release authorization.

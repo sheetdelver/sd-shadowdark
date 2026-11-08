@@ -8,14 +8,34 @@
         "server": "module/server"
     },
     "compatibility": {
-        "coreVersion": ">=0.19.2",
+        "coreVersion": ">=0.22.3",
         "apiContracts": {
-            "module-api": ">=1.6.0 <2.0.0",
-            "ui-extension-api": ">=3.2.0 <4.0.0",
+            "module-api": ">=1.7.0 <2.0.0",
+            "ui-extension-api": ">=3.6.0 <4.0.0",
             "roll-engine-api": ">=1.0.0 <2.0.0"
         }
     },
     "worldSettings": [
+        {
+            "key": "shadowdark.playerShowLightRemaining",
+            "scope": "world",
+            "systemVersion": ">=4.0.6 <=4.0.6",
+            "schema": {
+                "type": "number",
+                "enum": [
+                    0,
+                    1,
+                    2
+                ]
+            },
+            "default": {
+                "value": 2,
+                "source": "native Shadowdark 4.0.6 system/src/settings.mjs: playerShowLightRemaining, world Number, default 2",
+                "systemVersion": ">=4.0.6 <=4.0.6"
+            },
+            "affectsPreparation": false,
+            "exposure": "authenticated"
+        },
         {
             "key": "shadowdark.usePulpMode",
             "scope": "world",
@@ -102,6 +122,11 @@
             },
             {
                 "id": "shadowdark.monsters",
+                "type": "Actor",
+                "hydrate": true
+            },
+            {
+                "id": "shadowdark-community-content.monsters",
                 "type": "Actor",
                 "hydrate": true
             },

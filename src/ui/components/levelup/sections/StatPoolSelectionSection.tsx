@@ -3,6 +3,8 @@ import { Plus, Minus, Coins, Dumbbell } from 'lucide-react';
 
 interface StatPoolSelectionSectionProps {
     total: number;
+    maxPerStat?: number;
+    title?: string;
     allocated: Record<string, number>;
     onChange: (stat: string, delta: number) => void;
 }
@@ -16,7 +18,7 @@ const STATS = [
     { id: 'cha', label: 'Charisma' }
 ];
 
-export const StatPoolSelectionSection: React.FC<StatPoolSelectionSectionProps> = ({ total, allocated, onChange }) => {
+export const StatPoolSelectionSection: React.FC<StatPoolSelectionSectionProps> = ({ total, maxPerStat, title, allocated, onChange }) => {
     if (total <= 0) return null;
 
     const used = Object.values(allocated).reduce((a, b) => a + (Number(b) || 0), 0);
@@ -29,9 +31,9 @@ export const StatPoolSelectionSection: React.FC<StatPoolSelectionSectionProps> =
                     <Dumbbell size={16} />
                 </div>
                 <div>
-                    <h3 className="font-serif font-black text-lg uppercase tracking-wider leading-none">Distribute Points</h3>
+                    <h3 className="font-serif font-black text-lg uppercase tracking-wider leading-none">{title ?? "Distribute Points"}</h3>
                     <p className="text-xs text-neutral-500 font-bold uppercase tracking-widest mt-1">
-                        Allocate {total} points across any stats
+                        Allocate {total} points{maxPerStat === 1 ? ", one per stat" : " across any stats"}
                     </p>
                 </div>
                 <div className={`ml-auto font-mono font-bold px-2 py-1 rounded text-xs border ${remaining === 0 ? 'bg-green-100 border-green-500 text-green-700' : 'bg-neutral-100 border-neutral-300 text-neutral-600'}`}>
@@ -42,7 +44,7 @@ export const StatPoolSelectionSection: React.FC<StatPoolSelectionSectionProps> =
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                 {STATS.map(stat => {
                     const value = allocated[stat.id] || 0;
-                    const canAdd = remaining > 0;
+                    const canAdd = remaining > 0 && (!maxPerStat || value < maxPerStat);
                     const canSub = value > 0;
 
                     return (
@@ -65,6 +67,7 @@ export const StatPoolSelectionSection: React.FC<StatPoolSelectionSectionProps> =
 
                             <div className="flex items-center gap-1">
                                 <button
+                                    aria-label={`Decrease ${stat.label}`}
                                     onClick={() => onChange(stat.id, -1)}
                                     disabled={!canSub}
                                     className={`
@@ -75,6 +78,7 @@ export const StatPoolSelectionSection: React.FC<StatPoolSelectionSectionProps> =
                                     <Minus size={14} strokeWidth={3} />
                                 </button>
                                 <button
+                                    aria-label={`Increase ${stat.label}`}
                                     onClick={() => onChange(stat.id, 1)}
                                     disabled={!canAdd}
                                     className={`

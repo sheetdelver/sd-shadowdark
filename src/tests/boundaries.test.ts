@@ -203,15 +203,28 @@ async function actions() {
             const failed = fakeRuntime(wizardActor(), { rolls: [3] });
             const result = await statusOf(await handleActorAction('w1', request(failed.runtime, { requestId: 'req-fail-0001', kind: 'spell', itemId: 'mm' }) as any));
             assert.equal(result.body.outcome.success, false);
-            assert.deepEqual(failed.writes.find(write => write[0] === 'item.update'), ['item.update', { type: 'Actor', id: 'w1' }, 'mm', { 'system.lost': true }]);
-            const focus = fakeRuntime(wizardActor(), { rolls: [3] });
+            assert.deepEqual(failed.writes.find(write => write[0] === 'item.update'), ['item.update', { type: 'Actor', id: 'w1' }, 'mm', { 'system.lost': true, 'flags.shadowdark.sheetDelver.spellLoss': { reason: 'rest', castingClass: 'Compendium.shadowdark.classes.Item.wiz' } }]);
+            const focusActor = wizardActor(); focusActor.items.find((item: any) => item._id === 'mm').system.duration = { type: 'focus' };
+            const focus = fakeRuntime(focusActor, { rolls: [3] });
             await handleActorAction('w1', request(focus.runtime, { requestId: 'req-focus-001', kind: 'spell', itemId: 'mm', focus: true }) as any);
             assert.equal(focus.writes.filter(write => write[0] === 'item.update').length, 0);
         });
-        await check('C4', 'scroll is consumed even on success', async () => {
+        await check('SD-UI10', 'only native focus duration enables Player focus and its loss exemption', async () => {
+            for (const duration of ['instant', 'rounds', 'permanent', undefined, 'focus']) {
+                const actor = wizardActor(); const spell = actor.items.find((item: any) => item._id === 'mm');
+                spell.system.duration = duration ? { type: duration } : undefined;
+                const action = prepareRequestedAction(prepareActorCore(actor, lookups), actor, lookups, { kind: 'spell', itemId: 'mm' })!;
+                assert.equal(action.focusAllowed, duration === 'focus', String(duration));
+                const trial = fakeRuntime(actor, { rolls: [3] });
+                await handleActorAction('w1', request(trial.runtime, { requestId: `req-duration-${duration ?? 'missing'}`, kind: 'spell', itemId: 'mm', focus: true }) as any);
+                assert.equal(trial.writes.filter(write => write[0] === 'item.update').length, duration === 'focus' ? 0 : 1);
+            }
+        });
+        await check('C4', 'scroll is marked spent and retained even on success', async () => {
             const { runtime, writes } = fakeRuntime(wizardActor(), { rolls: [18] });
             await handleActorAction('w1', request(runtime, { requestId: 'req-scroll-01', kind: 'spell', itemId: 'scroll', spellIndex: 0 }) as any);
-            assert.ok(writes.some(write => write[0] === 'item.delete' && write[2] === 'scroll'));
+            assert.ok(writes.some(write => write[0] === 'item.update' && write[2] === 'scroll' && write[3]['flags.shadowdark.sheetDelver.scrollSpent'] === true));
+            assert.ok(!writes.some(write => write[0] === 'item.delete'));
         });
         await check('C4', 'wand critical failure loses that spell and breaks the wand', async () => {
             const { runtime, writes } = fakeRuntime(wizardActor(), { rolls: [1] });
@@ -404,6 +417,53 @@ async function registryAndRoutes() {
             assert.equal(writes.length, 0);
         } finally { shadowdarkAdapter.resolveDocumentFor = resolveFor; }
     });
+    await check('SD-UI23', 'declared community monsters remain distinct; absent optional pack leaves base catalog intact', async () => {
+        const base = { _id: 'same', name: 'Goblin', type: 'NPC', pack: 'shadowdark.monsters', uuid: 'Compendium.shadowdark.monsters.Actor.same', system: {} };
+        const community = { ...base, pack: 'shadowdark-community-content.monsters', uuid: 'Compendium.shadowdark-community-content.monsters.Actor.same' };
+        for (const rows of [[base], [base, community]]) {
+            const registry = new ShadowdarkRegistry();
+            registry.attach({ findAll: async (type: string) => type === 'Actor' ? rows : [] } as any, {} as any);
+            const collection = await registry.getCollection('monsters', { readable: () => true });
+            assert.deepEqual(collection.map(row => row.uuid).sort(), rows.map(row => row.uuid).sort());
+        }
+    });
+    await check('SD-UI23', 'Monster Stats exposes each readable catalog pack independently with native summaries', async () => {
+        const registry = (shadowdarkAdapter as any)._registry;
+        const collection = registry.getCollection;
+        const rows = [
+            { _id: 'one', uuid: 'Compendium.shadowdark.monsters.Actor.one', name: 'Duplicate', type: 'NPC', system: { level: { value: 1 }, move: 'near' } },
+            { _id: 'two', uuid: 'Compendium.shadowdark-community-content.monsters.Actor.two', name: 'Duplicate', type: 'NPC', system: { level: { value: 0 }, move: 'far', moveNote: 'fly', alignment: 'chaotic' } },
+            { _id: 'three', uuid: 'Compendium.shadowdark-community-content.monsters.Actor.three', name: 'Unknown', type: 'NPC', system: {} },
+        ];
+        registry.getCollection = async (_id: string, options: any) => rows.filter(row => options.readable(row.uuid.includes('shadowdark-community-content.monsters') ? 'shadowdark-community-content.monsters' : 'shadowdark.monsters'));
+        try {
+            let denied = false;
+            const runtime: any = { documents: { list: async () => ({ rows: [] }), get: async () => null },
+                access: { canReadPack: (pack: string) => !denied && pack === 'shadowdark-community-content.monsters',
+                    packs: () => [{ id: 'shadowdark-community-content.monsters', label: 'Extra Monsters', type: 'Actor' }] } };
+            const response = await statusOf(await handleBestiaryList({ runtime } as any));
+            assert.equal(response.status, 200);
+            assert.equal(response.body.entries.length, 2, 'unreadable base pack must not hide another readable pack');
+            assert.deepEqual(response.body.sources, [{ id: 'pack:shadowdark-community-content.monsters', label: 'Extra Monsters' }]);
+            const [known, unknown] = response.body.entries;
+            assert.equal(known.level, 0); assert.equal(known.move, 'far'); assert.equal(known.moveNote, 'fly');
+            assert.equal(unknown.level, null); assert.equal(unknown.move, null); assert.equal(unknown.alignment, null);
+            runtime.access.canReadPack = () => !denied;
+            runtime.access.packs = () => ['shadowdark.monsters', 'shadowdark-community-content.monsters'].map(id => ({ id, label: 'Monsters', type: 'Actor' }));
+            const both = await statusOf(await handleBestiaryList({ runtime } as any));
+            assert.equal(both.body.entries.length, 3);
+            assert.equal(both.body.entries.filter((entry: any) => entry.name === 'Duplicate').length, 2);
+            assert.deepEqual(new Set(both.body.sources.map((entry: any) => entry.label)), new Set([
+                'Monsters (shadowdark.monsters)', 'Monsters (shadowdark-community-content.monsters)'
+            ]));
+
+            runtime.artwork = { resolve: async () => { denied = true; return { status: 'unavailable' }; } };
+            // A caller revocation during source I/O is checked again before output.
+            runtime.documents.list = async () => { denied = true; return { rows: [] }; };
+            const revoked = await statusOf(await handleBestiaryList({ runtime } as any));
+            assert.deepEqual(revoked.body.entries, []); assert.deepEqual(revoked.body.sources, []);
+        } finally { registry.getCollection = collection; }
+    });
     await check('SD01-16', 'bestiary offers compendium monsters only with the caller pack capability', async () => {
         const registry = (shadowdarkAdapter as any)._registry;
         const collection = registry.getCollection;
@@ -424,6 +484,7 @@ async function registryAndRoutes() {
             assert.equal(card.facts.find((fact: any) => fact.label === 'AC').value, '11');
             assert.equal(card.facts.find((fact: any) => fact.label === 'Senses').value, 'Dark-adapted');
             assert.equal(card.actions.length, 0, 'no spawn, encounter or share action');
+            assert.equal(card.subtitle, '', 'NPC cards must not invent a type from the level');
         } finally { registry.getCollection = collection; registry.getDocument = resolve; }
     });
 }
@@ -536,7 +597,7 @@ async function reviewCorrections() {
             const first = await statusOf(await handleActorAction('w1', request(runtime, body) as any));
             assert.equal(first.status, 200); assert.equal(first.body.outcome.success, false);
             assert.ok(first.body.warnings.some((warning: string) => /chat transport down/.test(warning)));
-            assert.deepEqual(writes.filter(write => write[0] === 'item.update').map(write => write[3]), [{ 'system.lost': true }]);
+            assert.deepEqual(writes.filter(write => write[0] === 'item.update').map(write => write[3]), [{ 'system.lost': true, 'flags.shadowdark.sheetDelver.spellLoss': { reason: 'rest', castingClass: 'Compendium.shadowdark.classes.Item.wiz' } }]);
             assert.equal((await statusOf(await handleActorAction('w1', request(runtime, body) as any))).body.replayed, true);
             assert.equal(rolls(), 0); assert.equal(writes.filter(write => write[0] === 'item.update').length, 1);
         });
@@ -609,6 +670,24 @@ async function importerAndCards() {
         const card = buildOwnedItemCard(prepareShadowdarkView(actor), actor.items[0])!;
         const text = JSON.stringify(card);
         assert.doesNotMatch(text, /Flying|Secret/); assert.ok(card.states.includes('Unidentified'));
+    });
+    await check('SD-UI17', 'Foundry inline labels and deterministic dice counts share rendering', () => {
+        const raw = '[[/roll (1 + (floor(@level.value/2)))d6]]{1 + half your level (rounded down)}';
+        for (const level of [1, 2, 3, 10]) {
+            const result = resolveFormula('(1 + (floor(@level.value/2)))d6', {level:{value:level}});
+            assert.deepEqual(result, {ok:true, value:`${1+Math.floor(level/2)}d6`, deterministic:false});
+        }
+        const html = presentDescription(raw, undefined, {level:{value:3}});
+        assert.match(html, /data-formula="2d6"/);
+        assert.match(html, />1 \+ half your level \(rounded down\)<\/button>/);
+        assert.doesNotMatch(html, /\{1|@level/);
+        assert.doesNotMatch(presentDescription(raw), /data-action|\{1/);
+        assert.equal(resolveFormula('(1d4)d6').ok, false);
+        assert.equal(resolveFormula('(-1)d6').ok, false);
+        assert.equal(resolveFormula('(1.5)d6').ok, false);
+        assert.equal(resolveFormula('(floor(@missing/2))d6').ok, false);
+        const safe=presentDescription('[[/r 1d6]]{<img src=x onerror=steal()>Oops}');
+        assert.doesNotMatch(safe, /<img|onerror=/);
     });
     await check('SD01-13', 'description presentation sanitizes without rewriting source', () => {
         const source = '<p onclick="steal()">Hit [[/r 1d6]] or [[check 12 dex]] @UUID[Compendium.shadowdark.spells.Item.x]{Light}<script>alert(1)</script><a href="javascript:alert(1)">x</a></p>';

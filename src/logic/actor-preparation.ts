@@ -1,7 +1,9 @@
+import { spellGrantCastingRefs } from './spell-grants';
 import { describeMigration, isRejectedBonusesKey, nativeKeyMigration } from './legacy-effect-keys';
 import { collectEffects, type CanonicalChange, type CanonicalEffect } from './effects';
 import { clone, finiteNumber, getProperty, setProperty, slugify } from './foundry';
 import { resolveFormula } from './formula';
+import { classifyEffectKey } from './effect-key-coverage';
 import { getActiveEffectKeys, numericKey, type RollKeyItem } from './roll-keys';
 import { documentId, parseUuid, sourceRef, type DocumentRef } from './identity';
 import { UNAVAILABLE_RULE_INPUTS, type RuleInputs } from './world-settings';
@@ -156,6 +158,10 @@ export function buildRollData(kind: ActorKind, working: Record<string, any>): Re
 
 const typeOf = (value: unknown): string => value === null || value === undefined ? 'null' : Array.isArray(value) ? 'Array' : typeof value;
 
+// Roll selectors read canonical changes again against completed roll data.
+// A later effect may supply a reference that is absent during phased application.
+const usesCompletedRollData = (key: string) => key.startsWith('system.roll.') && classifyEffectKey(key).kind === 'roll-key';
+
 function castDelta(raw: unknown, targetType: string): unknown {
     if (targetType === 'boolean') return typeof raw === 'string' ? raw === 'true' : !!raw;
     if (targetType === 'number') return Number(raw);
@@ -240,7 +246,7 @@ export function applyEffectChange(kind: ActorKind, working: Record<string, any>,
         const resolved = resolveFormula(value, buildRollData(kind, working), { forceDeterministic: forceInt });
         if (resolved.ok) value = resolved.value;
         else if (forceInt) { report(`${label}: ${resolved.reason}`); return; }
-        else if (typeof value === 'string' && value.includes('@')) report(`${label}: ${resolved.reason}`);
+        else if (typeof value === 'string' && value.includes('@') && !usesCompletedRollData(change.key)) report(`${label}: ${resolved.reason}`);
     }
     const current = getProperty(working, path);
     let result: ReturnType<typeof applyTyped>;
@@ -417,11 +423,31 @@ export function prepareActorCore(source: any, lookups: PreparationLookups = {}, 
         setProperty(working, 'attributes.ac.value', ac);
         working.slots = (finiteNumber(working.slots) ?? 10) + Math.max(0, (abilities.str.value ?? 10) - 10);
         const spellcasting = working.spellcasting ?? {};
-        spellcasting.classes = [...new Set(Array.isArray(spellcasting.classes) ? spellcasting.classes : [])].sort();
+        // Native prose grants (including non-caster boons) are module-prepared rules;
+        // source effects remain untouched. Resolve casting ability from the exact Class.
+        const grantedClasses = spellGrantCastingRefs(items.map(({ item }: any) => item)).flatMap(uuid => {
+            const ref = parseUuid(uuid), cls = ref ? lookups.classDocument?.(ref) : null;
+            return cls?.system?.spellcasting?.ability ? [slugify(cls.name ?? '')] : [];
+        });
+        spellcasting.classes = [...new Set([...(Array.isArray(spellcasting.classes) ? spellcasting.classes : []), ...grantedClasses])].sort();
         spellcasting.allowAllItems = !!spellcasting.allowAllItems;
         if (spellcasting.itemAbility && !ABILITY_KEYS.includes(spellcasting.itemAbility)) spellcasting.itemAbility = '';
     }
     applyPhase(kind, working, effects, 'final', diagnostics);
+    // Validate roll references when their consumers do, without reordering or
+    // reapplying Actor changes. Keep genuine failures visible on the Effects tab,
+    // including situational effects which have not been selected for a roll yet.
+    const completedRollData = buildRollData(kind, working);
+    for (const effect of effects.filter(effect => effect.applies)) for (const change of effect.changes) {
+        if (!['initial', 'final'].includes(change.phase) || !usesCompletedRollData(change.key)
+            || typeof change.value !== 'string' || !change.value.includes('@')) continue;
+        const resolved = resolveFormula(change.value, completedRollData);
+        if (!resolved.ok) {
+            const message = `${effect.name} → ${change.key}: ${resolved.reason}`;
+            diagnostics.push(message);
+            if (!effect.diagnostics.includes(message)) effect.diagnostics.push(message);
+        }
+    }
     abilities = abilityFrom();
     if (kind === 'Player') {
         ac = finiteNumber(working.attributes?.ac?.value) ?? 10;

@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import { characterEditValues, characterEditPatch, characterEditErrors } from '../logic/character-edit';
+import { ABILITY_KEYS } from '../logic/actor-preparation';
+const actor = { name: 'Mira', system: { abilities: Object.fromEntries(ABILITY_KEYS.map(k => [k, { value: 12 }])), attributes: { hp: { value: 6, max: 10 } } }, derived: { abilities: { str: { value: 14 } }, hp: { max: 15 } } };
+const before = characterEditValues(actor);
+assert.equal(before.str, '12');
+assert.equal(before.hp, '10');
+assert.deepEqual(characterEditPatch(before, { ...before, name: ' Mira II ', str: '13', hp: '11' }), { name: 'Mira II', 'system.abilities.str.value': 13, 'system.attributes.hp.max': 11 });
+assert.deepEqual(characterEditPatch(before, before), {});
+assert.deepEqual(characterEditErrors({ ...before, str: '0', hp: '200' }), {});
+for (const value of ['', '-1', '1.5', '1e2', '9007199254740992']) assert.ok(characterEditErrors({ ...before, str: value }).str);
+assert.ok(characterEditErrors({ ...before, name: ' ' }).name);
+assert.equal(actor.system.attributes.hp.value, 6);
+console.log('Character edit: source defaults, sparse patch and native bounds passed.');

@@ -1,7 +1,11 @@
+import { resolveFormula } from './formula';
 import type { PreparedAction } from './actions';
 import { bonusLabel } from './actions';
 import { formatUuid, parseUuid, type DocumentRef } from './identity';
 import type { ShadowdarkView, ViewLookups } from './prepared-view';
+import { isWand } from './wands';
+import { readEffect, effectStatus, type CanonicalChange, type CanonicalEffect } from './effects';
+import { NATIVE_PREDEFINED_EFFECTS } from '../data/native-predefined-effects';
 
 /**
  * Card view models for the module's resource-detail modal. Every card is built
@@ -27,9 +31,14 @@ export interface ResourceCard {
     title: string;
     subtitle: string;
     img?: string;
+    /** Original portrait if an optional installed artwork asset cannot load. */
+    fallbackImg?: string;
+    artworkCredit?: string;
     facts: CardFact[];
     states: string[];
     description: unknown;
+    /** Caller-visible prepared data; absent on actor-independent catalog previews. */
+    rollData?: Record<string, unknown>;
     actions: CardAction[];
     sections: CardSection[];
     diagnostics: string[];
@@ -47,7 +56,7 @@ const VARIABLE_DURATIONS = new Set(['days', 'hours', 'minutes', 'realTime', 'rou
 export const MOVE_LABELS: Record<string, string> = {
     none: 'None', close: 'Close', near: 'Near', doubleNear: 'Double Near', tripleNear: 'Triple Near', far: 'Far', special: 'Special',
 };
-const ALIGNMENT_LABELS: Record<string, string> = { lawful: 'Lawful', neutral: 'Neutral', chaotic: 'Chaotic' };
+export const ALIGNMENT_LABELS: Record<string, string> = { lawful: 'Lawful', neutral: 'Neutral', chaotic: 'Chaotic' };
 const ABILITY_LABELS: Record<string, string> = { str: 'STR', dex: 'DEX', con: 'CON', int: 'INT', wis: 'WIS', cha: 'CHA' };
 
 /** Native getSpellDuration helper. */
@@ -94,10 +103,39 @@ function spellFacts(spell: any, lookups: ViewLookups, action?: PreparedAction, c
     const duration = spellDuration(system.duration);
     if (duration) facts.push({ label: 'Duration', value: duration });
     if (action?.damage?.formula) facts.push({ label: action.damage.label, value: action.damage.formula });
-    else if (system.formula && system.damageType && system.damageType !== 'none') facts.push({ label: system.damageType === 'healing' ? 'Healing' : 'Damage', value: system.formula });
+    else if (system.formula && system.damageType && system.damageType !== 'none') {
+        const formula = resolveFormula(system.formula);
+        facts.push({ label: system.damageType === 'healing' ? 'Healing' : 'Damage', value: formula.ok ? String(formula.value) : String(system.formula).includes('@') ? 'Varies by character' : 'Unavailable' });
+    }
     if (action?.ability) facts.push({ label: 'Casting', value: `${ABILITY_LABELS[action.ability]} ${bonusLabel(action.bonus)}${action.advantage > 0 ? ', advantage' : action.advantage < 0 ? ', disadvantage' : ''}` });
     else if (action && action.kind === 'spell' && action.available) facts.push({ label: 'Casting', value: bonusLabel(action.bonus) });
     return facts;
+}
+
+function armorAcFact(system:any):CardFact {
+    const ac=system.ac??{},base=Number(ac.base??0),modifier=Number(ac.modifier??0);
+    return {label:'AC',value:base?`${base}${ac.attribute?` + ${ABILITY_LABELS[ac.attribute]??ac.attribute}`:''}${modifier?` ${signed(modifier)}`:''}`:signed(modifier)};
+}
+
+/** Describe stored changes without executing formulas or claiming a preview is active. */
+function effectChangeFact(change: CanonicalChange): CardFact {
+    const label = Object.values(NATIVE_PREDEFINED_EFFECTS).find(def => def.key === change.key)?.label ?? change.key;
+    const value = typeof change.value === 'string' ? change.value : JSON.stringify(change.value) ?? '';
+    const operation: Record<string, string> = { add: 'Add', subtract: 'Subtract', multiply: 'Multiply by', override: 'Set to', upgrade: 'Minimum', downgrade: 'Maximum', custom: 'Custom' };
+    return { label, value: `${operation[change.type] ?? change.type} ${value}${change.phase !== 'initial' ? ` (${change.phase})` : ''}` };
+}
+
+function effectSections(effects: Array<Pick<CanonicalEffect, 'name' | 'changes' | 'disabled' | 'transfer' | 'situational' | 'suppressed' | 'suppressionReason' | 'applies'>>, preview = false): CardSection[] {
+    if (!effects.length) return [];
+    return [{ title: 'Effects', entries: effects.map(effect => ({
+        title: effect.name,
+        facts: [
+            { label: 'Status', value: preview
+                ? effect.disabled ? 'Disabled' : !effect.transfer ? 'Not transferred' : effect.situational ? 'Enabled (situational)' : 'Enabled'
+                : effectStatus(effect) },
+            ...effect.changes.map(effectChangeFact),
+        ],
+    })) }];
 }
 
 /** Card for an Item owned by the prepared Actor. */
@@ -109,13 +147,14 @@ export function buildOwnedItemCard(view: ShadowdarkView, item: any, lookups: Vie
     const actions = view.actions.filter(action => action.itemId === itemId);
     const states: string[] = [];
     if (itemView.lost) states.push('Lost');
+    if (itemView.scroll?.spent) states.push('Spent');
     if (itemView.broken) states.push('Broken');
     if (!itemView.identified) states.push('Unidentified');
     if (itemView.physical) states.push(itemView.stashed ? 'Stashed' : itemView.equipped ? 'Equipped' : 'Carried');
     const facts: CardFact[] = [];
     const diagnostics = [...itemView.diagnostics];
     let kind: CardKind = 'item';
-    let subtitle = item.type;
+    let subtitle = itemView.wand ? 'Wand' : itemView.scroll ? 'Scroll' : item.type;
 
     if (item.type === 'Spell') {
         kind = 'spell';
@@ -133,9 +172,9 @@ export function buildOwnedItemCard(view: ShadowdarkView, item: any, lookups: Vie
             if (system.loseOnFailure ?? true) facts.push({ label: 'On failure', value: 'Lost' });
         }
     } else {
-        if (itemView.magicItem || ['Scroll', 'Wand', 'Potion'].includes(item.type)) kind = 'magic';
+        if (itemView.wand || itemView.magicItem || ['Scroll', 'Wand', 'Potion'].includes(item.type)) kind = 'magic';
         if (itemView.properties.length) facts.push({ label: 'Properties', value: itemView.properties.map(property => property.name ?? 'Unresolved property').join(', ') });
-        if (item.type === 'Weapon') {
+        if (item.type === 'Weapon' && !itemView.wand) {
             facts.push({ label: 'Type', value: `${system.type === 'ranged' ? 'Ranged' : 'Melee'}, ${RANGE_LABELS[system.range] ?? system.range ?? 'Close'}` });
             const grips = new Set(actions.filter(entry => entry.kind === 'attack').map(entry => entry.attack?.handedness));
             const dice = (hands: 'oneHanded' | 'twoHanded') => typeof system.damage?.[hands] === 'string' && system.damage[hands].trim() ? system.damage[hands].trim() : 'unavailable';
@@ -155,13 +194,9 @@ export function buildOwnedItemCard(view: ShadowdarkView, item: any, lookups: Vie
                 if (action.attack?.special) facts.push({ label: 'Special', value: action.attack.special });
             }
         }
-        if (item.type === 'Armor') {
-            const ac = system.ac ?? {};
-            const base = Number(ac.base ?? 0), modifier = Number(ac.modifier ?? 0);
-            facts.push({ label: 'AC', value: base ? `${base}${ac.attribute ? ` + ${ABILITY_LABELS[ac.attribute] ?? ac.attribute}` : ''}${modifier ? ` ${signed(modifier)}` : ''}` : signed(modifier) });
-        }
-        if (item.type === 'Wand' || item.type === 'Scroll') {
-            for (const spell of itemView.spells ?? []) facts.push({ label: item.type === 'Wand' ? `Spell ${spell.index + 1}` : 'Spell',
+        if (item.type === 'Armor') facts.push(armorAcFact(system));
+        if (itemView.wand || itemView.scroll) {
+            for (const spell of itemView.spells ?? []) facts.push({ label: itemView.wand ? `Spell ${spell.index + 1}` : 'Spell',
                 value: `${spell.label ?? (spell.ref ? formatUuid(spell.ref) : 'No linked spell')}${spell.lost ? ' (lost)' : ''}` });
         }
         if (itemView.physical) {
@@ -174,9 +209,9 @@ export function buildOwnedItemCard(view: ShadowdarkView, item: any, lookups: Vie
     return {
         kind, itemId, ref: itemView.source, title: item.name, subtitle, img: item.img, facts, states,
         // Native sheets show the current description; the alternate identity is GM data.
-        description: system.description ?? '',
+        description: system.description ?? '', rollData: view.rollData,
         actions: cardActions(actions.filter(action => action.kind !== 'attack' || kind === 'item')),
-        sections: [], diagnostics: [...diagnostics, ...actions.flatMap(action => action.reason ? [action.reason] : [])],
+        sections: effectSections(view.effects.filter(effect => effect.owner.kind === 'item' && effect.owner.itemId === itemId)), diagnostics: [...diagnostics, ...actions.flatMap(action => action.reason ? [action.reason] : [])],
     };
 }
 
@@ -185,17 +220,22 @@ export function buildDocumentCard(doc: any, ref: DocumentRef | null, lookups: Vi
     const system = doc?.system ?? {};
     const kind: CardKind = doc?.type === 'Spell' ? 'spell'
         : ['Talent', 'Boon', 'Class Ability', 'NPC Feature'].includes(doc?.type) ? 'feature'
-            : system.magicItem || ['Scroll', 'Wand', 'Potion'].includes(doc?.type) ? 'magic' : 'item';
+            : isWand(doc) || system.magicItem || ['Scroll', 'Wand', 'Potion'].includes(doc?.type) ? 'magic' : 'item';
     const facts = kind === 'spell' ? spellFacts(doc, lookups) : [];
-    if (doc?.type === 'Weapon') {
+    if(doc?.type==='Boon') {
+        if(system.boonType)facts.push({label:'Boon',value:String(system.boonType)});
+        if(system.level!==undefined)facts.push({label:'Level gained',value:String(system.level)});
+    }
+    if (doc?.type === 'Weapon' && !isWand(doc)) {
         facts.push({ label: 'Damage', value: [system.damage?.oneHanded && `1H ${system.damage.oneHanded}`, system.damage?.twoHanded && `2H ${system.damage.twoHanded}`].filter(Boolean).join(', ') || 'Damage unavailable' });
     }
+    if (doc?.type === 'Armor') facts.push(armorAcFact(system));
     const cost = costLabel(system.cost);
     if (cost) facts.push({ label: 'Cost', value: cost });
     return {
-        kind, itemId: null, ref, title: doc?.name ?? 'Document', subtitle: doc?.type ?? '', img: doc?.img, facts,
+        kind, itemId: null, ref, title: doc?.name ?? 'Document', subtitle: isWand(doc) ? 'Wand' : doc?.type ?? '', img: doc?.img, facts,
         states: system.identification?.identified === false ? ['Unidentified'] : [], description: system.description ?? '',
-        actions: [], sections: [], diagnostics: ref ? [] : ['This preview has no exact document identity.'],
+        actions: [], sections: effectSections((Array.isArray(doc?.effects) ? doc.effects : []).map((effect: any) => readEffect(effect, {kind: 'item', itemId: String(doc?._id ?? doc?.id ?? '')}, doc)), true), diagnostics: ref ? [] : ['This preview has no exact document identity.'],
     };
 }
 
@@ -238,7 +278,7 @@ export function buildNpcCard(view: ShadowdarkView, source: any, ref: DocumentRef
     if (features.length) sections.push({ title: 'Features', entries: features });
     if (spells.length) sections.push({ title: 'Spells', entries: spells });
     return {
-        kind: 'npc', itemId: null, ref, title: source?.name ?? 'Creature', subtitle: `Level ${view.level} creature`, img: source?.img,
-        facts, states: [], description: system.notes ?? '', actions: [], sections, diagnostics: view.diagnostics,
+        kind: 'npc', itemId: null, ref, title: source?.name ?? 'Creature', subtitle: '', img: source?.img,
+        facts, states: [], description: system.notes ?? '', rollData: view.rollData, actions: [], sections, diagnostics: view.diagnostics,
     };
 }

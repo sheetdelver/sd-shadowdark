@@ -1,3 +1,8 @@
+import { spellGrantCastingRefs } from '../logic/spell-grants';
+import { isScroll, scrollSpellUuid } from '../logic/scrolls';
+import { isWand, wandSpells } from '../logic/wands';
+import { prepareReferenceView } from './reference-view';
+import { resolveDisplayArtwork } from './community-artwork';
 import { BaseSystemAdapter, logger } from '@sheet-delver/sdk';
 import type {
     ActorPreparationContext,
@@ -19,7 +24,7 @@ import { actionFormula, prepareRequestedAction, type ActionRequest, type RollOve
 import { canonicalUuid, DECLARED_PACKS, documentId, formatUuid, parseUuid, sourceRef } from '../logic/identity';
 import type { ViewLookups } from '../logic/prepared-view';
 import type { ChoiceCatalog } from '../logic/talent-choices';
-import { advancementSpellChoices, grantedSpellSources, spellListIdentity } from '../logic/spell-model';
+import { knownSpellSources, advancementSpellChoices, grantedSpellSources, spellListIdentity } from '../logic/spell-model';
 
 /**
  * ShadowdarkAdapter — the Shadowdark system adapter (ADR-0027 conformed).
@@ -112,6 +117,11 @@ export class ShadowdarkAdapter extends BaseSystemAdapter {
         return getInitiativeFormula(actor);
     }
 
+    /** Optional SDK display hook, structurally typed to retain the older host floor. */
+    resolveDisplayArtwork = resolveDisplayArtwork;
+    prepareReferenceView = (context: Parameters<typeof prepareReferenceView>[0], runtime: Parameters<typeof prepareReferenceView>[1]) =>
+        prepareReferenceView(context, runtime, this.lookups());
+
     getActorCardData(actor: PreparedActorData): any {
         const derived = (actor.derived ?? {}) as any;
         const label = (entry: any) => entry?.label ?? entry?.value ?? '';
@@ -122,7 +132,13 @@ export class ShadowdarkAdapter extends BaseSystemAdapter {
             subtext: [ancestry, className || 'Adventurer', `Level ${level}`].filter(Boolean).join(' • '),
             ancestry,
             class: className,
-            level
+            level,
+            // Core refreshes cards independently of the dashboard's Actor list.
+            // Keep displayed stats in this projection, using shared preparation.
+            blocks: [
+                { title: 'HP', value: derived.hp?.value ?? '?', subValue: `/ ${derived.hp?.max ?? '?'}`, valueClass: 'sd-ui-success' },
+                { title: 'AC', value: derived.ac ?? '?' },
+            ],
         };
     }
 
@@ -274,8 +290,8 @@ export class ShadowdarkAdapter extends BaseSystemAdapter {
         };
         const items: any[] = Array.isArray(actor?.items) ? actor.items : [];
         const player = actorKind(actor) === 'Player';
-        await Promise.all([...(player ? [resolve(actor?.system?.class)] : []), ...items.flatMap(item => item.type === 'Scroll' ? [resolve(item.system?.spellUuid)]
-            : item.type === 'Wand' ? (item.system?.spells ?? []).map((s: any) => resolve(s.uuid)) : [])]);
+        await Promise.all([...(player ? [resolve(actor?.system?.class), ...spellGrantCastingRefs(items).map(resolve)] : []), ...items.flatMap(item => isScroll(item) ? [resolve(scrollSpellUuid(item))]
+            : isWand(item) ? wandSpells(item).map(s => resolve(s.uuid)) : [])]);
         const spells = [...items.filter(item => item.type === 'Spell'), ...[...documents.values()].filter(doc => doc.type === 'Spell')];
         if (player) await Promise.all(spells.flatMap(spell => (Array.isArray(spell.system?.class) ? spell.system.class : []).map(resolve)));
         await Promise.all([...documents.values()].filter(doc => doc.type === 'Class').map(doc => resolve(doc.system?.spellcasting?.class)));
@@ -369,8 +385,12 @@ export class ShadowdarkAdapter extends BaseSystemAdapter {
                 const catalog = await this.spellCatalog(caller, classRef);
                 availableSpells = catalog.rows;
                 diagnostics.push(...catalog.sources.filter(source => source.status === 'failed').map(source => `${source.source}: ${source.reason}`));
-                const granted = grantedSpellSources(actor?.items ?? []);
-                for (const spell of availableSpells) if (granted.has(canonicalUuid(spell.uuid) ?? '')) spell.isInnate = true;
+                const plannedTalents = targetLevel === 1 ? [classDoc, patronDoc].flatMap(doc => doc?.system?.talents ?? []) : [];
+                const granted = grantedSpellSources(actor?.items ?? [], plannedTalents);
+                const known = knownSpellSources(actor?.items ?? []);
+                availableSpells = availableSpells.map(spell => ({ ...spell,
+                    isInnate: granted.has(canonicalUuid(spell.uuid) ?? ''),
+                    isKnown: known.has(canonicalUuid(spell.uuid) ?? '') }));
             } else diagnostics.push('The class is not a declared compendium document, so its spell list is unavailable.');
         }
 

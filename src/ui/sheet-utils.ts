@@ -4,6 +4,7 @@ import { calculateXPForLevel, calculateXPCarryover, shouldGainTalent } from '../
 
 export { calculateXPForLevel, calculateXPCarryover, shouldGainTalent };
 
-import { resolveImage, processHtmlContent, getSafeDescription } from '@sheet-delver/sdk';
-export { resolveImage, processHtmlContent as formatDescription, getSafeDescription };
+import { resolveImage, getSafeDescription } from '@sheet-delver/sdk';
+export { resolveImage, getSafeDescription };
+export { presentDescription as formatDescription } from '../logic/description';
 export { presentDescription } from '../logic/description';

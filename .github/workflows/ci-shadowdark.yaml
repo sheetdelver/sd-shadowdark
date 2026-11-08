@@ -24,7 +24,7 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     env:
-      CI_CORE_REF: 'v0.19.2'
+      CI_CORE_REF: 'v0.22.3'
       SHEET_DELVER_DATA: ${{ github.workspace }}/sheet-delver-core/.module-ci-data
     defaults:
       run:
@@ -34,7 +34,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           repository: sheetdelver/sheetdelver
-          ref: v0.19.2
+          ref: v0.22.3
           path: sheet-delver-core
           persist-credentials: false
 
@@ -94,6 +94,8 @@ jobs:
           npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/weapon-rules.test.ts"
           npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/actor-enricher.test.ts"
           npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/presentation.test.ts"
+          npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/community-artwork.test.ts"
+          npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/reference-view.test.ts"
           npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/roll-feedback.test.ts"
           npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/importer-mapping.test.ts"
           npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/native-alignment.test.ts"
@@ -107,6 +109,10 @@ jobs:
           npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/native-parity.test.ts"
           npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/advancement-recovery.test.ts"
           npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/creation-validation.test.ts"
+          npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/creator-contracts.test.ts"
+          npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/character-creator.test.ts"
+          npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/character-edit.test.ts"
+          npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/treasure.test.ts"
 
       - name: Explicit module, UI and migration typing
         if: steps.reuse.outputs.reused != 'true'
@@ -122,13 +128,13 @@ jobs:
         if: steps.reuse.outputs.reused != 'true'
         run: |
           SHADOWDARK_PLAYWRIGHT_MODULE="$RUNNER_TEMP/shadowdark-browser-tools/node_modules/playwright/index.mjs" \
-            node .module-ci-data/local/modules/shadowdark/src/tests/collection-consumers.browser.mjs "$RUNNER_TEMP/shadowdark-collection-results"
+            npx tsx .module-ci-data/local/modules/shadowdark/src/tests/collection-consumers.browser.mjs "$RUNNER_TEMP/shadowdark-collection-results"
 
       - name: Verify action recovery and Actor lifecycle consumers
         if: steps.reuse.outputs.reused != 'true'
         run: |
           SHADOWDARK_PLAYWRIGHT_MODULE="$RUNNER_TEMP/shadowdark-browser-tools/node_modules/playwright/index.mjs" \
-            node .module-ci-data/local/modules/shadowdark/src/tests/action-consumers.browser.mjs "$RUNNER_TEMP/shadowdark-action-results"
+            npx tsx .module-ci-data/local/modules/shadowdark/src/tests/action-consumers.browser.mjs "$RUNNER_TEMP/shadowdark-action-results"
           SHADOWDARK_PLAYWRIGHT_MODULE="$RUNNER_TEMP/shadowdark-browser-tools/node_modules/playwright/index.mjs" \
             node .module-ci-data/local/modules/shadowdark/src/tests/actor-lifecycle.browser.mjs "$RUNNER_TEMP/shadowdark-actor-results"
 
@@ -138,6 +144,18 @@ jobs:
           SHADOWDARK_PLAYWRIGHT_MODULE="$RUNNER_TEMP/shadowdark-browser-tools/node_modules/playwright/index.mjs" \
             node .module-ci-data/local/modules/shadowdark/src/tests/parity-corrections.browser.mjs "$RUNNER_TEMP/shadowdark-corrective-results"
 
+      - name: Verify Character Creator workflow
+        if: steps.reuse.outputs.reused != 'true'
+        run: |
+          SHADOWDARK_PLAYWRIGHT_MODULE="$RUNNER_TEMP/shadowdark-browser-tools/node_modules/playwright/index.mjs" \
+            npx tsx .module-ci-data/local/modules/shadowdark/src/tests/character-creator.browser.mjs "$RUNNER_TEMP/shadowdark-creator-results"
+
+      - name: Verify GM treasure workflow
+        if: steps.reuse.outputs.reused != 'true'
+        run: |
+          SHADOWDARK_PLAYWRIGHT_MODULE="$RUNNER_TEMP/shadowdark-browser-tools/node_modules/playwright/index.mjs" \
+            npx tsx .module-ci-data/local/modules/shadowdark/src/tests/treasure.browser.mjs "$RUNNER_TEMP/shadowdark-treasure-results"
+
       - name: Verify distributable package
         if: steps.reuse.outputs.reused != 'true' || steps.reuse.outputs.package == 'true'
         env:
@@ -146,6 +164,14 @@ jobs:
           VERSION=$(node -p "require('./.module-ci-data/local/modules/shadowdark/info.json').version")
           npm run module:package -- 'shadowdark' --release-tag "v$VERSION" \
             --repository "$REPOSITORY_URL" --changelog "$REPOSITORY_URL/releases/tag/v$VERSION"
+
+      - name: Verify compiled Character Creator contracts
+        if: steps.reuse.outputs.reused != 'true'
+        run: |
+          VERSION=$(node -p "require('./.module-ci-data/local/modules/shadowdark/info.json').version")
+          node .module-ci-data/local/modules/shadowdark/src/tests/creator-packaged.mjs \
+            --archive="$SHEET_DELVER_DATA/dist/modules/shadowdark-$VERSION.tgz" \
+            --out="$RUNNER_TEMP/shadowdark-creator-compiled" --core="$PWD"
 
       - name: Prepare validated publication files
         if: (steps.reuse.outputs.reused != 'true' || steps.reuse.outputs.package == 'true') && github.event_name != 'pull_request'

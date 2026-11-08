@@ -1,3 +1,4 @@
+import { MAX_CHARACTER_LEVEL } from '../../logic/advancement';
 import { useState, useCallback } from 'react';
 import { useShadowdarkUI } from '../context/ShadowdarkUIContext';
 import { formatUuid } from '../../logic/identity';
@@ -21,6 +22,10 @@ export function useShadowdarkLevelUp(
      */
     const triggerLevelUp = useCallback(async () => {
         const currentLevel = actor.system?.level?.value || 0;
+        if (currentLevel >= MAX_CHARACTER_LEVEL && !actor.advancementPending) {
+            addNotification('Level 10 is the maximum character level.', 'info');
+            return;
+        }
         const targetLevel = currentLevel + 1;
         
         let fetchedClasses = [];
@@ -73,7 +78,7 @@ export function useShadowdarkLevelUp(
         
         setLevelUpData(data);
         setShowLevelUpModal(true);
-    }, [actor, onFetchPack]);
+    }, [actor, onFetchPack, addNotification]);
 
     const closeLevelUp = useCallback(() => {
         setShowLevelUpModal(false);

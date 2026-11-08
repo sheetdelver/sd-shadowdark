@@ -135,7 +135,7 @@ export default function AddEffectsModal({ isOpen, onClose, onCreate, onUpdate, i
         else setError('The effect was not saved. Check the notification for details.');
     };
 
-    const field = 'w-full bg-white border-2 border-black px-2 py-2 text-sm outline-none focus:bg-neutral-50';
+    const field = 'sd-form-field w-full bg-white border-2 border-black px-2 py-2 text-sm outline-none focus:bg-neutral-50';
     const showRows = editing || template === 'custom';
     return (
         <ModuleDialog open title={editing ? 'Edit Effect' : 'Add Effect'} subtitle={editing ? `${initialData.sourceName ?? ''}${legacy ? ' · legacy effect shape' : ''}` : undefined}
@@ -146,7 +146,7 @@ export default function AddEffectsModal({ isOpen, onClose, onCreate, onUpdate, i
                         className="min-h-11 px-6 bg-black text-white font-bold uppercase text-xs disabled:opacity-40">{saving ? 'Saving…' : editing ? 'Save Changes' : 'Add Effect'}</button>
                 </div>
             }>
-            <form onSubmit={submit} className="space-y-4">
+            <form onSubmit={submit} className="sd-editor-form space-y-4">
                 {error && <p role="alert" className="border-2 border-red-700 bg-red-50 text-red-800 p-2 text-sm font-bold">{error}</p>}
                 {!editing && (
                     <label className="block">

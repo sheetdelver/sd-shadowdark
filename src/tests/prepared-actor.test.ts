@@ -50,6 +50,24 @@ export function run(): void {
     assert.equal(new ShadowdarkAdapter().getInitiativeFormula(prepared), '1d20+2');
     assert.deepEqual(prepared.derived.initiative, { value: 2, advantage: 0 });
 
+    // Dashboard realtime refresh replaces only card data, retaining the original
+    // list Actor. HP/AC must therefore be complete in every card projection.
+    const cardAdapter = new ShadowdarkAdapter();
+    const initialCard = cardAdapter.getActorCardData(prepared);
+    assert.deepEqual(initialCard.blocks, [
+        { title: 'HP', value: 4, subValue: '/ 6', valueClass: 'sd-ui-success' },
+        { title: 'AC', value: 12 },
+    ]);
+    const changed = structuredClone(source);
+    changed.system.attributes.hp = { value: 0, max: 8 };
+    changed.system.abilities.dex.base = 18;
+    const refreshedCard = cardAdapter.getActorCardData(cardAdapter.prepareActorData(changed as unknown as FoundryActor, context));
+    assert.deepEqual(refreshedCard.blocks, [
+        { title: 'HP', value: 0, subValue: '/ 8', valueClass: 'sd-ui-success' },
+        { title: 'AC', value: 14 },
+    ], 'card-only refresh must carry HP (including zero), max HP and prepared AC');
+    assert.equal((prepared.derived.hp as { value: number }).value, 4, 'original list snapshot stays unchanged');
+
     const combatStats = manifest.info.combatTracking?.attributes ?? [];
     const readPath = (path: string): unknown => path.split('.').reduce<unknown>((value, key) =>
         value && typeof value === 'object' ? (value as Record<string, unknown>)[key] : undefined, prepared);

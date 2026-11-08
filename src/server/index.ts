@@ -1,13 +1,19 @@
+import { handleTreasureCatalog, handleTreasureName, handleTreasureDraw, handleTreasureOriginalDraw, handleTreasurePrepare, handleTreasureDeliver, handleTreasureStatus } from './api/treasure';
+import { handleLightChat } from './api/light-chat';
+import { handleItemChat } from './api/item-chat';
+import { handleRest } from './api/rest';
 import { json, error, type ModuleServerRequest, type ModuleServerParams } from '@sheet-delver/sdk/server';
 import { handleImport } from './api/import';
+import { handleCreatorPrepare, handleCreatorCreate, handleCreatorStatus, handleCreatorRoll, handleCreatorHP } from './api/character-creator';
 import { handleGetLevelUpData, handleRollHP, handleRollGold, handleFinalizeLevelUp, handleRollTalent, handleRollBoon } from "./api/level-up";
 import { handleLearnSpell, handleGetSpellsBySource } from './api/spells';
 import { handleGetDocument } from './api/document';
 import { handleEffects } from './api/effects';
 import { handleActorAction } from './api/actions';
 import { handleActorView } from './api/actor-view';
+import { handleSpellGrants } from './api/spell-grants';
 import { handleManageSpells } from './api/manage-spells';
-import { handleLanguagePlan, handleCreateCharacter } from './api/languages';
+import { handleLanguagePlan, handleManageLanguages, handleCreateCharacter } from './api/languages';
 import { handleLuck } from './api/luck';
 import { handleBestiaryCard, handleBestiaryList } from './api/bestiary';
 import { getErrorMessage, isSdkError } from '@sheet-delver/sdk';
@@ -34,7 +40,20 @@ async function effectRoute(run: () => Promise<unknown>) {
 }
 
 export const apiRoutes = {
+    'treasure/catalog': handleTreasureCatalog,
+    'treasure/name': handleTreasureName,
+    'treasure/draw': handleTreasureDraw,
+    'treasure/original-draw': handleTreasureOriginalDraw,
+    'treasure/prepare': handleTreasurePrepare,
+    'treasure/deliver': handleTreasureDeliver,
+    'treasure/status': handleTreasureStatus,
+    'characters/creator/prepare': handleCreatorPrepare,
+    'characters/creator/create': handleCreatorCreate,
+    'characters/creator/status': handleCreatorStatus,
+    'characters/creator/roll': handleCreatorRoll,
+    'characters/creator/hp': handleCreatorHP,
     'languages/plan': handleLanguagePlan,
+    'languages/manage': handleManageLanguages,
     'characters/create': handleCreateCharacter,
     'index': handleIndex,
     'custom-maps': handleGetCustomMaps,
@@ -77,6 +96,11 @@ export const apiRoutes = {
     'actors/[id]/actions': async (req: ModuleServerRequest, { params }: ModuleServerParams) => {
         return handleActorAction(await actorIdFrom(params), req);
     },
+    'actors/[id]/rest/plan': async (req: ModuleServerRequest, { params }: ModuleServerParams) => handleRest(await actorIdFrom(params), req, 'plan'),
+    'actors/[id]/rest/complete': async (req: ModuleServerRequest, { params }: ModuleServerParams) => handleRest(await actorIdFrom(params), req, 'complete'),
+    'actors/[id]/rest/status': async (req: ModuleServerRequest, { params }: ModuleServerParams) => handleRest(await actorIdFrom(params), req, 'status'),
+    'actors/[id]/light/chat': async (req: ModuleServerRequest, { params }: ModuleServerParams) => handleLightChat(await actorIdFrom(params), req),
+    'actors/[id]/items/chat': async (req: ModuleServerRequest, { params }: ModuleServerParams) => handleItemChat(await actorIdFrom(params), req),
     'actors/[id]/luck': async (req: ModuleServerRequest, { params }: ModuleServerParams) => {
         return handleLuck(await actorIdFrom(params), req);
     },
@@ -106,6 +130,7 @@ export const apiRoutes = {
     'actors/[id]/level-up/roll-boon': async (req: ModuleServerRequest, { params }: ModuleServerParams) => {
         return handleRollBoon(await actorIdFrom(params), req);
     },
+    'actors/[id]/spells/grants': async (req: ModuleServerRequest, { params }: ModuleServerParams) => handleSpellGrants(await actorIdFrom(params), req),
     'actors/[id]/spells/manage': async (req: ModuleServerRequest, { params }: ModuleServerParams) => {
         return handleManageSpells(await actorIdFrom(params), req);
     },

@@ -9,6 +9,7 @@
  * Run: npx tsx data/local/modules/shadowdark/src/tests/system-index.test.ts
  */
 import assert from 'node:assert/strict';
+import { systemIndexSession, TOOL_BESTIARY, TOOL_TREASURE } from '../ui/context/system-index-session';
 import { createSystemIndexStore, type SystemIndexScope } from '../ui/context/system-index-store';
 
 interface Call { url: string; signal: AbortSignal; resolve: (response: Response) => void; reject: (error: unknown) => void }
@@ -284,6 +285,31 @@ await test('RV-10: shared demand deduplicates; last consumer unmount retires an 
     const c = store.retainCollections(['gear']); calls[0].resolve(json([{ name: 'stale' }])); calls[1].resolve(json([{ name: 'current' }]));
     await new Promise(resolve => setImmediate(resolve)); assert.equal(store.getSnapshot().collections.gear[0].name, 'current');
     c(); store.release();
+});
+
+await test('tool catalogs survive navigation; off-page changes, caller changes and reconnect retire them', async () => {
+    const listeners = new Map<string,Set<(value:any)=>void>>();
+    const events:any = {on:(id:string,fn:(value:any)=>void)=>{if(!listeners.has(id))listeners.set(id,new Set());listeners.get(id)!.add(fn);return()=>listeners.get(id)!.delete(fn);}};
+    const emit=(id:string,value:any)=>listeners.get(id)?.forEach(fn=>fn(value));
+    const calls:string[]=[];
+    const fetcher=async(url:string)=>{calls.push(url);return json(url.endsWith('/index')?{}:url.endsWith('/bestiary')?{success:true,entries:[{name:'Goblin'}]}:{success:true,items:[],actors:[]});};
+    const session=systemIndexSession(events);session.configure(scope(),fetcher);
+    const flush=()=>new Promise(resolve=>setImmediate(resolve));await flush();
+    let stop=session.store.retainCollections([TOOL_BESTIARY,TOOL_TREASURE]);await flush();stop();
+    assert.equal(calls.length,3);
+    const revisit=systemIndexSession(events);assert.equal(revisit,session);revisit.configure(scope(),fetcher);
+    stop=revisit.store.retainCollections([TOOL_BESTIARY,TOOL_TREASURE]);await flush();stop();assert.equal(calls.length,3,'no repeated catalog or index requests');
+    emit('document:changed',{type:'Setting'});await flush();assert.equal(calls.length,3,'routine settings do not reload catalogs');
+    emit('document:changed',{type:'Actor'});await flush();assert.equal(calls.length,3,'off-page invalidation does not eagerly load catalogs');
+    assert.equal(session.store.getSnapshot().collections[TOOL_BESTIARY],undefined);
+    stop=session.store.retainCollections([TOOL_BESTIARY,TOOL_TREASURE]);await flush();stop();assert.equal(calls.length,5);
+    emit('world:packagesChanged',{});await flush();assert.equal(session.store.getSnapshot().collections[TOOL_TREASURE],undefined);
+    stop=session.store.retainCollections([TOOL_TREASURE]);await flush();stop();
+    emit('connection:changed',{connected:false,worldId:'w1'});assert.equal(session.store.getSnapshot().status,'offline');
+    emit('connection:changed',{connected:true,worldId:'w1'});await flush();assert.equal(session.store.getSnapshot().collections[TOOL_TREASURE],undefined);
+    session.configure(scope({userId:'another'}),fetcher);assert.equal(session.store.matchesScope(scope()),false);await flush();
+    stop=session.store.retainCollections([TOOL_TREASURE]);await flush();stop();
+    emit('module:disposed',{moduleId:'shadowdark'});assert.equal([...listeners.values()].reduce((n,s)=>n+s.size,0),0);
 });
 
 console.log(`\n${passed} passed`);

@@ -44,7 +44,26 @@ export function resolveFormula(raw: unknown, data: unknown = {}, options: { forc
     if (raw.length > 256) return { ok: false, reason: 'Formula exceeds the supported length.' };
     const replaced = replaceFormulaData(raw, data);
     if (!replaced.ok) return replaced;
-    const expression = replaced.value.replace(/\s+/g, '');
+    let expression = replaced.value.replace(/\s+/g, '');
+    // Native parenthetical die counts, e.g. Cure Wounds. Resolve only the
+    // deterministic count; never roll dice or execute template/JavaScript code.
+    let countMatch: RegExpExecArray | null;
+    while ((countMatch = /\)d[1-9]\d*/i.exec(expression))) {
+        const close = countMatch.index;
+        let open = close, depth = 1;
+        while (--open >= 0 && depth) {
+            if (expression[open] === ')') depth++;
+            if (expression[open] === '(') depth--;
+        }
+        open++;
+        if (depth) return { ok: false, reason: 'Unbalanced dice count.' };
+        // Include a function name immediately before the opening parenthesis.
+        while (open > 0 && /[a-z]/i.test(expression[open - 1])) open--;
+        const count = resolveFormula(expression.slice(open, close + 1), {}, { forceDeterministic: true });
+        if (!count.ok || !count.deterministic || count.value < 0 || count.value > 1000)
+            return { ok: false, reason: 'Dice count must be a deterministic integer between 0 and 1000.' };
+        expression = expression.slice(0, open) + count.value + expression.slice(close + 1);
+    }
     const tokens = expression.match(TOKEN) ?? [];
     if (!tokens.length || tokens.join('') !== expression) {
         return { ok: false, reason: `Unsupported formula syntax: ${raw}` };

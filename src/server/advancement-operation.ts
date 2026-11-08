@@ -96,6 +96,14 @@ export async function pendingAdvancement(req: ModuleServerRequest, actor: any) {
     return journal && !isTerminal(journal) ? receipt(journal, actor, req.runtime.world!.snapshot().identity.contextRevision) : null;
 }
 
+/** Actor-wide fence without exposing another caller's operation details. Caller holds Actor lock. */
+export async function hasUnfinishedAdvancement(req: ModuleServerRequest, actorId: string) {
+    const active = await req.runtime.dataStore.get<{ key: string }>(activeKey(req, actorId));
+    if (!active) return false;
+    const journal = await req.runtime.dataStore.get<Journal>(active.key);
+    return !journal || !isTerminal(journal);
+}
+
 /** Shared caller projection refresh; no Foundry writes, only proven receipt completion/retirement. */
 export async function advancementNeedsReview(req: ModuleServerRequest, actorId: string) {
     if (!scope(req, actorId)) return false;

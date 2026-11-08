@@ -13,6 +13,10 @@ import { prepareWeaponAttack } from '../logic/weapon-rules';
 import { ShadowdarkUIProvider } from '../ui/context/ShadowdarkUIContext';
 import { ShadowdarkActorProvider } from '../ui/context/ShadowdarkActorContext';
 import AbilitiesTab from '../ui/AbilitiesTab';
+import InventoryTab from '../ui/InventoryTab';
+import TalentsTab from '../ui/TalentsTab';
+import { groupPaperTalents } from '../ui/talent-display';
+import { SheetCharacterName } from '../ui/components/SheetCharacterName';
 import ShadowdarkPaperSheet from '../ui/ShadowdarkPaperSheet';
 import {
     armsman, bastardSword, contextWith, coreActorResponse, dagger, greatsword, lantern, torch, hostActorProjection, legacyMastery, longsword, MASTERY_UUID, preparationContext, primLike,
@@ -51,6 +55,51 @@ function render(component: any, actor: any) {
             onRoll: noop, onToggleEffect: noop, onDeleteEffect: noop, onCreateEffect: noop,
             onUpdateEffect: noop, onAddPredefinedEffect: noop, onRefresh: noop,
         } as any))));
+}
+
+async function sheetNameStatus() {
+    await check('UI-zero-hp', 'sheet names show zero HP without changing the editable name or treating unknown HP as zero', () => {
+        const actor: any = hostActorProjection(prepare(primLike()));
+        actor.canEdit = true;
+        for (const hp of [0, 5, undefined]) {
+            actor.derived.hp.value = hp;
+            const before = structuredClone(actor);
+            const paper = render(ShadowdarkPaperSheet, actor);
+            const heading = renderToStaticMarkup(createElement(SheetCharacterName, { hp, dark: true, children: actor.name }));
+            for (const html of [paper, heading]) {
+                assert.equal(html.includes('aria-label="At 0 hit points"'), hp === 0);
+                assert.equal(html.includes('(💀)'), hp === 0);
+                assert.equal(html.includes('sd-sheet-character-name-zero'), hp === 0);
+            }
+            assert.equal(heading.includes('sd-sheet-character-name-dark'), hp === 0);
+            assert.ok(paper.includes(actor.name), 'the displayed name remains intact');
+            assert.ok(!paper.includes(`value="${actor.name}"`), 'name editing belongs to the shared modal');
+            assert.match(paper, />Edit<\/button>/, 'the owner can open the shared editor');
+            assert.deepEqual(actor, before);
+        }
+    });
+}
+
+async function talentAcquisitionDisplay() {
+    await check('UI-talents', 'separate acquisition levels and paper repeat counts preserve owned talents', () => {
+        const source = 'Compendium.shadowdark.talents.Item.HzzgAIdhoAyfeItJ';
+        const talent = (id: string, level: number | null) => ({ _id: id, name: 'Backstab +1 Damage Dice', type: 'Talent', _stats: { compendiumSource: source }, system: { level, talentClass: 'level', description: 'Your Backstab deals +1 dice of damage.' }, effects: [{ disabled: false, transfer: true, changes: [{ key: 'system.bonus.backstabdice', mode: 2, value: '1' }] }] });
+        const actor: any = hostActorProjection(prepare(primLike()));
+        actor.items = [talent('first', 1), talent('second', 3)];
+        actor.derived.items = actor.items.map((item: any) => ({ id: item._id, name: item.name, type: item.type }));
+        const original = structuredClone(actor.items);
+        const tab = render(TalentsTab, actor), paper = render(ShadowdarkPaperSheet, actor);
+        assert.match(tab, /Level gained: 1/); assert.match(tab, /Level gained: 3/);
+        assert.match(paper, /\(x2\)/); assert.match(paper, /Levels gained: 1, 3/);
+        assert.equal((paper.match(/Backstab \+1 Damage Dice/g) ?? []).length, 1);
+        assert.deepEqual(actor.items, original);
+        actor.items[1].effects[0].changes[0].value = '2';
+        assert.equal(groupPaperTalents(actor.derived.items, actor.items).length, 2, 'different effects stay separate');
+        delete actor.items[1]._stats;
+        assert.equal(groupPaperTalents(actor.derived.items, actor.items).length, 2, 'same name alone is not identity');
+        actor.items[1].system.level = null;
+        assert.match(render(TalentsTab, actor), /Level gained: unknown/);
+    });
 }
 
 async function issue23() {
@@ -287,6 +336,20 @@ async function inventoryControls() {
         assert.deepEqual(controlsFor(source, 'torch').map(control => control.id), ['stash', 'light']);
         assert.deepEqual(controlsFor(source, 'lantern').map(control => control.id), ['stash'], 'native Lantern is not itself a light source');
     });
+    await check('C6', 'both inventories show active light remaining time from the current source', () => {
+        for (const component of [InventoryTab, ShadowdarkPaperSheet]) {
+            for (const [seconds, expected] of [[3600, '60 min remaining'], [125, '2 min 5 sec remaining'], [0, '0 sec remaining'], [undefined, 'Time remaining unavailable']] as const) {
+                const source: any = armsman([torch()]);
+                const light = source.items.find((item: any) => item._id === 'torch');
+                light.system.light.active = true;
+                light.system.light.remainingSecs = seconds;
+                const actor = hostActorProjection(prepare(source));
+                assert.ok(render(component, actor).includes(expected), `${component.name}: ${expected}`);
+                light.system.light.active = false;
+                assert.ok(!render(component, hostActorProjection(prepare(source))).includes(expected), 'unlit lights hide remaining time');
+            }
+        }
+    });
     await check('C6', 'lighting a torch puts out other lit sources and marks it used', () => {
         const source = armsman([torch(), torch('torch2', { active: true, hasBeenUsed: true })]);
         assert.deepEqual(byId(controlsFor(source, 'torch'), 'light').writes, [
@@ -327,18 +390,18 @@ async function luck() {
         assert.doesNotMatch(html, />\s*Token\s*</, 'no visible label');
         assert.doesNotMatch(html, /Pulp|luck tokens/i);
     });
-    // User decision (October 16): no label in either mode; Pulp off shows only the
-    // tick box; Pulp on shows only a number input, with spinner buttons where there is space.
-    await check('C8', 'Pulp luck replaces the token with an unlabelled number input and spinner', () => {
+    // User refinement: both Pulp views use a spinner-free input and explicit −/+ buttons.
+    await check('C8', 'Pulp luck uses a spinner-free numeric input with explicit step buttons', () => {
         const html = render(() => createElement(LuckControl, {}), at(worldSnapshot(4, { usePulpMode: true })));
         assert.doesNotMatch(html, /type="checkbox"|Token|Pulp|<label/);
-        assert.match(html, /<input[^>]*type="number"[^>]*value="3"|<input[^>]*value="3"[^>]*type="number"/);
+        assert.match(html, /<input[^>]*type="text"[^>]*inputMode="numeric"[^>]*value="3"/);
         assert.match(html, /aria-label="Spend a luck token"/); assert.match(html, /aria-label="Gain a luck token"/);
     });
-    await check('C8', 'compact Pulp luck (paper sheet) is the number input only', () => {
+    await check('C8', 'compact Pulp luck has the same spinner-free input and step buttons', () => {
         const html = render(() => createElement(LuckControl, { compact: true }), at(worldSnapshot(4, { usePulpMode: true })));
-        assert.match(html, /type="number"/);
-        assert.doesNotMatch(html, /<button|type="checkbox"|Token|Pulp|<label/);
+        assert.match(html, /type="text"[^>]*inputMode="numeric"[^>]*value="3"/);
+        assert.doesNotMatch(html, /type="number"|type="checkbox"|Token|Pulp|<label/);
+        assert.match(html, /aria-label="Spend a luck token"/); assert.match(html, /aria-label="Gain a luck token"/);
     });
     await check('G8-A', 'an unavailable setting shows an inert, explained placeholder instead of a guessed control', () => {
         const html = render(() => createElement(LuckControl, {}), at(worldSnapshot(7, {}, { usePulpMode: 'not-ready' })));
@@ -502,6 +565,8 @@ export async function run(options: { report?: boolean } = {}) {
     await effectsAndStats();
     await choicesAndIdentity();
     await attackModes();
+    await talentAcquisitionDisplay();
+    await sheetNameStatus();
     await inventoryControls();
     await luck();
     await spellCardFacts();

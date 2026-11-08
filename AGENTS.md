@@ -4,6 +4,23 @@ Read this file, then `temp/AGENT-HANDOFF.md` when present and the module-owned
 ADR/audit it names. Read [module architecture](docs/architecture.md) for technical
 context. The Core handoff is not this repository's work queue.
 
+Current presentation work is [ADR-0003](docs/adr/0003-preserve-module-presentation.md)
+and its [whole-UI audit](docs/audits/2026-10-20-presentation-regressions.md).
+ADR-0001/0002 remain closed for their agreed native behavior scope.
+The Character Creator is [ADR-0005](docs/adr/0005-character-creator.md),
+with its [workflow audit](docs/audits/2026-10-23-character-creator-workflow.md).
+Its accepted implementation and scoped verification are recorded in ADR-0005.
+Follow the latest operator decisions there; historical pending gates do not
+create new requirements. Additional draft protection was explicitly declined.
+Use its CC-01–CC-08 evidence ledger. Preserve the distinction
+between paper totals and native base values, exact independent grant identities,
+and unknown versus proven creation outcomes. Do not extend the level-0/1 writer
+or invent higher-level progression merely to expose a larger level selector.
+Settings panels supply semantic controls and content; Core owns their appearance.
+Do not mount module theme wrappers or paper styling in settings tabs.
+The optional HUD sheet-view pilot is [ADR-0004](docs/adr/0004-optional-hud-sheet-settings.md).
+Preserve its existing browser-wide storage key and older sheet-button entry point.
+
 ## Scope and repository ownership
 
 This is an independent SheetDelver system-module repository. Keep its code,
@@ -11,6 +28,17 @@ tests, documentation, audits and handoff here. Core and sibling modules are
 read-only unless the current user explicitly selects work in those repositories.
 An unavailable host contract is an external dependency to report, not permission
 to edit Core, import private host code or add a direct Foundry transport.
+
+Optional treasure names and owned-card sharing are scoped by
+[ADR-0010](docs/adr/0010-item-naming-and-chat-sharing.md). Preserve suggestion/apply
+separation, caller-bound source resolution, informational chat snapshots and
+duplicate-post receipts. Hidden-identity authoring was declined; imports and
+potion mixing remain deferred.
+
+Explicit Boon effect authoring uses the shared custom-boon fields and validator
+in [ADR-0011](docs/adr/0011-boon-effect-authoring.md). Boons exclude item Attributes
+and Personality; configured native effects are independent from descriptive
+duration/uses. Keep preview, review, library and assignment effects consistent.
 
 Use public `@sheet-delver/sdk` entry points. Core owns source/prepared stores,
 authorization, world/session lifecycle and shared chat, notifications and dice
@@ -34,6 +62,12 @@ second world cache/lifecycle or treat module-prepared data as native browser dat
   compatibility minima or CI toolchain pins as incidental housekeeping.
 - Follow this module's CI/release workflows and the host's documented packaging
   contract. Release publication is a separate authorized operation.
+- Record any Core/SDK/API requirement changes with explicit old → new versions
+  in CHANGELOG.md and the current handoff, alongside manifest/toolchain updates.
+  Keep this guidance current when a new required floor is adopted. Use the previous
+  release baseline, not intermediate branch bumps; identify the supporting Core
+  publication and whether it must precede the module release. Optional adoption
+  must name its introduction versions without implying an increased minimum.
 
 ## Standalone release tooling
 
@@ -90,6 +124,24 @@ use temporary Git fixtures. No Core checkout is needed to run the helper.
   the handoff. Update documentation and tests with the implementation.
 
 ## Shadowdark rules and current design constraints
+
+For every new or changed UI surface, inspect the nearest existing module surface
+and reuse its layout, components, typography, spacing and control conventions.
+Adding functionality does not authorize a new visual design. Use shared Core
+SDK page chrome and module theme/content configuration instead of duplicating
+navigation/header markup. General styling
+keywords alone are not sufficient: compare the actual rendered result with the
+established UI at desktop and phone sizes. Reuse shared components where they
+fit, and preserve Core-owned theming for host settings and shared surfaces.
+Record the chosen reference, specific deviations and visual acceptance in the
+owning ADR. Keep implementation-specific design instructions in that ADR, not
+in agent guidance or the handoff; the handoff should link the active decision.
+
+Behavior refactoring does not authorize redesign. Preserve the module's paper
+layout, serif headings, heavy borders, square controls and shadows across every
+affected sheet, tool and dialog. Style working shared shells without discarding
+focus/host-overlay behavior. Verify the declared stylesheet in an installed
+archive as well as local source; record any deliberately retained visual change.
 
 Use the native item/template's actual damage, properties, formulas and actions.
 Keep Player and NPC schemas distinct, including NPC explicit ability modifiers
@@ -246,6 +298,8 @@ npx tsx data/local/modules/shadowdark/src/tests/system-index.test.ts
 npx tsx data/local/modules/shadowdark/src/tests/native-parity.test.ts
 npx tsx data/local/modules/shadowdark/src/tests/advancement-recovery.test.ts
 npx tsx data/local/modules/shadowdark/src/tests/creation-validation.test.ts
+npx tsx data/local/modules/shadowdark/src/tests/creator-contracts.test.ts
+npx tsx data/local/modules/shadowdark/src/tests/character-creator.test.ts
 node data/local/modules/shadowdark/src/tests/verify-types.mjs
 npm run module:check -- shadowdark
 ```
@@ -257,7 +311,7 @@ host version before running compatibility checks. Tools may run from Core,
 but module work does not authorize changing Core files or generated settings.
 CI checks out `Muttley/foundryvtt-shadowdark` at
 `9677d16b3903b3b640f00d4efd48249142ac8334` (release-4.0.6) into the isolated
-toolchain's `temp/shadowdark`. All 17 source suites run against that static
+toolchain's `temp/shadowdark`. All 18 source suites run against that static
 reference; missing required native fixtures fail rather than silently skip.
 This is source-only testing and does not require a running Foundry service.
 
@@ -298,6 +352,10 @@ before/after transient transport loss. `--server-disconnect` selects an explicit
 native session kick instead; keep that diagnostic result separate from ordinary
 reconnect and never add automatic relogin to make it pass. Resource dialog tests
 also cover floating-tool clearance and yielding to shared SDK dialogs.
+The current presentation pass is qualified on Core 0.19.5. Its
+`--presentation-only` option runs the complete surface/width/theme matrix and
+explicitly skips the separately retained behavioral follow-ups; it never implies
+native acceptance or changes the declared minimum Core version.
 
 ADR-0002 regressions additionally run `src/tests/native-parity.test.ts` and
 `node --import tsx src/tests/native-parity.oracles.mjs` from the configured Core
@@ -322,8 +380,12 @@ thresholds belong to the shared action model.
 Language rarity comes only from system.rarity; unknown remains unclassified.
 Creation uses native Class/Ancestry fixed/common/rare/select fields with separate
 restricted pools and server validation. No implicit Common/INT or Background
-allowance is added. Ordinary inventory editing has no creation quota and retains
-custom/unreadable entries. Source filters constrain browsing, not fixed grants.
+allowance is added. ADR-0003's user-selected guided sheet editor now applies
+those native source allowances; this supersedes the previous unrestricted UI
+policy, not the historical finding about native's ordinary editor. Retain current
+extras/custom/unreadable entries unless explicitly removed and validate through
+`languages/manage` before the one primary patch. Source
+filters constrain browsing, not fixed grants. Do not show UUIDs as routine labels.
 
 For owner-bound operations, SDK strict get reads can return null at a higher
 threshold even when observer-visible. Use the shared requireOwnedActor guard to
@@ -357,3 +419,132 @@ compiled public apiRoutes with `@sheet-delver/sdk/testing`, not a live host. Cor
 archive preview must retain its full-GM deployment guard when no service account
 is configured; do not invent credentials or bypass it to label an offline install
 passed. Source suites, compiled contracts and native acceptance are distinct.
+
+### ADR-0003 review follow-up (2026-10-21)
+
+Inventory language editing always loads all caller-readable source-filtered rows,
+even for fixed-only characters. `languageEditingPlan` permits replacing classified
+fixed defaults and homogeneous choices within Common/Rare totals; creation keeps
+its exact grants/pools. Do not hide catalog rows when capacity is full or restore
+fixed-choice locks in the ordinary editor. Mixed/unclassified pools are explicit.
+Shared `prepareSpellAction.focusAllowed` requires native duration `focus` as well
+as a Player-owned Spell; UI and server use the same predicate.
+Card artwork is a full-width faded background; the visible title is an inset
+centered black panel below the modal Close bar, type is a property, and Data notes
+belong below the divider above actions. Preserve accessible dialog naming,
+keyboard/overlay behavior and source-preserving action paths.
+
+Optional monster artwork uses the public caller-bound SDK artwork resolver.
+Preserve custom images and canonical source identity; do not add native manifest
+fetches or name matching. `community-artwork.test.ts` is the eighteenth source
+suite. Installed checks support `--artwork-only --community-art-root=<read-only
+installed-package>`; this fixture marks the provider enabled synthetically and
+never claims actual native activation. Add `--production` for build/start.
+
+Core combat artwork adoption implements optional `resolveDisplayArtwork` using
+the caller-bound read-only argument and the shared exact-origin/default policy.
+Preserve custom displayed Combatant/Token images, not just custom Actor images.
+Verify real session `_id` shapes and managed production rendering; a successful
+resolver response alone does not prove the UI applied it. The October22 user instruction explicitly raises the next release floor to
+Core0.20.0/module-api1.7.0/UI3.3.0. This supersedes the earlier keep-floor policy
+for this release; do not infer further floor changes. Runtime absence of a native
+art package still preserves original images.
+
+
+### Coordinated Core release floor — 2026-10-31
+
+The user authorized aligning Shadowdark requirements and CI with released Core
+v0.22.3. Manifest minimum >=0.20.0 → >=0.22.3; README and validation/release
+workflow pins0.22.0 →0.22.3. Core0.22.3 includes the accepted compendium freshness
+and persistent SDK-event fixes. It provides SDK3.8.0/module-api1.7.0/UI3.6.0;
+the existing API contract minima are unchanged. Historical older-host evidence
+remains historical. Module version stays0.9.6; release version, commit and
+publication remain separately authorized operations.
+
+
+### Review regression guardrails — October22
+
+Route description presentation through `logic/description.ts`, including inline
+Foundry `{Label}` metadata; keep Core sanitization last and source HTML unchanged.
+Use explicit `derived.rollData` on actor-bound consumers; never guess context for
+catalog previews or execute arbitrary templates. Shared deterministic formula
+handling serves both display and actions. See ADR0003 SD-UI17 for supported scope.
+Known spell exclusions use canonical origins, including talent/boon choices, at
+both picker and write boundaries. Preserve existing duplicate/custom copies.
+A preflight `advancementWrites: "none"` response permits correction; an unknown
+or partial write does not. Preserve the maintained recovery regressions.
+
+SD-UI16c supersedes the rejected manual missing-grant workflow of SD-UI16b.
+Never merge fixed-grant entitlement into owned-spell identity. Creation/advancement
+must include actual granted Spell Items. Existing owner sheets automatically POST
+missing fixed grants, then refresh actual ownership/casting rows. The read-only
+view and observers never write. Fixed grants cannot be manually selected again;
+ordinary/choice grants keep their existing rules. Reuse exact native mappings,
+caller-readable sources, Actor queue, context fences and durable actor-wide
+receipts. Unknown creates never authorize a replacement. This selected fixed-grant
+fulfillment does not authorize effect-key migrations or general Actor repair.
+
+
+SD-UI16d extends the choice-grant workflow. Use the exact-source shared policy in
+`logic/spell-grants.ts`, including the independent grant matcher; do not infer
+spell lists from talent names. Preserve saved grant source/casting Class/level
+metadata, quota exemption and noncaster casting permission without granting an
+ordinary progression table. Shune uses the user-approved acquisition-level floor,
+minimum tier1; keep [SheetDelver handling](docs/rules/spell-grants.md) authoritative
+for that interpretation. Historical unknown spell choices are not inferred.
+
+SD-UI18 requires end-to-end coverage for every required talent target: native
+table result, mounted picker, submitted request, final validation and saved
+effects. Keep the four native placeholder templates enumerated in creation tests;
+fixed Magic Missile Advantage is already resolved. Stat distributions use shared
+`logic/stat-choices.ts` rules and one allocation per independent grant, never a
+global pool copied into every Talent. Preserve repeated native +1/+2 grants and
+the Warlock distinct-stat restriction. Test both creation and existing-Actor
+advancement, including correction after a zero-write validation failure. Keep
+[talent handling](docs/rules/talent-choices.md) and audit SD-UI18 current.
+
+SD-UI20 deliberately retains spent scroll Items instead of native automatic
+deletion. Reuse `logic/scrolls.ts` for modern and legacy Basic scrolls. Historical
+Gear Add dropped provenance: only the two complete native content signatures
+qualify for the source-less fallback. Never infer capability from names alone or
+arbitrary description links. New gear copies must preserve exact origin, effects
+and flags through `ownedCopy`; regress the actual Add callback payload, not just
+hand-authored owned fixtures. The caller-bound
+action route persists the spent flag before the result using existing receipts.
+All spell/card consumers must reject reuse; inventory retains manual discard.
+Keep [scroll handling](docs/rules/scrolls.md) explicit about this module policy and
+its boundary with native Foundry UI behavior.
+
+SD-UI21 retains the user-verified core p49 caster/list restriction; visibility
+does not imply casting permission. Shared spell actions resolve exact supported
+mishap traditions/tier tables and persist their follow-up dispatch in the original
+action receipt. Never reroll a cast or an uncertain mishap on retry. Wizard and
+Magical Dabbler rules do not supply Witch Diabolical tables or Priest/Seer penance.
+Missing tables require an explicit warning, not a guessed replacement. Table
+instructions/effects remain manual. Keep scroll spending, wand lost spells and
+wand breakage distinct; clearing lost entries never repairs a broken wand.
+
+SD-UI22: do not infer wand capability from stored type alone. Native Blind/Deafen
+is Weapon; Unlife/Warding are Basic. Use logic/wands.ts across lookups, actions,
+cards and controls. Legacy recognition requires exact origin or complete native
+signature without conflicting origin, never name alone. Preserve types; write
+legacy loss/breakage to module flags, modern state to native fields. Restore after
+rest must never repair broken wands. Include actual native legacy templates and
+historical source-less Gear Add copies in regressions. Curse prose stays manual.
+
+
+SD-UI23: Monster Stats retains the stable bestiary route/tool ID. Native monster
+sources are declared separately: shadowdark.monsters and optional
+shadowdark-community-content.monsters. Do not collapse packs or same-name rows;
+use exact identities and caller-filtered pack labels. Core skips absent declared
+packs. Missing native list values are unavailable, not guessed zero/Near. NPC
+cards omit the invented level-as-type subtitle; the actual Level remains a fact.
+
+
+### Browser consumer stylesheet validation — October31
+
+Run collection-consumers.browser.mjs with the existing tsx toolchain. Its isolated
+harness compiles/includes module Tailwind alongside host CSS; the host cannot scan
+ignored module source. Do not treat a host-CSS-only layout as installed-module
+rendering, or bypass pointer interception with forced clicks. Focus fixtures must
+explicitly declare focus duration; ordinary Player spells do not imply focus.

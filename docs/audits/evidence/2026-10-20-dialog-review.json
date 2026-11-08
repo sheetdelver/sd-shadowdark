@@ -1,0 +1,144 @@
+{
+  "date": "2026-10-20",
+  "scope": "ADR-0003 SD-UI06\u201308 user review corrections",
+  "module": {
+    "base": "60b9c63",
+    "branch": "fix/restore-module-presentation",
+    "version": "0.9.6",
+    "uncommitted": true
+  },
+  "core": {
+    "version": "0.19.6",
+    "commit": "10dd775ef2c01ec17c65a1bc3005c5d498d4c115"
+  },
+  "nativeReference": {
+    "version": "4.0.6",
+    "commit": "9677d16b3903b3b640f00d4efd48249142ac8334"
+  },
+  "finalArchiveSha256": "b8294884a064abe6cc42708f9afb2c40f70d0bd49ed474bb2632fd0724338360",
+  "sourceSuites": [
+    {
+      "test": "action-phases.test.ts",
+      "exit": 0
+    },
+    {
+      "test": "actor-enricher.test.ts",
+      "exit": 0
+    },
+    {
+      "test": "advancement-recovery.test.ts",
+      "exit": 0
+    },
+    {
+      "test": "boundaries.test.ts",
+      "exit": 0
+    },
+    {
+      "test": "creation-validation.test.ts",
+      "exit": 0
+    },
+    {
+      "test": "effect-conformance.test.ts",
+      "exit": 0
+    },
+    {
+      "test": "importer-mapping.test.ts",
+      "exit": 0
+    },
+    {
+      "test": "languages.test.ts",
+      "exit": 0
+    },
+    {
+      "test": "migration-hooks.test.ts",
+      "exit": 0
+    },
+    {
+      "test": "native-alignment.test.ts",
+      "exit": 0
+    },
+    {
+      "test": "native-parity.test.ts",
+      "exit": 0
+    },
+    {
+      "test": "prepared-actor.test.ts",
+      "exit": 0
+    },
+    {
+      "test": "presentation.test.ts",
+      "exit": 0
+    },
+    {
+      "test": "roll-feedback.test.ts",
+      "exit": 0
+    },
+    {
+      "test": "system-index.test.ts",
+      "exit": 0
+    },
+    {
+      "test": "weapon-rules.test.ts",
+      "exit": 0
+    },
+    {
+      "test": "world-adoption.test.ts",
+      "exit": 0
+    }
+  ],
+  "languageRouteCases": 14,
+  "mountedConsumers": 43,
+  "correctiveSpellAndAdvancementConsumers": 16,
+  "finalLanguageMountedCases": 4,
+  "baseline": {
+    "source": "HEAD / 60b9c63",
+    "expectedFailure": "Identical language catalog and plan supplied; old ordinary editor permits the common choice with zero common allowance.",
+    "preservedLanguageCasesPassing": 3
+  },
+  "explicitTypes": "pass",
+  "moduleCheckAndPackage": "pass",
+  "documentationLinks": 31,
+  "installed": [
+    {
+      "archiveSha256": "02834e00f1ca357492b6c81ffaae070f2a73f47012e54370ebb29684c5f29d05",
+      "widths": [
+        360,
+        768,
+        1024,
+        1440
+      ],
+      "themes": [
+        "dark",
+        "light"
+      ],
+      "checks": 11,
+      "pageErrors": [],
+      "expandedEditors": false
+    },
+    {
+      "archiveSha256": "b8294884a064abe6cc42708f9afb2c40f70d0bd49ed474bb2632fd0724338360",
+      "widths": [
+        360,
+        1440
+      ],
+      "themes": [
+        "dark",
+        "light"
+      ],
+      "checks": 7,
+      "pageErrors": [],
+      "expandedEditors": true
+    }
+  ],
+  "sourceAndMigrationPreservation": {
+    "infoCatalogDefinitions": "byte-identical to before archive",
+    "sixCompiledHooks": "same code; generated build-root source comments differ",
+    "coreWorkingTree": "clean"
+  },
+  "limits": [
+    "Controlled SDK and controlled upstream; no native Foundry or operator acceptance",
+    "Native artwork is unavailable in the isolated upstream; typography/control geometry uses actual packaged CSS",
+    "External Foundry edits are not atomic with the reviewed one-document patch",
+    "User visual approval and Git/release operations remain pending"
+  ]
+}
