@@ -1,5 +1,7 @@
 # SheetDelver — Shadowdark RPG
 
+[![CI](https://github.com/sheetdelver/sd-shadowdark/actions/workflows/ci-shadowdark.yaml/badge.svg?branch=main)](https://github.com/sheetdelver/sd-shadowdark/actions/workflows/ci-shadowdark.yaml?query=branch%3Amain)
+
 Character sheets and tools for playing Shadowdark RPG with SheetDelver.
 
 ## Character sheets
@@ -11,9 +13,6 @@ Character sheets and tools for playing Shadowdark RPG with SheetDelver.
 - Manage Pulp luck, Renown and limited-use abilities.
 - Complete rests with HP recovery, spell resets and optional ration consumption.
 - Track light timers, spell loss and scroll/wand use.
-
-<img src="https://github.com/sheetdelver/sheetdelver/blob/main/images/sheets/shadowdark/sd-character-sheet.png" alt="Shadowdark character sheet" width="25%">
-<img src="https://github.com/sheetdelver/sheetdelver/blob/main/images/sheets/shadowdark/sd-paper-view.png" alt="Shadowdark paper-style sheet" width="25%">
 
 ## Character creation
 
