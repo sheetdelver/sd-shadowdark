@@ -4,8 +4,10 @@ Read this file, then `temp/AGENT-HANDOFF.md` when present and the module-owned
 ADR/audit it names. Read [module architecture](docs/architecture.md) for technical
 context. The Core handoff is not this repository's work queue.
 
-Current presentation work is [ADR-0003](docs/adr/0003-preserve-module-presentation.md)
+Accepted presentation behavior is recorded in [ADR-0003](docs/adr/0003-preserve-module-presentation.md)
 and its [whole-UI audit](docs/audits/2026-10-20-presentation-regressions.md).
+Use the [audit index](docs/audits/README.md) for completed scopes and retained boundaries;
+these records are not an active implementation queue.
 ADR-0001/0002 remain closed for their agreed native behavior scope.
 The Character Creator is [ADR-0005](docs/adr/0005-character-creator.md),
 with its [workflow audit](docs/audits/2026-10-23-character-creator-workflow.md).
@@ -313,7 +315,7 @@ host version before running compatibility checks. Tools may run from Core,
 but module work does not authorize changing Core files or generated settings.
 CI checks out `Muttley/foundryvtt-shadowdark` at
 `9677d16b3903b3b640f00d4efd48249142ac8334` (release-4.0.6) into the isolated
-toolchain's `temp/shadowdark`. All 18 source suites run against that static
+toolchain's `temp/shadowdark`. The workflow lists the maintained source suites run against that static
 reference; missing required native fixtures fail rather than silently skip.
 This is source-only testing and does not require a running Foundry service.
 
@@ -354,7 +356,7 @@ before/after transient transport loss. `--server-disconnect` selects an explicit
 native session kick instead; keep that diagnostic result separate from ordinary
 reconnect and never add automatic relogin to make it pass. Resource dialog tests
 also cover floating-tool clearance and yielding to shared SDK dialogs.
-The current presentation pass is qualified on Core 0.19.5. Its
+The October 20 presentation pass was qualified on Core 0.19.5. The harness's
 `--presentation-only` option runs the complete surface/width/theme matrix and
 explicitly skips the separately retained behavioral follow-ups; it never implies
 native acceptance or changes the declared minimum Core version.
@@ -460,8 +462,9 @@ v0.22.3. Manifest minimum >=0.20.0 → >=0.22.3; README and validation/release
 workflow pins0.22.0 →0.22.3. Core0.22.3 includes the accepted compendium freshness
 and persistent SDK-event fixes. It provides SDK3.8.0/module-api1.7.0/UI3.6.0;
 the existing API contract minima are unchanged. Historical older-host evidence
-remains historical. Module version stays0.9.6; release version, commit and
-publication remain separately authorized operations.
+remains historical. These requirements shipped in the 1.0 release line;
+`info.json` and CHANGELOG.md identify the current release. Future release
+operations still require separate authorization.
 
 
 ### Review regression guardrails — October22

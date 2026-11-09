@@ -1,13 +1,14 @@
 # Shadowdark presentation regression review
 
-## Current disposition — October 26 operator closeout
+## Current disposition — reconciled November 8
 
 The user accepts the implemented changes: ration/HP/spell/daily-resource rest,
 spell loss controls, SDK torch cards (including their presentation difference),
-Pulp luck controls and remaining UI/Creator work. Wands during rest are explicitly
-not yet user-tested; isolated evidence remains, with no claim of new native
-v13/v14 coverage. Additional draft protection/restoration is declined; existing
-navigation warning is accepted. CC-R03 is withdrawn. CC-R04/CC-07 are closed for
+Pulp luck controls and remaining UI/Creator work. The user subsequently verified
+wand spell-loss reset on October27, closing that follow-up in
+[ADR-0006](../adr/0006-shared-character-rest.md). This does not add an exhaustive
+native v13/v14 or broken-wand matrix. Additional draft protection/restoration is
+declined; the existing navigation warning is accepted. CC-R03 is withdrawn. CC-R04/CC-07 are closed for
 accepted user flows with existing isolated recovery evidence, not an exhaustive
 live failure-injection claim. ADR-0003/0004/0005/0006 record the scoped closeout.
 

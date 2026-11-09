@@ -145,15 +145,15 @@ validation and unchanged Core0.19.2 toolchain identity. It also rejects packagin
 or dependency installation in publication. No presentation/runtime source changed.
 
 
-## Current baseline — October 31
+## Published baseline — November 8, 2026
 
-Core0.22.3 is released (local tag and release checkout verified). The user
-approved aligning the module manifest to >=0.22.3 and README/CI/release pins to
-0.22.3. This includes accepted compendium-cache freshness and SDK-event lifetime
-fixes. The host provides SDK3.8.0; required module-api1.7.0, UI API3.6.0 and roll
-API1.0.0 remain unchanged. Module version remains0.9.6.
+[Shadowdark 1.0.2](https://github.com/sheetdelver/sd-shadowdark/releases/tag/v1.0.2)
+is published. PR, main and tag validation passed; publication and the downloaded
+archive checksum, packaged version and release manifest were verified.
+The [readiness review](audits/2026-10-27-one-point-zero-readiness.md#release-closeout--november-8)
+records the superseded 1.0 preparation gates and retained deferrals.
 
-The [readiness review](audits/2026-10-27-one-point-zero-readiness.md) tracks two
-existing spell-loss test expectation failures and final release checks. Release
-version selection, final CI/installed smoke, commit and publication remain
-separate. Use the release helper only after validation and release authorization.
+The manifest requires Core >=0.22.3, module API >=1.7.0 <2.0.0,
+UI API >=3.6.0 <4.0.0 and roll API >=1.0.0 <2.0.0. Validation and release
+workflows pin Core v0.22.3. No compatibility or release-version change is part
+of the documentation reconciliation. Future releases require new authorization.

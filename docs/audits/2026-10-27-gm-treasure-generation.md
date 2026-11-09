@@ -1,7 +1,12 @@
 # GM treasure and item generation audit
 
 Date: 2026-10-27
-Status: Mundane Items/card and Boons accepted; Magic Items / Attributes implemented for review
+Status: Completed — selected workflows accepted and released under ADR-0009
+
+Current disposition: [ADR-0009 closeout](../adr/0009-gm-treasure-and-item-generator.md#closeout--november-8-2026)
+supersedes the staged implementation/review notes below. Naming/card sharing and
+Boon effects are completed in ADR-0010/0011. Imports and potion mixing remain
+deferred; historical source research does not reopen them.
 
 ## Sources and scope
 

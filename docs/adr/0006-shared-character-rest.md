@@ -211,7 +211,7 @@ such as permanent loss and required penance still constrain what can be reset.
 - [x] R4 matching buttons, shared modal, Consume ration? checkbox and separate recovery/exclusion lists in both layouts.
 - [x] R5 focused source, mounted UI, typing and packaged-route verification.
 - [x] User acceptance of ration, HP, spells and daily resources.
-- [ ] Wand rest operator check; retained as an unverified follow-up, not a checkpoint blocker.
+- [x] Wand spell-loss reset verified by the user October27; broken-wand exclusions retain isolated coverage.
 
 ## Implementation and verification
 

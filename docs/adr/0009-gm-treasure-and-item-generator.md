@@ -1,9 +1,20 @@
 # ADR-0009: GM treasure and item generator
 
-**Status:** Implemented — current workflows accepted for checkpoint; final installed release smoke remains
+**Status:** Completed — selected workflows accepted, installed smoke verified and released
 **Date:** 2026-10-27
 
 ---
+
+## Closeout — November 8, 2026
+
+The selected item workflows are implemented and user accepted. The
+[readiness review](../audits/2026-10-27-one-point-zero-readiness.md#installed-native-smoke--october31)
+records the October 31 installed native smoke; its release closeout records
+subsequent validation and publication. The remaining installed-smoke/release
+notes in earlier checkpoints are historical, not open gates.
+[ADR-0010](0010-item-naming-and-chat-sharing.md) completed optional naming and
+owned-card sharing; [ADR-0011](0011-boon-effect-authoring.md) completed Boon effects.
+Imports and potion mixing remain deferred; hidden-identity authoring was declined.
 
 ## Context
 
@@ -543,7 +554,7 @@ vertical slice before extending more table families.
 - [x] Author original SheetDelver tables instead of requiring external datasets (October28). External imports are no longer a current gate.
 - Deferred: optional user-supplied table import after stabilization; see SD-TREASURE-IMPORT.
 - [x] Use dedicated category tabs with independent workflows, save reusable world Items under SheetDelver/type, optionally assign, then reset the successful tab (user decision, October 27).
-- [x] Implement dedicated tab workflows and save/assign/reset; current work accepted for checkpoint October31. Final installed release smoke remains separate.
+- [x] Implement dedicated tab workflows and save/assign/reset; current work accepted for checkpoint October31. Installed smoke passed October31; see the closeout above.
 - [x] Retain fully disclosed item delivery and reject unidentified templates; remove the redundant recipient acknowledgement per October31 user review. Hidden-identity authoring is outside this scope.
 
 ## First working slice — October 27

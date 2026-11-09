@@ -82,9 +82,11 @@ using Foundry v14’s permanent-effect shape; this does not ignore real duration
 changes. After completion, returning to the Creator starts a fresh form rather
 than reopening the previous completed request.
 
-Native v13/v14 acceptance remains ADR-0005 CC-07. Creator's own Back uses the
-shared discard confirmation; shell-wide navigation protection remains a separate
-public SDK gap. Keep the page open while editing.
+The user accepted the Creator flows recorded in ADR-0005 CC-07; this is not an
+exhaustive native v13/v14 failure-injection claim. The page-header Back action
+uses the shared discard confirmation; step Back preserves entries. Editable
+entries last only while this page is open. Additional draft restoration and
+shell-wide navigation protection were explicitly declined.
 
 ## Ability-score guidance
 

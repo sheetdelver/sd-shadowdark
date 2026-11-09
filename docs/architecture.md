@@ -116,7 +116,7 @@ reactive consumers of the same persisted value. Reset removes only that key;
 failures keep the old mode and present errors. The panel checks its abort signal.
 The original sheet button remains on older Core, so no floor/version/workflow
 change is needed. See [ADR0004](adr/0004-optional-hud-sheet-settings.md) for archive
-verification and pending operator acceptance. Existing native world settings stay
+verification and completed operator acceptance. Existing native world settings stay
 read-only under their current contracts.
 
 ## Existing presentation and rules
@@ -181,11 +181,12 @@ clear floating tools at active layer160 and lower to90 while suspended beneath
 the shared SDK roller/confirmation. Phone footer actions remain reachable while
 the host retains its shared dialog focus/lifecycle.
 
-`info.json` is the compatibility authority. Its Core floor is **>=0.19.2**;
-the CI checkout, reusable release workflow and `core_ref` select **v0.19.2**.
-Module API `>=1.6.0 <2.0.0`, UI API
-`>=3.2.0 <4.0.0` and roll-engine API `>=1.0.0 <2.0.0` remain unchanged. Aggregate
-SDK 3.4.0 is informational and has no manifest field. `info.json` owns the module release version; SDK/API versions do not change
+`info.json` is the compatibility authority. Its Core floor is **>=0.22.3**;
+the CI checkout, reusable release workflow and `core_ref` select **v0.22.3**.
+Required contracts are module API `>=1.7.0 <2.0.0`, UI API
+`>=3.6.0 <4.0.0` and roll-engine API `>=1.0.0 <2.0.0`.
+The host's aggregate SDK version is informational and has no manifest field.
+`info.json` owns the module release version; SDK/API versions do not change
 with a module point release.
 
 Initialization warms the runtime-backed registry. The adapter then prepares
@@ -558,8 +559,11 @@ does not include the context revision and recovery does not change the adapter
 generation, so a replay after a context change returns the recorded result and
 never rolls again.
 
-Not implemented, stated in the UI: luck spending, rest and recovery, ammunition
-consumption, damage auto-roll, duration expiry and custom change types.
+Rest recovery is implemented through the [shared rest utility](#shared-rest-completion).
+Luck tokens have explicit sheet controls; roll actions do not spend them automatically.
+Ammunition consumption, damage auto-roll and duration expiry remain manual or
+Foundry-managed. Supported permanent modifiers and Boon effects use validated
+native effect fields; arbitrary custom change types are not executed.
 
 ## Weapon and mastery preparation
 
@@ -655,7 +659,7 @@ is outside the supported baseline.
 
 `info.json` declares the module version, API compatibility and world settings.
 CI checkout, the reusable release workflow and its `core_ref` all use the
-Core `v0.20.0` toolchain (publication pending). CI also runs on `migration.json` and
+Core `v0.22.3` toolchain. CI also runs on `migration.json` and
 `migrations/**` changes. Release assets include the package archive, checksum,
 catalog manifest and release history. A module release tag identifies the
 matching manifest version. With the root `migration.json`, packaging compiles
@@ -734,47 +738,23 @@ deadline (each hook keeps Core's one-second bound). Because `dataReadVersion` is
 `>=4.0.0 <=4.0.6`, Core refuses to serve a world whose native system version is
 outside that range while this catalog is installed.
 
-## Independent review limitations (October 16, 2026)
+## Independent review resolution
 
-*Superseded by the Core 0.19.1 implementation (October 17): RV-05 and RV-08 are
-fixed with offline and isolated real-Core evidence; RV-06 has isolated real-Core
-recovery evidence; the migration catalog is active. The paragraphs below are the
-historical review-time state.*
+The [October 16 independent review](audits/2026-10-15-native-alignment.md#independent-review-addendum--october-16-2026)
+records the historical gaps and corrective evidence. RV-05/RV-08 settings and
+migration corrections, RV-06 recovery, and the selected native acceptance are
+closed under [ADR-0001](adr/0001-native-alignment-and-resource-cards.md).
+The active migration catalog and current world-context behavior are documented
+above and below; the original proposal is not a pending Core implementation gate.
 
-The [independent review addendum](audits/2026-10-15-native-alignment.md#independent-review-addendum--october-16-2026)
-qualifies the supported behavior described above. The module-only corrections
-are in place and covered offline (see the audit's
-[module correction pass](audits/2026-10-15-native-alignment.md#module-correction-pass--october-16-2026)):
-one compendium caller policy on every route (RV-01), request identity and
-reconciliation for action replays (RV-03) and spell card classes from prepared
-labels (RV-04). The migration prototype route and hook were removed; the pure
-planner `logic/effect-key-migration.ts` remains, with direct planner and
-serializer tests, for Core's eventual runner (RV-02). No caller can migrate
-data today; existing Actors keep their stored keys, which are reported.
+Maintenance uses Core's admin-owned job and packaged pure module hooks. No
+caller, renderer or initialization path may start repairs, and ordinary bootstrap
+may only resume an already approved job. Existing content ambiguities still need
+explicit source review; migration completion does not prove all character content
+is correct. Retain the separately qualified and deferred items in the audit.
 
-Still open: the native-default settings seam does not read the current world
-setting (RV-05; the luck presentation itself is the user's decision above, not a
-pending correction), and registry attachment reset does not cover Core's
-retained adapter on same-world recovery (RV-06). Both need the Core contracts below.
-
-Core ADR-0064 proposes bounded settings/context and permission contracts. Its
-migration design is now an admin-owned release upgrade job: the module provides a
-separate migration.json catalog/version-directory definitions with pure
-check/plan/verify hooks, while Core previews, authorizes, gates access,
-executes and verifies changes across restart. No module maintenance-write runtime
-or owner repair fallback is selected. Ordinary bootstrap may resume an approved
-job but cannot start new repairs. It must check fresh data even when its ledger
-says complete, blocking world readiness after an incompatible external restore.
-Native-user lockout and world backup/undo are excluded; admin receives a backup
-limitation warning. World-setting context continues to refresh live.
-Nothing in this module currently implements those proposed APIs.
-Native/operator acceptance and real host-boundary checks remain pending; the
-module's ADR stays open.
-
-Core ADR-0064 G0a also requires a full-Gamemaster **service account** for every
-world connection, with lower-role/demotion blocking and admin correction/retry.
-This enforcement shipped in Core 0.19.0 and does not change human Assistant/player
-module permissions. No module-side role promotion or privileged fallback is allowed.
+Core's full-Gamemaster **service account** gate shipped in 0.19.0. It does not
+change ordinary Assistant/player permissions or authorize module-side promotion.
 
 ## Pack-permission signal boundary (CG-9)
 

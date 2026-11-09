@@ -1,7 +1,10 @@
 # Shadowdark 1.0 readiness review
 
 Date: 2026-10-27
-Status: Updated November4 — naming, card sharing and Boon effects implemented and user accepted
+Status: Completed — selected 1.0 scope accepted and released; reconciled November8
+
+The release closeout below supersedes earlier pending CI, smoke, version-selection
+and publication notes. Dated checkpoints retain their original evidence and limits.
 
 ## Baseline and conclusion
 
@@ -411,3 +414,22 @@ The local check had used tsx. CI now uses the existing tsx toolchain for this
 harness, consistent with collection, Creator and treasure browser tests. The
 corrected local invocation passes14/14; no runtime code or assertion changed.
 Hosted validation must pass on the corrected commit before merging/releasing.
+
+## Release closeout — November 8
+
+The selected 1.0 scope is released. The October31 installed native smoke and
+November4 user acceptance stand; the earlier spell-loss expectation failures
+and CI invocation issue were corrected before publication. Later point releases
+include the documented creation/progression and Treasure review corrections.
+
+[Version 1.0.2](https://github.com/sheetdelver/sd-shadowdark/releases/tag/v1.0.2)
+was published at `4a299b29b0cd440630cf88e61bf1a33e414c6b8c` following PR18.
+PR validation `42561178119`, main validation `42562004452`, release-commit
+validation `42562699611` and tag validation `42562699737` passed. Publication
+run `42562874051` succeeded; the downloaded archive checksum and packaged/manifest
+versions were verified. These release checks do not expand native acceptance
+beyond the recorded test scopes.
+
+Imports and potion mixing remain deferred; hidden-identity authoring remains
+explicitly declined. No unresolved release gate is carried from this readiness
+review. Future work and publication require separate scope and authorization.
