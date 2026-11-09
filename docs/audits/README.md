@@ -15,3 +15,8 @@ No selected implementation/acceptance gate remains open in
 publication are separate operations. F01–F06 are not an active implementation
 queue; their selection requires a new task. Historical pending paragraphs do not
 reopen completed work or establish a new Core migration defect.
+
+## November8 follow-up
+
+Current selected follow-up: [Reveal treasure review errors](2026-11-08-treasure-review-feedback.md).
+Automated checks and user verification accepted; patch release 1.0.2.

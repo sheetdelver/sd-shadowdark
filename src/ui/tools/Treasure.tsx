@@ -85,6 +85,19 @@ function TreasureWorkflow({category,initialDraft,remember,lock,recoverCategory}:
     scopeRef.current = scope;
     const draftScope = useRef(scope);
     const reviewRef = useRef<HTMLElement>(null), outcomeRef = useRef<HTMLElement>(null);
+    const fieldsRef = useRef<HTMLFieldSetElement>(null);
+    useEffect(() => {
+        if (busy || !Object.keys(errors).length) return;
+        // Wait until review releases the disabled fieldset before restoring focus.
+        const frame = requestAnimationFrame(() => {
+            const target = fieldsRef.current?.querySelector<HTMLElement>('[aria-invalid="true"], [role="alert"]');
+            if (!target) return;
+            if (target.getAttribute('role') === 'alert') target.tabIndex = -1;
+            target.focus({preventScroll:true});
+            target.scrollIntoView({block:'center',behavior:'smooth'});
+        });
+        return () => cancelAnimationFrame(frame);
+    }, [errors,busy]);
     useEffect(() => { if (operation || requestId) outcomeRef.current?.scrollIntoView({block:'start',behavior:'smooth'}); },[operation,requestId]);
     const ready = catalog !== null && resource.ready && isConnected;
     useEffect(() => { setNameSuggestion(''); }, [detailsVersion, catalog, ready]);
@@ -358,7 +371,7 @@ function TreasureWorkflow({category,initialDraft,remember,lock,recoverCategory}:
                     {requestId&&!operation&&plan&&<button disabled={busy} onClick={deliver}>Retry same request</button>}
                 </section>}
                 <p>{category==='boons'?'Create a non-monetary reward, save it to your library and optionally assign it to a character.':category==='mundane'?'Create a nonmagical valuable, or use an existing native item.':category==='weapons'?'Build from a native weapon, enter its features and qualities, then save the finished item.':'Assign an existing item, or customize one and save it to your world library.'}</p>
-                <fieldset disabled={busy || uncertain || operation?.state === 'complete'} className="sd-creator-fields">
+                <fieldset ref={fieldsRef} disabled={busy || uncertain || operation?.state === 'complete'} className="sd-creator-fields">
                     {category==='random' && <section aria-label="Result source"><h2>1. Result source</h2>
                         <p>Missing tables? Roll outside the application and enter the item details below.</p>
                         <div className="sd-treasure-actions"><button onClick={() => setPicker('table')}>{catalog.tables.find(t=>t.uuid===table)?.name || 'Choose available table'}</button>
