@@ -552,10 +552,12 @@ async function levelUpHitPoints() {
         assert.deepEqual(advancementHitPoints(prepareActorCore(actor), 1, 3), { value: 3, max: 3 });
         assert.deepEqual(actor, before);
     });
-    await check('RV-15', 'later advancement retains wounds and native prepared HP bonuses', () => {
+    await check('RV-15', 'later advancement retains wounds without persisting prepared HP bonuses twice', () => {
         const actor: any = primLike(); actor.items.push({ ...structuredClone(fighter), _id: 'ownedClass', _stats: { compendiumSource: fighter.uuid } }); actor.system.attributes.hp = { value: 4, max: 8 };
         actor.effects = [{ _id: 'hpGrant', name: 'HP grant', changes: [{ key: 'system.attributes.hp.max', mode: 2, value: '2' }] }];
-        assert.deepEqual(advancementHitPoints(prepareActorCore(actor), 3, 3), { value: 7, max: 13 });
+        actor.system.attributes.hp=advancementHitPoints(prepareActorCore(actor), 3, 3);
+        assert.deepEqual(actor.system.attributes.hp, { value: 7, max: 11 });
+        assert.deepEqual(prepareActorCore(actor).hp, { value: 7, max: 13 });
     });
 }
 

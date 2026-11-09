@@ -1,3 +1,4 @@
+import { presentReferenceDescription } from '../../logic/description';
 import { useState, useMemo } from 'react';
 import { X, Search, Check, Loader2 } from 'lucide-react';
 import { CollectionStatus } from './CollectionStatus';
@@ -91,7 +92,7 @@ export default function CompendiumSelectModal({ isOpen, onClose, onSelect, title
                                             </span>
                                             {opt.disabledReason && <span className="text-xs font-bold">{opt.disabledReason}</span>}
                                             {opt.description && (
-                                                <span className={`text-[10px] font-medium line-clamp-1 ${isSelected ? 'text-white/60' : 'text-neutral-500'}`}>{String(opt.description ?? '').replace(/<[^>]*>?/gm, '')}</span>
+                                                <span className={`text-[10px] font-medium line-clamp-1 ${isSelected ? 'text-white/60' : 'text-neutral-500'}`}><span dangerouslySetInnerHTML={{ __html: presentReferenceDescription(opt.description).replace(/<[^>]*>/g, ' ') }} /></span>
                                             )}
                                         </div>
                                         <div className="shrink-0 ml-4">

@@ -365,8 +365,10 @@ await check('SD02-01 native fixed grants survive creation copies; exact-source h
     const classDoc = byUuid.get(KNIGHT);
     const grants = await resolveSubItems(classDoc, async uuid => byUuid.get(uuid) ?? null, context);
     assert.ok(grants.some(doc => (doc.effects ?? []).some((effect: any) => (effect.changes ?? []).some((change: any) => change.key === 'system.spellcasting.classes' && change.value === 'witch'))));
-    const ancestry = { type: 'Ancestry', name: 'Exact ancestry', system: { talents: [talent.uuid], talentChoiceCount: 0 } };
+    const ancestry = { type: 'Ancestry', name: 'Exact ancestry', system: { talents: [talent.uuid], talentChoiceCount: 1 } };
     assert.equal((await resolveSubItems(ancestry, async uuid => byUuid.get(uuid), { ...context, addedSourceIds: new Set(), addedNames: new Set() })).length, 1);
+    assert.equal((await resolveSubItems({...ancestry,system:{...ancestry.system,talentChoiceCount:0}}, async uuid=>byUuid.get(uuid), {...context,addedSourceIds:new Set(),addedNames:new Set()})).length,0,
+        'native ancestry pool above the allowance is not a fixed grant');
     const wizardGrant = byUuid.get(WIZARD).system.talents.map((uuid: string) => byUuid.get(uuid)).find((doc: any) => doc.effects?.some((effect: any) => effect.changes?.some((change: any) => change.key === 'system.spellcasting.classes')));
     const missing = castingActor(); missing.effects = []; missing.system.custom = { retain: true };
     const explicit = structuredClone(missing); explicit.items.push({ ...ownedCopy(wizardGrant, wizardGrant.uuid), _id: 'reviewedGrant' });

@@ -191,6 +191,11 @@ await check('final malformed preflight proves zero writes and remains editable',
     const before=writeCount,d=base();(d as any).level=21;const response=await handleCreatorCreate(req({requestId:'bad-preflight',draft:d,review:'none',contextRevision:revision}));assert.equal(response.status,400);assert.equal((await response.json() as any).creationWrites,'none');assert.equal(writeCount,before);
 });
 await check('caller permission revocation blocks preparation; no warmed registry bypass',async()=>{deny=true;try{await assert.rejects(()=>prepareCreator(req({}),base()));}finally{deny=false;}});
+await check('observed24 native Thief passes Creator review with Backstab',async()=>{
+    const d=base(1,'Compendium.shadowdark.classes.Item.C6wkCa2w5dlgSq7f');d.fixedChoices={};
+    d.awards=[{id:'dex',origin:'recorded',level:1,source:'Compendium.shadowdark.talents.Item.vIbwotCa1eqCVZMU',choices:{}}];
+    const p=await ready(d);assert.equal(p.ready,true);assert.ok(p.source.items.some((i:any)=>i.name==='Backstab'));
+});
 await check('optional rolls are explicit and use public runtime only',async()=>{const before=rollCount;await prepareCreator(req({}),base());assert.equal(rollCount,before);const r=await handleCreatorRoll(req({kind:'score'}));assert.equal(r.status,200);assert.equal(rollCount,before+1);const gold=await handleCreatorRoll(req({kind:'gold'}));assert.equal(gold.status,200);assert.equal((await gold.json() as any).formula,'2d6 * 5');assert.equal(rollCount,before+2);});
 await check('optional HP gains use first-level prepared CON and later die totals',async()=>{
     const d=base(3,FIGHTER);

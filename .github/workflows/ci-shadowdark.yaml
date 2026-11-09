@@ -111,6 +111,9 @@ jobs:
           npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/creation-validation.test.ts"
           npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/creator-contracts.test.ts"
           npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/character-creator.test.ts"
+          npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/observed-issues.test.ts"
+          npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/creator-matrix.test.ts"
+          npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/progression-matrix.test.ts"
           npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/character-edit.test.ts"
           npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/treasure.test.ts"
 

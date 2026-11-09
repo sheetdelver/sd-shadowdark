@@ -10,6 +10,7 @@ import tailwind from '@tailwindcss/postcss';
 import { creatorRows as rows, creatorSources as sources } from './fixtures/creator.ts';
 import { worldSnapshot } from './fixtures/native-406.ts';
 import { shadowdarkAdapter as adapter } from '../server/ShadowdarkAdapter.ts';
+import { handleLanguagePlan, handleCreateCharacter } from '../server/api/languages.ts';
 import { handleCreatorPrepare,handleCreatorCreate,handleCreatorStatus,handleCreatorRoll,handleCreatorHP } from '../server/api/character-creator.ts';
 const { chromium }=await import(process.env.SHADOWDARK_PLAYWRIGHT_MODULE||'playwright');
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..'),core=path.resolve(process.env.SHADOWDARK_CORE||process.cwd());
@@ -53,7 +54,7 @@ async function test(name,width,run){
         if(url.includes('/document/'))return {status:200,body:sources.get(url.split('/document/')[1])??null};
         if(url.endsWith('/index'))return{status:200,body:await adapter.getSystemDataForUser(runtime)};
         if(url.includes('/fetch-pack/'))return{status:200,body:await adapter.getCollection(url.split('/').at(-1),{caller:{runtime,isGM:false}})};
-        const handler=handlers[url.split('/').at(-1)];if(!handler)throw Error('Unexpected route '+url);
+        const handler=url.endsWith('/characters/create')?handleCreateCharacter:url.endsWith('/languages/plan')?handleLanguagePlan:handlers[url.split('/').at(-1)];if(!handler)throw Error('Unexpected route '+url);
         const response=await handler({runtime,userSession:{userId},json:async()=>structuredClone(body)});return{status:response.status,body:await response.json()};
     });
     try{
@@ -69,6 +70,15 @@ const pick=async(p,title,name)=>{
 };
 const finishIdentity=async p=>{await pick(p,'Background',rows.find(r=>r.type==='Background').name);await p.getByLabel('Alignment',{exact:true}).selectOption('neutral');await waitPlan(p);};
 try{
+    for(const width of [390,1000])await test(`observed25 priest spell picker ${width}px renders Foundry labels`,width,async p=>{
+        await p.getByLabel('Name',{exact:true}).fill('Priest');await pick(p,'Class','Priest');await pick(p,'Ancestry','Dwarf');await finishIdentity(p);
+        await step(p,'Ability scores');for(const stat of ['STR','DEX','CON','INT','WIS','CHA'])await p.getByLabel(stat,{exact:true}).fill('12');
+        await step(p,'Talents and boons');await p.getByRole('button',{name:'Choose level 1 talent',exact:true}).click();await p.getByRole('button',{name:/^\+1 on Spellcasting Checks —/}).click();await waitPlan(p);
+        await step(p,'Languages and spells');await p.getByRole('button',{name:'Choose level 1 tier 1 spell',exact:true}).click();
+        const dialog=p.getByRole('dialog',{name:'Select Level 1 · Tier 1 spells',exact:true});
+        const text=await dialog.innerText();assert.ok(!text.includes('[['));assert.ok(!text.includes('@UUID['));assert.match(text,/half your level/);assert.match(text,/Spell Effect: Holy Weapon/);
+        await p.screenshot({path:path.join(out,`priest-picker-${width}.png`),fullPage:true});
+    });
     await test('required steps cannot be skipped; Level 0 Class is excluded from adventuring choices',900,async p=>{
         await waitPlan(p);assert.deepEqual(await p.getByLabel('Level',{exact:true}).locator('option').allTextContents(),Array.from({length:11},(_,n)=>String(n)));await p.locator('.sd-creator-name').getByRole('alert').filter({hasText:'Enter the character’s name.'}).waitFor();assert.equal(await p.getByRole('button',{name:'Next',exact:true}).isDisabled(),true);assert.equal(await p.getByRole('button',{name:'7. Review and create',exact:true}).isDisabled(),true);
         await p.getByLabel('Current XP',{exact:true}).fill('-1');assert.equal(await p.getByLabel('Current XP',{exact:true}).inputValue(),'0');await p.getByLabel('Current XP',{exact:true}).fill('0');await p.getByLabel('Name',{exact:true}).fill('Novice');await pick(p,'Ancestry','Dwarf');await finishIdentity(p);
@@ -214,6 +224,31 @@ try{
         for(let i=0;i<4;i++){await p.getByRole('button',{name:'Add Language',exact:true}).click();await p.getByRole('dialog',{name:'Select Language on your sheet',exact:true}).getByRole('button').filter({hasText:' — '}).first().click();await waitPlan(p);}
         assert.equal(await p.getByRole('button',{name:'Add Language',exact:true}).isDisabled(),true);
         const draft=await p.evaluate(()=>window.calls.filter(c=>c.url.endsWith('/prepare')).at(-1).body.draft);assert.equal(draft.spells.length,16);assert.ok(draft.spells.every(s=>s.source!==grant&&s.castingClass===wizard));assert.equal(draft.languages.length,4);assert.equal(await p.getByRole('button',{name:'Next',exact:true}).isDisabled(),false);await p.getByRole('button',{name:'Next',exact:true}).click();await p.getByRole('heading',{name:'5. Hit points',exact:true}).waitFor();assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+    });
+    for(const width of [390,1000])await test(`matrix ancestry generator ${width}px: choose one native option`,width,async p=>{
+        await p.evaluate(()=>{window.activeTool='generator';window.render();});
+        await p.getByRole('region',{name:'Character generation',exact:true}).waitFor();
+        await p.getByLabel('Ancestry',{exact:true}).selectOption('Compendium.shadowdark.ancestries.Item.mpqXJtii4nj4ukKk');
+        await p.getByRole('button',{name:'Select (0/1)',exact:true}).click();
+        await p.getByText('Farsight (Ranged)',{exact:true}).click();
+        await p.getByRole('button',{name:'Confirm',exact:true}).click();
+        await p.getByRole('button',{name:'Edit Choices',exact:true}).waitFor();
+        await p.getByLabel('Ancestry',{exact:true}).selectOption('Compendium.shadowdark.ancestries.Item.855WNm4l1T7S8akj');
+        await p.getByRole('button',{name:'Select (0/1)',exact:true}).click();
+        await p.getByText('Knack (Luck)',{exact:true}).click();
+        await p.getByRole('button',{name:'Confirm',exact:true}).click();
+        await p.getByRole('button',{name:'Edit Choices',exact:true}).waitFor();
+        assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+        await p.screenshot({path:path.join(out,`generator-choice-${width}.png`),fullPage:true});
+        const before=writes;
+        await p.getByPlaceholder('Character Name').fill('Selected Kobold');
+        await p.locator('select').filter({has:p.locator('option',{hasText:'Select background...'})}).selectOption(rows.find(r=>r.type==='Background').uuid);
+        await p.getByRole('button',{name:'Create Character',exact:true}).click();
+        await p.waitForFunction(()=>window.testNavigation?.includes('/actors/'));
+        assert.equal(writes,before+1);
+        const saved=[...actors.values()].at(-1),pool=sources.get('Compendium.shadowdark.ancestries.Item.855WNm4l1T7S8akj').system.talents;
+        assert.deepEqual(saved.items.filter(i=>pool.includes(i._stats?.compendiumSource)).map(i=>i.name),['Knack (Luck)']);
+
     });
     for(const width of [390,1280])await test(`generator ${width}px: connected paper surface`,width,async p=>{
         await p.evaluate(()=>{window.activeTool='generator';window.render();});

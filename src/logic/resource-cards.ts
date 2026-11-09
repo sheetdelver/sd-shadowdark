@@ -119,7 +119,7 @@ function armorAcFact(system:any):CardFact {
 
 /** Describe stored changes without executing formulas or claiming a preview is active. */
 function effectChangeFact(change: CanonicalChange): CardFact {
-    const label = Object.values(NATIVE_PREDEFINED_EFFECTS).find(def => def.key === change.key)?.label ?? change.key;
+    const label = Object.values(NATIVE_PREDEFINED_EFFECTS).find(def => def.key === change.key && def.mode === change.mode)?.label ?? change.key;
     const value = typeof change.value === 'string' ? change.value : JSON.stringify(change.value) ?? '';
     const operation: Record<string, string> = { add: 'Add', subtract: 'Subtract', multiply: 'Multiply by', override: 'Set to', upgrade: 'Minimum', downgrade: 'Maximum', custom: 'Custom' };
     return { label, value: `${operation[change.type] ?? change.type} ${value}${change.phase !== 'initial' ? ` (${change.phase})` : ''}` };
@@ -175,7 +175,7 @@ export function buildOwnedItemCard(view: ShadowdarkView, item: any, lookups: Vie
         if (itemView.wand || itemView.magicItem || ['Scroll', 'Wand', 'Potion'].includes(item.type)) kind = 'magic';
         if (itemView.properties.length) facts.push({ label: 'Properties', value: itemView.properties.map(property => property.name ?? 'Unresolved property').join(', ') });
         if (item.type === 'Weapon' && !itemView.wand) {
-            facts.push({ label: 'Type', value: `${system.type === 'ranged' ? 'Ranged' : 'Melee'}, ${RANGE_LABELS[system.range] ?? system.range ?? 'Close'}` });
+            facts.push({ label: 'Attack', value: `${system.type === 'ranged' ? 'Ranged' : 'Melee'}, ${RANGE_LABELS[system.range] ?? system.range ?? 'Close'}` });
             const grips = new Set(actions.filter(entry => entry.kind === 'attack').map(entry => entry.attack?.handedness));
             const dice = (hands: 'oneHanded' | 'twoHanded') => typeof system.damage?.[hands] === 'string' && system.damage[hands].trim() ? system.damage[hands].trim() : 'unavailable';
             facts.push(grips.size > 1

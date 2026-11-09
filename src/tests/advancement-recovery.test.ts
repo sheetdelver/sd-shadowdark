@@ -50,6 +50,14 @@ const checks: any[] = [];
 async function check(name: string, run: () => Promise<void>) { try { await run(); checks.push({ name, pass: true }); } catch (e) { checks.push({ name, pass: false, error: String(e) }); } }
 const unchangedAdvancement = (f: ReturnType<typeof fixture>) => { assert.deepEqual(f.actor.system.level, f.initial.system.level); assert.deepEqual(f.actor.system.attributes.hp, f.initial.system.attributes.hp); };
 const finished = (f: ReturnType<typeof fixture>) => { assert.deepEqual(f.actor.system.level, { value: 3, xp: 15 }); assert.deepEqual(f.actor.system.attributes.hp, { value: 11, max: 11 }); assert.equal(f.actor.items.length, 4); };
+await check('observed26 finalization writes base HP with Stout, not its prepared maximum',async()=>{
+    const f=fixture();f.actor.system.attributes.hp={value:5,max:3};
+    const stout=rows.find(doc=>doc.name==='Stout');assert.ok(stout);
+    f.actor.items.push({...ownedCopy(stout),_id:'stout'});f.body.baseline=reviewToken(f.actor);f.body.hpRoll=4;
+    const result=await f.run();assert.equal(result.status,200,JSON.stringify(result.body));
+    assert.deepEqual(f.actor.system.attributes.hp,{value:9,max:7});
+    assert.deepEqual(prepareActorCore(f.actor).hp,{value:9,max:9});
+});
 await check('level cap blocks new advancement and HP rolls without writes; level 9 can reach 10', async () => {
     for (const level of [10,20]) {
         const f=fixture();f.actor.system.level={value:level,xp:999};f.body.targetLevel=level+1;f.body.baseline=reviewToken(f.actor);

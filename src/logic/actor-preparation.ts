@@ -96,6 +96,8 @@ export interface PreparedActorCore {
     level: number;
     abilities: Record<AbilityKey, PreparedAbility>;
     hp: { value: number; max: number };
+    /** Native stored HP before ActiveEffects; advancement must write this base. */
+    baseHp: { value: number; max: number };
     ac: number;
     acSource: 'prepared-armor' | 'npc-explicit';
     maxSlots: number | null;
@@ -388,12 +390,17 @@ export function prepareActorCore(source: any, lookups: PreparationLookups = {}, 
     const kind = actorKind(source);
     const diagnostics: string[] = [];
     const working = migrateSystem(kind, source?.system);
+    const baseHp = { value: finiteNumber(working.attributes?.hp?.value) ?? 0, max: finiteNumber(working.attributes?.hp?.max) ?? 0 };
     const effects = collectEffects(source);
     for (const effect of effects) diagnostics.push(...effect.diagnostics.map(message => `${effect.name}: ${message}`));
     const items = (Array.isArray(source?.items) ? source.items : []).map((item: any) => ({ item, basics: prepareItemBasics(item, lookups) }));
 
     // prepareBaseData
     if (kind === 'Player') {
+        // Native Backstab references an optional additive talent accumulator.
+        // Foundry Roll treats its absent value as zero; preserve explicit values
+        // and apply any extra-die talents normally, without defaulting arbitrary refs.
+        working.bonus = { backstabdice: 0, ...(working.bonus ?? {}) };
         working.slots = 10;
         working.spellcasting = { classes: [], allowAllItems: false, itemAbility: '' };
     }
@@ -468,7 +475,7 @@ export function prepareActorCore(source: any, lookups: PreparationLookups = {}, 
 
     for (const { basics } of items as Array<{ basics: PreparedItemBasics }>) diagnostics.push(...basics.diagnostics.map((message: string) => `${basics.name}: ${message}`));
     return {
-        kind, effective: working, level: finiteNumber(working.level?.value) ?? 0, abilities,
+        kind, effective: working, baseHp, level: finiteNumber(working.level?.value) ?? 0, abilities,
         hp: { value: finiteNumber(working.attributes?.hp?.value) ?? 0, max: finiteNumber(working.attributes?.hp?.max) ?? 0 },
         ac, acSource: kind === 'Player' ? 'prepared-armor' : 'npc-explicit', maxSlots,
         slotUsage: kind === 'Player' ? slotUsage(items, working.coins) : null,
