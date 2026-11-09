@@ -50,7 +50,7 @@ await adapter.initialize({...runtime,logger:console});
 const handlers={name:handleTreasureName,'original-draw':handleTreasureOriginalDraw,catalog:handleTreasureCatalog,draw:handleTreasureDraw,prepare:handleTreasurePrepare,deliver:handleTreasureDeliver,status:handleTreasureStatus};
 const browser=await chromium.launch({executablePath:process.env.SHADOWDARK_CHROME,headless:true,args:['--no-sandbox','--disable-background-networking']});
 const results=[];
-try{for(const width of [390,1000]){
+try{for(const width of [390,1000,1440]){
  store=new Map();library=[];folders=[];actor={_id:'mira',name:'Mira',type:'Player',items:[]};writes=0;lost=false;rollCount=0;
  let requireFoundryAssets=false;
  const page=await browser.newPage({viewport:{width,height:1000}}),errors=[];page.setDefaultTimeout(7000);page.on('pageerror',e=>errors.push(e.message));
@@ -111,6 +111,18 @@ try{for(const width of [390,1000]){
  // A dedicated weapon recipe retains independent parts and other tabs' drafts.
  await page.getByRole('button',{name:'Weapons',exact:true}).click();
  await page.getByLabel('Weapon type',{exact:true}).selectOption(weapon.uuid);
+ // Empty required results must lead back to the field from the off-screen footer.
+ await page.getByLabel('Weapon bonus',{exact:true}).selectOption('1');
+ const prepareBefore=await page.evaluate(()=>window.calls.filter(c=>c.url.endsWith('/treasure/prepare')).length);
+ await page.getByRole('button',{name:'Review item',exact:true}).click();
+ await page.getByText('Enter, choose or roll a result (up to 1,000 characters).',{exact:true}).waitFor();
+ await page.waitForTimeout(400);
+ await page.screenshot({path:path.join(out,'review-error-'+width+'.png')});
+ assert.equal(await page.getByLabel('Weapon feature',{exact:true}).evaluate(e=>document.activeElement===e),true,'failed review focuses the weapon feature');
+ assert.equal(await page.getByLabel('Weapon feature',{exact:true}).getAttribute('aria-invalid'),'true');
+ assert.ok(await page.getByLabel('Weapon feature',{exact:true}).evaluate(e=>{const r=e.getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight;}),'invalid field visible');
+ assert.match(await page.getByRole('heading',{name:'Weapon feature',exact:false}).innerText(),/\*/,'required field visibly marked');
+ assert.equal(await page.evaluate(()=>window.calls.filter(c=>c.url.endsWith('/treasure/prepare')).length),prepareBefore,'invalid draft never submitted');
  await page.getByLabel('Weapon feature',{exact:true}).fill('Silver pommel');
  await page.getByLabel('Weapon bonus',{exact:true}).selectOption('2');
  await page.getByLabel('Add attributes',{exact:true}).check();

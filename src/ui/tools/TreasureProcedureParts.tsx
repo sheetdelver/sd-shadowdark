@@ -8,12 +8,13 @@ import { TREASURE_MODIFIERS, supportsTreasureModifiers, type TreasureModifier } 
 /** Existing paper/input/dice pattern, shared without merging category procedures. */
 export function TreasurePart({label,table,value,change,roll,error,rollError}:{label:string;table:string;value:OriginalPart;
     change:(v:OriginalPart)=>void;roll:()=>void;error?:string;rollError?:React.ReactNode}){
-    return <div className="sd-mundane-part"><h3>{label}</h3>
-        <div className="sd-mundane-input-row"><textarea aria-label={label} aria-required="true" maxLength={1000} value={value.text} onChange={e=>change({...value,text:e.target.value})}/>
+    const errorId = React.useId();
+    return <div className="sd-mundane-part"><h3>{label} <span aria-hidden="true">*</span></h3>
+        <div className="sd-mundane-input-row"><textarea aria-label={label} aria-required="true" aria-invalid={error ? true : undefined} aria-describedby={error ? errorId : undefined} maxLength={1000} value={value.text} onChange={e=>change({...value,text:e.target.value})}/>
             <OriginalDice label={`Roll ${label.toLowerCase()}`} onClick={roll}/></div>
         <select aria-label={`Choose ${label.toLowerCase()}`} value={originalRow(value.source)?.text===value.text?value.source?.result??'':''} onChange={e=>change(e.target.value?originalSelection(table,e.target.value):{text:value.text})}>
             <option value="">Enter your own or choose a result…</option>{ORIGINAL_TABLES[table].rows.map(row=><option key={row.id} value={row.id}>{row.text}</option>)}
-        </select><OriginalSourceNote part={value}/>{error&&<p role="alert">{error}</p>}{rollError}
+        </select><OriginalSourceNote part={value}/>{error&&<p id={errorId} role="alert">{error}</p>}{rollError}
     </div>;
 }
 export function PermanentModifiers({value,change,errors,type}:{value:TreasureModifier[];change:(v:TreasureModifier[])=>void;errors:Record<string,string>;type:string}){

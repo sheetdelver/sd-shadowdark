@@ -4,6 +4,10 @@ Historical entries are reconstructed from [published releases](https://github.co
 
 ## Unreleased
 
+## 1.0.2
+
+- Reveal treasure review errors.
+
 ## 1.0.1
 
 - Fix Thief creation validation.

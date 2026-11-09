@@ -1456,3 +1456,7 @@ The complete native class/ancestry creation matrix is `creator-matrix.test.ts`;
 `progression-matrix.test.ts` advances the same Actors from 0 through 10, including
 receipt replay, spell quotas and retained source state. See
 [ADR-0012](adr/0012-observed-creation-and-card-corrections.md) for scope and limits.
+
+Treasure review validation focuses and scrolls to the first invalid control or
+inline error after its busy fieldset unlocks. Required TreasurePart fields show
+an asterisk and link their inline error through aria-describedby (ADR-0013).
