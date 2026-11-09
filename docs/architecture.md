@@ -1443,3 +1443,16 @@ the Treasure and Creator overrides. Core's editor remains unchanged. Treasure
 review no longer requires a redundant recipient-disclosure checkbox; GM access,
 source visibility, current-review validation, identification restrictions and exact
 save/recovery remain enforced. The review note explains manual written qualities.
+
+## Observed creation corrections (ADR-0012)
+
+Prepared Players initialize the optional Backstab bonus accumulator before effects;
+unknown formula paths remain errors. Preparation exposes stored HP separately
+from effect-adjusted HP. Later advancement adds the gain to stored values, so
+permanent max-HP bonuses apply once. Generator ancestry choices travel as exact
+`ancestryTalentChoices` references through preparation and the final review; the
+server enforces the native pool/count and retains owned choices on advancement.
+The complete native class/ancestry creation matrix is `creator-matrix.test.ts`;
+`progression-matrix.test.ts` advances the same Actors from 0 through 10, including
+receipt replay, spell quotas and retained source state. See
+[ADR-0012](adr/0012-observed-creation-and-card-corrections.md) for scope and limits.

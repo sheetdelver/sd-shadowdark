@@ -416,6 +416,7 @@ async function finalizeLevelUp(actorId: string, req: ModuleServerRequest, input?
         const verified = await verifyGrants(body, classObj, req);
 
         const state = {
+            ancestryTalentChoices: body.ancestryTalentChoices,
             rolledTalents: verified.rolledTalents,
             rolledBoons: verified.rolledBoons,
             selectedSpells: verified.selectedSpells,

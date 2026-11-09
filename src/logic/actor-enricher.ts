@@ -167,7 +167,11 @@ export async function resolveSubItems(
 
     const isAncestry = parentItem.type === "Ancestry";
 
-    const talentRefs = parentItem.system.talents || [];
+    const talentPool = parentItem.system.talents || [];
+    // Ancestries store alternatives in talents itself. Classes instead use
+    // the separate talentChoices pool. Selected ancestry alternatives are
+    // supplied explicitly by Generator/import inputs, never all auto-granted.
+    const talentRefs = isAncestry && talentPool.length > (parentItem.system.talentChoiceCount ?? 0) ? [] : talentPool;
     const featureRefs = parentItem.system.features || [];
     const abilityRefs = parentItem.system.abilities || [];
     const classAbilities = parentItem.system.classAbilities || [];
@@ -189,7 +193,7 @@ export async function resolveSubItems(
         if (!uuid) throw new Error(`Required ${parentItem.name} grant has no exact UUID.`);
         const doc = await resolveDocFn(uuid);
         if (!doc) throw new Error(`Required ${parentItem.name} grant ${uuid} is unavailable; no partial character was created.`);
-        // Native talents are fixed; talentChoices is the separate choice pool.
+        // These are fixed grants; optional pools were excluded above.
         return enrichItem({ ...doc, uuid }, { ...context,
             defaultTalentClass: isAncestry ? 'ancestry' : parentItem.type === 'Class' ? 'class' : context.defaultTalentClass });
     });

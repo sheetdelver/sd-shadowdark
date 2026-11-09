@@ -19,6 +19,7 @@ export interface LevelUpProps {
     currentLevel: number;
     targetLevel: number;
     ancestry: any;
+    ancestryTalentChoices?: string[];
     classObj: any;
     classUuid: string;
     patron?: any;
@@ -886,6 +887,7 @@ export const useLevelUp = (props: LevelUpProps) => {
                     targetLevel,
                     classUuid: targetClassUuid,
                     ancestryUuid: ancestry?.uuid,
+                    ancestryTalentChoices: props.ancestryTalentChoices,
                     patronUuid: selectedPatronUuid,
                     rolledTalents,
                     rolledBoons,

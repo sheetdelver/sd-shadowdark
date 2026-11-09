@@ -335,7 +335,7 @@ function spellcastingAbility(core: PreparedActorCore, spell: any, viaItem: boole
     const spellcasting = core.spellcasting as { classes: string[]; allowAllItems: boolean; itemAbility: string };
     if (viaItem && spellcasting.itemAbility) return { ability: spellcasting.itemAbility as AbilityKey, reason: null };
     const classRefs: unknown[] = Array.isArray(spell?.system?.class) ? spell.system.class : [];
-    if (!classRefs.length) return { ability: null, reason: 'The spell has no class reference.' };
+    if (!classRefs.length) return { ability: null, reason: 'The spell has no class reference. Ask your GM to open this owned spell in Foundry and set its Class from the original spell. Its existing uses and other details have been kept.' };
     if (!viaItem && !spellcasting.classes.length) return { ability: null, reason: 'Missing casting grant: no active effect grants this Actor a casting class.' };
     const unresolved: string[] = [];
     let classes = classRefs.flatMap(value => {

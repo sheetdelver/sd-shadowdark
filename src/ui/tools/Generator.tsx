@@ -340,6 +340,7 @@ function GeneratorContent() {
             return;
         }
 
+        let retired = false;
         const loadAncestry = async () => {
             try {
                 const details = ancestryDetails;
@@ -387,12 +388,16 @@ function GeneratorContent() {
                          logger.error("Ancestry choice load error", e);
                      }
                 }
-
+                if (!retired) {
+                    setAncestryTalents({fixed:fixedTalents, choice:choiceTalents, choiceCount:effectiveChoiceCount});
+                    setSelectedAncestryTalents(previous => previous.filter(ref => choiceTalents.some(t => t.uuid === ref)).slice(0,effectiveChoiceCount));
+                }
             } catch (e) {
                 logger.error("Ancestry load error", e);
             }
         };
         loadAncestry();
+        return () => { retired = true; };
     }, [formData.ancestry, collections, fetchDocument, ancestryDetails, formData.level0]);
 
 
@@ -1489,6 +1494,7 @@ function GeneratorContent() {
                         currentLevel={0}
                         targetLevel={1}
                         ancestry={ancestryDetails}
+                        ancestryTalentChoices={selectedAncestryTalents}
                         classObj={classDetails}
                         classUuid={formData.class}
                         patron={formData.patron ? { uuid: formData.patron, system: collections.patrons?.find((p: any) => p.uuid === formData.patron) } : null}

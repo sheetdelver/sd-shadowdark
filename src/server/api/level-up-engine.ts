@@ -97,6 +97,7 @@ export function getChoices(table: any, sourceResults?: any[]): any[] {
 }
 
 export interface LevelUpState {
+    ancestryTalentChoices?: string[];
     rolledTalents: any[];
     rolledBoons: any[];
     selectedSpells: any[];
@@ -286,7 +287,17 @@ export async function assembleFinalItems(state: LevelUpState, targetLevel: numbe
             }
 
             await processBaggageGroup(ancestry, resolveGear, 'ancestry');
-            await processBaggageGroup(ancestry, resolveBaggage, 'ancestry');
+            // The ancestry's native talents array is a choice pool when it
+            // exceeds talentChoiceCount. Never grant every alternative.
+            const pool:string[] = ancestry.system?.talents ?? [];
+            const count = ancestry.system?.talentChoiceCount ?? 0;
+            if (!Number.isInteger(count) || count < 0) throw new SdkError('validation', 'Invalid ancestry talent allowance.');
+            const selected = pool.length <= count ? pool : state.ancestryTalentChoices
+                ?? pool.filter(ref => isExisting(ref));
+            if (!Array.isArray(selected) || selected.length !== Math.min(count,pool.length)
+                || new Set(selected).size !== selected.length || selected.some(ref => !pool.includes(ref)))
+                throw new SdkError('validation', `Choose exactly ${Math.min(count,pool.length)} talents from ${ancestry.name}'s ancestry pool.`);
+            await processBaggageGroup({...ancestry, system:{...ancestry.system, talents:selected}}, resolveBaggage, 'ancestry');
         }
         if (background) {
             await processBaggageGroup(background, resolveBaggage, 'background');

@@ -4,6 +4,14 @@ Historical entries are reconstructed from [published releases](https://github.co
 
 ## Unreleased
 
+## 1.0.1
+
+- Fix Thief creation validation.
+- Preserve ancestry talent choices.
+- Prevent repeated HP bonuses.
+- Clarify spell and effect cards.
+- Cover creation and progression.
+
 ## 1.0.0
 
 - Add manual Character Creator.

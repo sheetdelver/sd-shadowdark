@@ -80,7 +80,7 @@ async function masteryAssemblyRegression() {
             const generatorItems = (await Promise.all(combined.map(item => enrichItem(item, context)))).filter(Boolean);
             assert.equal(generatorItems.filter(item => item.name.startsWith(template.name)).length, 2,
                 'generator enrichment must retain both already-resolved selections');
-            const ancestry = { name: 'Independent ancestry', type: 'Ancestry', system: { talents: [template.uuid] } };
+            const ancestry = { name: 'Independent ancestry', type: 'Ancestry', system: { talents: [template.uuid], talentChoiceCount: 1 } };
             const fixedGrants = await assembleFinalItems(state(kind, choices, []), 1, fixed, ancestry, undefined, undefined, testCaller);
             assert.equal(fixedGrants.filter(item => item.name.startsWith(template.name)).length, 2,
                 'independent class and ancestry grants are not fixed-reference aliases');

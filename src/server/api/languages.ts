@@ -6,7 +6,7 @@ import { isSdkError, getErrorMessage, SdkError } from '@sheet-delver/sdk';
 import { shadowdarkAdapter } from '../ShadowdarkAdapter';
 import { callerOf, requestRevision, contextConflict, requireOwnedActor } from '../access';
 import { callerLanguagePlan } from '../languages';
-import { canonicalUuid } from '../../logic/identity';
+import { canonicalUuid, sourceRef, formatUuid } from '../../logic/identity';
 import { prepareShadowdarkView } from '../../logic/prepared-view';
 import { requestRules } from '../access';
 import { validateLanguageSelections, validateLanguageInventory, languageEditingPlan } from '../../logic/languages';
@@ -92,6 +92,11 @@ export async function handleCreateCharacter(req: ModuleServerRequest) {
         const ancestry = await resolveLanguageIdentity(actor.system?.ancestry, 'Ancestry', req);
         const classDoc = await resolveLanguageIdentity(actor.system?.class, 'Class', req);
         if (!ancestry || (actor.system.level.value === 1 && !classDoc)) return error('validation', 'Choose exact readable ancestry and class sources before creation.');
+        const pool:string[] = ancestry.system?.talents ?? [];
+        const count = Math.min(ancestry.system?.talentChoiceCount ?? 0,pool.length);
+        const selected = (actor.items ?? []).map((item:any)=>sourceRef(item)).filter(Boolean).map((ref:any)=>formatUuid(ref)).filter((ref:string)=>pool.includes(ref));
+        if (selected.length !== count || new Set(selected).size !== selected.length)
+            return error('validation', `Creation requires exactly ${count} distinct talents from ${ancestry.name}'s ancestry pool.`);
         const plan = await callerLanguagePlan(callerOf(req), ancestry, actor.system.level.value === 1 ? classDoc : null);
         const choices = validateLanguageSelections(plan, body.languageChoices);
         if (!choices.valid) return error('validation', choices.errors.join(' '));

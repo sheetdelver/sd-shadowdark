@@ -151,6 +151,8 @@ block the affected write before creation.
 Advancement follows native `LevelUpSD._finalizeLevelUp`, including XP carryover
 above level zero and first-level HP from the hit die plus prepared CON (minimum1).
 Generator and server share `logic/advancement.ts`; prepare grants before HP.
+ADR-0012 corrects later-level gains to update stored base HP, keeping permanent
+effects separate instead of persisting prepared maximum HP twice.
 Advancement completion requires all grant receipts and the final Actor patch;
 a target-level event is not completion. Keep exact confirmed IDs, frozen HP/XP
 and request identity through retries. Fully dispatched advancement may settle automatically when the exact final
