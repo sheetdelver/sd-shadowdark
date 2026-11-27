@@ -1,6 +1,6 @@
 {
     "id": "shadowdark",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "title": "Shadowdark RPG",
     "manifest": {
         "ui": "module/ui.tsx",
