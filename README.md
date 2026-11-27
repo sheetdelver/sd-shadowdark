@@ -40,3 +40,6 @@ See the [changelog](CHANGELOG.md) for release highlights.
 ## Third-party license
 
 This product is an independent product published under the Shadowdark RPG Third-Party License and is not affiliated with The Arcane Library, LLC. Shadowdark RPG © 2023 The Arcane Library, LLC.
+
+Native system minimum: **4.0.0**. Newer versions are admitted subject to data
+validation; tested baselines are recorded in the module documentation.

@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import currentKeys from './fixtures/native-412-effect-keys.json';
+import { classifyEffectKey } from '../logic/effect-key-coverage';
+import info from '../../info.json';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -255,10 +258,28 @@ async function bundled() {
 async function catalog() {
     await test('G8-B', 'the root catalog is active and names the native 4.0.6 milestone', () => {
         const root = JSON.parse(readFileSync(join(moduleRoot, 'migration.json'), 'utf8'));
-        assert.deepEqual(root, { schemaVersion: 'sheet-delver-migrations.v1', systemVersions: { '4.0.6': 'migrations/4.0.6' } });
+        assert.deepEqual(root, { schemaVersion: 'sheet-delver-migrations.v1', systemVersions: { '4.0.6': 'migrations/4.0.6', '4.1.2': 'migrations/4.1.2' } });
         assert.equal(existsSync(join(moduleRoot, 'migrations/migration.json')), false, 'no second, staged catalog remains');
         assert.equal(definition.schemaVersion, 'sheet-delver-migration-definition.v1');
         assert.equal(definition.dataReadVersion, '>=4.0.0 <=4.0.6');
+    });
+    await test('native-minimum', '4.1.2 pack keys retain consumers and settings have minimum-only admission', () => {
+        assert.deepEqual(currentKeys.keys.filter(key => classifyEffectKey(key).kind === 'unknown'), []);
+        for (const row of info.worldSettings) {
+            assert.equal(row.systemVersion, row.key === 'shadowdark.playerShowLightRemaining' ? '>=4.0.6' : '>=4.0.0');
+            assert.equal(row.default.systemVersion, row.systemVersion);
+        }
+    });
+    await test('native-minimum', 'forward checks preserve historical steps and validate newer source data', () => {
+        const forward = JSON.parse(readFileSync(join(moduleRoot, 'migrations/4.1.2/definition.json'), 'utf8'));
+        assert.equal(forward.dataReadVersion, '>=4.0.0');
+        assert.equal(forward.steps.length, definition.steps.length);
+        for (const [index, entry] of forward.steps.entries()) {
+            const old = definition.steps[index];
+            assert.equal(entry.systemVersion, '>4.0.6');
+            assert.equal(entry.id, old.id.replace('4.0', 'forward'));
+            assert.deepEqual({ ...entry, id: old.id, systemVersion: old.systemVersion }, old);
+        }
     });
     await test('G8-B', 'world step: required, targets effects and token deltas, reads only declared relations', () => {
         assert.deepEqual([step.id, step.revision, step.required, step.targets, step.paths, step.foundryGenerations, step.systemVersion, step.dependencies],
