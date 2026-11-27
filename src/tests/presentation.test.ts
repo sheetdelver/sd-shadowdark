@@ -24,10 +24,10 @@ assert.equal(manifest.info.compatibility?.apiContracts?.['module-api'], '>=1.7.0
 assert.equal(manifest.info.compatibility?.apiContracts?.['roll-engine-api'], '>=1.0.0 <2.0.0');
 assert.equal((manifest.info as any).sdkVersion, undefined, 'no invented SDK manifest field');
 assert.deepEqual((manifest.info.worldSettings ?? []).map(row => [row.key, row.scope, row.systemVersion, row.schema.type, row.default?.value, row.affectsPreparation, row.exposure]), [
-    ['shadowdark.playerShowLightRemaining', 'world', '>=4.0.6 <=4.0.6', 'number', 2, false, 'authenticated'],
-    ['shadowdark.usePulpMode', 'world', '>=4.0.0 <=4.0.6', 'boolean', false, true, 'authenticated'],
-    ['shadowdark.autoConsumeAmmunition', 'world', '>=4.0.0 <=4.0.6', 'boolean', true, true, 'authenticated'],
-    ['shadowdark.sourceFilters', 'world', '>=4.0.0 <=4.0.6', 'array', [], true, 'authenticated'],
+    ['shadowdark.playerShowLightRemaining', 'world', '>=4.0.6', 'number', 2, false, 'authenticated'],
+    ['shadowdark.usePulpMode', 'world', '>=4.0.0', 'boolean', false, true, 'authenticated'],
+    ['shadowdark.autoConsumeAmmunition', 'world', '>=4.0.0', 'boolean', true, true, 'authenticated'],
+    ['shadowdark.sourceFilters', 'world', '>=4.0.0', 'array', [], true, 'authenticated'],
 ]);
 assert.equal(manifest.info.combatTracking?.attributes?.[0]?.path, 'system.attributes.hp');
 assert.equal(manifest.info.combatTracking?.attributes?.[1]?.path, 'derived.ac');

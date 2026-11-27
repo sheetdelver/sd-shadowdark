@@ -4,6 +4,9 @@ Historical entries are reconstructed from [published releases](https://github.co
 
 ## Unreleased
 
+- Remove native version ceilings
+
+
 ## 1.0.2
 
 - Reveal treasure review errors.

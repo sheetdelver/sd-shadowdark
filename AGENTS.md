@@ -553,3 +553,11 @@ harness compiles/includes module Tailwind alongside host CSS; the host cannot sc
 ignored module source. Do not treat a host-CSS-only layout as installed-module
 rendering, or bypass pointer interception with forced clicks. Focus fixtures must
 explicitly declare focus duration; ordinary Player spells do not imply focus.
+
+## Native admission policy (November 26, 2026)
+
+[ADR-0014](docs/adr/0014-native-version-compatibility.md) supersedes prior exact/upper native-version
+admission instructions. Use native >=4.0.0; record tested versions separately.
+Preserve schema, source, authorization and Foundry-generation checks. Core/SDK
+contract ranges and release versions are unchanged. Do not claim future-version
+parity merely because a version passes admission.

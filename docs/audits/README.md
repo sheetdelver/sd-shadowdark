@@ -33,3 +33,5 @@ No selected implementation/acceptance gate remains open in
 publication are separate operations. F01–F06 are not an active implementation
 queue; their selection requires a new task. Historical pending paragraphs do not
 reopen completed work or establish a new Core migration defect.
+
+Current compatibility correction: [ADR-0014](../adr/0014-native-version-compatibility.md). Offline checks and operator acceptance remain distinct.

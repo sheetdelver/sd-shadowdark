@@ -1440,3 +1440,9 @@ receipt replay, spell quotas and retained source state. See
 Treasure review validation focuses and scrolls to the first invalid control or
 inline error after its busy fieldset unlocks. Required TreasurePart fields show
 an asterisk and link their inline error through aria-describedby (ADR-0013).
+
+## Native version admission
+
+Current native minimum: **4.0.0**, with no upper admission bound. See
+[ADR-0014](adr/0014-native-version-compatibility.md). Shadowdark retains the published 4.0.6 definitions unchanged. A 4.1.2 milestone admits >=4.0.0 and adds required forward checks for >4.0.6 with new step IDs. Both effect-key checks and pack checks remain mandatory. The light-display setting retains its 4.0.6 minimum.
+Dated native verification does not claim parity with every future release.

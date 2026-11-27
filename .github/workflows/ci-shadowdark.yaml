@@ -53,6 +53,14 @@ jobs:
           path: sheet-delver-core/temp/shadowdark
           persist-credentials: false
 
+      - name: Check out static native Shadowdark 4.1.2 compatibility reference
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: Muttley/foundryvtt-shadowdark
+          ref: a34db60066cc70e955d6af59e875a087b6c7dcb7 # release-4.1.2
+          path: sheet-delver-core/temp/shadowdark-forward
+          persist-credentials: false
+
       - name: Use Node.js 22
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -105,6 +113,7 @@ jobs:
           npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/effect-conformance.test.ts"
           npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/world-adoption.test.ts"
           npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/migration-hooks.test.ts"
+          SHADOWDARK_FORWARD_NATIVE_REF="$PWD/temp/shadowdark-forward" npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/native-forward-compatibility.test.ts"
           npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/system-index.test.ts"
           npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/native-parity.test.ts"
           npx tsx ".module-ci-data/local/modules/shadowdark/src/tests/advancement-recovery.test.ts"
