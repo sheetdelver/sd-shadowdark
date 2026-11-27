@@ -53,3 +53,11 @@ and HP-roll consumers, plus changed predefined spell/light effects, require
 a separately selected behavior audit. No new presets or mechanics are silently
 inferred in this compatibility fix. Production 4.1.2 was operator-reported; no
 production socket, document write or native browser probe was performed.
+
+## Release CI runner correction
+
+The release PR passed contract, rule and TypeScript checks, but its browser setup
+failed when `ubuntu-latest` selected Ubuntu26.04. Pinned Playwright1.56.1 does not
+support that image. Validation now pins Ubuntu24.04, supported by the same
+Playwright release; browser checks remain mandatory and no runtime dependency
+or SDK/Core minimum changes.
